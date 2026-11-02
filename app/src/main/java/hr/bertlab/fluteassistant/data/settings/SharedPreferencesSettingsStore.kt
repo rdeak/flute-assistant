@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import hr.bertlab.fluteassistant.domain.flute.Tune
-import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import hr.bertlab.fluteassistant.domain.model.Subdivision
@@ -71,10 +71,10 @@ class SharedPreferencesSettingsStore @Inject constructor(
 
     // A tune saved before lengths were snapped holds times in ms; they become lengths at the
     // metronome's stored tempo, the one the flute counts beats in.
-    override fun loadTune(): List<TuneNote> =
+    override fun loadTune(): List<TuneItem> =
         Tune.decode(prefs.getString(KEY_TUNE, null) ?: "", legacyBpm = loadMetronomeConfig().bpm)
 
-    override fun saveTune(notes: List<TuneNote>) = prefs.edit { putString(KEY_TUNE, Tune.encode(notes)) }
+    override fun saveTune(items: List<TuneItem>) = prefs.edit { putString(KEY_TUNE, Tune.encode(items)) }
 
     private inline fun <reified T : Enum<T>> enumOrDefault(name: String?, default: T): T =
         enumValues<T>().firstOrNull { it.name == name } ?: default

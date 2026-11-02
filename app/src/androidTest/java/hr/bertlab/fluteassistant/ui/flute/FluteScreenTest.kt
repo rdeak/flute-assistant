@@ -13,10 +13,12 @@ import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,9 +27,13 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -51,6 +57,8 @@ class FluteScreenTest {
     private val activated = mutableListOf<Int>()
     private var playToggles = 0
     private var erases = 0
+    private val restEvents = mutableListOf<String>()
+    private var breaths = 0
 
     private fun show(initial: FluteUiState, locale: Locale = Locale.ENGLISH) {
         state = mutableStateOf(initial)
@@ -61,6 +69,10 @@ class FluteScreenTest {
                     onKeyPressed = { pressed += it },
                     onKeyReleased = { released += it },
                     onKeyActivated = { activated += it },
+                    onRestPressed = { restEvents += "press" },
+                    onRestReleased = { restEvents += "release" },
+                    onRestActivated = { restEvents += "activate" },
+                    onBreath = { breaths++ },
                     onTogglePlayback = { playToggles++ },
                     onEraseLast = { erases++ },
                 )
@@ -102,7 +114,7 @@ class FluteScreenTest {
                 tune = listOf(TuneNote(67, NoteLength.QUARTER)),
                 heldMidi = 67,
                 heldIndex = 0,
-                shownMidi = 67,
+                shown = Shown.Note(67),
                 heldLength = NoteLength.QUARTER,
             ),
         )
@@ -148,7 +160,7 @@ class FluteScreenTest {
 
     @Test
     fun the_pill_reads_stop_while_playing() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playingIndex = 1, shownMidi = 67))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playingIndex = 1, shown = Shown.Note(67)))
         compose.onNodeWithText("Stop").assertIsDisplayed()
         compose.onNodeWithText("Play").assertDoesNotExist()
     }
@@ -156,7 +168,7 @@ class FluteScreenTest {
     @Test
     fun the_line_scrolls_to_the_newest_note() {
         val tune = List(29) { TuneNote(if (it % 2 == 0) 60 else 62, NoteLength.QUARTER) } + TuneNote(84, NoteLength.QUARTER)
-        show(FluteUiState(tune = tune, heldMidi = 84, heldIndex = 29, shownMidi = 84))
+        show(FluteUiState(tune = tune, heldMidi = 84, heldIndex = 29, shown = Shown.Note(84)))
         compose.onNode(hasContentDescription("C6, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))).assertIsDisplayed()
     }
 
@@ -171,6 +183,10 @@ class FluteScreenTest {
                         onKeyPressed = {},
                         onKeyReleased = {},
                         onKeyActivated = {},
+                        onRestPressed = {},
+                        onRestReleased = {},
+                        onRestActivated = {},
+                        onBreath = {},
                         onTogglePlayback = {},
                         onEraseLast = {},
                     )
@@ -210,12 +226,110 @@ class FluteScreenTest {
 
     @Test
     fun holding_a_key_does_not_move_the_keys() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), shownMidi = 60))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), shown = Shown.Note(60)))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
         state.value = state.value.copy(heldMidi = 60, heldIndex = 0, heldLength = NoteLength.HALF)
         compose.onNodeWithContentDescription("Held for 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
         state.value = FluteUiState()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
+    }
+
+    @Test
+    fun the_breath_and_rest_keys_end_the_top_row() {
+        show(FluteUiState())
+        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
+        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
+        val b5 = compose.onNodeWithContentDescription("B5").getBoundsInRoot()
+        val breath = compose.onNodeWithContentDescription("Breathe").getBoundsInRoot()
+        val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
+        assertTrue("the keys should sit in C6's row: $c6 $breath $rest", abs((breath.top - c6.top).value) <= 1f && abs((rest.top - c6.top).value) <= 1f)
+        assertTrue("Breathe $breath should come after C6 $c6, Rest $rest after it", c6.right < breath.left && breath.right < rest.left)
+        assertTrue("Rest $rest should end where B5 $b5 does", abs((rest.right - b5.right).value) <= 1f)
+        assertTrue("C6 $c6 should be as wide as C5 $c5", abs((c6.width - c5.width).value) <= 1f)
+        assertTrue("Rest $rest should be two keys wide", rest.width > c5.width * 2)
+    }
+
+    @Test
+    fun the_rest_key_reports_press_and_release_and_the_breath_key_marks_on_touch() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Rest").performTouchInput { down(center) }
+        assertEquals(listOf("press"), restEvents)
+        compose.onNodeWithContentDescription("Rest").performTouchInput { up() }
+        assertEquals(listOf("press", "release"), restEvents)
+        compose.onNodeWithContentDescription("Rest").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals("activate", restEvents.last())
+        compose.onNodeWithContentDescription("Breathe").performTouchInput { down(center) }
+        assertEquals(1, breaths)
+        compose.onNodeWithContentDescription("Breathe").performTouchInput { up() }
+        compose.onNodeWithContentDescription("Breathe").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(2, breaths)
+        assertTrue(pressed.isEmpty())
+    }
+
+    @Test
+    fun rests_and_breaths_in_the_line_say_what_they_are() {
+        show(
+            FluteUiState(
+                tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.EIGHTH), TuneRest(NoteLength.HALF), TuneBreath),
+                shown = Shown.Breath,
+            ),
+        )
+        val line = hasAnyAncestor(hasContentDescription("Your tune, 1 note"))
+        compose.onNode(hasContentDescription("Rest, half a beat") and line).assertExists()
+        compose.onNode(hasContentDescription("Rest, 2 beats") and line).assertExists()
+        compose.onNode(hasContentDescription("Breathe here") and line).assertExists()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_held_rest_shows_its_sign_and_beats() {
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), restHeld = true, heldIndex = 0, shown = Shown.Rest, heldLength = NoteLength.HALF))
+        compose.onAllNodesWithContentDescription("Rest").assertCountEquals(2) // the bubble and the key
+        compose.onNodeWithContentDescription("Held for 2 beats").assertExists()
+        compose.onNodeWithContentDescription("Rest, 2 beats").assertExists()
+    }
+
+    @Test
+    fun rests_and_breaths_in_croatian() {
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER), TuneRest(NoteLength.EIGHTH), TuneBreath)), Locale("hr"))
+        compose.onNodeWithContentDescription("Stanka, 1 doba").assertExists()
+        compose.onNodeWithContentDescription("Stanka, pola dobe").assertExists()
+        compose.onNodeWithContentDescription("Ovdje udahni").assertExists()
+        compose.onNodeWithContentDescription("Udahni").assertExists()
+        compose.onNodeWithContentDescription("Stanka").assertExists()
+    }
+
+    @Test
+    fun the_line_starts_with_the_metronome_time_signature() {
+        show(FluteUiState(timeSignature = TimeSignature.THREE_FOUR))
+        compose.onNodeWithContentDescription("Time signature 3/4").assertIsDisplayed()
+        compose.onNodeWithText("👆 Tap or hold a note").assertIsDisplayed()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER)), timeSignature = TimeSignature.SIX_EIGHT)
+        compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Time signature 3/4").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_note_tied_across_a_bar_line_is_read_once_at_its_whole_length() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.DOTTED_HALF), TuneNote(69, NoteLength.HALF), TuneRest(NoteLength.WHOLE))))
+        compose.onAllNodesWithContentDescription("A4, 2 beats").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription("Rest, 4 beats").assertCountEquals(1)
+    }
+
+    @Test
+    fun the_time_signature_in_croatian() {
+        show(FluteUiState(timeSignature = TimeSignature.SIX_EIGHT), Locale("hr"))
+        compose.onNodeWithContentDescription("Mjera 6/8").assertExists()
+    }
+
+    @Test
+    fun in_six_eight_the_hold_dots_count_clicks() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0, shown = Shown.Note(60), heldLength = NoteLength.HALF))
+        val fourFour = compose.onNodeWithContentDescription("Held for 2 beats").getBoundsInRoot()
+        state.value = state.value.copy(timeSignature = TimeSignature.SIX_EIGHT)
+        val sixEight = compose.onNodeWithContentDescription("Held for 4 beats").getBoundsInRoot()
+        assertTrue("eight dots $sixEight should be wider than four $fourFour", sixEight.width > fourFour.width * 1.8f)
+        assertEquals(fourFour.top, sixEight.top) // the keys below do not move
     }
 }

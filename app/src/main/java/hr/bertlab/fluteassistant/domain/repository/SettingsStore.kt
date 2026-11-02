@@ -1,6 +1,6 @@
 package hr.bertlab.fluteassistant.domain.repository
 
-import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 
@@ -29,6 +29,6 @@ interface SettingsStore {
     fun loadNoteSound(): Boolean
     fun saveNoteSound(enabled: Boolean)
     /** The flute tab's tune, as stored (decoded leniently, see Tune.decode); the caller sanitises. */
-    fun loadTune(): List<TuneNote>
-    fun saveTune(notes: List<TuneNote>)
+    fun loadTune(): List<TuneItem>
+    fun saveTune(items: List<TuneItem>)
 }

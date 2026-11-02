@@ -117,6 +117,11 @@
     <string name="flute_play">Sviraj</string>
     <string name="flute_erase">Obriši zadnju notu</string>
     <string name="flute_keys">Tipke flaute</string>
+    <!-- Stanka, as music schools name a rest (cijela, polovinka, četvrtinka, osminka) -->
+    <string name="flute_rest">Stanka</string>
+    <string name="flute_breath">Udahni</string>
+    <string name="flute_breath_here">Ovdje udahni</string>
+    <string name="flute_time_signature">Mjera %1$d/%2$d</string>
     <plurals name="flute_tune_line">
         <item quantity="one">Tvoja pjesmica, %1$d nota</item>
         <item quantity="few">Tvoja pjesmica, %1$d note</item>

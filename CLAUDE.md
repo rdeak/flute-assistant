@@ -33,50 +33,17 @@ configuration cache is on.
 ./gradlew testDebugUnitTest lintRelease bundleRelease     # pre-upload check (docs/release/README.md)
 ```
 
-Instrumented-test notes: pass one class at a time (a comma-separated list only ran the first
-class here); the task uninstalls the app when it finishes, so `adb install -r` again before any
-adb-driven checks; uninstall a release-signed build first or the debug install fails.
-
 ### Emulator
 
-A physical phone is often attached over USB, so pin adb to the emulator with
-`ANDROID_SERIAL=emulator-5554`. The only AVD is `Medium_Phone_API_37.0`. `-no-audio` is
-required: with host audio on, the emulator crashed about 30 s after the metronome started. That
-also means the audio output itself can only be judged on a real device.
-
-```sh
-$ANDROID_HOME/emulator/emulator -avd Medium_Phone_API_37.0 -no-window -no-audio -gpu swiftshader_indirect -no-boot-anim &
-adb shell pm grant hr.bertlab.fluteassistant android.permission.RECORD_AUDIO
-adb shell cmd locale set-app-locales hr.bertlab.fluteassistant --user 0 --locales hr   # switch the app to Croatian (the in-app flags do the same)
-adb shell cmd uimode night yes                                                         # dark mode
-adb exec-out screencap -p > shot.png
-```
-
-The notification-permission dialog appears on the first metronome start (API 33+);
-`adb shell input keyevent 4` dismisses it.
+Running on the emulator and instrumented tests: the `emulator` skill (`.claude/skills/emulator/SKILL.md`).
+In short: a phone is often attached, so pin `ANDROID_SERIAL=emulator-5554`; start the AVD with
+`-no-audio`; pass one test class at a time; the test run uninstalls the app when it finishes.
 
 ### Release
 
-Versions live in `gradle.properties`. Pushing a new `fluteAssistant.versionName` to `main` makes
-`.github/workflows/release.yml` tag `v<name>` and publish a GitHub Release with the signed bundle,
-APK and mapping file; every push to `main` runs the full check (`testDebugUnitTest lintRelease
-bundleRelease assembleRelease`, signed; no instrumented tests). Three jobs (build, then play,
-then release; only a release run keeps a 7-day artifact for the later two) so "Re-run failed
-jobs" repeats only what failed. `tools/release.sh` derives the versionCode from the name (major * 10000 +
-minor * 100 + patch), checks both outputs carry the upload certificate (a build without the
-secrets comes out unsigned on purpose, so the check is what stops it being published), writes
-the notes from the git log, and `tools/release.sh secrets` sets the four signing secrets from
-`keystore.properties` without showing them. A release also uploads the bundle to the Play
-internal testing track through Workload Identity Federation (no key file; repository variables
-`PLAY_WORKLOAD_IDENTITY_PROVIDER` and `PLAY_SERVICE_ACCOUNT`, both required); closed test and
-production stay manual. Release signing reads the
-`FLUTE_ASSISTANT_STORE_FILE / STORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD` env vars, then the
-gitignored `keystore.properties`; without either the release build is produced unsigned. Never
-read or print the keystore password. Release builds use whole-app R8 (a package-scoped
-optimisation crashed at startup inside androidx.startup). Process, Play Console answers and the
-Secrets Manager backup recipe are in `docs/release/`. Launcher PNGs and store graphics come from
-`java -Djava.awt.headless=true tools/IconGen.java /tmp/icons`. Store screenshots (one per tab, en and hr,
-padded to 9:16) come from `tools/play-screenshots.sh` with the emulator up and a debug APK built.
+The release process (version bump in `gradle.properties`, the release and listing workflows,
+signing, Play upload, store graphics and screenshots) is in the `release` skill
+(`.claude/skills/release/SKILL.md`) and `docs/release/`. Never read or print the keystore password.
 
 ## Build wiring (AGP 9)
 
@@ -96,177 +63,16 @@ now). `localeFilters` strips every library locale except en and hr.
 
 ## Architecture
 
-Layered by package under `app/src/main/java/hr/bertlab/fluteassistant/`, with the Hilt modules
-in `di/` binding each interface to its Android implementation:
+Layered by package under `app/src/main/java/hr/bertlab/fluteassistant/` (`domain/` pure Kotlin,
+`data/`, `audio/`, `playback/`, `ui/`), with the Hilt modules in `di/` binding each interface to
+its Android implementation. Room enum `Converters` fall back to defaults on unknown names.
 
-- `domain/` is pure Kotlin: `MetronomeConfig` (bpm, `TimeSignature` with per-beat accents,
-  `Subdivision` offsets, `SoundProfile`), `NoteMath` (frequency to MIDI/cents),
-  `TapTempoCalculator`, `TunerMode`, `FluteRange` and `FluteFingerings` (`domain/tuner/`),
-  `StaffNotes` (the note reading game's fifteen notes and their staff places), `Tune` (the
-  digital flute's tune), the `PresetRepository` and `SettingsStore` interfaces, preset use cases.
-- `data/` implements them: Room (`PresetEntity`, `PresetDao`, enum `Converters` that fall back
-  to defaults on unknown names) and `SharedPreferencesSettingsStore` for last-used settings.
-- `audio/` holds the metronome, tuner and flute-tone engines; `core/MonotonicClock` is a
-  fake-able clock and `core/log/` the logger.
-- `playback/` keeps the metronome alive off screen (foreground service).
-- `ui/` is Compose + MVVM: `StateFlow` UI state plus intent methods on the ViewModels.
-
-### Metronome audio path
-
-`MetronomeConfig` -> `ClickScheduler` (sample-accurate click timeline; positions accumulate as
-doubles so there is no drift, and `retime` moves the already-scheduled click when only the tempo
-changes) -> `MetronomeRenderer` (mixes active click "voices" into PCM blocks, caches samples
-synthesised by `ClickSynth`, passes everything through `SoftLimiter`) ->
-`AudioTrackMetronomePlayer` (a dedicated URGENT_AUDIO thread doing blocking float-PCM writes to a
-low-latency streaming `AudioTrack`; stops on audio-focus loss and ACTION_AUDIO_BECOMING_NOISY).
-Scheduler, renderer and synth have no Android dependencies and are unit-tested on the JVM.
-
-The player is an app-wide singleton that outlives any screen. Its contract (`MetronomePlayer`):
-`start()` returns a session id (or `NO_SESSION` when focus is refused); every `BeatEvent` carries
-that id plus `audibleAtNanos` derived from `AudioTrack.getTimestamp`, so the UI delays the beat
-flash until the click is actually heard and ignores events from stale sessions; `playback` is a
-StateFlow that a newly created ViewModel or the service adopts; `sessionEnded` is an event flow
-rather than state because a session can start and fail within the same frame.
-
-### Background playback
-
-`MetronomeViewModel` calls `BackgroundPlayback.start()` after a successful start and never stops
-playback in `onCleared`. `MetronomeService` owns nothing: it promotes the process with a
-media-playback notification, mirrors `player.playback` into that notification, stops itself when
-the flow goes null, and calls `player.stop()` from the notification's Stop action and from
-`onTaskRemoved`. It returns START_NOT_STICKY on purpose.
-
-### Tuner path
-
-`AudioRecordTunerEngine` exposes a cold `Flow<PitchFrame>`: collecting opens the microphone
-(UNPROCESSED source when available, 4096-sample window advanced by 2048, conflated on
-Dispatchers.IO) and cancelling releases it; it throws `SecurityException` without RECORD_AUDIO.
-`YinPitchDetector` (pure Kotlin: YIN plus a silence gate and period refinement for high notes)
-produces the estimate; the engine uses `YinPitchDetector.forFlute`, which searches only one
-semitone beyond `FluteRange` (so voices and mains hum below the flute cannot register as low
-notes) and gates at `QUIET_ROOM_RMS` (about -60 dBFS, a value only a real phone can confirm).
-`TunerViewModel` gates on probability (`MIN_PROBABILITY` 0.85 on top of YIN's own 0.2
-threshold: two stacked confidence gates whose combined cliff sits at about 9 dB breath-noise
-signal-to-noise, right where a beginner's airy tone lives; the KDoc on `MIN_PROBABILITY`
-explains how to read `tuner.summary` to confirm it on a phone and what the evidence-backed
-relaxation is), publishes a reading only once the last `LOCK_FRAMES` (3,
-about 130 ms) agree within `LOCK_CENTS` (30) so a syllable or a bump never shows a note and a
-disagreeing frame freezes the reading instead of moving it, median-smooths a 5-frame window and
-holds the last reading for about 0.9 s of silence or unsteadiness before clearing;
-`NoteMath.frequencyToNote` turns the median into a `NoteReading`. Two modes (`TunerMode`,
-remembered through `SettingsStore.saveTunerMode`, default `IDENTIFY`): `IDENTIFY` names the
-nearest note (`TunerUiState.identifiedMidi`: the reading's note, but a drift just past the halfway
-point to a neighbour, still within `NEAR_TARGET_CENTS` of the old note, moves it only after
-`TunerViewModel.SWITCH_FRAMES`, about 0.5 s, so it never flickers; the first note after silence
-and a clear step to another note move it at once) and measures against it; `TARGET` lets the
-child pick the note to play with the
-‹ › half-step buttons of `TargetNote` (`FluteRange`: c1 to c4, MIDI 60 to 96, default a1 / A4, remembered through
-`SettingsStore.saveTargetNote` and clamped on load) and measures against it with
-`TunerUiState.centsOffTarget` (`NoteMath.centsBetween`), so a wrong note is pinned at an end of
-the pitch window instead of being relabelled. `TunerUiState.homeMidi` (the chosen or identified
-note) is the pitch window's home ring, `heardMidi` its sound bubble (the home note, or the other
-note or octave played in target mode) and `gaugeCents` (cents from `homeMidi`) what
-`PitchWindow` and the status line show; `TunerUiState.status` judges it against
-`IN_TUNE_CENTS` (10, a child's wobble, deliberately wider than a professional tuner's 5), the one
-place that threshold lives (the bubble sits in its ring exactly when the status says
-"Perfect!" and jumps clear of it as soon as it does not). There is no tolerance
-setting on purpose: one good default beats a control. In target mode a reading within
-`NEAR_TARGET_CENTS` (70) of the chosen note or of its octaves is still that note or that octave
-(`TargetMismatch.NONE`, `OCTAVE_UP` / `OCTAVE_DOWN`), so a1 played sixty cents flat reads
-"Too low", not "That's gis1". `HearingTracker` turns level plus
-`FrameDecision` into `Hearing` (sound from `SOUND_LEVEL`, quiet or loud around `CLOSE_LEVEL`,
-reported after `UNCLEAR_FRAMES` sound frames, a gap of `UNCLEAR_GAP_FRAMES` tolerated);
-`TunerUiState.advice` (`TunerAdvice`) is derived from status, mismatch and hearing and shown on
-one advice line under the status (spec: revision 5 of
-`docs/superpowers/specs/2026-10-22-tuner-target-note-design.md`). Unsteady frames count towards
-`HOLD_FRAMES` like silent ones. `noteLabel` follows the locale's octave convention
-(`bool/note_octaves_helmholtz`: scientific C4 in English, music-school c1 in Croatian).
-`TunerViewModel.playTargetNote` sounds the chosen note for two seconds through
-`ReferenceTonePlayer` (`ReferenceToneSynth` renders it, `AudioTrackReferenceTonePlayer` plays
-it) and ignores microphone frames meanwhile. `FluteFingerings.keysFor(midi)` is the C-foot
-Boehm chart (Woodwind Fingering Guide basic fingerings; no entry for MIDI 94 and 95) that
-`FingeringDiagram` draws.
-
-### Note reading path
-
-`StaffNotes` (`domain/notes/`) is the pool: the naturals c1 to c3 (MIDI 60 to 84), fifteen
-notes whose index in `ALL` is their place on the treble staff (0 = the ledger line below,
-`LINE_POSITIONS` 2, 4, 6, 8, 10 are the lines, 14 = the second ledger line above);
-`ledgerLinesFor` and `sanitize` (unknown or empty stored sets fall back to `DEFAULT_PRACTICE`,
-c1 to g1) live there too. `NotesViewModel` (Activity-scoped; spec:
-`docs/superpowers/specs/2026-10-22-note-reading-game-design.md`) runs one round of
-`NotesUiState.ROUND_LENGTH` (10) notes: `onNoteTapped(midi)` judges an answer (ignored while
-`solved` or `roundOver`), a right tap sets `solved`, appends to `results` (true = first tap),
-plays the note through the tuner's `ReferenceTonePlayer` at `REFERENCE_TONE_VOLUME` and after
-`FEEDBACK_MS` (1200) draws the next note (never the same twice in a row unless only one is
-chosen) or ends the round; a wrong tap joins `wrongTaps`, becomes `lastWrongTap` (the cross that
-gets the arrow) and zeroes the streak. `taps` counts
-every tap so `accuracyPercent` (right taps over all taps) differs from `score`; `roundMillis`
-is the time from the round's first tap to the tenth note found (`MonotonicClock`, so tests use
-`FakeClock`), shown in the summary only as one of the metronome's animals (`NotesUiState.speed`,
-the time per note: cheetah up to 2 s, rabbit 3.5 s, duck 6 s, turtle 10 s, then the snail), as the
-accuracy is only one to three stars (`aimStars`: 90 % and 70 %). The chosen
-notes persist through `SettingsStore.savePracticeNotes` (`practice_notes`, a string set), the last one cannot be switched off, and any change to them starts a fresh round; the sound of
-a found note can be switched off (`toggleSound`, `SettingsStore.saveNoteSound`, a switch row
-under the picker's rows); `resetRound()` (also behind `playAgain`) throws the round away and is
-called by the tab bar when the tab is left, and `stopSound()` when the screen is disposed, so
-the tuner's microphone does not hear the tone. A `Random` is passed through an internal
-secondary constructor for deterministic tests. `NoteStaff` draws the staff on a Canvas
-(it takes all the height left in the stage and sizes the places from it; it shows the staff
-and its two neighbouring spaces, d1 to g2, plus the ledger-line places c1, a2, h2, c3 only as
-far as a chosen note needs them, `StaffNotes.visiblePositions`, their ledger lines dashed; every
-place a full-width band, the spaces tinted, the lines thick; a small, faint hand-built clef whose
-curl sits on the G line; one note column in the middle of the width, clear of a right-handed
-finger sliding on the right, after the user rejected a two-column split). The child answers by touch and slide: a finger down shows a see-through note
-on the nearest place and turns its band yellow (`placing`, hoisted to `NotesContent` for the
-"Slide, let go" line), it follows the finger with a haptic tick per place, lifting it answers,
-sliding off the staff cancels. A miss is a cross inside its own place (`CROSS_RADIUS` 0.45 of the
-pitch, so it never hides the place next to it), the latest with a ⬆️/⬇️ arrow towards the right
-place; the found note is a head in its letter's colour with sparkles. Over the canvas sits a
-column of fifteen full-width places that take no touches but are buttons for accessibility,
-named "Staff position N" counted from the bottom, never the note, so a screen reader does not
-give the answer away; their semantic click answers at once.
-
-### Digital flute path
-
-`Tune` (`domain/flute/`) is the child's tune: `TuneNote(midi, length)`, at most `MAX_NOTES`
-(200). Since the canvas of 2026-10-24 a note's `NoteLength` is how long its key was held,
-snapped to the metronome tab's tempo (read from `SettingsStore.loadMetronomeConfig`, clamped to
-the ring's 40 to 200): the nearest of an eighth, a quarter, a half, a dotted half and a whole
-note (`NoteLength.ofBeats`, split halfway: ¾, 1½, 2½, 3½ beats; longer stays a whole note).
-Lengths are kept in beats, so the tempo applies only at playback and changing it later keeps
-the rhythm; `Tune.durationMs` turns a length into time, with `gapMs` (80 ms, at most a quarter
-of the note) taken out of its end so a repeated note is heard twice and the tempo stays exact.
-Pauses between presses are not recorded (a child hunting for the next key would make the tune
-halting), but the stored string (`"60:2,67:4"`, half beats; `decode` is lenient and `sanitize`
-keeps only `StaffNotes.ALL`) tolerates an optional third field per note so pauses can be added
-without a migration, and reads a value above 8 as a held time in ms from before lengths were
-snapped (never under 300), converted at the stored tempo; `SettingsStore.saveTune` keeps it
-under `tune` across restarts. Sound:
-`FluteTimbre` (`audio/flute/`, the harmonics the tuner's `ReferenceToneSynth` now shares)
-under `SustainedToneSynth`, a phase-continuous oscillator with an attack (30 ms) / sustain /
-release (120 ms) envelope and a retrigger fade (10 ms), so a note on, a note off or a takeover
-never clicks; `AudioTrackFluteTonePlayer` (`FluteTonePlayer`) streams it from an URGENT_AUDIO
-thread like the metronome (float PCM, low latency, media attributes, no audio focus), writing
-silence while nothing is held and every block written in full (`writeFully`, retried through
-a route rebuild so a sustained tone never skips samples); on `close()` the thread
-(`ToneRenderLoop`, the loop body kept pure Kotlin so the close path is unit-tested) lets a
-sounding note release and plays the track buffer out before it gives the track back, never
-touches the command queue once retired (after a rotation the successor thread is already
-serving the keys), and a new `open()` meanwhile starts its own track at once, so two tracks
-overlap for the fade rather than the first press after a rotation waiting for it. `FluteViewModel` (Activity-scoped; spec:
-`docs/superpowers/specs/2026-10-23-digital-flute-design.md`) opens the player in `enterTab()`
-and closes it in `leaveTab()` (`FluteScreen`'s `LifecycleStartEffect`, so the first press is
-never late and nothing plays off screen); `onKeyPressed(midi)` sounds the key at once, shows
-it (`shownMidi`) and appends it as an eighth (not at the cap, where it only sounds), then grows
-it while the key stays down at `Tune.growAtMs` (`heldLength`, which the hold dots and the pill
-show); `onKeyReleased(midi)` silences it and records the length the hold made from
-`MonotonicClock` (`Tune.lengthOf`, the same rule, so the pill never jumps at lift-off), ignored
-unless that key is the one held (the newest press wins; sliding off a key releases it);
-`onKeyActivated(midi)` is the screen-reader path (one beat: a quarter note); `togglePlayback()`
-plays the tune from the start at the metronome's tempo, each note for its length, lighting it
-in the line, on its key and on the fingering diagram, and stops at once on the pill, on a key
-press or on `eraseLast()`, which drops the last note (the erase button repeats while held).
+Each feature's design, thresholds and the reasons behind them live in a CLAUDE.md next to its
+code, which loads when you work in that folder; read the one for the feature you are changing:
+`audio/metronome/` (metronome audio path, player contract), `playback/` (background playback),
+`ui/tuner/` (tuner path), `ui/notes/` (note reading game), `ui/flute/` (digital flute: tune,
+rests and breaths, bars and ties). The matching `audio/`, `domain/` and `ui/metronome/` folders
+point there.
 
 ### UI conventions
 
@@ -348,11 +154,20 @@ at the bottom (a star for first time, a faint star for a retry, yellow for the c
 highest on top, the "Sound" switch row and a big OK, the only way back. The end-of-round summary
 has no numbers on screen either: a trophy, ten stars, and tiles for the best streak (flames), the
 aim (one to three stars) and the speed (an animal). The flute tab has a stage with the note's
-bubble, four hold dots under it that fill one per beat while a key is held (always laid out, so
+bubble, hold dots under it that fill one per metronome click of the held note's length (four in
+4/4, eight in 6/8; always laid out, so
 the keys never move under a finger), the fingering and one scrolling line of the notes played
-(pills in their letter's colour, as wide as the note is long, a faint note symbol under each),
+(pills in their letter's colour, as wide as the note is long, a faint note symbol under each;
+since 2026-11-02 written in bars of the metronome tab's time signature: the signature stacked at
+the left end, fixed while the pills scroll, a bar line after each full bar, a note held across one
+split into pieces joined by a tie under their symbols, as the user chose over a bar line through
+the pill; the signature's figures are the one number the user asked for on a main screen, keep them),
 the fifteen keys in three octave rows highest on top (each in its letter's colour; a key sounds
-for as long as it is held) and, at the bottom, one big Play pill ("Play" / "Stop", at the
+for as long as it is held) with, at the end of the top row beside c³, a 😮‍💨 breath key and a
+💤 rest key (two keys wide each, icon only; the rest is held like a note and grows the same way,
+in the line a grey pill with 💤 and the real rest symbol under it, the bubble 💤 and no
+fingering; a breath has no length, in the line the face over the breath mark comma, and playback
+goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, one big Play pill ("Play" / "Stop", at the
 metronome's tempo) with a round erase button beside it (it sinks while held and repeats like a
 keyboard's backspace): no record button, no clear-all, no tempo control and no note lengths as a
 control (lengths come only from how long a key is held; the user drew this on 2026-10-24). The user rejected a wider
@@ -378,17 +193,8 @@ failures with the exception. Guard costly `v` calls with `logger.isVerbose(tag)`
 through `android.util.Log` directly, never log user-identifying data, and keep event names
 stable: they are the interface a logcat session is read with.
 
-Tuner events: `mic.open` (source, rate, buffer), `mic.close`, `tuner.permission`,
-`tuner.frame` (verbose: f, p, level, `FrameDecision`), `tuner.summary` every
-`TunerViewModel.SUMMARY_FRAMES` frames (counts per decision, pMin/pMax/pMean against `gate`,
-levelMean, reading, target, mode, hearing), `tuner.reading` when the shown note changes,
-`tuner.hearing` (hearing, levelMean) when it changes, `tuner.target`, `tuner.mode`,
-`tuner.reference`, `tuner.error`, `reference.error`. Metronome: `metronome.start` / `stop` / `ended` / `focus_lost` / `noisy` / `track_open` / `track_closed`
-(underruns) / `error`; playback: `playback.error`. Flute: `tone.track_open` (rate, block and
-buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
-length, added: false at the cap, per note ended), `flute.play` (notes, bpm), `flute.play_done`, `flute.stop`
-(reason: pill, key, erase or leave, so every `flute.play` has a closing line), `flute.erase`
-(left).
+Each subsystem's events are listed in its folder's CLAUDE.md: `ui/tuner/` (`FA.Tuner`),
+`audio/metronome/` (`FA.Metronome`, `FA.Playback`), `ui/flute/` (`FA.Flute`).
 
 ```sh
 adb logcat -s FA.Tuner FA.Metronome FA.Playback FA.Flute   # everything structured, debug build

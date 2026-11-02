@@ -5,8 +5,12 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
+import hr.bertlab.fluteassistant.domain.flute.TuneBreath
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.fakes.FakeClock
 import hr.bertlab.fluteassistant.fakes.FakeFluteTonePlayer
@@ -51,6 +55,9 @@ class FluteViewModelTest {
     private fun on(midi: Int) = FakeFluteTonePlayer.NoteOn(freq(midi), TunerViewModel.REFERENCE_TONE_VOLUME)
 
     private val FluteViewModel.current: FluteUiState get() = state.value
+
+    /** The length of a step the test knows is a note. */
+    private val TuneItem.length get() = (this as TuneNote).length
 
     /** Presses [midi], holds it for [heldMs] of fake time and lets go. */
     private fun FluteViewModel.tap(midi: Int, heldMs: Long) {
@@ -411,5 +418,241 @@ class FluteViewModelTest {
         advanceTimeBy(501)
         assertEquals(1, tonePlayer.offCount)
         assertEquals(listOf(TuneNote(67, QUARTER)), vm.current.tune)
+    }
+
+    /** Holds the rest key for [heldMs] of fake time and lets go. */
+    private fun FluteViewModel.rest(heldMs: Long) {
+        onRestPressed()
+        clock.now += heldMs
+        onRestReleased()
+    }
+
+    @Test
+    fun `the rest key adds a silent rest that grows like a note`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.onRestPressed()
+        assertEquals(listOf(TuneRest(EIGHTH)), vm.current.tune)
+        assertTrue(vm.current.restHeld)
+        assertTrue(vm.current.restLit)
+        assertEquals(0, vm.current.heldIndex)
+        assertEquals(Shown.Rest, vm.current.shown)
+        assertNull(vm.current.shownMidi)
+        assertEquals(0, vm.current.holdBeats)
+        assertTrue(tonePlayer.notesOn.isEmpty())
+        advanceTimeBy(751)
+        runCurrent()
+        assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
+        assertEquals(2, vm.current.holdBeats)
+        clock.now += 1000
+        vm.onRestReleased()
+        assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
+        assertFalse(vm.current.restHeld)
+        assertNull(vm.current.heldLength)
+        assertEquals(Shown.Rest, vm.current.shown)
+        assertEquals(vm.current.tune, settings.tune)
+        assertEquals(0, tonePlayer.offCount)
+        val event = logger.events("flute.rest").single()
+        assertEquals(1000L, event["heldMs"])
+        assertEquals(HALF, event["length"])
+        assertEquals(true, event["added"])
+        assertTrue(logger.events("flute.note").isEmpty())
+    }
+
+    @Test
+    fun `a rest takes over a held note and silences it`() {
+        val vm = viewModel()
+        vm.onKeyPressed(67)
+        clock.now += 500
+        vm.onRestPressed()
+        assertNull(tonePlayer.sounding)
+        assertNull(vm.current.heldMidi)
+        assertEquals(listOf(TuneNote(67, QUARTER), TuneRest(EIGHTH)), vm.current.tune)
+        vm.onKeyReleased(67) // the finger on the note lifts after the rest took over
+        assertTrue(vm.current.restHeld)
+        assertEquals(1, tonePlayer.offCount)
+    }
+
+    @Test
+    fun `a note takes over a held rest`() {
+        val vm = viewModel()
+        vm.onRestPressed()
+        clock.now += 500
+        vm.onKeyPressed(60)
+        assertEquals(on(60), tonePlayer.sounding)
+        assertFalse(vm.current.restHeld)
+        assertEquals(listOf(TuneRest(QUARTER), TuneNote(60, EIGHTH)), vm.current.tune)
+        vm.onRestReleased()
+        assertEquals(60, vm.current.heldMidi)
+        assertEquals(1, logger.events("flute.rest").size)
+    }
+
+    @Test
+    fun `a breath is a mark with no sound, never twice in a row`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onBreath()
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneBreath), vm.current.tune)
+        assertEquals(Shown.Breath, vm.current.shown)
+        assertEquals(vm.current.tune, settings.tune)
+        vm.onBreath()
+        assertEquals(2, vm.current.tune.size)
+        assertEquals(listOf(true, false), logger.events("flute.breath").map { it["added"] })
+        assertEquals(1, tonePlayer.notesOn.size)
+    }
+
+    @Test
+    fun `a breath ends a held note`() {
+        val vm = viewModel()
+        vm.onKeyPressed(60)
+        clock.now += 500
+        vm.onBreath()
+        assertNull(tonePlayer.sounding)
+        assertNull(vm.current.heldMidi)
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneBreath), vm.current.tune)
+    }
+
+    @Test
+    fun `play is silent through a rest and goes straight past a breath`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.rest(1000)
+        vm.onBreath()
+        vm.tap(67, 500)
+        vm.togglePlayback()
+        assertEquals(0, vm.current.playingIndex)
+        advanceTimeBy(501)
+        assertEquals(1, vm.current.playingIndex)
+        assertEquals(Shown.Rest, vm.current.shown)
+        assertNull(tonePlayer.sounding)
+        assertTrue(vm.current.restLit)
+        assertNull(vm.current.litMidi)
+        assertEquals(1, vm.current.litIndex)
+        advanceTimeBy(998) // a half rest: two whole beats of silence, no gap to take out
+        assertEquals(1, vm.current.playingIndex)
+        assertEquals(3, tonePlayer.notesOn.size) // the two taps, then c1 played back: nothing for the rest
+        advanceTimeBy(2)
+        assertEquals(3, vm.current.playingIndex) // the breath took no time
+        assertEquals(on(67), tonePlayer.sounding)
+        assertFalse(vm.current.restLit)
+        advanceTimeBy(500)
+        assertFalse(vm.current.isPlaying)
+        val play = logger.events("flute.play").single()
+        assertEquals(2, play["notes"])
+        assertEquals(1, play["rests"])
+    }
+
+    @Test
+    fun `erase removes rests and breaths and waits while the rest key is held`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.rest(500)
+        vm.onBreath()
+        vm.eraseLast()
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneRest(QUARTER)), vm.current.tune)
+        vm.onRestPressed()
+        vm.eraseLast()
+        assertEquals(3, vm.current.tune.size)
+        clock.now += 100
+        vm.onRestReleased()
+        vm.eraseLast()
+        vm.eraseLast()
+        assertEquals(listOf(TuneNote(60, QUARTER)), vm.current.tune)
+    }
+
+    @Test
+    fun `activating the rest key adds a quarter rest`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.onRestActivated()
+        assertTrue(vm.current.restHeld)
+        advanceTimeBy(501)
+        assertFalse(vm.current.restHeld)
+        assertEquals(listOf(TuneRest(QUARTER)), vm.current.tune)
+        assertTrue(tonePlayer.notesOn.isEmpty())
+    }
+
+    @Test
+    fun `at the cap a rest or a breath is shown but not added`() {
+        settings.tune = List(200) { TuneNote(60, QUARTER) }
+        val vm = viewModel()
+        vm.onRestPressed()
+        assertEquals(Shown.Rest, vm.current.shown)
+        assertNull(vm.current.heldIndex)
+        vm.onRestReleased()
+        vm.onBreath()
+        assertEquals(Shown.Breath, vm.current.shown)
+        assertEquals(200, vm.current.tune.size)
+        assertEquals(TuneNote(60, QUARTER), vm.current.tune.last())
+        assertEquals(false, logger.events("flute.rest").single()["added"])
+        assertEquals(false, logger.events("flute.breath").single()["added"])
+    }
+
+    @Test
+    fun `leaving the tab or pressing play ends a held rest`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.onRestPressed()
+        clock.now += 500
+        vm.leaveTab()
+        assertFalse(vm.current.restHeld)
+        assertEquals(listOf(TuneRest(QUARTER)), vm.current.tune)
+        assertEquals(0, tonePlayer.offCount)
+        vm.enterTab()
+        vm.onRestPressed()
+        clock.now += 500
+        vm.togglePlayback()
+        assertFalse(vm.current.restHeld)
+        assertEquals(listOf(TuneRest(QUARTER), TuneRest(QUARTER)), vm.current.tune)
+        assertTrue(vm.current.isPlaying)
+    }
+
+    @Test
+    fun `the line takes the metronome's time signature, read again when the tab opens`() {
+        settings.config = MetronomeConfig(timeSignature = TimeSignature.THREE_FOUR)
+        val vm = viewModel()
+        assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
+        settings.config = MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT)
+        vm.enterTab()
+        assertEquals(TimeSignature.SIX_EIGHT, vm.current.timeSignature)
+    }
+
+    @Test
+    fun `in six eight the flute counts a click as an eighth note, like the metronome`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
+        val vm = viewModel()
+        vm.tap(60, 500) // one click
+        vm.tap(62, 1000) // two clicks
+        assertEquals(listOf(TuneNote(60, EIGHTH), TuneNote(62, QUARTER)), vm.current.tune)
+        vm.togglePlayback()
+        advanceTimeBy(501)
+        assertEquals(1, vm.current.playingIndex) // the eighth lasted one click
+        advanceTimeBy(1000)
+        assertFalse(vm.current.isPlaying) // and the quarter two
+        val play = logger.events("flute.play").single()
+        assertEquals(120, play["bpm"])
+        assertEquals("6/8", play["time"])
+    }
+
+    @Test
+    fun `a screen reader's quarter note lasts two clicks in six eight`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
+        val vm = viewModel()
+        vm.onKeyActivated(67)
+        advanceTimeBy(999)
+        assertEquals(67, vm.current.heldMidi)
+        advanceTimeBy(2)
+        assertEquals(listOf(TuneNote(67, QUARTER)), vm.current.tune)
+    }
+
+    @Test
+    fun `in six eight a held note's dots fill click by click of its length`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
+        val vm = viewModel()
+        vm.onKeyPressed(67)
+        assertEquals(1, vm.current.holdBeats) // an eighth: one click
+        advanceTimeBy(751)
+        runCurrent()
+        assertEquals(2, vm.current.holdBeats) // a quarter: two clicks
+        advanceTimeBy(750)
+        runCurrent()
+        assertEquals(4, vm.current.holdBeats) // a half: four
     }
 }

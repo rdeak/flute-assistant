@@ -3,26 +3,32 @@ package hr.bertlab.fluteassistant.ui.flute
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
@@ -36,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteLabel
@@ -56,6 +63,9 @@ private val KeyDepth = 5.dp
 val FluteKeysMinHeight: Dp = (KeyMinHeight + KeyDepth) * 3 + KeyRowGap * 2
 
 
+/** The breath and the rest key each span this many note keys (and the gap between them). */
+private const val SignKeySpan = 2
+
 /**
  * The fifteen keys ([StaffNotes.ALL]) in three rows, one per octave, highest on top as on
  * the staff (c3 alone, then c2 to h2, then c1 to h1), each key in its letter's colour with
@@ -64,48 +74,177 @@ val FluteKeysMinHeight: Dp = (KeyMinHeight + KeyDepth) * 3 + KeyRowGap * 2
  * onto another key does not press it, so every note in the tune is a deliberate tap. A
  * screen reader activates a key through [onActivate]. The rows share the height they are
  * given, between 58 and 72 dp each, centred.
+ *
+ * The top row's free end holds two plain keys, each two note keys wide: the breath key (😮‍💨),
+ * which calls [onBreath] as the finger goes down, and the rest key (💤), held like a note key
+ * ([onRestPress], [onRestRelease], [onRestActivate]) and sunk while [restLit].
  */
 @Composable
 fun FluteKeys(
     litMidi: Int?,
+    restLit: Boolean,
     onPress: (Int) -> Unit,
     onRelease: (Int) -> Unit,
     onActivate: (Int) -> Unit,
+    onRestPress: () -> Unit,
+    onRestRelease: () -> Unit,
+    onRestActivate: () -> Unit,
+    onBreath: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
     val rows = remember { StaffNotes.ALL.groupBy { Math.floorDiv(it, 12) }.toSortedMap().values.reversed() }
     val keysPerRow = remember(rows) { rows.maxOf { it.size } }
-    Column(
-        modifier = modifier.semantics { contentDescription = groupLabel },
-        verticalArrangement = Arrangement.spacedBy(KeyRowGap, Alignment.CenterVertically),
-    ) {
-        rows.forEach { row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f, fill = false)
-                    .heightIn(min = KeyMinHeight + KeyDepth, max = KeyMaxHeight + KeyDepth)
-                    .padding(bottom = KeyDepth),
-                horizontalArrangement = Arrangement.spacedBy(KeyGap),
-            ) {
-                row.forEach { midi ->
-                    FluteKey(
-                        midi = midi,
-                        lit = midi == litMidi,
-                        onPress = onPress,
-                        onRelease = onRelease,
-                        onActivate = onActivate,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                    )
+    BoxWithConstraints(modifier = modifier) {
+        // One note key's width, so the short top row lines up with the full rows below it.
+        val keyWidth = (maxWidth - KeyGap * (keysPerRow - 1)) / keysPerRow
+        val signKeyWidth = keyWidth * SignKeySpan + KeyGap * (SignKeySpan - 1)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = groupLabel },
+            verticalArrangement = Arrangement.spacedBy(KeyRowGap, Alignment.CenterVertically),
+        ) {
+            rows.forEach { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .heightIn(min = KeyMinHeight + KeyDepth, max = KeyMaxHeight + KeyDepth)
+                        .padding(bottom = KeyDepth),
+                    horizontalArrangement = Arrangement.spacedBy(KeyGap),
+                ) {
+                    row.forEach { midi ->
+                        FluteKey(
+                            midi = midi,
+                            lit = midi == litMidi,
+                            onPress = onPress,
+                            onRelease = onRelease,
+                            onActivate = onActivate,
+                            modifier = Modifier
+                                .width(keyWidth)
+                                .fillMaxHeight(),
+                        )
+                    }
+                    if (row.size < keysPerRow) {
+                        // The short top row: c3, a gap, then the breath and the rest key at its end.
+                        Spacer(Modifier.weight(1f))
+                        BreathKey(
+                            onBreath = onBreath,
+                            modifier = Modifier
+                                .width(signKeyWidth)
+                                .fillMaxHeight(),
+                        )
+                        RestKey(
+                            lit = restLit,
+                            onPress = onRestPress,
+                            onRelease = onRestRelease,
+                            onActivate = onRestActivate,
+                            modifier = Modifier
+                                .width(signKeyWidth)
+                                .fillMaxHeight(),
+                        )
+                    }
                 }
-                // A short row (c3 alone) keeps its keys as wide as the others.
-                repeat(keysPerRow - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
+}
+
+/** The rest key: a plain key with 💤, held like a note key, the rest growing while it is down. */
+@Composable
+private fun RestKey(
+    lit: Boolean,
+    onPress: () -> Unit,
+    onRelease: () -> Unit,
+    onActivate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val label = stringResource(R.string.flute_rest)
+    val currentOnPress by rememberUpdatedState(onPress)
+    val currentOnRelease by rememberUpdatedState(onRelease)
+    SignKey(
+        emoji = SLEEP_EMOJI,
+        label = label,
+        pressed = lit,
+        onActivate = onActivate,
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    currentOnPress()
+                    tryAwaitRelease() // up, or the finger slid off: both let go of the key
+                    currentOnRelease()
+                },
+            )
+        },
+    )
+}
+
+/** The breath key: a plain key with 😮‍💨 that marks a breath as the finger goes down and sinks while it stays. */
+@Composable
+private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.flute_breath)
+    val currentOnBreath by rememberUpdatedState(onBreath)
+    var pressed by remember { mutableStateOf(false) }
+    SignKey(
+        emoji = BREATH_EMOJI,
+        label = label,
+        pressed = pressed,
+        onActivate = onBreath,
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures(
+                onPress = {
+                    pressed = true
+                    currentOnBreath()
+                    try {
+                        tryAwaitRelease()
+                    } finally {
+                        pressed = false
+                    }
+                },
+            )
+        },
+    )
+}
+
+/** A plain (not a note's colour) key showing [emoji], named [label] for a screen reader; sunk in a yellow ring while [pressed]. */
+@Composable
+private fun SignKey(
+    emoji: String,
+    label: String,
+    pressed: Boolean,
+    onActivate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = FluteTheme.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = label
+                onClick {
+                    onActivate()
+                    true
+                }
+            }
+            .drawBehind { if (pressed) drawKeyRing() }
+            .chunky(KeyShape, colors.raised, colors.outline, KeyDepth, pressed = pressed),
+    ) {
+        Emoji(emoji, fontSize = 28)
+    }
+}
+
+/** The yellow ring around a pressed key, a little outside its outline. */
+private fun DrawScope.drawKeyRing() {
+    val gap = 2.dp.toPx() + 2.5.dp.toPx()
+    drawRoundRect(
+        color = Sun,
+        topLeft = Offset(-gap, -gap + 3.dp.toPx()),
+        size = Size(size.width + gap * 2, size.height + gap * 2),
+        cornerRadius = CornerRadius(21.dp.toPx() + gap),
+        style = Stroke(5.dp.toPx()),
+    )
 }
 
 @Composable
@@ -132,19 +271,7 @@ private fun FluteKey(
                     true
                 }
             }
-            .drawBehind {
-                // The yellow ring around the lit key, a little outside its outline.
-                if (lit) {
-                    val gap = 2.dp.toPx() + 2.5.dp.toPx()
-                    drawRoundRect(
-                        color = Sun,
-                        topLeft = Offset(-gap, -gap + 3.dp.toPx()),
-                        size = Size(size.width + gap * 2, size.height + gap * 2),
-                        cornerRadius = CornerRadius(21.dp.toPx() + gap),
-                        style = Stroke(5.dp.toPx()),
-                    )
-                }
-            }
+            .drawBehind { if (lit) drawKeyRing() }
             .chunky(KeyShape, noteColor(midi), colors.outline, KeyDepth, pressed = lit)
             .pointerInput(midi) {
                 detectTapGestures(

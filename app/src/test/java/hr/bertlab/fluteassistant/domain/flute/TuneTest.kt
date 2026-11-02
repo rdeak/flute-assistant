@@ -5,6 +5,7 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
+import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -25,23 +26,49 @@ class TuneTest {
 
     @Test
     fun `lengths follow the tempo`() {
-        assertEquals(500.0, Tune.beatMs(120), 0.001)
-        assertEquals(EIGHTH, Tune.lengthOf(374, bpm = 120))
-        assertEquals(QUARTER, Tune.lengthOf(375, bpm = 120))
-        assertEquals(QUARTER, Tune.lengthOf(749, bpm = 120))
-        assertEquals(HALF, Tune.lengthOf(750, bpm = 120))
-        assertEquals(EIGHTH, Tune.lengthOf(749, bpm = 60)) // the same hold is shorter at a slower tempo
-        assertEquals(250L, Tune.durationMs(EIGHTH, bpm = 120))
-        assertEquals(2000L, Tune.durationMs(WHOLE, bpm = 120))
-        assertEquals(1500L, Tune.durationMs(QUARTER, bpm = 40))
+        val pulse = Pulse(120)
+        assertEquals(500.0, pulse.quarterMs, 0.001)
+        assertEquals(EIGHTH, Tune.lengthOf(374, pulse))
+        assertEquals(QUARTER, Tune.lengthOf(375, pulse))
+        assertEquals(QUARTER, Tune.lengthOf(749, pulse))
+        assertEquals(HALF, Tune.lengthOf(750, pulse))
+        assertEquals(EIGHTH, Tune.lengthOf(749, Pulse(60))) // the same hold is shorter at a slower tempo
+        assertEquals(250L, Tune.durationMs(EIGHTH, pulse))
+        assertEquals(2000L, Tune.durationMs(WHOLE, pulse))
+        assertEquals(1500L, Tune.durationMs(QUARTER, Pulse(40)))
+    }
+
+    @Test
+    fun `in eighths time a click is an eighth note, as the metronome counts`() {
+        val sixEight = Pulse(120, TimeSignature.SIX_EIGHT)
+        assertEquals(500.0, sixEight.clickMs, 0.001)
+        assertEquals(1000.0, sixEight.quarterMs, 0.001)
+        assertEquals(500L, Tune.durationMs(EIGHTH, sixEight)) // one click
+        assertEquals(3000L, Tune.durationMs(DOTTED_HALF, sixEight)) // a full bar: six clicks
+        assertEquals(EIGHTH, Tune.lengthOf(500, sixEight)) // held for one click
+        assertEquals(QUARTER, Tune.lengthOf(1000, sixEight)) // two clicks
+        assertEquals(listOf(750L, 1500L, 2500L, 3500L), Tune.growAtMs(sixEight))
+        assertEquals(1000L, Tune.durationMs(HALF, Pulse(60, TimeSignature.TWO_TWO))) // 2/2 clicks half notes
+    }
+
+    @Test
+    fun `a bar lasts as long as the metronome's bar in every time signature`() {
+        for (signature in TimeSignature.entries) {
+            val pulse = Pulse(100, signature)
+            val metronomeBarMs = signature.beatsPerBar * pulse.clickMs
+            assertEquals(signature.name, metronomeBarMs, Bars.halfBeatsPerBar(signature) * pulse.quarterMs / 2, 0.001)
+        }
     }
 
     @Test
     fun `a held note grows exactly when its release would make the longer length`() {
         for (bpm in listOf(40, 70, 97, 120, 133, 200)) {
-            for ((step, at) in Tune.growAtMs(bpm).withIndex()) {
-                assertEquals("bpm $bpm, step $step", NoteLength.entries[step + 1], Tune.lengthOf(at, bpm))
-                assertEquals("bpm $bpm, step $step", NoteLength.entries[step], Tune.lengthOf(at - 1, bpm))
+            for (signature in listOf(TimeSignature.FOUR_FOUR, TimeSignature.SIX_EIGHT, TimeSignature.TWO_TWO)) {
+                val pulse = Pulse(bpm, signature)
+                for ((step, at) in Tune.growAtMs(pulse).withIndex()) {
+                    assertEquals("$pulse, step $step", NoteLength.entries[step + 1], Tune.lengthOf(at, pulse))
+                    assertEquals("$pulse, step $step", NoteLength.entries[step], Tune.lengthOf(at - 1, pulse))
+                }
             }
         }
     }
@@ -76,6 +103,32 @@ class TuneTest {
             listOf(TuneNote(60, QUARTER), TuneNote(72, HALF), TuneNote(74, HALF)),
             Tune.decode("60:2,x:1,61:2,67,72:4:150, ,74:3,76:0,77:-2", legacyBpm = 120),
         )
+    }
+
+    @Test
+    fun `rests and breaths round-trip next to notes`() {
+        val items = listOf(TuneNote(60, QUARTER), TuneRest(EIGHTH), TuneNote(67, HALF), TuneBreath, TuneRest(DOTTED_HALF), TuneRest(WHOLE))
+        assertEquals("60:2,r:1,67:4,b,r:6,r:8", Tune.encode(items))
+        assertEquals(items, Tune.decode("60:2,r:1,67:4,b,r:6,r:8", legacyBpm = 120))
+    }
+
+    @Test
+    fun `decode reads rests and breaths leniently`() {
+        assertEquals(
+            listOf(TuneRest(QUARTER), TuneRest(WHOLE), TuneBreath, TuneRest(HALF)),
+            Tune.decode("r:2,r:20,r,r:0,r:x, b ,r:3:150", legacyBpm = 120),
+        )
+    }
+
+    @Test
+    fun `sanitize keeps rests and breaths but never two breaths in a row`() {
+        assertEquals(
+            listOf(TuneBreath, TuneNote(60, QUARTER), TuneBreath, TuneRest(HALF), TuneBreath),
+            Tune.sanitize(
+                listOf(TuneBreath, TuneNote(60, QUARTER), TuneBreath, TuneNote(96, QUARTER), TuneBreath, TuneRest(HALF), TuneBreath, TuneBreath),
+            ),
+        )
+        assertEquals(200, Tune.sanitize(List(250) { if (it % 2 == 0) TuneRest(QUARTER) else TuneBreath }).size)
     }
 
     @Test

@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
@@ -85,6 +84,10 @@ fun FluteScreen(
         onKeyPressed = viewModel::onKeyPressed,
         onKeyReleased = viewModel::onKeyReleased,
         onKeyActivated = viewModel::onKeyActivated,
+        onRestPressed = viewModel::onRestPressed,
+        onRestReleased = viewModel::onRestReleased,
+        onRestActivated = viewModel::onRestActivated,
+        onBreath = viewModel::onBreath,
         onTogglePlayback = viewModel::togglePlayback,
         onEraseLast = viewModel::eraseLast,
         modifier = modifier,
@@ -104,14 +107,14 @@ private val PlayShadow = 8.dp
 private val FitsHeight = 20.dp + (38.dp + BubbleSize + 6.dp + HoldBeatsGap + HoldDot + 14.dp + 48.dp + 14.dp + TuneLineHeight) +
     14.dp + FluteKeysMinHeight + 14.dp + PlayRowHeight + PlayShadow + 16.dp
 
-/** The dots under the note: one per beat, up to a whole note's four. */
-private val MaxHoldBeats = NoteLength.WHOLE.wholeBeats
 
 /**
  * The whole flute tab, top to bottom: a stage with the note shown (held, last played, or
- * playing now) in its letter's colour, a dashed bubble with a pointing finger before the
- * first tap, and under it, while a key is held, [HoldBeats] filling one dot per beat; the
- * tuner's flute drawing with that note's fingering and the scrolling [TuneLine]; then the octave rows of [FluteKeys] taking the height left, and the Play row:
+ * playing now) in its letter's colour, 💤 for a rest and 😮‍💨 for a breath, a dashed bubble
+ * with a pointing finger before the first tap, and under it, while a key is held, [HoldBeats]
+ * filling one dot per beat; the tuner's flute drawing with that note's fingering (none for a
+ * rest or a breath) and the scrolling [TuneLine]; then the octave rows of [FluteKeys], with the
+ * breath and the rest key at the end of the top row, taking the height left, and the Play row:
  * one big pill ("Play", green; "Stop", red, while the tune plays) and a round erase
  * button, both faded while the tune is empty. On an ordinary phone held upright nothing
  * scrolls; when the height is short of [FitsHeight] the keys keep their minimum and the
@@ -123,6 +126,10 @@ fun FluteContent(
     onKeyPressed: (Int) -> Unit,
     onKeyReleased: (Int) -> Unit,
     onKeyActivated: (Int) -> Unit,
+    onRestPressed: () -> Unit,
+    onRestReleased: () -> Unit,
+    onRestActivated: () -> Unit,
+    onBreath: () -> Unit,
     onTogglePlayback: () -> Unit,
     onEraseLast: () -> Unit,
     modifier: Modifier = Modifier,
@@ -143,13 +150,21 @@ fun FluteContent(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(HoldBeatsGap),
                 ) {
-                    NoteBubble(
-                        midi = shown,
-                        size = BubbleSize,
-                        fontSize = 48.sp,
-                        placeholder = POINTING_EMOJI,
+                    when (state.shown) {
+                        Shown.Rest -> SignBubble(SLEEP_EMOJI, stringResource(R.string.flute_rest))
+                        Shown.Breath -> SignBubble(BREATH_EMOJI, stringResource(R.string.flute_breath))
+                        is Shown.Note, null -> NoteBubble(
+                            midi = shown,
+                            size = BubbleSize,
+                            fontSize = 48.sp,
+                            placeholder = POINTING_EMOJI,
+                        )
+                    }
+                    HoldBeats(
+                        beats = state.holdBeats,
+                        total = state.maxHoldBeats,
+                        color = shown?.let(::noteColor) ?: FluteTheme.colors.mutedText, // a rest's dots: the ink of its symbol
                     )
-                    HoldBeats(beats = state.holdBeats, color = shown?.let(::noteColor) ?: FluteTheme.colors.raised)
                 }
                 FingeringDiagram(
                     keys = shown?.let(FluteFingerings::keysFor),
@@ -159,13 +174,18 @@ fun FluteContent(
                         .fillMaxWidth()
                         .aspectRatio(FINGERING_ASPECT_RATIO),
                 )
-                TuneLine(tune = state.tune, litIndex = state.litIndex)
+                TuneLine(tune = state.tune, litIndex = state.litIndex, timeSignature = state.timeSignature)
             }
             FluteKeys(
                 litMidi = state.litMidi,
+                restLit = state.restLit,
                 onPress = onKeyPressed,
                 onRelease = onKeyReleased,
                 onActivate = onKeyActivated,
+                onRestPress = onRestPressed,
+                onRestRelease = onRestReleased,
+                onRestActivate = onRestActivated,
+                onBreath = onBreath,
                 modifier = Modifier
                     .fillMaxWidth()
                     .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
@@ -190,13 +210,29 @@ fun FluteContent(
     }
 }
 
+/** The bubble for a rest or a breath: [emoji] on the quiet track colour, outlined and raised like a note's. */
+@Composable
+private fun SignBubble(emoji: String, description: String) {
+    val colors = FluteTheme.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(BubbleSize)
+            .chunky(CircleShape, colors.track, colors.outline, 6.dp)
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        Emoji(emoji, fontSize = 44)
+    }
+}
+
 /**
- * Four dots under the note while a key is held, one more filled in the note's colour for each
- * beat its note has grown to ([FluteUiState.holdBeats]: the same length its pill shows). When
- * no key is held they are laid out but invisible, so the keys never move under a finger.
+ * [total] dots under the note while a key is held (a whole note's metronome clicks: four in
+ * 4/4, eight in 6/8), one more filled in the note's colour for each click its note has grown to
+ * ([FluteUiState.holdBeats]: the same length its pill shows). When no key is held they are laid
+ * out but invisible, so the keys never move under a finger.
  */
 @Composable
-private fun HoldBeats(beats: Int?, color: Color) {
+private fun HoldBeats(beats: Int?, total: Int, color: Color) {
     val colors = FluteTheme.colors
     val description = beats?.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.flute_held_beats, it, it) }
     Row(
@@ -205,7 +241,7 @@ private fun HoldBeats(beats: Int?, color: Color) {
             .alpha(if (beats == null) 0f else 1f)
             .clearAndSetSemantics { if (description != null) contentDescription = description },
     ) {
-        repeat(MaxHoldBeats) { index ->
+        repeat(total) { index ->
             val filled = beats != null && index < beats
             Box(
                 modifier = Modifier

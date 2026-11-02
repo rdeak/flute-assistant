@@ -133,6 +133,14 @@
     <string name="flute_play">Play</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
+    <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest in the tune line -->
+    <string name="flute_rest">Rest</string>
+    <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
+    <string name="flute_breath">Breathe</string>
+    <!-- Accessibility name of a breath sign in the tune line -->
+    <string name="flute_breath_here">Breathe here</string>
+    <!-- Accessibility name of the time signature at the start of the tune line, e.g. "Time signature 4/4" -->
+    <string name="flute_time_signature">Time signature %1$d/%2$d</string>
     <!-- Accessibility name of the tune line; the argument is how many notes it holds -->
     <plurals name="flute_tune_line">
         <item quantity="one">Your tune, %1$d note</item>
