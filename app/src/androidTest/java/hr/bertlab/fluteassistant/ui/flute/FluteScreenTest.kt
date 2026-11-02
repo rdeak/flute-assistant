@@ -94,7 +94,8 @@ class FluteScreenTest {
         assertTrue("the octave rows should share a left edge: $c4 $c5 $c6", abs((c4.left - c5.left).value) <= 1f)
         assertTrue("the octave rows should share a left edge: $c4 $c5 $c6", abs((c5.left - c6.left).value) <= 1f)
         assertTrue("D4 $d4 should be right of C4 $c4", d4.left >= c4.right)
-        assertTrue("a key should be at least 58 dp tall, was ${c4.height}", c4.height >= 58.dp)
+        // 58 dp, as on the canvas; the layout rounds it to whole pixels (152 px, 57.9 dp, on a 2.625 screen).
+        assertTrue("a key should be 58 dp tall, was ${c4.height}", abs((c4.height - 58.dp).value) <= 0.5f)
     }
 
     @Test
@@ -108,7 +109,7 @@ class FluteScreenTest {
     }
 
     @Test
-    fun the_held_note_is_named_fingered_and_in_the_line() {
+    fun the_held_note_is_on_the_staff_and_named_in_the_line() {
         show(
             FluteUiState(
                 tune = listOf(TuneNote(67, NoteLength.QUARTER)),
@@ -118,11 +119,10 @@ class FluteScreenTest {
                 heldLength = NoteLength.QUARTER,
             ),
         )
-        compose.onAllNodesWithText("G4").assertCountEquals(2) // the name and the key
-        compose.onNodeWithContentDescription("Fingering for G4").assertExists()
+        compose.onAllNodesWithText("G4").assertCountEquals(1) // the key; the line's pill is read by its description, the staff is silent
+        compose.onNodeWithContentDescription("Fingering for G4").assertDoesNotExist() // the line took the flute drawing's place
         compose.onNodeWithContentDescription("Your tune, 1 note").assertExists()
         compose.onNode(hasContentDescription("G4, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 1 note"))).assertExists()
-        compose.onNodeWithContentDescription("Held for 1 beat").assertExists()
         compose.onNodeWithText("👆 Tap or hold a note").assertDoesNotExist()
     }
 
@@ -228,8 +228,8 @@ class FluteScreenTest {
     fun holding_a_key_does_not_move_the_keys() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), shown = Shown.Note(60)))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
-        state.value = state.value.copy(heldMidi = 60, heldIndex = 0, heldLength = NoteLength.HALF)
-        compose.onNodeWithContentDescription("Held for 2 beats").assertExists()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0, heldLength = NoteLength.HALF)
+        compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
         state.value = FluteUiState()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
@@ -283,10 +283,9 @@ class FluteScreenTest {
     }
 
     @Test
-    fun a_held_rest_shows_its_sign_and_beats() {
+    fun a_held_rest_is_written_on_the_staff_with_its_length() {
         show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), restHeld = true, heldIndex = 0, shown = Shown.Rest, heldLength = NoteLength.HALF))
-        compose.onAllNodesWithContentDescription("Rest").assertCountEquals(2) // the bubble and the key
-        compose.onNodeWithContentDescription("Held for 2 beats").assertExists()
+        compose.onAllNodesWithContentDescription("Rest").assertCountEquals(1) // the key
         compose.onNodeWithContentDescription("Rest, 2 beats").assertExists()
     }
 
@@ -324,12 +323,12 @@ class FluteScreenTest {
     }
 
     @Test
-    fun in_six_eight_the_hold_dots_count_clicks() {
+    fun a_new_time_signature_rewrites_the_staff_without_moving_the_keys() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0, shown = Shown.Note(60), heldLength = NoteLength.HALF))
-        val fourFour = compose.onNodeWithContentDescription("Held for 2 beats").getBoundsInRoot()
+        val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
         state.value = state.value.copy(timeSignature = TimeSignature.SIX_EIGHT)
-        val sixEight = compose.onNodeWithContentDescription("Held for 4 beats").getBoundsInRoot()
-        assertTrue("eight dots $sixEight should be wider than four $fourFour", sixEight.width > fourFour.width * 1.8f)
-        assertEquals(fourFour.top, sixEight.top) // the keys below do not move
+        compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
+        compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
+        assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
     }
 }

@@ -107,7 +107,6 @@ class FluteViewModelTest {
         assertEquals(67, vm.current.shownMidi)
         assertEquals(listOf(TuneNote(67, EIGHTH)), vm.current.tune)
         assertEquals(EIGHTH, vm.current.heldLength)
-        assertEquals(0, vm.current.holdBeats)
         assertEquals(vm.current.tune, settings.tune)
     }
 
@@ -147,22 +146,21 @@ class FluteViewModelTest {
         advanceTimeBy(1)
         runCurrent()
         assertEquals(QUARTER, vm.current.tune[0].length)
-        assertEquals(1, vm.current.holdBeats)
+        assertEquals(QUARTER, vm.current.heldLength)
         advanceTimeBy(375)
         runCurrent()
         assertEquals(HALF, vm.current.heldLength)
-        assertEquals(2, vm.current.holdBeats)
         advanceTimeBy(500)
         runCurrent()
         assertEquals(DOTTED_HALF, vm.current.tune[0].length)
         advanceTimeBy(500)
         runCurrent()
         assertEquals(WHOLE, vm.current.tune[0].length)
-        assertEquals(4, vm.current.holdBeats)
+        assertEquals(WHOLE, vm.current.heldLength)
         clock.now += 1800
         vm.onKeyReleased(67)
         assertEquals(listOf(TuneNote(67, WHOLE)), vm.current.tune)
-        assertNull(vm.current.holdBeats)
+        assertNull(vm.current.heldLength)
         advanceTimeBy(5000)
         assertEquals(listOf(TuneNote(67, WHOLE)), vm.current.tune)
     }
@@ -437,12 +435,12 @@ class FluteViewModelTest {
         assertEquals(0, vm.current.heldIndex)
         assertEquals(Shown.Rest, vm.current.shown)
         assertNull(vm.current.shownMidi)
-        assertEquals(0, vm.current.holdBeats)
+        assertEquals(EIGHTH, vm.current.heldLength)
         assertTrue(tonePlayer.notesOn.isEmpty())
         advanceTimeBy(751)
         runCurrent()
         assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
-        assertEquals(2, vm.current.holdBeats)
+        assertEquals(HALF, vm.current.heldLength)
         clock.now += 1000
         vm.onRestReleased()
         assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
@@ -643,16 +641,16 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `in six eight a held note's dots fill click by click of its length`() = runTest(dispatcher) {
+    fun `in six eight a held note grows at the pace of the eighth-note clicks`() = runTest(dispatcher) {
         settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
         val vm = viewModel()
         vm.onKeyPressed(67)
-        assertEquals(1, vm.current.holdBeats) // an eighth: one click
+        assertEquals(EIGHTH, vm.current.heldLength) // one click
         advanceTimeBy(751)
         runCurrent()
-        assertEquals(2, vm.current.holdBeats) // a quarter: two clicks
+        assertEquals(QUARTER, vm.current.heldLength) // two clicks of 500 ms make a beat
         advanceTimeBy(750)
         runCurrent()
-        assertEquals(4, vm.current.holdBeats) // a half: four
+        assertEquals(HALF, vm.current.heldLength) // four
     }
 }

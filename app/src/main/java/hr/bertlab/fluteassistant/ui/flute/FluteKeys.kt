@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,16 +51,18 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
-/** A key is never shorter than this: a sure target for a small finger. */
-private val KeyMinHeight = 58.dp
-private val KeyMaxHeight = 72.dp
+/**
+ * A key's height: a sure target for a small finger, and the canvas's 58 at every screen height
+ * (the user, 2026-11-02: keys as on the canvas; they used to stretch to 72 dp to fill the space).
+ */
+private val KeyHeight = 58.dp
 private val KeyRowGap = 12.dp
 private val KeyGap = 6.dp
 private val KeyShape = RoundedCornerShape(21.dp)
 private val KeyDepth = 5.dp
 
 /** The keys' height when the screen is too short to give them more: three rows at their minimum. */
-val FluteKeysMinHeight: Dp = (KeyMinHeight + KeyDepth) * 3 + KeyRowGap * 2
+val FluteKeysMinHeight: Dp = (KeyHeight + KeyDepth) * 3 + KeyRowGap * 2
 
 
 /** The breath and the rest key each span this many note keys (and the gap between them). */
@@ -72,8 +74,8 @@ private const val SignKeySpan = 2
  * its name; the key of [litMidi] sinks onto its shadow inside a yellow ring. A finger down
  * calls [onPress] at once and the finger lifting, or sliding off, calls [onRelease]; sliding
  * onto another key does not press it, so every note in the tune is a deliberate tap. A
- * screen reader activates a key through [onActivate]. The rows share the height they are
- * given, between 58 and 72 dp each, centred.
+ * screen reader activates a key through [onActivate]. Every row is [KeyHeight] tall, as on the
+ * canvas, and the three rows sit centred in the height they are given.
  *
  * The top row's free end holds two plain keys, each two note keys wide: the breath key (😮‍💨),
  * which calls [onBreath] as the finger goes down, and the rest key (💤), held like a note key
@@ -109,8 +111,7 @@ fun FluteKeys(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f, fill = false)
-                        .heightIn(min = KeyMinHeight + KeyDepth, max = KeyMaxHeight + KeyDepth)
+                        .height(KeyHeight + KeyDepth)
                         .padding(bottom = KeyDepth),
                     horizontalArrangement = Arrangement.spacedBy(KeyGap),
                 ) {

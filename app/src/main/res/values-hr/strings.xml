@@ -127,19 +127,13 @@
         <item quantity="few">Tvoja pjesmica, %1$d note</item>
         <item quantity="other">Tvoja pjesmica, %1$d nota</item>
     </plurals>
-    <!-- Accessibility name of one note of the tune line: the note (e.g. "C4") and its length in beats -->
+    <!-- Accessibility name of one note on the staff: the note (e.g. "C4") and its length in beats -->
     <plurals name="flute_note_beats">
         <item quantity="one">%1$s, %2$d doba</item>
         <item quantity="few">%1$s, %2$d dobe</item>
         <item quantity="other">%1$s, %2$d doba</item>
     </plurals>
     <string name="flute_note_half_beat">%1$s, pola dobe</string>
-    <!-- Accessibility name of the dots under the note while a key is held -->
-    <plurals name="flute_held_beats">
-        <item quantity="one">Držiš %1$d dobu</item>
-        <item quantity="few">Držiš %1$d dobe</item>
-        <item quantity="other">Držiš %1$d doba</item>
-    </plurals>
     <!-- Croatian music schools name octaves c1, c2, c3 (jednocrtna, dvocrtna, trocrtna), with
          the one-lined octave starting at middle C -->
     <bool name="note_octaves_helmholtz">true</bool>

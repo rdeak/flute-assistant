@@ -133,30 +133,25 @@
     <string name="flute_play">Play</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
-    <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest in the tune line -->
+    <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->
     <string name="flute_rest">Rest</string>
     <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
     <string name="flute_breath">Breathe</string>
-    <!-- Accessibility name of a breath sign in the tune line -->
+    <!-- Accessibility name of a breath sign on the staff -->
     <string name="flute_breath_here">Breathe here</string>
-    <!-- Accessibility name of the time signature at the start of the tune line, e.g. "Time signature 4/4" -->
+    <!-- Accessibility name of the time signature after the clef on the staff, e.g. "Time signature 4/4" -->
     <string name="flute_time_signature">Time signature %1$d/%2$d</string>
-    <!-- Accessibility name of the tune line; the argument is how many notes it holds -->
+    <!-- Accessibility name of the tune on the staff; the argument is how many notes it holds -->
     <plurals name="flute_tune_line">
         <item quantity="one">Your tune, %1$d note</item>
         <item quantity="other">Your tune, %1$d notes</item>
     </plurals>
-    <!-- Accessibility name of one note of the tune line: the note (e.g. "C4") and its length in beats -->
+    <!-- Accessibility name of one note on the staff: the note (e.g. "C4") and its length in beats -->
     <plurals name="flute_note_beats">
         <item quantity="one">%1$s, %2$d beat</item>
         <item quantity="other">%1$s, %2$d beats</item>
     </plurals>
     <string name="flute_note_half_beat">%1$s, half a beat</string>
-    <!-- Accessibility name of the dots under the note while a key is held -->
-    <plurals name="flute_held_beats">
-        <item quantity="one">Held for %1$d beat</item>
-        <item quantity="other">Held for %1$d beats</item>
-    </plurals>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>

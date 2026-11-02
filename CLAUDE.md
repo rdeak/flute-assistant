@@ -109,7 +109,8 @@ point there.
   in `AppIcons`. The app icon's picture is one vector, `@drawable/ic_app_art` (a robot
   over a flute, from the canvas's "App icon" board): the launcher insets it into the adaptive icon's
   safe zone, `AppLogo` puts it on the golden rounded square in the top bar, and `tools/IconGen.java`
-  draws the same shapes for the PNGs and the Play listing. Note names are shown with the octave raised (`noteText`, built from
+  draws the same shapes for the PNGs and the Play listing. Note names are shown with the octave raised as every canvas board draws it, a `sup` at 0.48 of the
+letter, its top level with the letter's top, 1 sp after it (`noteText`, matched on 2026-11-02, built from
   `noteLabelParts`) in a round `NoteBubble`; English keeps scientific octaves (C⁴), Croatian the
   school ones (c¹), and accessibility and tests still read the plain `noteLabel`.
 - On a short screen (360 x 640 dp, large text) the ring and the tuner's pitch window shrink to
@@ -153,20 +154,28 @@ at the bottom (a star for first time, a faint star for a retry, yellow for the c
 "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in octave rows,
 highest on top, the "Sound" switch row and a big OK, the only way back. The end-of-round summary
 has no numbers on screen either: a trophy, ten stars, and tiles for the best streak (flames), the
-aim (one to three stars) and the speed (an animal). The flute tab has a stage with the note's
-bubble, hold dots under it that fill one per metronome click of the held note's length (four in
-4/4, eight in 6/8; always laid out, so
-the keys never move under a finger), the fingering and one scrolling line of the notes played
-(pills in their letter's colour, as wide as the note is long, a faint note symbol under each;
-since 2026-11-02 written in bars of the metronome tab's time signature: the signature stacked at
-the left end, fixed while the pills scroll, a bar line after each full bar, a note held across one
-split into pieces joined by a tie under their symbols, as the user chose over a bar line through
-the pill; the signature's figures are the one number the user asked for on a main screen, keep them),
+aim (one to three stars) and the speed (an animal). The flute tab has a stage with only two things (the user's canvas of
+2026-11-02, replacing the hold dots and the line of pills, then changed by the user the same
+evening): the tune on a real five-line staff (`TuneStaff`, geometry in `StaffGeometry`, lines
+18 dp apart: the faint treble clef and the metronome tab's time signature fixed at the left, each
+note at its true height drawn as printed music draws it, the whole note (head, stem, flag, dot,
+tie) in its letter's colour, the tilted oval head with a thin ink edge and no letter in it, every
+stem up, as the user asked; the shape says the length, filled with a flag for an eighth, filled
+for a quarter, a ring for a half and a dotted half, a wider ring and no stem for a whole note, and the
+room after it grows 29 dp a beat; bar lines after each full bar, a note held across one as two
+heads tied under them; the held step gets a yellow ring and a soft yellow band that grows with it,
+the playing step the ring; the signature's figures are the one number the user asked for on a
+main screen, keep them) and under each note, in the fingering's place, its name in a pill in its
+letter's colour, in the same room as the note so names and notes line up and scroll as one (the
+user's "align note names with the notes"), the pill as wide as the note's room, bar lines through
+the names too, a rest a grey 💤 pill, a breath no pill; the held step's yellow band covers its notes
+and its names together; the names went from a single-name bubble to a separate pill line (with
+length symbols, then without) to this, all on 2026-11-02; the flute tab shows no
+fingering any more, the tuner still does;
 the fifteen keys in three octave rows highest on top (each in its letter's colour; a key sounds
 for as long as it is held) with, at the end of the top row beside c³, a 😮‍💨 breath key and a
 💤 rest key (two keys wide each, icon only; the rest is held like a note and grows the same way,
-in the line a grey pill with 💤 and the real rest symbol under it, the bubble 💤 and no
-fingering; a breath has no length, in the line the face over the breath mark comma, and playback
+on the staff its rest symbol in grey with 💤 under the staff, in the line a grey 💤 pill; a breath has no length, on the staff the breath mark with 😮‍💨 over it, and playback
 goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, one big Play pill ("Play" / "Stop", at the
 metronome's tempo) with a round erase button beside it (it sinks while held and repeats like a
 keyboard's backspace): no record button, no clear-all, no tempo control and no note lengths as a

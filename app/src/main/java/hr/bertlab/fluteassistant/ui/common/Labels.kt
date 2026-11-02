@@ -12,6 +12,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.SoundProfile
@@ -104,18 +105,34 @@ fun noteLabelParts(resources: Resources, midi: Int): Pair<String, String> {
     }
 }
 
-/** [noteLabelParts] as display text: the octave figure small and raised. */
+/**
+ * [noteLabelParts] as display text: the octave figure small and raised, as every canvas board
+ * draws it (`<sup style="font-size: 0.48em; margin-left: 1px">`): 0.48 of the letter's size,
+ * its baseline raised about a third of the letter's size as a browser raises a `sup` (so its top
+ * meets the top of the letter), and a hair of space before it. Matched to the canvas on
+ * 2026-11-02 at the user's request; before, it sat higher (0.55) and touched the letter.
+ */
 @Composable
 @ReadOnlyComposable
 fun noteText(midi: Int): AnnotatedString {
     val (name, octave) = noteLabelParts(LocalResources.current, midi)
     return buildAnnotatedString {
-        append(name)
-        if (octave.isNotEmpty()) {
-            withStyle(SpanStyle(fontSize = 0.5.em, baselineShift = BaselineShift(0.55f))) { append(octave) }
+        if (octave.isEmpty()) {
+            append(name)
+            return@buildAnnotatedString
         }
+        append(name.dropLast(1))
+        // Letter spacing is shared either side of a glyph, so this leaves 1 sp after the letter at any size: the sup's 1 px.
+        withStyle(SpanStyle(letterSpacing = OCTAVE_GAP)) { append(name.last()) }
+        withStyle(SpanStyle(fontSize = OCTAVE_SIZE, baselineShift = BaselineShift(OCTAVE_RISE))) { append(octave) }
     }
 }
+
+private val OCTAVE_SIZE = 0.48.em
+private val OCTAVE_GAP = 2.sp
+
+/** How far the octave figure's baseline rises, as a share of the letter's size: a browser's `sup`. */
+private const val OCTAVE_RISE = 0.36f
 
 /**
  * The colour of a note's letter ([NoteLetterColors]); a sharp takes the colour of the

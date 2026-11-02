@@ -42,7 +42,7 @@ import javax.inject.Inject
  * key ends whatever key was held before, so the newest press wins. The tempo is the metronome tab's, read from
  * [SettingsStore] at each press and at Play, counted in its time signature's beats as the
  * metronome clicks them ([Pulse]: in 6/8 a click is an eighth note); the time signature, which
- * the tune line is written in, is also read when the tab opens. The tune is saved through [SettingsStore] on every
+ * the staff is written in, is also read when the tab opens. The tune is saved through [SettingsStore] on every
  * change and restored, sanitised, on creation. Activity-scoped, so the tune survives tab
  * switches and rotation; [enterTab] and [leaveTab] follow the tab's visibility so the player is
  * open only while the flute is on screen.
@@ -76,7 +76,7 @@ class FluteViewModel @Inject constructor(
 
     /**
      * The tab came on screen: open the output now so the first press is not late, and write the
-     * line in the metronome tab's time signature, which may have changed there meanwhile.
+     * staff in the metronome tab's time signature, which may have changed there meanwhile.
      */
     fun enterTab() {
         _state.update { it.copy(timeSignature = settings.loadMetronomeConfig().timeSignature) }
@@ -269,7 +269,7 @@ class FluteViewModel @Inject constructor(
 
     private fun heldFor(now: Long): Long = (now - (pressedAt ?: now)).coerceAtLeast(0)
 
-    /** The held key's note or rest reached [length]: show it on the dots and in the line. */
+    /** The held key's note or rest reached [length]: show it on the staff, its shape and its room growing. */
     private fun grow(length: NoteLength) {
         _state.update { s -> s.copy(tune = s.withHeldLength(length), heldLength = length) }
     }

@@ -21,12 +21,6 @@ enum class NoteLength(val halfBeats: Int) {
     /** Whole quarter-note beats: none for an eighth. */
     val wholeBeats: Int get() = halfBeats / 2
 
-    /**
-     * Whole metronome clicks this length lasts in [signature], as the hold dots count them: its
-     * quarter beats in x/4, eighths in x/8 (a whole note is eight clicks in 6/8), halves in x/2.
-     */
-    fun clicksIn(signature: TimeSignature): Int = halfBeats * signature.noteValue / 8
-
     companion object {
         /**
          * The beats after the press at which a held key's note grows into the next length:

@@ -13,9 +13,8 @@ Lengths are kept in beats, so the tempo applies only at playback and changing it
 the rhythm. Time is counted in the metronome's `Pulse` (`domain/flute/Tune.kt`: its bpm and time
 signature, read at each press and at Play): one click is one beat of the signature's note value,
 so in 6/8 a click is an eighth note and a quarter lasts two clicks (since 2026-11-02, at the
-user's request, so a flute bar lasts as long as the metronome's; the hold dots count clicks too,
-`NoteLength.clicksIn`: four for a whole note in 4/4, eight in 6/8, filling 1, 2, 4, 6, 8 there as
-the note grows, since no length is three or five clicks). `Tune.durationMs` turns a length into time, with `gapMs` (80 ms, at most a quarter
+user's request, so a flute bar lasts as long as the metronome's; the hold dots that counted those
+clicks under the bubble went with the bubble in the canvas of 2026-11-02, see below). `Tune.durationMs` turns a length into time, with `gapMs` (80 ms, at most a quarter
 of the note) taken out of its end so a repeated note is heard twice and the tempo stays exact.
 The time between presses is not recorded (a child hunting for the next key would make the tune
 halting): a silence is only ever a rest the child put there. The stored string
@@ -24,12 +23,45 @@ halting): a silence is only ever a rest the child put there. The stored string
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
 snapped (never under 300), converted at the stored tempo; `SettingsStore.saveTune` keeps it
 under `tune` across restarts. `Bars.write` (`domain/flute/Bars.kt`, since 2026-11-02) is how the
-tune line writes the tune in bars of the metronome tab's time signature (`FluteUiState.timeSignature`,
+staff writes the tune in bars of the metronome tab's time signature (`FluteUiState.timeSignature`,
 read at creation and in `enterTab()`; a bar is `beatsPerBar * 8 / noteValue` half beats of the
 flute's quarter-note beat, so 6/8 holds three quarters): `LineMark.Step` / `Breath` / `BarLine`, a
 bar line after every full bar (the last too), a note or rest that runs past one split there into
-`StepPart`s (the longest lengths that fit, a 2½-beat piece as a half and an eighth) that the line
-ties under their symbols (a note) or just splits (a rest); the tune itself is never changed. Sound:
+`StepPart`s (the longest lengths that fit, a 2½-beat piece as a half and an eighth) that the staff
+ties (a note) or just splits (a rest); the tune itself is never changed.
+
+The stage (the user's canvas of 2026-11-02, boards `Flute*.dc.html`, then changed by the user the
+same evening) holds only `TuneStaff`: the staff and, under each note in the place the canvas gave
+the fingering, its name (`NameRow` / `NamePill`, `StaffGeometry.NAMES_TOP`): a pill in its letter's
+colour as wide as the note's room on the staff less a 3 dp gap, the name in the first beat's room
+under the head, a grey 💤 pill for a rest, no pill for a breath, the bar line drawn through the
+names too, a note's pills tied under them. Each step is one `LazyRow` item holding its notes and
+its names, so they line up and scroll as one (the user: "align note names with the notes, left to
+right"), and the held step's band covers both ("a yellow rectangle covering notes and names at the
+same time"). That replaced, the same evening, a 96 dp single-name bubble and then a separate line
+of pills (`TuneLine`, deleted); the hold dots and, on this tab, the fingering are gone, and
+`FluteUiState.shown` is no longer drawn. A screen reader reads the row ("Your tune, N notes") and
+each step once ("G4, 2 beats", "Breathe here"). `TuneStaff` draws a real five-line staff from `StaffGeometry` (pure
+Kotlin, in dp: lines 18 apart, three quarters of the canvas's 24, to leave room for the bubble and
+for the stems, a note step 9, `StaffNotes.positionOf` for the height, every stem up on the right
+of the head as the user asked, ledger lines from `StaffNotes.ledgerLinesFor`): the faint treble clef
+(`ui/common/drawTrebleClef`, shared with the notes game) and the time signature fixed at the left,
+then a `LazyRow` of the `Bars.write` marks, each a `Spacer` that draws itself in a dp-scaled
+`drawBehind` (a step's width is its pieces' `slotWidth`, 29 dp a beat; a bar line 10, a breath 18). Each note is drawn as printed music draws it, all of it in
+its letter's colour (the user's call: "same colour as the note name, shape by the rules"): a
+tilted oval head (`HEAD_TILT`) with a thin ink edge so a yellow e¹ stays visible on white and on
+the yellow ring, no letter in it (the line under it names the note), filled for an eighth (plus a
+flag) and a quarter, a ring for a half and a dotted half (plus a dot, moved up off a line), a wider
+ring and no stem for a whole note; the stem, flag, dot and tie in the note's colour too; a rest is its symbol in `mutedText`
+over its grey 💤 pill; a breath the comma with 😮‍💨 over the staff; ties go under the heads. The step at `litIndex` gets a yellow ring per head, the one at `heldIndex` also a yellow
+band across its room, and is drawn under its neighbours (`zIndex(-1)`) so the ring never covers the
+head beside it; it grows in place because the held step's length in `tune` is updated as it
+grows. Text on the staff (the time signature, the emoji) is measured at a fixed dp size, so it
+stays in the staff at any font scale. The staff with its names is `TuneStaffHeight` (241 dp, the staff 175) at every tune, so
+the keys never move; c³'s stem (87 dp above the top line) may reach 12 dp into the stage's padding
+and c¹'s ring and tie 8 dp into the gap above the names, which `StaffGeometryTest` checks for
+every height; with the names the stage fits a 412 x 915 phone without scrolling. Where the
+drawing differs from the canvas: `.superpowers/design/flute-assistant-screens/README.md`. Sound:
 `FluteTimbre` (`audio/flute/`, the harmonics the tuner's `ReferenceToneSynth` now shares)
 under `SustainedToneSynth`, a phase-continuous oscillator with an attack (30 ms) / sustain /
 release (120 ms) envelope and a retrigger fade (10 ms), so a note on, a note off or a takeover
@@ -47,9 +79,9 @@ overlap for the fade rather than the first press after a rotation waiting for it
 and closes it in `leaveTab()` (`FluteScreen`'s `LifecycleStartEffect`, so the first press is
 never late and nothing plays off screen); `onKeyPressed(midi)` sounds the key at once, shows
 it (`FluteUiState.shown`, a `Shown.Note`, `Rest` or `Breath`) and appends it as an eighth (not at the cap, where it only sounds), then grows
-it while the key stays down at `Tune.growAtMs` (`heldLength`, which the hold dots and the pill
-show); `onKeyReleased(midi)` silences it and records the length the hold made from
-`MonotonicClock` (`Tune.lengthOf`, the same rule, so the pill never jumps at lift-off), ignored
+it while the key stays down at `Tune.growAtMs` (`heldLength`, and the step's length in `tune`,
+which the staff shows); `onKeyReleased(midi)` silences it and records the length the hold made from
+`MonotonicClock` (`Tune.lengthOf`, the same rule, so the note never changes at lift-off), ignored
 unless that key is the one held (the newest press wins; sliding off a key releases it);
 `onKeyActivated(midi)` is the screen-reader path (one beat: a quarter note);
 `onRestPressed` / `onRestReleased` / `onRestActivated` are the same for the rest key without a
@@ -57,8 +89,8 @@ sound (`restHeld`; a rest that takes over a held note silences it, since a note 
 note deliberately skips the note off), and `onBreath` ends a held key and appends a breath unless
 the last step is one (a breath at the cap or after a breath is only shown); `togglePlayback()`
 plays the tune from the start at the metronome's tempo, each note for its length, lighting it
-in the line, on its key and on the fingering diagram, silent for each rest's whole length (its
-pill lit, 💤 in the bubble, the rest key sunk: `restLit`) and straight past each breath, and
+on the staff, on its name and on its key, silent for each rest's whole length (its symbol and
+its pill ringed, the rest key sunk: `restLit`) and straight past each breath, and
 stops at once on the pill, on a key press or on `eraseLast()`, which drops the last step (the
 erase button repeats while held).
 
