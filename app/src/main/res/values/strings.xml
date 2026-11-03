@@ -4,6 +4,8 @@
     <string name="tab_tuner">Tuner</string>
     <string name="tab_notes">Notes</string>
     <string name="tab_flute">Flute</string>
+    <!-- The metronome tab's state for a screen reader while the drum beats -->
+    <string name="tab_metronome_playing">Playing</string>
 
     <!-- Metronome -->
     <string name="play">Play</string>
@@ -133,6 +135,10 @@
     <string name="flute_play">Play</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
+    <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->
+    <string name="flute_speed_knob">Speed: %1$s, tap to change</string>
+    <!-- The big button under the ring that opens in place over the flute's staff, closing it -->
+    <string name="speed_done">OK</string>
     <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->
     <string name="flute_rest">Rest</string>
     <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->

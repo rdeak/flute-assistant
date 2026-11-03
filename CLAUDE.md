@@ -85,10 +85,15 @@ point there.
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
   when the notes tab is left, so the child always comes back to a zero score. `MainScreen` also
   keeps the screen on (`ui/common/KeepScreenOn`) while the metronome plays, the tuner listens or
-  the flute plays the tune back.
+  the flute plays the tune back. While the metronome plays, the bottom bar's 🥁 hops on every beat
+  on every tab (since 2026-11-03: `TabBar` with `rememberBeatFlash` / `hopOnBeat` from
+  `ui/common/BeatFlash.kt`, the same hop as the ring's animal), so a running drum is visible
+  everywhere and one tap on it reaches Stop; a screen reader hears that tab as "Playing"
+  (`tab_metronome_playing`).
 - Each screen is split into a stateful `MetronomeScreen` / `TunerScreen` / `NotesScreen` /
   `FluteScreen` (ViewModel, permissions, lifecycle) and a stateless `MetronomeContent` /
-  `TunerContent` / `NotesContent` / `FluteContent` taking state plus callbacks. The `*Content` composables are what the Compose
+  `TunerContent` / `NotesContent` / `FluteContent` taking state plus callbacks (`FluteScreen` is also handed the metronome's state and
+  ViewModel, for the flute's speed knob and its panel). The `*Content` composables are what the Compose
   UI tests render, wrapped in the test-only `LocaleProvider` to pin the language.
 - Every user-visible string is a resource in both `values/strings.xml` and
   `values-hr/strings.xml`. Domain enums stay language-free; `ui/common/Labels.kt` maps them to
@@ -117,7 +122,8 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   fit, so Play and the status line stay in view; only below a tab's minimum height
   does `Modifier.fitOrScroll` make it scroll (a fixed-height column, so weights still work). The
   notes tab scrolls a little on such phones rather than shrink the staff's places, and the flute
-  scrolls below its own `FitsHeight` as before.
+  scrolls below its own `FitsHeight` as before (its speed panel, like the metronome tab, only
+  below `MetronomeMinHeight`).
 - `ui/common/ValueWheel` is the snapping three-row drum behind the metronome's `TempoWheel`. Its
   content description stays on the `LazyColumn` node: the UI tests scroll it with
   `performScrollToIndex`.
@@ -154,9 +160,9 @@ at the bottom (a star for first time, a faint star for a retry, yellow for the c
 "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in octave rows,
 highest on top, the "Sound" switch row and a big OK, the only way back. The end-of-round summary
 has no numbers on screen either: a trophy, ten stars, and tiles for the best streak (flames), the
-aim (one to three stars) and the speed (an animal). The flute tab has a stage with only two things (the user's canvas of
+aim (one to three stars) and the speed (an animal). The flute tab has a stage (the user's canvas of
 2026-11-02, replacing the hold dots and the line of pills, then changed by the user the same
-evening): the tune on a real five-line staff (`TuneStaff`, geometry in `StaffGeometry`, lines
+evening) with two things, the staff and the names, and since 2026-11-03 a third, the speed knob over the staff: the tune on a real five-line staff (`TuneStaff`, geometry in `StaffGeometry`, lines
 18 dp apart: the faint treble clef and the metronome tab's time signature fixed at the left, each
 note at its true height drawn as printed music draws it, the whole note (head, stem, flag, dot,
 tie) in its letter's colour, the tilted oval head with a thin ink edge and no letter in it, every
@@ -171,14 +177,21 @@ user's "align note names with the notes"), the pill as wide as the note's room, 
 the names too, a rest a grey 💤 pill, a breath no pill; the held step's yellow band covers its notes
 and its names together; the names went from a single-name bubble to a separate pill line (with
 length symbols, then without) to this, all on 2026-11-02; the flute tab shows no
-fingering any more, the tuner still does;
+fingering any more, the tuner still does; at the staff's top left, since 2026-11-03 (chosen by
+the user from three mockups), the metronome's yellow knob with the speed's animal on it (`SpeedKnob`,
+54 dp, touching only the faint clef's tip, never a note or the signature; it hops on each click while
+the tune plays back), whose tap swaps the stage, the keys and the Play row, in place, for the
+metronome tab's own stage (`MetronomeStage`: the beat bubbles with − / + and the ring exactly as
+drawn there, its tempo figure the one number the panel shows) over one big green OK, the only way
+back;
 the fifteen keys in three octave rows highest on top (each in its letter's colour; a key sounds
 for as long as it is held) with, at the end of the top row beside c³, a 😮‍💨 breath key and a
 💤 rest key (two keys wide each, icon only; the rest is held like a note and grows the same way,
 on the staff its rest symbol in grey with 💤 under the staff, in the line a grey 💤 pill; a breath has no length, on the staff the breath mark with 😮‍💨 over it, and playback
 goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, one big Play pill ("Play" / "Stop", at the
 metronome's tempo) with a round erase button beside it (it sinks while held and repeats like a
-keyboard's backspace): no record button, no clear-all, no tempo control and no note lengths as a
+keyboard's backspace): no record button, no clear-all, no tempo control but that knob and the metronome's
+stage it opens in place, and no note lengths as a
 control (lengths come only from how long a key is held; the user drew this on 2026-10-24). The user rejected a wider
 layout (−/+ beside the ring, a ten-button signature scroller, flags in the content area) as too
 packed: keep the screens this sparse. Tap tempo, subdivisions, click sounds, volume, presets and the A4 reference still

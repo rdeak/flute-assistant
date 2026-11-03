@@ -4,6 +4,8 @@
     <string name="tab_tuner">Štimer</string>
     <string name="tab_notes">Note</string>
     <string name="tab_flute">Flauta</string>
+    <!-- The metronome tab's state for a screen reader while the drum beats -->
+    <string name="tab_metronome_playing">Svira</string>
 
     <!-- Metronome -->
     <string name="play">Sviraj</string>
@@ -117,6 +119,8 @@
     <string name="flute_play">Sviraj</string>
     <string name="flute_erase">Obriši zadnju notu</string>
     <string name="flute_keys">Tipke flaute</string>
+    <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>
+    <string name="speed_done">U redu</string>
     <!-- Stanka, as music schools name a rest (cijela, polovinka, četvrtinka, osminka) -->
     <string name="flute_rest">Stanka</string>
     <string name="flute_breath">Udahni</string>

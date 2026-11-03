@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.roundToLong
 
 /**
  * The flute tab: a key pressed sounds through [FluteTonePlayer] until it is released and is
@@ -47,10 +48,16 @@ import javax.inject.Inject
  * switches and rotation; [enterTab] and [leaveTab] follow the tab's visibility so the player is
  * open only while the flute is on screen.
  *
+ * While the tune plays, [FluteUiState.beatPulse] counts the metronome's clicks (the first with the
+ * first note), which the speed knob's animal hops on. The knob opens the metronome's own ring in
+ * place: [openSpeed] stops the playback and ends a held key, [closeSpeed] (OK) reads the
+ * time signature again, which may have changed there.
+ *
  * Logs under [LogTags.FLUTE]: `flute.note` per note ended (midi, heldMs, length, added: false
  * at the cap), `flute.rest` per rest ended (heldMs, length, added), `flute.breath` (added: false
  * at the cap or right after a breath), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
- * `flute.stop` (reason: pill, key, erase or leave), `flute.erase` (left).
+ * `flute.stop` (reason: pill, key, erase, leave or speed), `flute.erase` (left), `flute.speed_open`
+ * and `flute.speed_done` (bpm, time).
  */
 @HiltViewModel
 class FluteViewModel @Inject constructor(
@@ -79,7 +86,7 @@ class FluteViewModel @Inject constructor(
      * staff in the metronome tab's time signature, which may have changed there meanwhile.
      */
     fun enterTab() {
-        _state.update { it.copy(timeSignature = settings.loadMetronomeConfig().timeSignature) }
+        syncTimeSignature()
         tonePlayer.open()
     }
 
@@ -175,6 +182,19 @@ class FluteViewModel @Inject constructor(
         )
         // Undispatched, so the first note sounds and lights before this call returns.
         playbackJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            // One hop per click, from the start of the tune (absolute times, like Tune.growAtMs, so
+            // the rounding never adds up); the first lands with the first note.
+            val hops = launch(start = CoroutineStart.UNDISPATCHED) {
+                var waited = 0L
+                var click = 0L
+                while (true) {
+                    val at = (click * pulse.clickMs).roundToLong()
+                    delay(at - waited)
+                    waited = at
+                    _state.update { it.copy(beatPulse = it.beatPulse + 1) }
+                    click++
+                }
+            }
             for ((index, item) in items.withIndex()) {
                 when (item) {
                     is TuneNote -> {
@@ -193,10 +213,29 @@ class FluteViewModel @Inject constructor(
                     TuneBreath -> Unit // a sign for the player: no time
                 }
             }
+            hops.cancel() // a child of this job, which would not complete while the hops run
             playbackJob = null
             _state.update { it.copy(playingIndex = null) }
             logger.d(LogTags.FLUTE, "flute.play_done")
         }
+    }
+
+    /**
+     * The speed knob was tapped and the metronome's ring is about to take the stage: end the
+     * playback (the tempo is about to change) and any held key.
+     */
+    fun openSpeed() {
+        stopPlayback(reason = "speed")
+        endHeld()
+        val pulse = pulse()
+        logger.d(LogTags.FLUTE, "flute.speed_open", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
+    }
+
+    /** OK on the metronome's ring: the tune is back, and its staff is written in the time signature chosen there. */
+    fun closeSpeed() {
+        syncTimeSignature()
+        val pulse = pulse()
+        logger.d(LogTags.FLUTE, "flute.speed_done", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
     }
 
     /** Drops the last step of the tune; ignored while a key is held or the tune is empty. Stops playback first. */
@@ -209,7 +248,10 @@ class FluteViewModel @Inject constructor(
         logger.d(LogTags.FLUTE, "flute.erase", "left" to _state.value.tune.size)
     }
 
-    /** Ends a playback in progress, saying what ended it; nothing playing: nothing happens. */
+    /**
+     * Ends a playback in progress, saying what ended it (`pill`, `key`, `erase`, `leave` or
+     * `speed`); its beat hops end with it. Nothing playing: nothing happens.
+     */
     private fun stopPlayback(reason: String) {
         if (!_state.value.isPlaying) return
         playbackJob?.cancel()
@@ -312,6 +354,11 @@ class FluteViewModel @Inject constructor(
     private fun pulse(): Pulse {
         val config = settings.loadMetronomeConfig()
         return Pulse(config.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM), config.timeSignature)
+    }
+
+    /** The staff is written in the metronome tab's time signature, which may have changed there meanwhile. */
+    private fun syncTimeSignature() {
+        _state.update { it.copy(timeSignature = settings.loadMetronomeConfig().timeSignature) }
     }
 
     private fun save() = settings.saveTune(_state.value.tune)

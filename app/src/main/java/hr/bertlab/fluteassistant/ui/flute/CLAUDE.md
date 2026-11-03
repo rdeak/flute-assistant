@@ -24,14 +24,16 @@ never two breaths in a row, older builds drop `r` and `b`) reads a note value ab
 snapped (never under 300), converted at the stored tempo; `SettingsStore.saveTune` keeps it
 under `tune` across restarts. `Bars.write` (`domain/flute/Bars.kt`, since 2026-11-02) is how the
 staff writes the tune in bars of the metronome tab's time signature (`FluteUiState.timeSignature`,
-read at creation and in `enterTab()`; a bar is `beatsPerBar * 8 / noteValue` half beats of the
+read at creation, in `enterTab()` and when OK closes the speed panel, all through
+`syncTimeSignature()`; a bar is `beatsPerBar * 8 / noteValue` half beats of the
 flute's quarter-note beat, so 6/8 holds three quarters): `LineMark.Step` / `Breath` / `BarLine`, a
 bar line after every full bar (the last too), a note or rest that runs past one split there into
 `StepPart`s (the longest lengths that fit, a 2½-beat piece as a half and an eighth) that the staff
 ties (a note) or just splits (a rest); the tune itself is never changed.
 
 The stage (the user's canvas of 2026-11-02, boards `Flute*.dc.html`, then changed by the user the
-same evening) holds only `TuneStaff`: the staff and, under each note in the place the canvas gave
+same evening) holds `TuneStaff`, with the speed knob over its top left (described after this
+paragraph): the staff and, under each note in the place the canvas gave
 the fingering, its name (`NameRow` / `NamePill`, `StaffGeometry.NAMES_TOP`): a pill in its letter's
 colour as wide as the note's room on the staff less a 3 dp gap, the name in the first beat's room
 under the head, a grey 💤 pill for a rest, no pill for a breath, the bar line drawn through the
@@ -91,13 +93,58 @@ the last step is one (a breath at the cap or after a breath is only shown); `tog
 plays the tune from the start at the metronome's tempo, each note for its length, lighting it
 on the staff, on its name and on its key, silent for each rest's whole length (its symbol and
 its pill ringed, the rest key sunk: `restLit`) and straight past each breath, and
-stops at once on the pill, on a key press or on `eraseLast()`, which drops the last step (the
-erase button repeats while held).
+stops at once on the pill, on a key press, on `openSpeed()` or on `eraseLast()`, which drops the
+last step (the erase button repeats while held).
+
+The speed knob and its panel (the user's pick of 2026-11-03 from three mockups, spec
+`docs/superpowers/specs/2026-11-03-flute-speed-knob-design.md`): the tune plays at the metronome
+tab's tempo and in its time signature, and the flute now shows and sets both. `SpeedKnob` is the
+ring's knob moved to the staff, where printed music writes the tempo: a `ChunkyButton` in `Sun`,
+`CircleShape`, `SpeedKnobSize` (54 dp) across with a 5 dp shadow, carrying the animal of the
+speed (`tempoBand(bpm).emoji` at 26 sp, `facingRight`), laid by `FluteContent` over `TuneStaff`'s
+box at its top left so it touches only the faint clef's tip (the clef's top is `TOP_LINE_Y -
+LINE_GAP`, 57 dp, the signature stands clear of it below, and `NOTES_CLIP`, also 57 dp, keeps
+every note, stem, ring and band from running under it); nothing on the staff moved for it, and it
+shows on an empty tune too. Its bpm is `MetronomeUiState.config.bpm`, hoisted from `MainScreen`
+through `FluteScreen` into `FluteContent`, so a change made on the metronome tab shows the
+moment the child comes back; a screen reader hears "Speed: Rabbit, tap to change"
+(`flute_speed_knob`), never a number. While the tune plays back the animal hops once per click:
+`togglePlayback()` starts a child coroutine of the playback job that adds one to
+`FluteUiState.beatPulse` at the absolute times `click * Pulse.clickMs` (so the rounding never
+adds up; the first lands with the first note, and in 6/8 a click is an eighth), cancelled with
+the playback, and `FluteContent` turns the counter into the hop with `rememberBeatFlash(beatPulse,
+isPlaying)` and `hopOnBeat` (`ui/common/BeatFlash.kt`, `HopDistance` 8 dp, `FLASH_DURATION_MS`
+220, the ring's own hop). The knob never hops for a running metronome, only for the tune's own
+playback; the tab bar's drum does that (`MainScreen`). `beatPulse` is not reset when playback
+ends, only the hopping stops.
+
+A tap on the knob opens the panel. `FluteContent` keeps `choosingSpeed` in `rememberSaveable`, as
+`NotesContent` keeps `choosingNotes`, so rotation and the language switch keep it open, and while
+it is true shows, in place of the stage, the keys and the Play row, the metronome tab's own
+`MetronomeStage` (`ui/metronome/`: the beat bubbles with − / + over the ring and its in-place
+wheel, one composable shared with `MetronomeContent`, so the flute never redraws it) fed the live
+metronome state and `MetronomeViewModel`'s `setBpm` / `setTimeSignature` (every change is saved
+by the metronome as before and passed on to a running one), and one
+`BigActionButton` OK (`speed_done`, `AppIcons.Done`, `ActionGo`) alone where Play was: no keys,
+no sponge, no sound (Play on the tune is the preview), and OK the only way back (the back button
+is not handled, as in the notes picker). The panel's column is `fitOrScroll` at
+`MetronomeMinHeight` rather than `FitsHeight`, which describes the keys, so the ring shrinks on a
+short screen as on the metronome tab, and it carries `closesTempoWheel` with its own
+`rememberTempoWheelState()`. The knob's `onClick` calls `FluteViewModel.openSpeed()` and then sets
+`choosingSpeed`: it stops a tune playing back (`flute.stop`, reason `speed`) and ends a held key
+as `leaveTab()` does, and leaves the tone player open. OK clears `choosingSpeed` and calls
+`closeSpeed()`, which runs `syncTimeSignature()` (the read `enterTab()` makes: the staff is
+rewritten in the time signature chosen in the panel) and logs; a tempo change needs nothing more,
+since lengths are kept in beats and the next press and Play read the new pulse. Leaving the flute
+tab with the panel open drops it (`MainScreen` composes only the open tab, so `choosingSpeed` goes
+with `FluteContent`, as the notes picker's does): the child comes back to the tune, and no
+`flute.speed_done` is logged for it.
 
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, per note ended), `flute.rest` (heldMs, length, added, per rest
 ended), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
 rests, bpm, time), `flute.play_done`, `flute.stop`
-(reason: pill, key, erase or leave, so every `flute.play` has a closing line), `flute.erase`
-(left).
+(reason: pill, key, erase, leave or speed, so every `flute.play` has a closing line), `flute.erase`
+(left), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and
+`flute.speed_done` (bpm, time, when OK closes it; leaving the tab with the panel open logs none).

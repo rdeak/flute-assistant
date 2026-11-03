@@ -1,7 +1,9 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
@@ -12,6 +14,7 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -25,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -33,8 +37,10 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -52,6 +58,7 @@ class FluteScreenTest {
     val compose = createComposeRule()
 
     private lateinit var state: MutableState<FluteUiState>
+    private lateinit var metronome: MutableState<MetronomeUiState>
     private val pressed = mutableListOf<Int>()
     private val released = mutableListOf<Int>()
     private val activated = mutableListOf<Int>()
@@ -59,25 +66,52 @@ class FluteScreenTest {
     private var erases = 0
     private val restEvents = mutableListOf<String>()
     private var breaths = 0
+    private var chosenBpm: Int? = null
+    private var chosenSignature: TimeSignature? = null
+    private var speedOpens = 0
+    private var speedDones = 0
 
-    private fun show(initial: FluteUiState, locale: Locale = Locale.ENGLISH) {
+    /**
+     * Renders [FluteContent] in [locale]. A [height] puts it in a box that tall (a short screen);
+     * a [restoration] renders it through that tester, so a test can emulate the Activity's
+     * re-creation with `rememberSaveable` state saved and restored.
+     */
+    private fun show(
+        initial: FluteUiState,
+        locale: Locale = Locale.ENGLISH,
+        height: Dp? = null,
+        restoration: StateRestorationTester? = null,
+    ) {
         state = mutableStateOf(initial)
-        compose.setContent {
+        metronome = mutableStateOf(MetronomeUiState(config = MetronomeConfig(bpm = 120)))
+        val content: @Composable () -> Unit = {
             LocaleProvider(locale) {
-                FluteContent(
-                    state = state.value,
-                    onKeyPressed = { pressed += it },
-                    onKeyReleased = { released += it },
-                    onKeyActivated = { activated += it },
-                    onRestPressed = { restEvents += "press" },
-                    onRestReleased = { restEvents += "release" },
-                    onRestActivated = { restEvents += "activate" },
-                    onBreath = { breaths++ },
-                    onTogglePlayback = { playToggles++ },
-                    onEraseLast = { erases++ },
-                )
+                val flute: @Composable () -> Unit = {
+                    FluteContent(
+                        state = state.value,
+                        metronome = metronome.value,
+                        onKeyPressed = { pressed += it },
+                        onKeyReleased = { released += it },
+                        onKeyActivated = { activated += it },
+                        onRestPressed = { restEvents += "press" },
+                        onRestReleased = { restEvents += "release" },
+                        onRestActivated = { restEvents += "activate" },
+                        onBreath = { breaths++ },
+                        onTogglePlayback = { playToggles++ },
+                        onEraseLast = { erases++ },
+                        onBpmChange = { bpm ->
+                            chosenBpm = bpm
+                            metronome.value = metronome.value.copy(config = metronome.value.config.withBpm(bpm))
+                        },
+                        onTimeSignatureChange = { chosenSignature = it },
+                        onSpeedOpen = { speedOpens++ },
+                        onSpeedDone = { speedDones++ },
+                    )
+                }
+                if (height == null) flute() else Box(Modifier.height(height)) { flute() }
             }
         }
+        if (restoration != null) restoration.setContent(content) else compose.setContent(content)
     }
 
     @Test
@@ -180,6 +214,7 @@ class FluteScreenTest {
                 Box(Modifier.width(360.dp)) {
                     FluteContent(
                         state = state.value,
+                        metronome = MetronomeUiState(),
                         onKeyPressed = {},
                         onKeyReleased = {},
                         onKeyActivated = {},
@@ -189,6 +224,10 @@ class FluteScreenTest {
                         onBreath = {},
                         onTogglePlayback = {},
                         onEraseLast = {},
+                        onBpmChange = {},
+                        onTimeSignatureChange = {},
+                        onSpeedOpen = {},
+                        onSpeedDone = {},
                     )
                 }
             }
@@ -330,5 +369,86 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
         compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
+    }
+
+    @Test
+    fun the_speed_knob_names_the_drums_animal_and_sits_at_the_staffs_top_left() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
+        knob.assertIsDisplayed()
+        val knobBounds = knob.getBoundsInRoot()
+        // The tune's row starts NOTES_CLIP (57 dp) into the staff, so the knob, 54 dp from the staff's left
+        // edge, ends before it; the time signature stands lower, between the first and third lines.
+        val tuneRow = compose.onNodeWithContentDescription("Your tune, 1 note").getBoundsInRoot()
+        val signature = compose.onNodeWithContentDescription("Time signature 4/4").getBoundsInRoot()
+        assertTrue("the knob $knobBounds should end before the notes start $tuneRow", knobBounds.right <= tuneRow.left + 1.dp)
+        assertTrue("the knob $knobBounds should sit above the time signature $signature", knobBounds.bottom <= signature.top + 1.dp)
+        assertTrue("the knob $knobBounds should start left of the time signature $signature", knobBounds.left < signature.left)
+        assertTrue("the knob should be 54 dp, was ${knobBounds.width}", abs((knobBounds.width - 54.dp).value) <= 0.5f)
+        compose.runOnIdle { metronome.value = MetronomeUiState(config = MetronomeConfig(bpm = 60)) }
+        compose.onNodeWithContentDescription("Speed: Turtle, tap to change").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_speed_knob_shows_on_an_empty_tune_too() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").assertIsDisplayed()
+        compose.onNodeWithText("👆 Tap or hold a note").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        assertEquals(1, speedOpens)
+    }
+
+    @Test
+    fun the_knob_speaks_croatian() {
+        show(FluteUiState(), Locale("hr"))
+        compose.onNodeWithContentDescription("Brzina: Zec, dodirni za promjenu").assertIsDisplayed()
+    }
+
+    @Test
+    fun tapping_the_knob_opens_the_drums_stage_in_place_and_ok_brings_the_tune_back() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        assertEquals(1, speedOpens)
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Beats in a bar: 4").assertIsDisplayed()
+        compose.onNodeWithText("OK").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+        compose.onNodeWithText("Play").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Erase the last note").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Your tune, 1 note").assertDoesNotExist()
+
+        compose.onNodeWithContentDescription("More beats").performClick()
+        assertEquals(TimeSignature.FIVE_FOUR, chosenSignature)
+        compose.onNodeWithContentDescription("Duck").performClick()
+        assertEquals(80, chosenBpm)
+
+        compose.onNodeWithText("OK").performClick()
+        assertEquals(1, speedDones)
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithText("Play").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Your tune, 1 note").assertExists()
+        compose.onNodeWithContentDescription("Speed: Duck, tap to change").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_speed_panel_survives_recreation() {
+        val restoration = StateRestorationTester(compose)
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))), restoration = restoration)
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertIsDisplayed()
+        compose.onNodeWithText("OK").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_speed_panel_fits_a_short_screen() {
+        // Short, but above the drum's 420 dp minimum, so the panel does not scroll: the ring shrinks.
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))), height = 500.dp)
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        compose.onNodeWithText("OK").assertIsDisplayed()
+        val ring = compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed")
+        ring.assertIsDisplayed()
+        assertTrue("the ring should shrink below 304 dp on a short screen, was ${ring.getBoundsInRoot().height}", ring.getBoundsInRoot().height < 304.dp)
     }
 }

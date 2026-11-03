@@ -653,4 +653,81 @@ class FluteViewModelTest {
         runCurrent()
         assertEquals(HALF, vm.current.heldLength) // four
     }
+
+    @Test
+    fun `the knob hops on every beat of the playing tune and stops with it`() = runTest(dispatcher) {
+        val vm = playingViewModel()
+        assertEquals(1L, vm.current.beatPulse) // the first beat, with the first note
+        advanceTimeBy(499)
+        assertEquals(1L, vm.current.beatPulse)
+        advanceTimeBy(1)
+        runCurrent() // advanceTimeBy stops short of the tasks due at its end
+        assertEquals(2L, vm.current.beatPulse) // 500 ms: a beat at 120
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(3L, vm.current.beatPulse)
+        advanceTimeBy(5000) // the tune is 1500 ms long
+        assertFalse(vm.current.isPlaying)
+        val afterEnd = vm.current.beatPulse
+        advanceTimeBy(5000)
+        assertEquals(afterEnd, vm.current.beatPulse)
+    }
+
+    @Test
+    fun `stop ends the hops too`() = runTest(dispatcher) {
+        val vm = playingViewModel()
+        advanceTimeBy(100)
+        vm.togglePlayback()
+        val stopped = vm.current.beatPulse
+        advanceTimeBy(5000)
+        assertEquals(stopped, vm.current.beatPulse)
+    }
+
+    @Test
+    fun `in six eight the knob hops on every click`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
+        val vm = viewModel()
+        vm.tap(60, 2000) // a half note: four clicks
+        vm.togglePlayback()
+        assertEquals(1L, vm.current.beatPulse)
+        advanceTimeBy(500) // one click is an eighth, 500 ms
+        runCurrent()
+        assertEquals(2L, vm.current.beatPulse)
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(3L, vm.current.beatPulse)
+    }
+
+    @Test
+    fun `opening the speed panel stops playback and says why`() = runTest(dispatcher) {
+        val vm = playingViewModel()
+        advanceTimeBy(100)
+        vm.openSpeed()
+        assertFalse(vm.current.isPlaying)
+        assertNull(tonePlayer.sounding)
+        assertEquals("speed", logger.events("flute.stop").single()["reason"])
+        val open = logger.events("flute.speed_open").single()
+        assertEquals(120, open["bpm"])
+        assertEquals(TimeSignature.FOUR_FOUR.label, open["time"])
+    }
+
+    @Test
+    fun `opening the speed panel ends a held key`() {
+        val vm = viewModel()
+        vm.onKeyPressed(67)
+        clock.now += 1000
+        vm.openSpeed()
+        assertNull(vm.current.heldMidi)
+        assertNull(tonePlayer.sounding)
+        assertEquals(HALF, vm.current.tune.single().length)
+    }
+
+    @Test
+    fun `closing the speed panel reads the metronome's time signature again`() {
+        val vm = viewModel()
+        settings.config = MetronomeConfig(timeSignature = TimeSignature.THREE_FOUR)
+        vm.closeSpeed()
+        assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
+        assertEquals(1, logger.events("flute.speed_done").size)
+    }
 }

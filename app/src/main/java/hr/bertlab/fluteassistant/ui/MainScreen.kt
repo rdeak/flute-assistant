@@ -45,6 +45,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
@@ -58,6 +59,8 @@ import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.KeepScreenOn
 import hr.bertlab.fluteassistant.ui.common.LanguageSwitch
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.hopOnBeat
+import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.flute.FluteScreen
 import hr.bertlab.fluteassistant.ui.flute.FluteViewModel
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeMessage
@@ -134,6 +137,8 @@ fun MainScreen(
                     if (selectedTab == AppTab.NOTES && tab != AppTab.NOTES) notesViewModel.resetRound()
                     selectedTab = tab
                 },
+                drumBeating = metronomeState.isPlaying,
+                beatPulse = metronomeState.beatPulse,
             )
         },
     ) { innerPadding ->
@@ -146,7 +151,12 @@ fun MainScreen(
                 AppTab.METRONOME -> MetronomeScreen(state = metronomeState, viewModel = metronomeViewModel)
                 AppTab.TUNER -> TunerScreen(state = tunerState, viewModel = tunerViewModel)
                 AppTab.NOTES -> NotesScreen(state = notesState, viewModel = notesViewModel)
-                AppTab.FLUTE -> FluteScreen(state = fluteState, viewModel = fluteViewModel)
+                AppTab.FLUTE -> FluteScreen(
+                    state = fluteState,
+                    viewModel = fluteViewModel,
+                    metronome = metronomeState,
+                    metronomeViewModel = metronomeViewModel,
+                )
             }
         }
     }
@@ -197,11 +207,15 @@ private fun TitleBar(tab: AppTab) {
 
 /**
  * The bottom bar: one emoji-and-word button per tab, the open one a yellow pill with an ink
- * outline. It draws its own background under the system navigation bar.
+ * outline. It draws its own background under the system navigation bar. While the metronome's
+ * drum beats ([drumBeating]) the metronome tab's 🥁 hops on every [beatPulse], on every tab, the
+ * same hop as the ring's animal, and a screen reader hears that tab as "Playing".
  */
 @Composable
-private fun TabBar(selected: AppTab, onSelect: (AppTab) -> Unit) {
+private fun TabBar(selected: AppTab, onSelect: (AppTab) -> Unit, drumBeating: Boolean, beatPulse: Long) {
     val colors = FluteTheme.colors
+    val drumFlash = rememberBeatFlash(beatPulse, drumBeating)
+    val drumPlaying = stringResource(R.string.tab_metronome_playing)
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
@@ -224,9 +238,16 @@ private fun TabBar(selected: AppTab, onSelect: (AppTab) -> Unit) {
                     .clip(TabShape)
                     .background(if (isSelected) Sun else Color.Transparent)
                     .border(OutlineWidth, if (isSelected) colors.outline else Color.Transparent, TabShape)
-                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(tab) }),
+                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(tab) })
+                    .semantics {
+                        if (tab == AppTab.METRONOME && drumBeating) stateDescription = drumPlaying
+                    },
             ) {
-                Emoji(tab.emoji, fontSize = 28)
+                Emoji(
+                    tab.emoji,
+                    fontSize = 28,
+                    modifier = if (tab == AppTab.METRONOME) Modifier.hopOnBeat(drumFlash) else Modifier,
+                )
                 Text(
                     text = stringResource(tab.labelRes),
                     style = MaterialTheme.typography.labelMedium,

@@ -32,6 +32,8 @@ data class FluteUiState(
     val heldLength: NoteLength? = null,
     /** The metronome tab's time signature, which the staff is written in (bar lines, ties). */
     val timeSignature: TimeSignature = TimeSignature.FOUR_FOUR,
+    /** Goes up by one on every click while the tune plays back; never reset, only its changes key the speed knob's hop (like `MetronomeUiState.beatPulse`). */
+    val beatPulse: Long = 0L,
 ) {
     val isPlaying: Boolean get() = playingIndex != null
     val isEmpty: Boolean get() = tune.isEmpty()

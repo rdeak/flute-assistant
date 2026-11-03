@@ -1,1 +1,3 @@
 How the metronome's audio path and player contract works, with the reasons behind it, is in `../../audio/metronome/CLAUDE.md`; read it before changing anything here.
+
+The tab's stage (the beat bubbles over the tempo ring) is `MetronomeStage`, shared with the flute tab's speed panel (2026-11-03): its caller owns the `TempoWheelState` and puts `closesTempoWheel` on its column, and `MetronomeMinHeight` is the height below which the metronome tab and the flute's speed panel scroll; `ui/common/BeatFlash.kt` (`rememberBeatFlash`, `hopOnBeat`) is the one hop shared by the ring's knob, the flute's speed knob and the bottom bar's 🥁.

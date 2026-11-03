@@ -25,7 +25,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -45,6 +44,7 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.facingRight
+import hr.bertlab.fluteassistant.ui.common.hopOnBeat
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 import kotlin.math.atan2
@@ -67,15 +67,13 @@ private const val KNOB_SIZE = 68f / DESIGN_SIZE
 /** Degrees left blank between two bands. */
 private const val BAND_GAP = 2.4f
 
-/** How far the knob's animal hops on a beat, in dp at the flash's peak. */
-private const val HOP_DP = 8f
-
 /**
  * A chunky tempo ring split into the five [TempoBand]s, each a fifth of the ring in its own
  * colour with its animal on it. A yellow knob carrying the current band's animal sits at the
  * tempo ([dialFraction]); dragging anywhere on the ring moves it with the finger, ticking at
  * every tempo, and tapping a band's animal jumps to that band ([TempoBand.jumpFrom]). The
- * middle shows the band's name over the tempo; while playing, the knob's animal hops with
+ * middle shows the tempo figure alone (the animal on the knob names the speed, and a screen reader
+ * hears the band as the ring's state); while playing, the knob's animal hops with
  * [flash] (read in the layer phase only) on every beat.
  *
  * Tapping the number swaps it for a [TempoWheel] in the same spot while [editing] is true;
@@ -188,7 +186,7 @@ fun TempoDial(
                 fontSize = (knob.value * 0.55f).roundToInt(),
                 modifier = Modifier
                     .facingRight()
-                    .graphicsLayer { translationY = -HOP_DP * density * flash() },
+                    .hopOnBeat(flash),
             )
         }
     }
