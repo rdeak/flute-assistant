@@ -84,7 +84,15 @@ it (`FluteUiState.shown`, a `Shown.Note`, `Rest` or `Breath`) and appends it as 
 it while the key stays down at `Tune.growAtMs` (`heldLength`, and the step's length in `tune`,
 which the staff shows); `onKeyReleased(midi)` silences it and records the length the hold made from
 `MonotonicClock` (`Tune.lengthOf`, the same rule, so the note never changes at lift-off), ignored
-unless that key is the one held (the newest press wins; sliding off a key releases it);
+unless that key is the one held (the newest press wins; sliding off a key releases it); a key the
+finger let go of and pressed again within `HOLD_REJOIN_MS` (60 ms), nothing else having happened
+since (a new hold, a hold ended by another key, a breath, Play, the speed panel or leaving the tab,
+or an erase all forget it), goes on with the same note from its first press, at the length the
+whole hold has made and growing from there (`rejoin`, logged as `flute.rejoin`; the rest key the same): since
+2026-11-03, because a touch screen can report one hold as several pieces (its palm rejection
+cancelling a flat finger and starting it over, or a bounce), and each piece became an eighth note
+of its own, the user's "bunch of short notes" when holding a key; a deliberate repeat of a note is
+far slower than the window, and Android itself takes an up and a down under 40 ms for jitter;
 `onKeyActivated(midi)` is the screen-reader path (one beat: a quarter note);
 `onRestPressed` / `onRestReleased` / `onRestActivated` are the same for the rest key without a
 sound (`restHeld`; a rest that takes over a held note silences it, since a note taking over a
@@ -143,7 +151,9 @@ with `FluteContent`, as the notes picker's does): the child comes back to the tu
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, per note ended), `flute.rest` (heldMs, length, added, per rest
-ended), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
+ended), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pressed again within
+`HOLD_REJOIN_MS` went on with its note or rest, so the `flute.note` before it was not the end of
+that note), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
 rests, bpm, time), `flute.play_done`, `flute.stop`
 (reason: pill, key, erase, leave or speed, so every `flute.play` has a closing line), `flute.erase`
 (left), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and

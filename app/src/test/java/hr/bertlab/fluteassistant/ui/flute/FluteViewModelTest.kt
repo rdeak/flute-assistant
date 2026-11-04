@@ -730,4 +730,107 @@ class FluteViewModelTest {
         assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
         assertEquals(1, logger.events("flute.speed_done").size)
     }
+
+    @Test
+    fun `a key let go of and pressed again at once goes on with the same note`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.onKeyPressed(67)
+        clock.now += 300
+        advanceTimeBy(300)
+        vm.onKeyReleased(67) // the touch screen reported the hold as over: a cancel or a bounce
+        assertEquals(listOf(TuneNote(67, EIGHTH)), vm.current.tune)
+        clock.now += 20
+        advanceTimeBy(20)
+        vm.onKeyPressed(67) // and the same finger as down again
+        assertEquals(on(67), tonePlayer.sounding)
+        assertEquals(67, vm.current.heldMidi)
+        assertEquals(0, vm.current.heldIndex)
+        assertEquals(listOf(TuneNote(67, EIGHTH)), vm.current.tune) // still the one note
+        assertEquals(EIGHTH, vm.current.heldLength)
+        advanceTimeBy(55) // ¾ of a beat after the first press: the hold grows from where it was
+        runCurrent()
+        assertEquals(QUARTER, vm.current.tune[0].length)
+        clock.now += 680 // a second held all told
+        advanceTimeBy(680)
+        vm.onKeyReleased(67)
+        assertEquals(listOf(TuneNote(67, HALF)), vm.current.tune)
+        assertEquals(vm.current.tune, settings.tune)
+        assertEquals(2, tonePlayer.offCount)
+        val rejoin = logger.events("flute.rejoin").single()
+        assertEquals(67, rejoin["midi"])
+        assertEquals(20L, rejoin["gapMs"])
+        assertEquals(listOf(300L, 1000L), logger.events("flute.note").map { it["heldMs"] })
+    }
+
+    @Test
+    fun `a note gone on with shows the length its whole hold has made`() {
+        val vm = viewModel()
+        vm.tap(67, 370)
+        clock.now += 10 // 380 ms into the hold: it passed ¾ of a beat during the gap
+        vm.onKeyPressed(67)
+        assertEquals(QUARTER, vm.current.heldLength)
+        assertEquals(listOf(TuneNote(67, QUARTER)), vm.current.tune)
+    }
+
+    @Test
+    fun `pressed again after a pause, the same key is a new note`() {
+        val vm = viewModel()
+        vm.tap(67, 300)
+        clock.now += FluteViewModel.HOLD_REJOIN_MS + 1
+        vm.tap(67, 300)
+        assertEquals(listOf(TuneNote(67, EIGHTH), TuneNote(67, EIGHTH)), vm.current.tune)
+        assertTrue(logger.events("flute.rejoin").isEmpty())
+    }
+
+    @Test
+    fun `a key let go of is not gone on with after another key, an erase or the rest`() {
+        val vm = viewModel()
+        vm.tap(67, 300)
+        clock.now += 10
+        vm.tap(69, 10)
+        clock.now += 10
+        vm.tap(67, 300) // a new g1 (an eighth), not the first one gone on with (a quarter by now)
+        assertEquals(listOf(TuneNote(67, EIGHTH), TuneNote(69, EIGHTH), TuneNote(67, EIGHTH)), vm.current.tune)
+        vm.eraseLast()
+        clock.now += 10
+        vm.tap(67, 300)
+        assertEquals(listOf(TuneNote(67, EIGHTH), TuneNote(69, EIGHTH), TuneNote(67, EIGHTH)), vm.current.tune)
+        clock.now += 10
+        vm.onRestPressed() // the rest is not the note let go of
+        assertEquals(4, vm.current.tune.size)
+        assertTrue(logger.events("flute.rejoin").isEmpty())
+    }
+
+    @Test
+    fun `the rest key let go of and pressed again at once goes on with the same rest`() {
+        val vm = viewModel()
+        vm.rest(300)
+        clock.now += 10
+        vm.onRestPressed()
+        assertTrue(vm.current.restHeld)
+        assertEquals(0, vm.current.heldIndex)
+        assertEquals(listOf(TuneRest(EIGHTH)), vm.current.tune)
+        clock.now += 690
+        vm.onRestReleased()
+        assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
+        assertNull(logger.events("flute.rejoin").single()["midi"])
+        assertTrue(tonePlayer.notesOn.isEmpty())
+    }
+
+    @Test
+    fun `at the cap a note gone on with is still not added`() {
+        settings.tune = List(200) { TuneNote(60, QUARTER) }
+        val vm = viewModel()
+        vm.tap(67, 300)
+        clock.now += 10
+        vm.onKeyPressed(67)
+        assertEquals(on(67), tonePlayer.sounding)
+        assertEquals(67, vm.current.heldMidi)
+        assertNull(vm.current.heldIndex)
+        clock.now += 690
+        vm.onKeyReleased(67)
+        assertEquals(200, vm.current.tune.size)
+        assertEquals(listOf(false, false), logger.events("flute.note").map { it["added"] })
+        assertEquals(1, logger.events("flute.rejoin").size)
+    }
 }
