@@ -135,7 +135,7 @@ private fun StatTile(
             modifier = Modifier
                 .padding(horizontal = 8.dp)
                 .alpha(if (faint) 0.3f else 1f)
-                .then(if (animal) Modifier.facingRight() else Modifier),
+                .then(if (animal) Modifier.facingRight(picture) else Modifier),
         )
         Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
     }

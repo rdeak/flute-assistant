@@ -47,6 +47,6 @@ fun SpeedKnob(
             .size(SpeedKnobSize)
             .semantics { contentDescription = description },
     ) {
-        if (!running) Emoji(band.emoji, fontSize = 26, modifier = Modifier.facingRight().hopOnBeat(flash))
+        if (!running) Emoji(band.emoji, fontSize = 26, modifier = Modifier.facingRight(band.emoji).hopOnBeat(flash))
     }
 }

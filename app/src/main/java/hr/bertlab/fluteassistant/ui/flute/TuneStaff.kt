@@ -440,7 +440,7 @@ private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, wrong: Boolean, modif
             animal != null -> Emoji(
                 animal.emoji,
                 fontSize = emojiSizeFor(StaffGeometry.ANIMAL_SIZE * s),
-                modifier = Modifier.facingRight().hopOnBeat(animal.flash),
+                modifier = Modifier.facingRight(animal.emoji).hopOnBeat(animal.flash),
             )
             mark == StepMark.FIRST_TRY -> Emoji(STAR_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.RETRY -> Emoji(

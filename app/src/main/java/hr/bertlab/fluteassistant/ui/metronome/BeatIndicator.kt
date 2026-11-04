@@ -134,7 +134,7 @@ private fun BeatBubbles(
                                 emoji = animal,
                                 fontSize = 32,
                                 modifier = Modifier
-                                    .facingRight()
+                                    .facingRight(animal)
                                     .graphicsLayer { translationY = -HOP_DP * density * flash() },
                             )
                         }

@@ -224,10 +224,3 @@ fun Emoji(emoji: String, fontSize: Int, modifier: Modifier = Modifier) {
         modifier = modifier.clearAndSetSemantics { },
     )
 }
-
-/**
- * Turns an animal emoji round to face right, the way the metronome's ring goes faster; every
- * speed animal (the ring's and the notes summary's) does. The emoji sets seen so far (Google's on
- * Android, Apple's on the design canvas) draw all five facing left.
- */
-fun Modifier.facingRight(): Modifier = graphicsLayer(scaleX = -1f)

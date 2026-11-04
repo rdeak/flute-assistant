@@ -157,7 +157,7 @@ fun TempoDial(
                     }
                     .semantics { contentDescription = label },
             ) {
-                if (each != band) Emoji(each.emoji, fontSize = 22, modifier = Modifier.alpha(0.75f).facingRight())
+                if (each != band) Emoji(each.emoji, fontSize = 22, modifier = Modifier.alpha(0.75f).facingRight(each.emoji))
             }
         }
 
@@ -185,7 +185,7 @@ fun TempoDial(
                 emoji = band.emoji,
                 fontSize = (knob.value * 0.55f).roundToInt(),
                 modifier = Modifier
-                    .facingRight()
+                    .facingRight(band.emoji)
                     .hopOnBeat(flash),
             )
         }
