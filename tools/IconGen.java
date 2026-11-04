@@ -129,8 +129,9 @@ public class IconGen {
         g.setFont(fit(g, "Flute Assistant", nunito("nunito_bold"), 86, maxWidth));
         g.drawString("Flute Assistant", textX, 222);
         g.setColor(MUTED);
-        g.setFont(fit(g, "Metronome, tuner, notes and flute", nunito("nunito_semibold"), 38, maxWidth));
-        g.drawString("Metronome, tuner, notes and flute", textX + 2, 284);
+        String subtitle = "Flute, metronome, tuner and notes"; // the tab bar's order
+        g.setFont(fit(g, subtitle, nunito("nunito_semibold"), 38, maxWidth));
+        g.drawString(subtitle, textX + 2, 284);
         // The flute's seven note colours, as on the icon.
         for (int i = 0; i < NOTES.length; i++) {
             g.setColor(NOTES[i]); g.fill(circle(textX + 18 + 44 * i, 342, 14));

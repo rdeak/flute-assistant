@@ -13,10 +13,10 @@ Settings and the child's tunes are stored locally on the device.
 | Field | Value |
 |---|---|
 | App name | Flute Assistant |
-| Short description | Metronome, tuner, note game and a digital flute for young flute players. |
+| Short description | A digital flute, metronome, tuner and note game for young flute players. |
 | Full description | See below |
 | App icon | `play-listing/icon-512.png` (512x512) |
-| Feature graphic | `play-listing/feature-graphic-1024x500.png` (subtitle "Metronome, tuner, notes and flute", text in `tools/IconGen.java`) |
+| Feature graphic | `play-listing/feature-graphic-1024x500.png` (subtitle "Flute, metronome, tuner and notes", text in `tools/IconGen.java`) |
 | Screenshots | `play-listing/screenshots/en/` and `hr/`: one per tab, 1080x1920 JPEG (9:16, the ratio Play asks for), made by `tools/play-screenshots.sh` on the emulator |
 | Category | Music & Audio |
 | Languages | English (default) and Croatian; the UI follows the system language and Android 13+ per-app language settings. Add a Croatian listing translation (draft below) with the `hr/` screenshots so Croatian users see the listing in their language. |
@@ -27,6 +27,11 @@ Full description, English:
 
 > Made for children in primary school who are learning the flute. Four big, friendly screens
 > and nothing to read.
+>
+> FLUTE. Fifteen colourful note keys in three octave rows. Hold a key to hear the note: the longer
+> you hold it, the longer the note, and your tune is written on a real staff with the note names
+> under it. Hear it played back, or press "Listen to me" and play it on your own flute for a star
+> under every note you get right. Six little books keep six tunes.
 >
 > METRONOME. A tempo ring with five animals, from a snail to a cheetah: drag the animal round or
 > tap one to jump to its speed. Two to six beats in a bar, shown as bubbles with the animal
@@ -41,18 +46,18 @@ Full description, English:
 > and let go. Ten notes a round, flames for hits in a row and stars at the end. Choose which
 > notes to practise.
 >
-> FLUTE. Fifteen colourful note keys in three octave rows. Hold a key to hear the note: the longer
-> you hold it, the longer the note, and your tune is written on a real staff with the note names
-> under it. Hear it played back, or press "Listen to me" and play it on your own flute for a star
-> under every note you get right. Six little books keep six tunes.
->
 > In English and Croatian. No account, no ads, no data leaves your device.
 
-Full description, Croatian (short description: "Metronom, štimer, igra čitanja nota i
-digitalna flauta za male flautiste."):
+Full description, Croatian (short description: "Digitalna flauta, metronom, štimer i igra
+čitanja nota za male flautiste."):
 
 > Napravljeno za djecu u osnovnoj školi koja uče svirati flautu. Četiri velika, vesela ekrana i
 > ništa za čitanje.
+>
+> FLAUTA. Petnaest šarenih tipki u tri reda. Drži tipku da čuješ ton: što je dulje držiš, to je
+> nota dulja, a tvoja se pjesmica zapisuje na pravo crtovlje s imenima nota ispod. Poslušaj je ili
+> pritisni „Poslušaj me“ i odsviraj je na svojoj flauti, za zvjezdicu ispod svake pogođene note.
+> Šest knjižica čuva šest pjesmica.
 >
 > METRONOM. Krug za tempo s pet životinja, od puža do geparda: povuci životinju po krugu ili
 > dodirni jednu da skočiš na njezinu brzinu. Od dvije do šest doba u taktu, kao mjehurići na
@@ -66,11 +71,6 @@ digitalna flauta za male flautiste."):
 > NOTE. Igra čitanja nota. Pojavi se ime note, a ti povuci prst do njezina mjesta na crtovlju i
 > pusti. Deset nota po krugu, plamičci za pogotke zaredom i zvjezdice na kraju. Sam biraš koje
 > note vježbaš.
->
-> FLAUTA. Petnaest šarenih tipki u tri reda. Drži tipku da čuješ ton: što je dulje držiš, to je
-> nota dulja, a tvoja se pjesmica zapisuje na pravo crtovlje s imenima nota ispod. Poslušaj je ili
-> pritisni „Poslušaj me“ i odsviraj je na svojoj flauti, za zvjezdicu ispod svake pogođene note.
-> Šest knjižica čuva šest pjesmica.
 >
 > Na hrvatskom i engleskom. Bez računa, bez oglasa, nikakvi podaci ne napuštaju uređaj.
 
