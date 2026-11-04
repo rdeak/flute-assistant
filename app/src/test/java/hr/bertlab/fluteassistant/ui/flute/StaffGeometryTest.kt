@@ -57,7 +57,7 @@ class StaffGeometryTest {
         for (s in listOf(1f, RunningStaffScale)) {
             val top = StaffGeometry.bookButtonTop(s)
             assertTrue("scale $s: top $top", top >= StaffGeometry.CLEF_BOTTOM * s + 4f)
-            assertTrue("scale $s", top + StaffGeometry.CORNER_BUTTON + StaffGeometry.CORNER_SHADOW <= StaffGeometry.TOTAL_HEIGHT * s)
+            assertTrue("scale $s", top + StaffGeometry.BOOK_BUTTON_HEIGHT + StaffGeometry.CORNER_SHADOW <= StaffGeometry.TOTAL_HEIGHT * s)
             assertTrue("scale $s", StaffGeometry.CORNER_BUTTON <= StaffGeometry.NOTES_CLIP * s)
         }
     }

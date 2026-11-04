@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
@@ -468,6 +469,39 @@ class FluteScreenTest {
     }
 
     @Test
+    fun the_corner_buttons_tell_a_screen_reader_they_are_off_once_the_tune_starts() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        val book = "Tune: Lollipop, tap to change"
+        val knob = "Speed: Rabbit, tap to change"
+        assertTrue("the book at rest", accessibilityEnabled(book))
+        assertTrue("the knob at rest", accessibilityEnabled(knob))
+        state.value = state.value.copy(playingIndex = 0)
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription(book).assertIsNotEnabled()
+        compose.onNodeWithContentDescription(knob).assertIsNotEnabled()
+        assertFalse("a screen reader is told the book is on while the tune runs", accessibilityEnabled(book))
+        assertFalse("a screen reader is told the knob is on while the tune runs", accessibilityEnabled(knob))
+    }
+
+    /**
+     * Whether Android's accessibility layer reports the button described as [description] as
+     * enabled, read from the merged button a screen reader focuses. Not from a `uiautomator dump`
+     * matched by `content-desc`: when a merged button has children, Compose adds a child node
+     * holding only the description (`SemanticsNode.emitFakeNodes`), and that child always reads
+     * enabled. The book's cover has its sweet as a child; the knob loses its animal while the tune
+     * runs, which is why a dump showed the knob off and the book on.
+     */
+    private fun accessibilityEnabled(description: String): Boolean {
+        val node = compose.onNodeWithContentDescription(description).fetchSemanticsNode()
+        val view = (node.root as ViewRootForTest).view
+        var enabled: Boolean? = null
+        compose.runOnUiThread {
+            enabled = view.accessibilityNodeProvider!!.createAccessibilityNodeInfo(node.id)!!.isEnabled
+        }
+        return enabled!!
+    }
+
+    @Test
     fun the_book_button_speaks_croatian() {
         show(FluteUiState(openBook = 3), locale = Locale("hr"))
         compose.onNodeWithContentDescription("Pjesmica: Krafna, dodirni za promjenu").assertExists()
@@ -476,16 +510,19 @@ class FluteScreenTest {
     @Test
     fun the_book_button_sits_under_the_clef_left_of_the_notes() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
-        val book = compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").getBoundsInRoot()
+        // The node is the book's cover, the pressable part; its page edges stand 6 dp further right.
+        val cover = compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").getBoundsInRoot()
+        val bookRight = cover.right + 6.dp
         val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").getBoundsInRoot()
-        // The tune's row starts NOTES_CLIP (57 dp) into the staff; the button, the knob's twin one corner
+        // The tune's row starts NOTES_CLIP (57 dp) into the staff; the book, the knob's twin one corner
         // down, stands in the same column left of it, under the time signature, beside the names.
         val tuneRow = compose.onNodeWithContentDescription("Your tune, 1 note").getBoundsInRoot()
         val signature = compose.onNodeWithContentDescription("Time signature 4/4").getBoundsInRoot()
-        assertTrue("the book button $book should sit below the time signature $signature", book.top >= signature.bottom - 1.dp)
-        assertTrue("the book button $book should end before the notes start $tuneRow", book.right <= tuneRow.left + 1.dp)
-        assertTrue("the book button $book should end no further right than the knob $knob", book.right <= knob.right + 1.dp)
-        assertTrue("the book button should be 54 dp, was ${book.width}", abs((book.width - 54.dp).value) <= 0.5f)
+        assertTrue("the book $cover should sit below the time signature $signature", cover.top >= signature.bottom - 1.dp)
+        assertTrue("the book, page edges and all, ending at $bookRight, should end before the notes start $tuneRow", bookRight <= tuneRow.left + 1.dp)
+        assertTrue("the book, ending at $bookRight, should end no further right than the knob $knob", bookRight <= knob.right + 1.dp)
+        assertTrue("the cover should be 48 dp wide, was ${cover.width}", abs((cover.width - 48.dp).value) <= 0.5f)
+        assertTrue("the cover should be 64 dp tall, was ${cover.height}", abs((cover.height - 64.dp).value) <= 0.5f)
     }
 
     // ---- The shelf ----

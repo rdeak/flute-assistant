@@ -88,7 +88,9 @@ fun Modifier.chunky(
  * A [chunky] button. Plain by default; pass [selected] to make it one option of a group
  * (a radio button or a tab) or [checked] to make it an on/off choice, so assistive
  * technology hears the state. [color] fills it; text on a bright fill is ink, on the plain
- * raised colour it is the theme's text colour.
+ * raised colour it is the theme's text colour. A disabled button fades to [DISABLED_ALPHA] unless
+ * [fade] is false, for a button the caller fades together with what is drawn around it (the book
+ * button's page edges), so the whole fades once, as one layer.
  */
 @Composable
 fun ChunkyButton(
@@ -106,6 +108,7 @@ fun ChunkyButton(
         else -> Role.Button
     },
     interactionSource: MutableInteractionSource? = null,
+    fade: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val source = interactionSource ?: remember { MutableInteractionSource() }
@@ -120,7 +123,7 @@ fun ChunkyButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .alpha(if (enabled || !fade) 1f else DISABLED_ALPHA)
             .chunky(shape, color, colors.outline, depth, pressed && enabled)
             .then(gesture),
     ) {

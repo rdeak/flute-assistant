@@ -187,8 +187,10 @@ the tune plays back), whose tap swaps the stage, the keys and the Play row, in p
 metronome tab's own stage (`MetronomeStage`: the beat bubbles with − / + and the ring exactly as
 drawn there, its tempo figure the one number the panel shows) over one big green OK, the only way
 back; at the staff's bottom left, under the clef and beside the names, since 2026-11-04 (chosen by
-the user from true-size mockups, the top right covered the newest notes' stems), a round white
-button carrying the open tune's sweet (`BookButton`: 🍭 🍪 🧁 🍩 🍦 🍬, one for each of six books), whose
+the user from true-size mockups, the top right covered the newest notes' stems), the open book
+itself as a little yellow book like the shelf's, spine, page edges and its sweet on the cover, the
+yellow knob's twin (`BookButton`: 🍭 🍪 🧁 🍩 🍦 🍬, one for each of six books; a round white button
+until the user asked for "same book layout" the same day), whose
 tap swaps the stage, the keys and the Play row, in place, for a shelf of six little books
 (`TuneShelf`, always in the same order, the open one yellow, each a sweet over the tune's first five
 notes, no word and no number on it) where one tap opens a book and closes the shelf: the flute

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,7 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -61,11 +62,15 @@ enum class Sweet(val emoji: String, @StringRes val nameRes: Int) {
 }
 
 /**
- * The round white button in the staff's left corner, under the treble clef and beside the names
- * row: the open book's [sweet], always shown (the child sees which tune is on the staff), the
- * speed knob's twin one corner down. A tap is [onClick] and opens the shelf. While the tune is
- * [running] (Play or Your turn) the button stays, faded and not pressable, as the knob does. A
- * screen reader hears the sweet's name ("Tune: Cookie, tap to change"), never a number.
+ * The open book in the staff's left corner, under the treble clef and beside the names row: the
+ * shelf's little book at about half its size ([CornerBook]: spine, page edges, the [sweet] on the
+ * cover, no label, since the tune is on the staff beside it), in [Sun] as the open book is on the
+ * shelf, so the child sees on the staff the very book they picked, and the yellow speed knob's
+ * twin one corner down. It is [StaffGeometry.CORNER_BUTTON] wide with its page edges and
+ * [StaffGeometry.BOOK_BUTTON_HEIGHT] tall, always shown. A tap on the cover is [onClick] and
+ * opens the shelf. While the tune is [running] (Play or Your turn) the book stays, faded as one
+ * and not pressable, as the knob does. A screen reader hears the sweet's name ("Tune: Cookie,
+ * tap to change"), never a number.
  */
 @Composable
 fun BookButton(
@@ -75,19 +80,22 @@ fun BookButton(
     modifier: Modifier = Modifier,
 ) {
     val description = stringResource(R.string.flute_book_button, stringResource(sweet.nameRes))
-    ChunkyButton(
+    // In dp, not sp, as on the shelf: a large font scale cannot push the sweet off the narrow cover.
+    val sweetFont = with(LocalDensity.current) { CornerSweetSize.toSp().value.roundToInt() }
+    LittleBook(
+        look = CornerBook,
+        color = Sun,
         onClick = onClick,
-        shape = CircleShape,
-        color = FluteTheme.colors.raised,
-        depth = StaffGeometry.CORNER_SHADOW.dp,
         enabled = !running,
-        modifier = modifier
-            .size(SpeedKnobSize)
-            .semantics { contentDescription = description },
+        coverModifier = Modifier.semantics { contentDescription = description },
+        modifier = modifier.size(StaffGeometry.CORNER_BUTTON.dp, StaffGeometry.BOOK_BUTTON_HEIGHT.dp),
     ) {
-        Emoji(sweet.emoji, fontSize = 26)
+        Emoji(sweet.emoji, fontSize = sweetFont, modifier = Modifier.align(Alignment.Center))
     }
 }
+
+/** The sweet on the book button: the round button's 26, which fits the room between the spine and the cover's edge. */
+private val CornerSweetSize = 26.dp
 
 /** The least a row of books may take; on a taller screen the three rows share the height. */
 private val BookMinHeight = 116.dp
@@ -148,20 +156,113 @@ fun TuneShelf(
 
 private const val BOOKS_IN_A_ROW = 2
 
-/** A book's cover: square at the spine, round at the edge that opens. */
-private val BookShape = RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 18.dp, bottomEnd = 18.dp)
-private val BookDepth = 4.dp
-private val SpineWidth = 12.dp
+/**
+ * The sizes of a little book. The shelf's covers ([ShelfBook]) and the staff's book button
+ * ([CornerBook]) are the same book drawn at two sizes by [LittleBook].
+ */
+private class BookLook(
+    val spine: Dp,
+    /** How far the page edges stand out past the cover's open edge; they reach [pagesHidden] further in, behind it. */
+    val pagesShow: Dp,
+    val pagesHidden: Dp,
+    /** The page edges stand this much in from the cover's top, and [pagesBottom] from its bottom. */
+    val pagesTop: Dp,
+    val pagesBottom: Dp,
+    spineCorner: Dp,
+    edgeCorner: Dp,
+    pagesCorner: Dp,
+    val depth: Dp,
+) {
+    /** The cover: square at the spine, round at the edge that opens. */
+    val shape = RoundedCornerShape(topStart = spineCorner, bottomStart = spineCorner, topEnd = edgeCorner, bottomEnd = edgeCorner)
+    val pagesShape = RoundedCornerShape(topEnd = pagesCorner, bottomEnd = pagesCorner)
+}
 
-/** How far the page edges stand out past the cover's open edge; they reach [PagesHidden] further in, behind it. */
-private val PagesShow = 8.dp
-private val PagesHidden = 12.dp
-private val PagesShape = RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
+/** A book on the shelf (`sweets-shelf-v2.html`). */
+private val ShelfBook = BookLook(
+    spine = 12.dp, pagesShow = 8.dp, pagesHidden = 12.dp, pagesTop = 6.dp, pagesBottom = 3.dp,
+    spineCorner = 6.dp, edgeCorner = 18.dp, pagesCorner = 8.dp, depth = 4.dp,
+)
+
+/**
+ * The book button under the staff's clef, about half a shelf book (`book-button-shape.html`, the
+ * user's pick of 2026-11-04), with the speed knob's shadow.
+ */
+private val CornerBook = BookLook(
+    spine = 7.dp, pagesShow = 6.dp, pagesHidden = 8.dp, pagesTop = 4.dp, pagesBottom = 2.dp,
+    spineCorner = 4.dp, edgeCorner = 12.dp, pagesCorner = 6.dp, depth = StaffGeometry.CORNER_SHADOW.dp,
+)
+
 private val PagesOutline = 2.dp
 
 /** One page's edge and the line after it, across the page edges. */
 private val PageEdge = 3.dp
 private val PageLine = 1.dp
+
+/**
+ * A little book drawn at [look]'s sizes: the page edges (thin lines on paper, the way a closed
+ * book's pages show) standing out past the cover's open edge, and over them the cover, a
+ * [ChunkyButton] in [color] with a dark spine down its start edge, [content] in the room between
+ * the spine and the cover's outline at its other edge. [coverModifier] goes on the cover, the
+ * pressable part. A disabled book fades once, page edges and cover together as one layer, so the
+ * page edges never show through a faded cover.
+ */
+@Composable
+private fun LittleBook(
+    look: BookLook,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    coverModifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    selected: Boolean? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val colors = FluteTheme.colors
+    Box(modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .padding(top = look.pagesTop, bottom = look.pagesBottom)
+                .width(look.pagesShow + look.pagesHidden)
+                .clip(look.pagesShape)
+                .background(colors.raised)
+                .drawBehind {
+                    val step = PageEdge.toPx()
+                    val line = PageLine.toPx()
+                    var x = step - line
+                    while (x < size.width) {
+                        drawRect(colors.border, topLeft = Offset(x, 0f), size = Size(line, size.height))
+                        x += step
+                    }
+                }
+                .border(PagesOutline, colors.outline, look.pagesShape),
+        )
+        ChunkyButton(
+            onClick = onClick,
+            shape = look.shape,
+            color = color,
+            depth = look.depth,
+            enabled = enabled,
+            selected = selected,
+            fade = false,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(end = look.pagesShow)
+                .then(coverModifier),
+        ) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxHeight()
+                    .width(look.spine)
+                    .background(colors.outline),
+            )
+            Box(Modifier.fillMaxSize().padding(start = look.spine, end = OutlineWidth), content = content)
+        }
+    }
+}
 
 /** The sweet's share of its cover's height: the mockup's 36 px sweet on a 112 px cover. */
 private const val SWEET_SHARE = 0.32f
@@ -217,62 +318,30 @@ private fun BookCover(
         book.isEmpty -> stringResource(R.string.flute_book_empty, name)
         else -> pluralStringResource(R.plurals.flute_book_notes, book.noteCount, name, book.noteCount)
     }
-    Box(modifier) {
-        // The page edges, behind the cover: thin lines on paper, the way a closed book's pages show.
-        Box(
+    LittleBook(
+        look = ShelfBook,
+        color = if (open) Sun else colors.raised,
+        onClick = onClick,
+        selected = open,
+        coverModifier = Modifier.semantics { contentDescription = description },
+        modifier = modifier,
+    ) {
+        BoxWithConstraints(
             Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .padding(top = 6.dp, bottom = 3.dp)
-                .width(PagesShow + PagesHidden)
-                .clip(PagesShape)
-                .background(colors.raised)
-                .drawBehind {
-                    val step = PageEdge.toPx()
-                    val line = PageLine.toPx()
-                    var x = step - line
-                    while (x < size.width) {
-                        drawRect(colors.border, topLeft = Offset(x, 0f), size = Size(line, size.height))
-                        x += step
-                    }
-                }
-                .border(PagesOutline, colors.outline, PagesShape),
-        )
-        ChunkyButton(
-            onClick = onClick,
-            shape = BookShape,
-            color = if (open) Sun else colors.raised,
-            depth = BookDepth,
-            selected = open,
-            modifier = Modifier
                 .fillMaxSize()
-                .padding(end = PagesShow)
-                .semantics { contentDescription = description },
+                // Centred between the spine and the cover's outline at its other edge.
+                .padding(horizontal = LabelMargin)
+                .clearAndSetSemantics { },
         ) {
-            Box(
-                Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxHeight()
-                    .width(SpineWidth)
-                    .background(colors.outline),
-            )
-            BoxWithConstraints(
-                Modifier
-                    .fillMaxSize()
-                    // Centred between the spine and the cover's outline at its other edge.
-                    .padding(start = SpineWidth + LabelMargin, end = OutlineWidth + LabelMargin)
-                    .clearAndSetSemantics { },
+            // In dp, not sp: the sweet grows with its cover, and a large font scale cannot push it out.
+            val sweetFont = with(LocalDensity.current) { sweetSize(maxWidth, maxHeight).toSp().value.roundToInt() }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                modifier = Modifier.fillMaxSize(),
             ) {
-                // In dp, not sp: the sweet grows with its cover, and a large font scale cannot push it out.
-                val sweetFont = with(LocalDensity.current) { sweetSize(maxWidth, maxHeight).toSp().value.roundToInt() }
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-                    modifier = Modifier.fillMaxSize(),
-                ) {
-                    Emoji(sweet.emoji, fontSize = sweetFont, modifier = if (book.isEmpty) Modifier.alpha(DISABLED_ALPHA) else Modifier)
-                    CoverLabel(book.coverNotes)
-                }
+                Emoji(sweet.emoji, fontSize = sweetFont, modifier = if (book.isEmpty) Modifier.alpha(DISABLED_ALPHA) else Modifier)
+                CoverLabel(book.coverNotes)
             }
         }
     }

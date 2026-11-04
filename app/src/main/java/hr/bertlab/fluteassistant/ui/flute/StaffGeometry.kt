@@ -86,15 +86,19 @@ internal object StaffGeometry {
     const val CLEF_BOTTOM = TOP_LINE_Y + 5.12f * CLEF_UNIT
 
     /**
-     * The round buttons in the staff's left corner (since 2026-11-04): the speed knob at the top
-     * and, under the clef, beside the names row, the open book's sweet. [CORNER_BUTTON] across
-     * ([NOTES_CLIP] is no less, so no note runs under either) with a [CORNER_SHADOW] shadow.
+     * The buttons in the staff's left corner (since 2026-11-04): the round speed knob at the top
+     * and, under the clef, beside the names row, the open book as a little book with its sweet,
+     * [BOOK_BUTTON_HEIGHT] tall. Both are [CORNER_BUTTON] across, the book's page edges included
+     * ([NOTES_CLIP] is no less, so no note runs under either), with a [CORNER_SHADOW] shadow.
      */
     const val CORNER_BUTTON = 54f
     const val CORNER_SHADOW = 5f
 
+    /** The book button's height: a book stands taller than it is wide, and the cell under the clef has 90 dp of room. */
+    const val BOOK_BUTTON_HEIGHT = 64f
+
     /** Where the book button's top is at [scale] (1 at rest, [RunningStaffScale] while the tune runs): centred on the names' pills. */
-    fun bookButtonTop(scale: Float): Float = (NAMES_TOP + PILL_HEIGHT / 2) * scale - CORNER_BUTTON / 2
+    fun bookButtonTop(scale: Float): Float = (NAMES_TOP + PILL_HEIGHT / 2) * scale - BOOK_BUTTON_HEIGHT / 2
 
     /** The time signature's figures: centred at this x, each across two spaces of the staff. */
     const val SIGNATURE_X = 48f

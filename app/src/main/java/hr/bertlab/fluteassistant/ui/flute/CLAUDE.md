@@ -268,11 +268,20 @@ get the old tune back on the next start, and once `open_book` exists a `tune` ke
 store over a throwaway preferences file, the first test of the store, and its "fresh store" gets the
 process's cached preferences, so it checks the key layout and encoding, not the disk write).
 
-The button (`BookButton`, `Shelf.kt`) is a round `ChunkyButton` in `colors.raised` (white: it is
-not "chosen", so not `Sun`, which marks the open book on the shelf), `SpeedKnobSize` (54 dp,
-`StaffGeometry.CORNER_BUTTON`) across with a 5 dp shadow, carrying the open book's sweet at 26 sp,
-the speed knob's twin one corner down: the knob above says how fast, the button below it says which
-tune. It stands at the staff's bottom left, under the clef, beside the names row, at
+The button (`BookButton`, `Shelf.kt`) is the open book itself, drawn as a little book like the
+shelf's (the user, later on 2026-11-04: "sweet icon that shows what slot is currently active should
+have same book layout with sweet same as load screen has", and from three true-size mockups,
+`book-button-shape.html`, "A is fine"): the shelf's `LittleBook` at the `CornerBook` sizes (a 7 dp
+spine, page edges 6 dp out and 4 / 2 dp in from the cover's top and bottom, corners 4 dp at the
+spine and 12 at the edge), `StaffGeometry.CORNER_BUTTON` (54 dp) wide with its page edges (the
+cover 48) and `BOOK_BUTTON_HEIGHT` (64 dp) tall, with the knob's 5 dp shadow, the open book's sweet
+at 26 dp (in dp, as on the shelf, so a large font scale cannot push it off the cover) and no label
+(the tune is on the staff beside it; five note bubbles would be 5 dp dots at this size). The cover is
+`Sun`, as the open book's is on the shelf (in dark mode too: `Sun` never changes), so the child sees
+on the staff the very book they picked, and it pairs with the yellow speed knob one corner up: the
+knob says how fast, the book under it says which tune. It replaced a round white button the same
+day (white then because it was "not chosen"; the user's "same book" overrode that). It stands at
+the staff's bottom left, under the clef, beside the names row, at
 `StaffGeometry.bookButtonTop`: centred on the names' pills (`NAMES_TOP + PILL_HEIGHT / 2`), in the
 column left of `NOTES_CLIP` (57 dp) that is empty from under the clef (`CLEF_BOTTOM`, 167 dp, the
 hook's lowest control point, a bound the stroke never passes) down to the bottom of the marks row
@@ -280,7 +289,11 @@ hook's lowest control point, a bound the stroke never passes) down to the bottom
 both scales). At `RunningStaffScale` the cell grows and the button does not; only its position
 follows the scaled geometry. It shows on an empty tune too, and while the tune runs it stays, faded
 and not pressable, still showing its sweet (the knob is inert then too; the sweet stays because,
-unlike the animal, it does not walk the staff). It was first sketched at the staff's top right
+unlike the animal, it does not walk the staff). The book fades as one layer: `LittleBook` fades
+its page edges and cover together and passes `fade = false` to its `ChunkyButton`, since a cover
+faded on its own would show the page edges behind it through its open edge. Only the cover is
+pressable and carries the description; `FluteScreenTest` checks the cover's 48 x 64 and that the
+page edges, 6 dp further right, end before the notes. It was first sketched at the staff's top right
 (approved from the sketch, "A is fine"), and turned down on the real staff for two reasons: the tune
 is shown scrolled to its end with `NOTES_END_PADDING` at 4 dp, and every note from c² up has its stem
 top inside the button's 0 to 59 dp, so it covered the newest notes' stems; keeping the staff's end
@@ -296,8 +309,9 @@ The shelf (`TuneShelf`, `Shelf.kt`): `FluteContent` keeps `choosingBook` in `rem
 keeps `choosingSpeed`, so rotation and the language switch keep it open, and while it is true the
 shelf takes the place of the stage, the keys and the Play row (leaving the tab drops it, and logs no
 closing line, as for the speed panel). Six `BookCover`s stand in two columns and three rows, always
-in the sweets' order (🍭 🍪 / 🧁 🍩 / 🍦 🍬), each a little book: a cover square at the spine and round
-at the edge that opens (`BookShape`), a dark spine down its left edge, page edges (thin lines on
+in the sweets' order (🍭 🍪 / 🧁 🍩 / 🍦 🍬), each a little book (`LittleBook` at the `ShelfBook` sizes,
+the drawing the book button shares): a cover square at the spine and round
+at the edge that opens (`BookLook.shape`), a dark spine down its left edge, page edges (thin lines on
 paper) showing past its right edge, the sweet large in the middle and under it a white label with
 the tune's first five notes (`Book.coverNotes`, rests and breaths skipped) as small `NoteBubble`s in
 their letters' colours, the label always five bubbles wide so every label is the same size (the

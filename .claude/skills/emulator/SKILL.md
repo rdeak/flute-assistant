@@ -24,3 +24,11 @@ adb exec-out screencap -p > shot.png
 
 The notification-permission dialog appears on the first metronome start (API 33+);
 `adb shell input keyevent 4` dismisses it.
+
+Reading a `uiautomator dump`: when a merged Compose button has children (an emoji, a label), Compose
+adds a child node holding only the button's `content-desc` (and one for its role), and that child
+always reads `enabled="true"` and `clickable="false"`. The button's real state (enabled, clickable,
+focusable) is on its parent node, the one without the description. Matching a button by its
+`content-desc` therefore finds the wrong node. A button without children keeps the description on
+itself, so the same button can switch between the two shapes when its content goes (the speed
+knob while the tune runs).
