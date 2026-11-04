@@ -135,8 +135,10 @@
     <!-- Digital flute (ui/flute): keys that sound while held, a line of the notes played, one Play button -->
     <string name="flute_hint">👆 Tap or hold a note</string>
     <string name="flute_play">Play</string>
-    <!-- The second big button: the phone listens to the child playing the tune on a real flute and marks each note -->
-    <string name="flute_your_turn">Your turn</string>
+    <!-- The second big button (the feature called "Your turn" in code and docs): the phone listens to the child
+         playing the tune on a real flute and marks each note. Worded as the child speaking to the phone, like
+         Croatian "Poslušaj me" (since 2026-11-04; it said "Your turn") -->
+    <string name="flute_your_turn">Listen to me</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
     <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->

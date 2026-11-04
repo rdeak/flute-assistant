@@ -206,7 +206,8 @@ for as long as it is held) with, at the end of the top row beside c³, a 😮‍
 on the staff its rest symbol in grey with 💤 under the staff, in the line a grey 💤 pill; a breath has no length, on the staff the breath mark with 😮‍💨 over it, and playback
 goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, two big buttons that stack their
 icon over their word, "Play" (the tune at the metronome's tempo) and, since 2026-11-04, "Your turn"
-(blue, a microphone: the phone listens to the child's real flute and waits for each written note,
+(labelled "Listen to me" / "Poslušaj me", the child speaking to the phone, as is Croatian
+"Odsviraj" for Play; blue, a microphone: the phone listens to the child's real flute and waits for each written note,
 the same letter in any octave; under the note a star for a first try, a faint star after a stumble,
 a ❌ for a moment under a wrong one, never a number and no summary; the first right-or-wrong outside
 the notes game, kept the child's by being opt-in and child-paced; spec

@@ -278,7 +278,7 @@ class FluteScreenTest {
                 }
             }
         }
-        for (label in listOf("Sviraj", "Ti sviraj")) {
+        for (label in listOf("Odsviraj", "Poslušaj me")) {
             val layouts = mutableListOf<TextLayoutResult>()
             val node = compose.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode()
             node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
@@ -289,8 +289,8 @@ class FluteScreenTest {
     @Test
     fun croatian_copy() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER))), Locale("hr"))
-        compose.onNodeWithText("Sviraj").assertExists()
-        compose.onNodeWithText("Ti sviraj").assertExists()
+        compose.onNodeWithText("Odsviraj").assertExists()
+        compose.onNodeWithText("Poslušaj me").assertExists()
         compose.onNodeWithContentDescription("Obriši zadnju notu").assertExists()
         compose.onNodeWithContentDescription("c1").assertExists()
         compose.onNodeWithContentDescription("Tvoja pjesmica, 3 note").assertExists()
@@ -656,17 +656,17 @@ class FluteScreenTest {
     fun your_turn_sits_beside_play_and_needs_a_note() {
         show(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER))))
         compose.onNodeWithText("Play").assertIsEnabled()
-        compose.onNodeWithText("Your turn").assertIsDisplayed()
-        compose.onNodeWithText("Your turn").assertIsNotEnabled()
+        compose.onNodeWithText("Listen to me").assertIsDisplayed()
+        compose.onNodeWithText("Listen to me").assertIsNotEnabled()
         val play = compose.onNodeWithText("Play").getBoundsInRoot()
-        val yourTurn = compose.onNodeWithText("Your turn").getBoundsInRoot()
+        val yourTurn = compose.onNodeWithText("Listen to me").getBoundsInRoot()
         val erase = compose.onNodeWithContentDescription("Erase the last note").getBoundsInRoot()
         assertTrue("Your turn $yourTurn should sit right of Play $play", yourTurn.left >= play.right)
         assertTrue("Your turn $yourTurn should sit left of the sponge $erase", yourTurn.right <= erase.left)
         assertEquals("both big buttons share the height", play.height, yourTurn.height)
         state.value = state.value.copy(tune = twoNotes)
-        compose.onNodeWithText("Your turn").assertIsEnabled()
-        compose.onNodeWithText("Your turn").performClick()
+        compose.onNodeWithText("Listen to me").assertIsEnabled()
+        compose.onNodeWithText("Listen to me").performClick()
         assertEquals(1, yourTurns)
     }
 
@@ -676,7 +676,7 @@ class FluteScreenTest {
         fun checkRunning() {
             compose.onNodeWithText("Stop").assertIsDisplayed()
             compose.onNodeWithText("Play").assertDoesNotExist()
-            compose.onNodeWithText("Your turn").assertDoesNotExist()
+            compose.onNodeWithText("Listen to me").assertDoesNotExist()
             compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
             compose.onNodeWithContentDescription("Erase the last note").assertDoesNotExist()
             val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
@@ -751,7 +751,7 @@ class FluteScreenTest {
         compose.onNodeWithText("Not now").assertIsDisplayed()
         compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
         compose.onNodeWithText("Play").assertDoesNotExist()
-        compose.onNodeWithText("Your turn").assertDoesNotExist()
+        compose.onNodeWithText("Listen to me").assertDoesNotExist()
         compose.onNodeWithText("Yes").performClick()
         assertEquals(1, micRequests)
         compose.onNodeWithText("Settings").performClick()
@@ -760,7 +760,7 @@ class FluteScreenTest {
         assertEquals(1, micDismissals)
         state.value = state.value.copy(micDenied = false)
         compose.onNodeWithContentDescription("Flute keys").assertExists()
-        compose.onNodeWithText("Your turn").assertIsDisplayed()
+        compose.onNodeWithText("Listen to me").assertIsDisplayed()
     }
 
     @Test

@@ -117,8 +117,12 @@
     <string name="note_sound">Zvuk</string>
     <!-- Digital flute -->
     <string name="flute_hint">👆 Dodirni ili drži notu</string>
-    <string name="flute_play">Sviraj</string>
-    <string name="flute_your_turn">Ti sviraj</string>
+    <!-- The flute's two big buttons are the child speaking to the phone: "play it" (the phone
+         plays the tune), "listen to me" (it listens to the child's flute). Not "Sviraj" /
+         "Ti sviraj", which read as the app telling the child to play; not "Prati me", since
+         pratiti in music also means to accompany, and the phone stays silent -->
+    <string name="flute_play">Odsviraj</string>
+    <string name="flute_your_turn">Poslušaj me</string>
     <string name="flute_erase">Obriši zadnju notu</string>
     <string name="flute_keys">Tipke flaute</string>
     <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>

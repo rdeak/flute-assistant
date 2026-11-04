@@ -161,7 +161,9 @@ with `FluteContent`, as the notes picker's does): the child comes back to the tu
 
 "Your turn" (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`,
 the first right-or-wrong outside the notes game, kept the child's by being opt-in, child-paced and
-score-free): the second big button beside Play (`flute_your_turn`, a drawn `AppIcons.Microphone`
+score-free): the second big button beside Play (`flute_your_turn`, labelled "Listen to me" / "Poslušaj me" and
+Play "Odsviraj" in Croatian since 2026-11-04: the child speaking to the phone, not "Sviraj" / "Ti
+sviraj", the app telling the child; not "Prati me", which in music also means to accompany; a drawn `AppIcons.Microphone`
 on `ActionListen` blue; the two buttons stack their icon over their word, `BigActionButton(stacked
 = true)`, because two icon-beside-word pills do not fit a phone's width; faded while the tune
 holds no note, `FluteUiState.canListen`). A tap (`FluteScreen` asks for RECORD_AUDIO first if
