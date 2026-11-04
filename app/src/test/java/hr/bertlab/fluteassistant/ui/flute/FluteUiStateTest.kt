@@ -67,6 +67,14 @@ class FluteUiStateTest {
     }
 
     @Test
+    fun `the animal stands on the last click's beat only while the tune plays`() {
+        val tune = listOf(TuneNote(60, NoteLength.HALF), TuneNote(67, NoteLength.QUARTER))
+        assertEquals(2, FluteUiState(tune = tune, playingIndex = 0, playingHalfBeat = 2).animalHalfBeat)
+        // A playback stopped mid-note leaves its count behind; Your turn waits over the head.
+        assertEquals(0, FluteUiState(tune = tune, isListening = true, listenIndex = 0, playingHalfBeat = 2).animalHalfBeat)
+    }
+
+    @Test
     fun `only a tune with a note can be listened to`() {
         assertFalse(FluteUiState().canListen)
         assertFalse(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER), TuneBreath)).canListen)

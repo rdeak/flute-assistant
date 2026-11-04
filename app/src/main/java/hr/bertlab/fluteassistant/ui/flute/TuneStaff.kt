@@ -1,5 +1,8 @@
 package hr.bertlab.fluteassistant.ui.flute
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -32,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -42,6 +47,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalDensity
@@ -57,6 +63,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -73,6 +80,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.facingRight
@@ -95,6 +103,7 @@ import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.HEAD_RY
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.HEAD_X
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.MIDDLE_LINE_Y
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.TOP_LINE_Y
+import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.partWidth
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.slotWidth
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.yOf
 import hr.bertlab.fluteassistant.ui.notes.RETRY_STAR_ALPHA
@@ -119,11 +128,18 @@ const val RunningStaffScale = 4f / 3f
 fun tuneStaffHeight(scale: Float): Dp = (StaffGeometry.TOTAL_HEIGHT * scale).dp
 
 /**
- * The knob's animal while the tune runs: under which step it stands, which animal, its hop
- * ([flash], 1 just after a beat or a landing), and whether it waits for the child to play that
- * step (Your turn) or runs with the tune (Play).
+ * The knob's animal while the tune runs: over which step it stands and how many half beats into it
+ * ([halfBeat], the last click's place in Play, 0 in Your turn), which animal, its hop ([flash], 1
+ * just after a beat or a landing), and whether it waits for the child to play that step (Your
+ * turn) or runs with the tune (Play).
  */
-data class StaffAnimal(val index: Int, val emoji: String, val flash: () -> Float, val waiting: Boolean)
+data class StaffAnimal(
+    val index: Int,
+    val emoji: String,
+    val flash: () -> Float,
+    val waiting: Boolean,
+    val halfBeat: Int = 0,
+)
 
 /** The rest key's sign, and a rest's name pill. */
 internal const val SLEEP_EMOJI = "💤" // zzz
@@ -152,8 +168,8 @@ private class StaffInk(
  * same room, so notes and names line up and scroll as one) and, under the names, a row for what
  * each note earned in "Your turn" ([MarkRow]: a star in [marks] under the head, faint after a
  * retry, and under the step a wrong note was heard for ([wrong]) that note as a bubble in its
- * own colour until the next note is judged) where the knob's [animal] stands
- * while the tune runs, hopping along with it. The faint treble clef
+ * own colour until the next note is judged). While the tune runs the knob's [animal] walks the
+ * staff at the knob's height ([WalkingAnimal]), hopping on to each beat's place. The faint treble clef
  * and the metronome tab's time signature stand at the left while the steps scroll past after
  * them, written in bars of [timeSignature] by [Bars.write]. Each note sits at its true height,
  * its head filled with its letter's colour (an open head with a coloured ring from a half note
@@ -332,33 +348,93 @@ private fun TuneMarks(
     LaunchedEffect(target, lineMarks) {
         listState.animateScrollToItem(target)
     }
-    LazyRow(
-        state = listState,
-        // The row starts a little before the first step, so a ring round it is never cut off.
-        modifier = Modifier
-            .padding(start = (StaffGeometry.NOTES_CLIP * s).dp)
-            .fillMaxSize()
-            .semantics { contentDescription = description },
-        contentPadding = PaddingValues(
-            start = ((StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP) * s).dp,
-            end = (StaffGeometry.NOTES_END_PADDING * s).dp,
-        ),
-    ) {
-        items(lineMarks) { mark ->
-            when (mark) {
-                is LineMark.Step -> StepMark(
-                    item = tune[mark.index],
-                    parts = mark.parts,
-                    lit = mark.index == litIndex,
-                    growing = mark.index == heldIndex,
-                    mark = marks[mark.index],
-                    animal = animal?.takeIf { it.index == mark.index },
-                    heard = wrong?.takeIf { it.index == mark.index }?.midi,
-                    ink = ink,
-                )
-                is LineMark.Breath -> BreathMark(ink, measurer)
-                LineMark.BarLine -> BarLineMark(ink)
+    // The row starts a little before the first step, so a ring round it is never cut off.
+    Box(Modifier.padding(start = (StaffGeometry.NOTES_CLIP * s).dp).fillMaxSize()) {
+        LazyRow(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .semantics { contentDescription = description },
+            contentPadding = PaddingValues(
+                start = ((StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP) * s).dp,
+                end = (StaffGeometry.NOTES_END_PADDING * s).dp,
+            ),
+        ) {
+            items(lineMarks) { mark ->
+                when (mark) {
+                    is LineMark.Step -> StepMark(
+                        item = tune[mark.index],
+                        parts = mark.parts,
+                        lit = mark.index == litIndex,
+                        growing = mark.index == heldIndex,
+                        mark = marks[mark.index],
+                        waiting = animal?.waiting == true && animal.index == mark.index,
+                        heard = wrong?.takeIf { it.index == mark.index }?.midi,
+                        ink = ink,
+                    )
+                    is LineMark.Breath -> BreathMark(ink, measurer)
+                    LineMark.BarLine -> BarLineMark(ink)
+                }
             }
+        }
+        if (animal != null) WalkingAnimal(animal, lineMarks, listState)
+    }
+}
+
+/**
+ * The knob's animal while the tune runs, walking the staff at the knob's height
+ * ([StaffGeometry.ANIMAL_Y]) over the step it stands for (the user's pick of the evening of
+ * 2026-11-04, "A": like the metronome's beat bubbles, never two hops in one place): over the
+ * step's head when the step begins, then on each click over that beat's place
+ * ([StaffGeometry.beatX]), so a half note is two places and a whole note four; it slides to each
+ * new place as it hops ([FLASH_DURATION_MS], the hop's own fall, so it lands as the hop ends),
+ * across bar lines and breaths too, and in Your turn from the note just played to the next. It is
+ * one layer over the row, placed from the row's own layout at every frame, so it moves with the
+ * staff's scrolling and never recomposes for it; the row's edges clip it, so a staff dragged back
+ * hides it rather than sliding it over the knob. Facing right, sized in dp like the staff's other
+ * text, and silent: a screen reader hears "play this one" on the step itself.
+ */
+@Composable
+private fun WalkingAnimal(animal: StaffAnimal, lineMarks: List<LineMark>, listState: LazyListState) {
+    val s = LocalStaffScale.current
+    // Where each mark starts along the row, in dp at rest, from the end of the row's start padding.
+    val starts = remember(lineMarks) { lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) } }
+    val step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == animal.index }
+    if (step < 0) return
+    val target = starts[step] + StaffGeometry.beatX((lineMarks[step] as LineMark.Step).parts, animal.halfBeat)
+    val x = remember { Animatable(target) }
+    LaunchedEffect(target) {
+        x.animateTo(target, tween(FLASH_DURATION_MS, easing = FastOutSlowInEasing))
+    }
+    val box = StaffGeometry.CORNER_BUTTON.dp // the knob's own box, so the animal's middle is the knob's
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .drawWithContent {
+                // Clipped at the row's sides only: the hop and c³'s stem may reach above the box.
+                clipRect(top = -size.height, bottom = size.height * 2) { this@drawWithContent.drawContent() }
+            },
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .size(box)
+                .offset {
+                    val info = listState.layoutInfo
+                    val first = info.visibleItemsInfo.firstOrNull()
+                    val firstStart = first?.let { starts.getOrNull(it.index) } ?: return@offset IntOffset(-box.roundToPx() * 4, 0)
+                    // The first item shown is the reference, so a pixel rounded per item never adds up.
+                    val middle = info.beforeContentPadding + first.offset + ((x.value - firstStart) * s).dp.toPx()
+                    IntOffset((middle - box.toPx() / 2).roundToInt(), (StaffGeometry.ANIMAL_Y.dp - box / 2).roundToPx())
+                },
+        ) {
+            Emoji(
+                animal.emoji,
+                fontSize = emojiSizeFor(StaffGeometry.ANIMAL_SIZE * s),
+                modifier = Modifier.facingRight(animal.emoji).hopOnBeat(animal.flash),
+            )
         }
     }
 }
@@ -370,18 +446,13 @@ private fun lengthDescription(name: String, length: NoteLength): String = when (
     else -> pluralStringResource(R.plurals.flute_note_beats, length.wholeBeats, name, length.wholeBeats)
 }
 
-private fun partWidth(part: StepPart): Float = when (part) {
-    is StepPart.Length -> slotWidth(part.length)
-    LineMark.BarLine -> BAR_SLOT
-}
-
 /**
  * One note or rest as written: its [parts], a piece per length with a bar line between two of
  * them where it crosses one, a note's heads tied, its names under them ([NameRow]) and, under
- * those, what it earned ([MarkRow]: [mark], or the [animal] standing here, or the wrong note
- * [heard] for it). A screen reader hears it once, by its whole length, then what it earned. The lit step
- * is drawn under its neighbours, so its yellow rings never cover the edge of the head or the pill
- * beside it.
+ * those, what it earned ([MarkRow]: [mark], or the wrong note [heard] for it). A screen reader
+ * hears it once, by its whole length, then what it earned, or that the animal is [waiting] on it
+ * in Your turn ("play this one"). The lit step is drawn under its neighbours, so its yellow rings
+ * never cover the edge of the head or the pill beside it.
  */
 @Composable
 private fun StepMark(
@@ -390,7 +461,7 @@ private fun StepMark(
     lit: Boolean,
     growing: Boolean,
     mark: StepMark?,
-    animal: StaffAnimal?,
+    waiting: Boolean,
     heard: Int?,
     ink: StaffInk,
 ) {
@@ -402,7 +473,7 @@ private fun StepMark(
     }
     val earned = when {
         heard != null -> stringResource(R.string.flute_mark_heard, noteLabel(heard))
-        animal != null && animal.waiting -> stringResource(R.string.flute_listen_here)
+        waiting -> stringResource(R.string.flute_listen_here)
         mark == StepMark.FIRST_TRY -> stringResource(R.string.flute_mark_first_try)
         mark == StepMark.RETRY -> stringResource(R.string.flute_mark_retry)
         else -> null
@@ -421,18 +492,18 @@ private fun StepMark(
             },
     ) {
         NameRow(item, parts, lit, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
-        MarkRow(mark, animal, heard, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
+        MarkRow(mark, heard, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
     }
 }
 
 /**
  * The marks row of one step, in the first beat's room so what stands there stands under the head
- * and the name: the wrong note [heard] for it as a bubble, else the [animal] (facing right,
- * hopping on its flash), else the star the step earned ([mark], faint after a retry), else
- * nothing. Sized in dp like the staff's other text, so large text never pushes it out of the row.
+ * and the name: the wrong note [heard] for it as a bubble, else the star the step earned ([mark],
+ * faint after a retry), else nothing. Sized in dp like the staff's other text, so large text
+ * never pushes it out of the row.
  */
 @Composable
-private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, heard: Int?, modifier: Modifier = Modifier) {
+private fun MarkRow(mark: StepMark?, heard: Int?, modifier: Modifier = Modifier) {
     val s = LocalStaffScale.current
     Box(
         contentAlignment = Alignment.Center,
@@ -440,11 +511,6 @@ private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, heard: Int?, modifier
     ) {
         when {
             heard != null -> HeardBubble(heard)
-            animal != null -> Emoji(
-                animal.emoji,
-                fontSize = emojiSizeFor(StaffGeometry.ANIMAL_SIZE * s),
-                modifier = Modifier.facingRight(animal.emoji).hopOnBeat(animal.flash),
-            )
             mark == StepMark.FIRST_TRY -> Emoji(STAR_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.RETRY -> Emoji(
                 STAR_EMOJI,
@@ -456,10 +522,10 @@ private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, heard: Int?, modifier
 }
 
 /**
- * The wrong note heard for a step, in the animal's place until the next note is judged: a round
- * bubble as tall as the marks row, filled in the heard letter's colour with its name, the way the
- * tuner shows another note under the home ring. The child reads "written G, heard A" from the pill
- * and the bubble. Chosen on 2026-11-04 over the ❌ (which said nothing about what came out) and
+ * The wrong note heard for a step, under it in the marks row until the next note is judged (the
+ * animal waits over the step meanwhile): a round bubble as tall as the marks row, filled in the
+ * heard letter's colour with its name, the way the tuner shows another note under the home ring.
+ * The child reads "written G, heard A" from the pill and the bubble. Chosen on 2026-11-04 over the ❌ (which said nothing about what came out) and
  * over the names in green (which doubled the pill above and broke the one-colour-per-letter code).
  */
 @Composable

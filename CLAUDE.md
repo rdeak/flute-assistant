@@ -217,9 +217,12 @@ name is already in the pill above and green is F's colour), never a number and n
 the notes game, kept the child's by being opt-in and child-paced; spec
 `docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`, details in `ui/flute/CLAUDE.md`);
 while the tune runs, by Play or by Your turn, the keys and the sponge hide, the staff
-grows by a third for a phone on a music stand, the knob's animal walks a marks row under the names
-(bouncing with the beats in Play, waiting under the next note in Your turn, the knob empty and the
-book button faded meanwhile) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's
+grows by a third for a phone on a music stand, the knob's animal walks the staff at the knob's
+height (since the evening of 2026-11-04, the user's pick from moving mockups: in Play it hops on to
+each beat's place on every click, like the metronome's beat bubbles, so a long note is never hopped
+on twice in one place; in Your turn it waits over the next note and hops on when the child plays it;
+the knob empty and the book button faded meanwhile; the stars and the heard note stay in a marks row
+under the names) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's
 stage it opens in place, and no note lengths as a
 control (lengths come only from how long a key is held; the user drew this on 2026-10-24). The user rejected a wider
 layout (−/+ beside the ring, a ten-button signature scroller, flags in the content area) as too

@@ -54,6 +54,9 @@ data class Pulse(val bpm: Int, val timeSignature: TimeSignature = TimeSignature.
 
     /** How long a quarter note lasts, the unit [NoteLength] counts in: two clicks in 6/8, one in 4/4, half of one in 2/2. */
     val quarterMs: Double get() = clickMs * timeSignature.noteValue / 4
+
+    /** How many half beats of the flute's beat (a quarter note) one click lasts: 2 in x/4, 1 in x/8, 4 in x/2. */
+    val halfBeatsPerClick: Int get() = 8 / timeSignature.noteValue
 }
 
 /** One step of the child's tune: a [TuneNote], a [TuneRest] or a [TuneBreath]. */

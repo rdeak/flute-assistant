@@ -66,7 +66,10 @@ import kotlin.math.roundToLong
  * open only while the flute is on screen.
  *
  * While the tune plays, [FluteUiState.beatPulse] counts the metronome's clicks (the first with the
- * first note), which the speed knob's animal hops on. The knob opens the metronome's own ring in
+ * first note), which the speed knob's animal hops on as it walks the staff, and
+ * [FluteUiState.playingHalfBeat] says how far into the playing step the last click fell, so a long
+ * note is hopped along, one beat's place per click, never twice in one place; the clicks are timed
+ * from each step's own start, so they never drift from the notes. The knob opens the metronome's own ring in
  * place: [openSpeed] stops the playback and ends a held key, [closeSpeed] (OK) reads the
  * time signature again, which may have changed there.
  *
@@ -280,38 +283,44 @@ class FluteViewModel @Inject constructor(
         )
         // Undispatched, so the first note sounds and lights before this call returns.
         playbackJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            // One hop per click, from the start of the tune (absolute times, like Tune.growAtMs, so
-            // the rounding never adds up); the first lands with the first note.
-            val hops = launch(start = CoroutineStart.UNDISPATCHED) {
+            var startsAt = 0 // half beats from the start of the tune to this step
+            for ((index, item) in items.withIndex()) {
+                val length = when (item) {
+                    is TuneNote -> item.length
+                    is TuneRest -> item.length
+                    TuneBreath -> continue // a sign for the player: no time
+                }
+                val duration = Tune.durationMs(length, pulse)
+                // The metronome's clicks that fall in this step, as half beats into it, timed from the
+                // step's own start, so a hop always lands with the note it belongs to (the first with
+                // the first note). Each moves the animal to that beat's place over the step.
+                val clicks = (0 until length.halfBeats).filter { (startsAt + it) % pulse.halfBeatsPerClick == 0 }
+                _state.update {
+                    it.copy(
+                        playingIndex = index,
+                        playingHalfBeat = 0,
+                        shown = if (item is TuneNote) Shown.Note(item.midi) else Shown.Rest,
+                        beatPulse = if (clicks.firstOrNull() == 0) it.beatPulse + 1 else it.beatPulse,
+                    )
+                }
+                if (item is TuneNote) tonePlayer.noteOn(NoteMath.midiToFrequency(item.midi), TunerViewModel.REFERENCE_TONE_VOLUME)
+                // What happens inside the step, by its time from the step's start: the later clicks
+                // (a half beat number) and, for a note, its end (null) a short gap before the next step.
+                val inside: List<Pair<Long, Int?>> = clicks.filter { it > 0 }.map { (it * pulse.quarterMs / 2).roundToLong() to it } +
+                    listOfNotNull(if (item is TuneNote) duration - Tune.gapMs(duration) to null else null)
                 var waited = 0L
-                var click = 0L
-                while (true) {
-                    val at = (click * pulse.clickMs).roundToLong()
+                for ((at, halfBeat) in inside.sortedBy { it.first }) {
                     delay(at - waited)
                     waited = at
-                    _state.update { it.copy(beatPulse = it.beatPulse + 1) }
-                    click++
-                }
-            }
-            for ((index, item) in items.withIndex()) {
-                when (item) {
-                    is TuneNote -> {
-                        val duration = Tune.durationMs(item.length, pulse)
-                        val gap = Tune.gapMs(duration)
-                        _state.update { it.copy(playingIndex = index, shown = Shown.Note(item.midi)) }
-                        tonePlayer.noteOn(NoteMath.midiToFrequency(item.midi), TunerViewModel.REFERENCE_TONE_VOLUME)
-                        delay(duration - gap)
+                    if (halfBeat == null) {
                         tonePlayer.noteOff()
-                        delay(gap)
+                    } else {
+                        _state.update { it.copy(playingHalfBeat = halfBeat, beatPulse = it.beatPulse + 1) }
                     }
-                    is TuneRest -> {
-                        _state.update { it.copy(playingIndex = index, shown = Shown.Rest) }
-                        delay(Tune.durationMs(item.length, pulse))
-                    }
-                    TuneBreath -> Unit // a sign for the player: no time
                 }
+                delay(duration - waited)
+                startsAt += length.halfBeats
             }
-            hops.cancel() // a child of this job, which would not complete while the hops run
             playbackJob = null
             _state.update { it.copy(playingIndex = null) }
             logger.d(LogTags.FLUTE, "flute.play_done")

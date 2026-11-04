@@ -1,6 +1,8 @@
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 
 /**
@@ -51,16 +53,14 @@ internal object StaffGeometry {
 
     /**
      * The marks row under the names (since 2026-11-04, "Your turn"): under each name, in the
-     * first beat's room so it stands under the head, the star a note earned, or the ❌ for a
-     * moment after a wrong note, or the knob's animal while the tune runs ([ANIMAL_SIZE], with
-     * room above it for its 8 dp hop). [TOTAL_HEIGHT] is the staff, its names and its marks: 16
-     * more than before the row, the air under the pills used.
+     * first beat's room so it stands under the head, the star a note earned, or the note heard
+     * for a wrong one as a bubble until the next note is judged. [TOTAL_HEIGHT] is the staff, its
+     * names and its marks: 16 more than before the row, the air under the pills used.
      */
     const val MARKS_GAP = 6f
     const val MARKS_TOP = NAMES_TOP + PILL_HEIGHT + MARKS_GAP
     const val MARKS_HEIGHT = 26f
     const val MARK_SIZE = 20f
-    const val ANIMAL_SIZE = 24f
     const val TOTAL_HEIGHT = MARKS_TOP + MARKS_HEIGHT
 
     /** A tie between two pills of one note: [PILL_TIE_GAP] under them, dipping [PILL_TIE_DIP]. */
@@ -94,6 +94,17 @@ internal object StaffGeometry {
     const val CORNER_BUTTON = 54f
     const val CORNER_SHADOW = 5f
 
+    /**
+     * The knob's animal while the tune runs (since the evening of 2026-11-04, the user's pick "A"
+     * from a moving true-size mockup; it walked the marks row before): it leaves the knob and walks
+     * the staff at the knob's height, its middle [ANIMAL_Y] from the top of the staff's box at
+     * every scale, as the knob does not grow with the running staff; [ANIMAL_SIZE] tall at rest
+     * scale (the running staff draws it a third bigger). Its hop (8 dp) keeps it inside the box,
+     * and it stands over the stems of the notes from f² up, never over a head but c³'s top edge.
+     */
+    const val ANIMAL_Y = CORNER_BUTTON / 2
+    const val ANIMAL_SIZE = 24f
+
     /** The book button's height: a book stands taller than it is wide, and the cell under the clef has 90 dp of room. */
     const val BOOK_BUTTON_HEIGHT = 64f
 
@@ -122,6 +133,45 @@ internal object StaffGeometry {
 
     /** A breath's room: no time, but enough that its face clears the stems and heads either side. */
     const val BREATH_SLOT = 18f
+
+    /** The room one piece of a step takes: its length's, or a bar line's inside a tied note. */
+    fun partWidth(part: StepPart): Float = when (part) {
+        is StepPart.Length -> slotWidth(part.length)
+        LineMark.BarLine -> BAR_SLOT
+    }
+
+    /** The room one mark of the line takes: a step its pieces', a bar line [BAR_SLOT], a breath [BREATH_SLOT]. */
+    fun markWidth(mark: LineMark): Float = when (mark) {
+        is LineMark.Step -> mark.parts.fold(0f) { sum, part -> sum + partWidth(part) }
+        is LineMark.Breath -> BREATH_SLOT
+        LineMark.BarLine -> BAR_SLOT
+    }
+
+    /**
+     * Where the running animal stands, from the left of a step written as [parts], [halfBeat] half
+     * beats into it: over the head at 0, then half a beat's room ([BEAT_WIDTH] / 2) further for each
+     * half beat, as each beat of a piece has its own room, so on every click it lands on a new place
+     * (a half note's second beat 29 dp on, a quarter's second click in 6/8 at the edge of its room),
+     * passing over a bar line inside a tied note. An eighth's room is a quarter's, but it lasts half a
+     * beat, so it only ever has its head. Past the step's end it stays on its last piece's head.
+     */
+    fun beatX(parts: List<StepPart>, halfBeat: Int): Float {
+        var x = 0f
+        var left = halfBeat
+        var lastHead = HEAD_X
+        for (part in parts) {
+            when (part) {
+                LineMark.BarLine -> x += BAR_SLOT
+                is StepPart.Length -> {
+                    if (left < part.length.halfBeats) return x + HEAD_X + left * BEAT_WIDTH / 2
+                    lastHead = x + HEAD_X
+                    left -= part.length.halfBeats
+                    x += slotWidth(part.length)
+                }
+            }
+        }
+        return lastHead
+    }
 
     /** A note head's centre from the start of its slot. */
     const val HEAD_X = 14.5f

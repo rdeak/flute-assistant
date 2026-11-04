@@ -1,6 +1,8 @@
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -46,10 +48,50 @@ class StaffGeometryTest {
         assertEquals(StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT + StaffGeometry.MARKS_GAP, StaffGeometry.MARKS_TOP)
         assertEquals(257f, StaffGeometry.TOTAL_HEIGHT)
         assertTrue(StaffGeometry.MARK_SIZE <= StaffGeometry.MARKS_HEIGHT)
-        assertTrue(StaffGeometry.ANIMAL_SIZE <= StaffGeometry.MARKS_HEIGHT)
-        // The animal at the top of its hop (8 dp) still stands under the pills, not over them.
-        val animalTop = StaffGeometry.MARKS_TOP + (StaffGeometry.MARKS_HEIGHT - StaffGeometry.ANIMAL_SIZE) / 2 - 8f
-        assertTrue(animalTop >= StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT - 2f)
+    }
+
+    @Test
+    fun `the running animal walks at the knob's height, above the staff, inside its box, over no head but c3's edge`() {
+        val s = RunningStaffScale
+        val half = StaffGeometry.ANIMAL_SIZE * s / 2
+        // Level with the knob's middle: the knob does not grow with the running staff, so neither does this height.
+        assertEquals(StaffGeometry.CORNER_BUTTON / 2, StaffGeometry.ANIMAL_Y)
+        // At the top of its hop (8 dp) it is still inside the staff's box, and it stands clear of the top line.
+        assertTrue(StaffGeometry.ANIMAL_Y - half - 8f >= 0f)
+        assertTrue(StaffGeometry.ANIMAL_Y + half <= StaffGeometry.TOP_LINE_Y * s)
+        // Every head is under it, but the top edge of the highest note's, c³'s, by a few dp (the head's tilt adds a quarter dp to its height).
+        val headTop = { position: Int -> (StaffGeometry.yOf(position) - StaffGeometry.HEAD_RY - 0.25f - StaffGeometry.HEAD_EDGE) * s }
+        for (position in 0 until StaffNotes.POSITIONS - 1) {
+            assertTrue("position $position", headTop(position) >= StaffGeometry.ANIMAL_Y + half)
+        }
+        assertTrue(headTop(StaffNotes.POSITIONS - 1) >= StaffGeometry.ANIMAL_Y + half - 4f)
+    }
+
+    @Test
+    fun `on each click the animal stands a new place on, a beat's room in four four and half of one in six eight`() {
+        val half = listOf(StepPart.Length(NoteLength.HALF))
+        assertEquals(StaffGeometry.HEAD_X, StaffGeometry.beatX(half, 0))
+        assertEquals(StaffGeometry.HEAD_X + StaffGeometry.BEAT_WIDTH, StaffGeometry.beatX(half, 2)) // 4/4: the second click
+        val whole = listOf(StepPart.Length(NoteLength.WHOLE))
+        assertEquals(listOf(14.5f, 43.5f, 72.5f, 101.5f), listOf(0, 2, 4, 6).map { StaffGeometry.beatX(whole, it) })
+        val quarter = listOf(StepPart.Length(NoteLength.QUARTER))
+        assertEquals(StaffGeometry.BEAT_WIDTH, StaffGeometry.beatX(quarter, 1)) // 6/8: the second click, at the room's edge
+        // The next note's head is the same distance on again: one place a click, all along the line.
+        assertEquals(StaffGeometry.slotWidth(NoteLength.QUARTER) + StaffGeometry.HEAD_X - StaffGeometry.beatX(quarter, 1), StaffGeometry.BEAT_WIDTH / 2)
+        // A half note tied over a bar line: its second beat is past the bar line, over the second head.
+        val tied = listOf(StepPart.Length(NoteLength.QUARTER), LineMark.BarLine, StepPart.Length(NoteLength.QUARTER))
+        assertEquals(StaffGeometry.BEAT_WIDTH + StaffGeometry.BAR_SLOT + StaffGeometry.HEAD_X, StaffGeometry.beatX(tied, 2))
+        // An eighth only ever has its head; past a step's end the animal stays on its last head.
+        assertEquals(StaffGeometry.HEAD_X, StaffGeometry.beatX(listOf(StepPart.Length(NoteLength.EIGHTH)), 0))
+        assertEquals(StaffGeometry.BEAT_WIDTH + StaffGeometry.BAR_SLOT + StaffGeometry.HEAD_X, StaffGeometry.beatX(tied, 9))
+    }
+
+    @Test
+    fun `a mark's room is what the staff draws for it`() {
+        val tied = LineMark.Step(0, listOf(StepPart.Length(NoteLength.QUARTER), LineMark.BarLine, StepPart.Length(NoteLength.HALF)))
+        assertEquals(29f + 10f + 58f, StaffGeometry.markWidth(tied))
+        assertEquals(StaffGeometry.BAR_SLOT, StaffGeometry.markWidth(LineMark.BarLine))
+        assertEquals(StaffGeometry.BREATH_SLOT, StaffGeometry.markWidth(LineMark.Breath(1)))
     }
 
     @Test

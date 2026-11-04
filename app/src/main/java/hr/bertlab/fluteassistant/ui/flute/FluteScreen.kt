@@ -149,9 +149,9 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  *
  * While the tune runs ([FluteUiState.isRunning]: Play, or Your turn with the microphone open) the
  * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]), so it
- * reads from a music stand at arm's length, with the knob's animal walking the marks row under
- * the names ([StaffAnimal]: under the playing step, hopping on each click, or waiting under the
- * step the child is to play), the knob itself empty and inert, and the book button faded and inert,
+ * reads from a music stand at arm's length, with the knob's animal walking the staff at the knob's
+ * height ([StaffAnimal]: over the playing step, hopping on to each beat's place on each click, or
+ * waiting over the step the child is to play), the knob itself empty and inert, and the book button faded and inert,
  * still showing its sweet, which does not walk the staff; between the stage and the bottom
  * row the tuner's advice line speaks only while the sound stays unclear, and the bottom row is one
  * wide red Stop ([onStop]) where Play was, so the thumb finds it. The marks stay when the run
@@ -273,7 +273,9 @@ fun FluteContent(
             // One flash for the animal wherever it is: the knob at rest (still), the staff while the tune runs.
             val flash = rememberBeatFlash(state.beatPulse, running)
             val animal = if (running) {
-                state.animalIndex?.let { StaffAnimal(it, tempoBand(metronome.config.bpm).emoji, flash, waiting = state.isListening) }
+                state.animalIndex?.let {
+                    StaffAnimal(it, tempoBand(metronome.config.bpm).emoji, flash, waiting = state.isListening, halfBeat = state.animalHalfBeat)
+                }
             } else {
                 null
             }

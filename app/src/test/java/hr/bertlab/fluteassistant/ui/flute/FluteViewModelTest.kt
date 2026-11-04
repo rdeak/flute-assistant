@@ -727,6 +727,65 @@ class FluteViewModelTest {
     }
 
     @Test
+    fun `on a long note the animal goes on a beat with each click, from the note's head`() = runTest(dispatcher) {
+        val vm = playingViewModel() // c1 a quarter, g1 a half note, 500 ms a click
+        assertEquals(0, vm.current.playingIndex)
+        assertEquals(0, vm.current.playingHalfBeat)
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(1, vm.current.playingIndex) // the half note begins on a click, over its head
+        assertEquals(0, vm.current.playingHalfBeat)
+        assertEquals(2L, vm.current.beatPulse)
+        advanceTimeBy(500)
+        runCurrent()
+        assertEquals(1, vm.current.playingIndex) // its second beat: a hop to the next place, not the same one
+        assertEquals(2, vm.current.playingHalfBeat)
+        assertEquals(3L, vm.current.beatPulse)
+        // The note still sounds past its last click and ends a short gap (80 ms) before the step does.
+        assertEquals(on(67), tonePlayer.sounding)
+        advanceTimeBy(419)
+        runCurrent()
+        assertEquals(on(67), tonePlayer.sounding)
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(tonePlayer.sounding)
+    }
+
+    @Test
+    fun `in six eight a quarter note is two clicks, two places`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
+        val vm = viewModel()
+        vm.tap(60, 2000) // a half note: four clicks of an eighth
+        vm.togglePlayback()
+        val places = mutableListOf(vm.current.playingHalfBeat)
+        repeat(3) {
+            advanceTimeBy(500)
+            runCurrent()
+            places += vm.current.playingHalfBeat
+        }
+        assertEquals(listOf(0, 1, 2, 3), places)
+    }
+
+    @Test
+    fun `an eighth off the click moves the animal on without a hop`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.tap(60, 250) // two eighths and a quarter at 120 bpm
+        vm.tap(62, 250)
+        vm.tap(64, 500)
+        vm.togglePlayback()
+        assertEquals(1L, vm.current.beatPulse)
+        advanceTimeBy(250)
+        runCurrent()
+        assertEquals(1, vm.current.playingIndex)
+        assertEquals(0, vm.current.playingHalfBeat)
+        assertEquals(1L, vm.current.beatPulse) // half way through the beat: no click
+        advanceTimeBy(250)
+        runCurrent()
+        assertEquals(2, vm.current.playingIndex)
+        assertEquals(2L, vm.current.beatPulse)
+    }
+
+    @Test
     fun `opening the speed panel stops playback and says why`() = runTest(dispatcher) {
         val vm = playingViewModel()
         advanceTimeBy(100)

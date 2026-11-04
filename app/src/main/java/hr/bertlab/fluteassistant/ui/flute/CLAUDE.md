@@ -134,14 +134,19 @@ shows on an empty tune too. Its bpm is `MetronomeUiState.config.bpm`, hoisted fr
 through `FluteScreen` into `FluteContent`, so a change made on the metronome tab shows the
 moment the child comes back; a screen reader hears "Speed: Rabbit, tap to change"
 (`flute_speed_knob`), never a number. While the tune plays back the animal hops once per click:
-`togglePlayback()` starts a child coroutine of the playback job that adds one to
-`FluteUiState.beatPulse` at the absolute times `click * Pulse.clickMs` (so the rounding never
-adds up; the first lands with the first note, and in 6/8 a click is an eighth), cancelled with
-the playback, and `FluteContent` turns the counter into the hop with `rememberBeatFlash(beatPulse,
-isPlaying)` and `hopOnBeat` (`ui/common/BeatFlash.kt`, `HopDistance` 8 dp, `FLASH_DURATION_MS`
-220, the ring's own hop). The knob never hops for a running metronome, only for the tune's own
-playback; the tab bar's drum does that (`MainScreen`). `beatPulse` is not reset when playback
-ends, only the hopping stops.
+the playback loop itself adds one to `FluteUiState.beatPulse` on every click that falls inside the
+step playing (the half beats `h` into it where `(start + h) % Pulse.halfBeatsPerClick == 0`: 2 in
+x/4, 1 in x/8, 4 in x/2), timed from that step's own start, so a hop always lands with its note
+(the first with the first note; in 6/8 a click is an eighth) and never drifts from the sound
+(since the evening of 2026-11-04; before that a separate coroutine counted clicks on its own clock
+and nothing said which beat of a long note a click fell on). Each click also sets
+`FluteUiState.playingHalfBeat` (0 at every step's start), the beat the walking animal stands over
+(below). An eighth starting off the click moves the animal on without a hop. A note's end, the
+gap before the next step, is in the same timeline and always after its last click. `FluteContent`
+turns the counter into the hop with `rememberBeatFlash(beatPulse, isPlaying)` and `hopOnBeat`
+(`ui/common/BeatFlash.kt`, `HopDistance` 8 dp, `FLASH_DURATION_MS` 220, the ring's own hop). The
+knob never hops for a running metronome, only for the tune's own playback; the tab bar's drum does
+that (`MainScreen`). `beatPulse` is not reset when playback ends, only the hopping stops.
 
 A tap on the knob opens the panel. `FluteContent` keeps `choosingSpeed` in `rememberSaveable`, as
 `NotesContent` keeps `choosingNotes`, so rotation and the language switch keep it open, and while
@@ -192,7 +197,7 @@ moving on; **ignored** is the letter of the step just judged, in any octave, unl
 also the one waited on (a written repeat), which counts only after `REPEAT_GUARD_MS` (300) so an
 octave pop never counts the repeat; **wrong** is anything else: `FluteUiState.wrong` (a
 `WrongNote`: the step and the MIDI heard) shows the note heard as a round bubble in its own letter
-colour in the animal's place until the next note is judged (a right note clears it, another wrong
+colour in the marks row under the step until the next note is judged (a right note clears it, another wrong
 note replaces it, an ignored one leaves it; no timer, so the child has time to read "written G,
 heard A" off the pill and the bubble; since the evening of 2026-11-04, in place of a ❌ for 700 ms,
 which said nothing about what came out; the user had asked for note names in the stars' place,
@@ -212,17 +217,38 @@ go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3: lines 24 dp apart,
 original size, for a phone on a music stand at arm's length; the geometry stays one table in dp
 and a private `LocalStaffScale` multiplies every size and every `scale(density * s)`), with the
 advice line in the keys' room and the wide Stop at the bottom; the knob's disc stays in the
-corner, empty and inert (`SpeedKnob(running = true)`), because its animal is on the staff: under
-the names a marks row (`StaffGeometry.MARKS_TOP`, 26 dp, in the first beat's room so it stands
-under the head and the name; the staff grew 16 dp for it) holds, per step, the ⭐ it earned
-(`STAR_EMOJI`, faint at `RETRY_STAR_ALPHA` after a retry, both the notes game's), the heard note's
-bubble (`HeardBubble`: a round bubble as tall as the row, `noteColor` fill, the ink outline, the
-name in `noteText` at up to 14 sp times the scale, the tuner's way of showing another note), or the
-animal (`StaffAnimal`: `FluteUiState.animalIndex`, the speed's emoji, the one `rememberBeatFlash`
-of the tab, `waiting` in Your turn), which bounces on every click in Play (`beatPulse` as before,
-in place on a long note, under a rest's 💤 pill too) and in Your turn jumps to the next note when
-the child gets it (`beatPulse` goes up on every advance and at the start, so it lands with a
-hop). Emoji in the row are sized in dp (`emojiSizeFor`) like the staff's other text. A screen
+corner, empty and inert (`SpeedKnob(running = true)`), because its animal is on the staff, walking
+it at the knob's height (`WalkingAnimal` in `TuneStaff.kt`; since the evening of 2026-11-04, the
+user's "move metronome animal to top so it moves on top line where it stands during notes entering
+phase; when a note has longer duration the animal should not jump more than once in one place", and
+their pick "A" of three moving true-size mockups, `.superpowers/brainstorm/*/content/animal-walk.html`:
+B glided steadily with the music, C also let the staff stand still and turn a page at the right
+edge; before, it bounced in place in the marks row under the names). `StaffAnimal` carries
+`FluteUiState.animalIndex`, `animalHalfBeat` (the last click's `playingHalfBeat` in Play, 0 in Your
+turn), the speed's emoji, the one `rememberBeatFlash` of the tab and `waiting` in Your turn. The
+animal stands over its step's head when the step begins and, on each click inside it, over that
+beat's place (`StaffGeometry.beatX`: the head plus half a beat's room, 14.5 dp, per half beat,
+past a bar line inside a tied note), like the metronome's beat bubbles: a half note is two places
+29 dp apart in 4/4, a whole note four, a quarter in 6/8 two places 14.5 apart, an eighth only its
+head; it slides to each new place in `FLASH_DURATION_MS` with `FastOutSlowInEasing` while it hops,
+so it lands as the hop ends, across bar lines and breaths too, and in Your turn from the note just
+played to the next, which it reaches with a hop (`beatPulse` goes up on every advance and at the
+start). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
+`StaffGeometry.ANIMAL_Y` (27 dp, the knob's middle, unscaled like the knob) from the box's top,
+`ANIMAL_SIZE` (24 dp) times the scale tall, placed in `Modifier.offset {}` from the row's
+`layoutInfo` (the first item shown, plus the dp from its start, which `StaffGeometry.markWidth`
+sums), so it follows the row's scrolling with no recomposition, and clipped at the row's sides
+only, so a staff the child drags back hides it rather than sliding it over the knob. Over the
+stems of the notes from f² up it stands on the stems' tops, and over c³ it touches the top edge of
+the head (`StaffGeometryTest` checks every other head stays under it). The staff still scrolls on
+at every new note (`Bars.anchor`, below), so in a long tune the staff moves under the animal at
+each note and the animal steps on along a long note. Under the names a marks row
+(`StaffGeometry.MARKS_TOP`, 26 dp, in the first beat's room so it stands under the head and the
+name; the staff grew 16 dp for it) holds, per step, the ⭐ it earned (`STAR_EMOJI`, faint at
+`RETRY_STAR_ALPHA` after a retry, both the notes game's) or the heard note's bubble (`HeardBubble`:
+a round bubble as tall as the row, `noteColor` fill, the ink outline, the name in `noteText` at up
+to 14 sp times the scale, the tuner's way of showing another note). Emoji on the staff are sized in
+dp (`emojiSizeFor`) like the staff's other text. A screen
 reader hears a step's mark after its length ("G4, 1 beat, got it" / "got it after a retry" /
 "play this one" / "heard A4"; `flute_mark_*`, `flute_mark_heard` taking the heard note's
 `noteLabel`, `flute_listen_here`). The staff scrolls (`animateScrollToItem` in `TuneMarks`, keyed

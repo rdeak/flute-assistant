@@ -36,6 +36,12 @@ data class FluteUiState(
     val shown: Shown? = null,
     /** The step of [tune] playing; null when not playing. */
     val playingIndex: Int? = null,
+    /**
+     * How many half beats into the playing step the metronome's last click fell, 0 from the step's
+     * start until a click inside it: the animal stands over that beat ([animalHalfBeat]). Read only
+     * while [playingIndex] is set.
+     */
+    val playingHalfBeat: Int = 0,
     /** How long the held key's note or rest has grown so far ([NoteLength.ofBeats]); null when no key is held. */
     val heldLength: NoteLength? = null,
     /** The metronome tab's time signature, which the staff is written in (bar lines, ties). */
@@ -95,8 +101,11 @@ data class FluteUiState(
     /** The step of the staff ringed in yellow: the playing step, else the one waited for, else the held key's. */
     val litIndex: Int? get() = playingIndex ?: listenIndex ?: heldIndex
 
-    /** The step the knob's animal stands under while the tune runs: the playing step, else the one waited for; null at rest. */
+    /** The step the knob's animal stands over while the tune runs: the playing step, else the one waited for; null at rest. */
     val animalIndex: Int? get() = playingIndex ?: listenIndex
+
+    /** How many half beats into [animalIndex]'s step the animal stands: the last click's in Play, the step's start while listening. */
+    val animalHalfBeat: Int get() = if (playingIndex != null) playingHalfBeat else 0
 
     /** The one line under the staff while listening: come closer or play one clear note when the sound stays unclear, else nothing. */
     val advice: TunerAdvice
