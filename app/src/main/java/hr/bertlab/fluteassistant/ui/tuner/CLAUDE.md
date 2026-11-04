@@ -39,7 +39,12 @@ setting on purpose: one good default beats a control. In target mode a reading w
 (`TargetMismatch.NONE`, `OCTAVE_UP` / `OCTAVE_DOWN`), so a1 played sixty cents flat reads
 "Too low", not "That's gis1". `HearingTracker` turns level plus
 `FrameDecision` into `Hearing` (sound from `SOUND_LEVEL`, quiet or loud around `CLOSE_LEVEL`,
-reported after `UNCLEAR_FRAMES` sound frames, a gap of `UNCLEAR_GAP_FRAMES` tolerated);
+reported after `UNCLEAR_FRAMES` sound frames, a gap of `UNCLEAR_GAP_FRAMES` tolerated; since
+2026-11-04, at the user's "make the advice line steadier" after a phone test with breathy flute
+recordings showed it switching come closer / clear note / nothing within seconds: once shown, a
+pause of up to `ADVICE_HOLD_FRAMES`, about 2 s, keeps the advice and the sound after it goes on
+at once, and quiet and loud swap only `CLOSE_MARGIN`, about 3 dB, past `CLOSE_LEVEL`; a shown note
+still clears it at once);
 `TunerUiState.advice` (`TunerAdvice`) is derived from status, mismatch and hearing and shown on
 one advice line under the status (spec: revision 5 of
 `docs/superpowers/specs/2026-10-22-tuner-target-note-design.md`). Unsteady frames count towards
