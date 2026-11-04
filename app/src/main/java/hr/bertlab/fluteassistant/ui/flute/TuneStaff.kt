@@ -166,7 +166,9 @@ private class StaffInk(
  * every pill, and the one at [heldIndex], still growing under a finger, a soft yellow band across
  * its room, covering its notes and its names together. Everything is drawn [scale] times its
  * resting size (the geometry is one table in dp, so the running staff is one multiplication).
- * The staff follows the newest step and the lit one, and the child can drag it back to look.
+ * The staff follows the newest step and the lit one, keeping the last note before the lit one in
+ * view ([Bars.anchor]: the note just played stays on the staff with what it earned, and the lit
+ * step is the second thing in view), and the child can drag it back to look.
  * While [tune] is empty a dashed hint sits on the lines instead.
  */
 @Composable
@@ -322,8 +324,9 @@ private fun TuneMarks(
     val notes = tune.count { it is TuneNote }
     val description = pluralStringResource(R.plurals.flute_tune_line, notes, notes)
     val lineMarks = remember(tune, signature) { Bars.write(tune, signature) }
-    // The lit step's mark, else the staff's end (a bar line, once a bar is full).
-    val target = lineMarks.indexOfFirst { it is LineMark.Step && it.index == litIndex }.takeIf { it >= 0 } ?: lineMarks.lastIndex
+    // The last note before the lit step (so the note just played stays in view with its mark and
+    // the lit step comes second), else the lit step, else the staff's end (a bar line, once a bar is full).
+    val target = Bars.anchor(lineMarks, tune, litIndex)
     val listState = rememberLazyListState()
     // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
     LaunchedEffect(target, lineMarks) {

@@ -64,6 +64,24 @@ object Bars {
         return marks
     }
 
+    /**
+     * Which of [marks] the staff scrolls to its left edge while step [litIndex] of [tune] sounds,
+     * is waited on or is held: the last note before it, so the note the child just played stays
+     * on the staff with what it earned (its star, or the note heard for it) and the lit step is the
+     * second thing in view (the user, 2026-11-04); the lit step itself when no note comes before it;
+     * the line's end when nothing is lit. Rests, breaths and bar lines between the two stay in view
+     * with them, as a rest between them would otherwise hide the star of the note before it.
+     */
+    fun anchor(marks: List<LineMark>, tune: List<TuneItem>, litIndex: Int?): Int {
+        val lit = marks.indexOfFirst { it is LineMark.Step && it.index == litIndex }
+        if (lit < 0) return marks.lastIndex
+        for (i in lit - 1 downTo 0) {
+            val mark = marks[i]
+            if (mark is LineMark.Step && tune[mark.index] is TuneNote) return i
+        }
+        return lit
+    }
+
     /** [halfBeats] as the longest lengths that fit, longest first: 5 is a half and an eighth. */
     private fun lengthsOf(halfBeats: Int): List<NoteLength> {
         val lengths = mutableListOf<NoteLength>()

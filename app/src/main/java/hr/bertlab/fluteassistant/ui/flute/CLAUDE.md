@@ -219,7 +219,17 @@ the child gets it (`beatPulse` goes up on every advance and at the start, so it 
 hop). Emoji in the row are sized in dp (`emojiSizeFor`) like the staff's other text. A screen
 reader hears a step's mark after its length ("G4, 1 beat, got it" / "got it after a retry" /
 "play this one" / "heard A4"; `flute_mark_*`, `flute_mark_heard` taking the heard note's
-`noteLabel`, `flute_listen_here`).
+`noteLabel`, `flute_listen_here`). The staff scrolls (`animateScrollToItem` in `TuneMarks`, keyed
+on the marks so a growing note stays in view) to `Bars.anchor` (`domain/flute/Bars.kt`): since
+2026-11-04 the last note before the lit step, so the note the child just played stays on the
+staff with its star or heard bubble and the lit step is the second thing in view (the user: "last
+played tone (success or fail) should be visible, that makes current tone as 2nd item"); before
+that the lit step itself stood at the left edge and the mark just earned scrolled straight out.
+Rests, breaths and bar lines between the two stay in view with them (a rest between them would
+otherwise hide the star again), the lit step itself is the anchor when no note comes before it,
+and the end of the line when nothing is lit; the same rule holds in Play and under a held key,
+where the list's end clamps the scroll as before. `FluteScreenTest` checks a mid-tune lit note
+with the note before it wholly on screen and the one before that not.
 
 The songbook (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-songbook-design.md`;
 the user: "child needs to practice more than two tunes and dont want to type notes over again when

@@ -128,4 +128,36 @@ class BarsTest {
     fun `nothing to write for an empty tune`() {
         assertTrue(Bars.write(emptyList(), TimeSignature.FOUR_FOUR).isEmpty())
     }
+
+    @Test
+    fun `the staff keeps the note before the lit step in view, so the lit step comes second`() {
+        val tune = listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER), TuneNote(64, QUARTER), TuneNote(65, QUARTER), TuneNote(67, QUARTER))
+        val marks = Bars.write(tune, TimeSignature.FOUR_FOUR) // S0 S1 S2 S3 | S4 |
+        assertEquals(3, Bars.anchor(marks, tune, litIndex = 4)) // the bar line between them stays in view too
+        assertEquals(1, Bars.anchor(marks, tune, litIndex = 2))
+    }
+
+    @Test
+    fun `the first step lit, or no note before it, anchors the staff on itself`() {
+        val tune = listOf(TuneRest(QUARTER), TuneNote(60, QUARTER), TuneNote(62, QUARTER))
+        val marks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+        assertEquals(0, Bars.anchor(marks, tune, litIndex = 0))
+        assertEquals(1, Bars.anchor(marks, tune, litIndex = 1)) // only a rest before it: no note to keep
+    }
+
+    @Test
+    fun `rests and breaths between the last note and the lit step stay in view with it`() {
+        val tune = listOf(TuneNote(60, QUARTER), TuneRest(QUARTER), TuneBreath, TuneNote(62, QUARTER))
+        val marks = Bars.write(tune, TimeSignature.FOUR_FOUR) // S0 S1(rest) B2 S3
+        assertEquals(0, Bars.anchor(marks, tune, litIndex = 3)) // the note the child last played, not the rest
+        assertEquals(0, Bars.anchor(marks, tune, litIndex = 1)) // a lit rest, in Play, keeps the note before it too
+    }
+
+    @Test
+    fun `nothing lit anchors the staff on its end`() {
+        val tune = listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER))
+        val marks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+        assertEquals(marks.lastIndex, Bars.anchor(marks, tune, litIndex = null))
+        assertEquals(marks.lastIndex, Bars.anchor(marks, tune, litIndex = 7)) // an index past the tune: the end
+    }
 }

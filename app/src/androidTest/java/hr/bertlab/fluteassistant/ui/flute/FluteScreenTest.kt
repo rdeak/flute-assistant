@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -715,6 +716,33 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("C4, 1 beat, got it").assertExists()
         compose.onNodeWithContentDescription("G4, 1 beat, got it after a retry").assertExists()
         compose.onNodeWithContentDescription("Flute keys").assertExists()
+    }
+
+    @Test
+    fun the_staff_keeps_the_note_just_played_in_view_before_the_lit_one() {
+        // Thirty quarter notes, far more than the running staff shows at once, so the lit one lands mid-tune.
+        val tune = MutableList(30) { TuneNote(if (it % 2 == 0) 60 else 62, NoteLength.QUARTER) }
+        tune[18] = TuneNote(84, NoteLength.QUARTER) // C6: the note before the one just played
+        tune[19] = TuneNote(83, NoteLength.QUARTER) // B5: just played, with its star
+        tune[20] = TuneNote(81, NoteLength.QUARTER) // A5: waited on now
+        show(FluteUiState(tune = tune, isListening = true, listenIndex = 20, marks = mapOf(19 to StepMark.FIRST_TRY)))
+        val line = hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))
+        assertWhollyShown(hasContentDescription("B5, 1 beat, got it") and line)
+        assertWhollyShown(hasContentDescription("A5, 1 beat, play this one") and line)
+        assertNotWhollyShown(hasContentDescription("C6, 1 beat") and line)
+    }
+
+    /** The one node matching [matcher] is on screen with none of it clipped away by the staff's edge. */
+    private fun assertWhollyShown(matcher: SemanticsMatcher) {
+        val node = compose.onNode(matcher).fetchSemanticsNode()
+        assertTrue("${matcher.description}: ${node.boundsInRoot} shows less than its ${node.size}", node.boundsInRoot.width >= node.size.width - 1f)
+    }
+
+    /** No node matching [matcher] is on screen in full: a step scrolled off the staff may still exist, unplaced or clipped to a sliver. */
+    private fun assertNotWhollyShown(matcher: SemanticsMatcher) {
+        val whole = compose.onAllNodes(matcher).fetchSemanticsNodes()
+            .filter { it.layoutInfo.isPlaced && it.boundsInRoot.width >= it.size.width - 1f }
+        assertTrue("${matcher.description} is wholly on screen", whole.isEmpty())
     }
 
     @Test
