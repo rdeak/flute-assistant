@@ -84,6 +84,7 @@
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
     <string name="allow_microphone">Da</string>
     <string name="open_settings">Postavke</string>
+    <string name="mic_not_now">Ne sad</string>
     <!-- Note reading game -->
     <string name="notes_correct">🎉 Tako je!</string>
     <string name="notes_wrong">🙈 Probaj opet</string>
@@ -117,6 +118,7 @@
     <!-- Digital flute -->
     <string name="flute_hint">👆 Dodirni ili drži notu</string>
     <string name="flute_play">Sviraj</string>
+    <string name="flute_your_turn">Ti sviraj</string>
     <string name="flute_erase">Obriši zadnju notu</string>
     <string name="flute_keys">Tipke flaute</string>
     <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>
@@ -138,6 +140,10 @@
         <item quantity="other">%1$s, %2$d doba</item>
     </plurals>
     <string name="flute_note_half_beat">%1$s, pola dobe</string>
+    <string name="flute_mark_first_try">pogodak</string>
+    <string name="flute_mark_retry">pogodak iz drugog puta</string>
+    <string name="flute_mark_wrong">pokušaj opet</string>
+    <string name="flute_listen_here">sviraj ovu</string>
     <!-- Croatian music schools name octaves c1, c2, c3 (jednocrtna, dvocrtna, trocrtna), with
          the one-lined octave starting at middle C -->
     <bool name="note_octaves_helmholtz">true</bool>

@@ -16,6 +16,14 @@ import hr.bertlab.fluteassistant.fakes.FakeClock
 import hr.bertlab.fluteassistant.fakes.FakeFluteTonePlayer
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
+import hr.bertlab.fluteassistant.fakes.FakeTunerEngine
+import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
+import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.ui.tuner.Hearing
+import hr.bertlab.fluteassistant.ui.tuner.HearingTracker
+import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.TestScope
 import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,6 +49,7 @@ class FluteViewModelTest {
     private val tonePlayer = FakeFluteTonePlayer()
     private val clock = FakeClock(now = 10_000L)
     private val logger = FakeLogger()
+    private val engine = FakeTunerEngine()
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -48,7 +57,7 @@ class FluteViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = FluteViewModel(settings, tonePlayer, clock, logger)
+    private fun viewModel() = FluteViewModel(settings, tonePlayer, engine, clock, logger)
 
     private fun freq(midi: Int) = NoteMath.midiToFrequency(midi)
 
@@ -893,5 +902,235 @@ class FluteViewModelTest {
         assertEquals(200, vm.current.tune.size)
         assertEquals(listOf(false, false), logger.events("flute.note").map { it["added"] })
         assertEquals(1, logger.events("flute.rejoin").size)
+    }
+
+    // ---- Your turn: the flute listens ----
+
+    private fun q(midi: Int) = TuneNote(midi, QUARTER)
+
+    private fun pitched(midi: Int) = PitchFrame(freq(midi), 0.97, level = 0.4f)
+    private val silentFrame = PitchFrame(null, 0.0, level = 0f)
+
+    private fun TestScope.emit(frame: PitchFrame) {
+        engine.frames.tryEmit(frame)
+        runCurrent()
+    }
+
+    /** One note the child plays: enough agreeing frames to lock, then the gap that ends it. */
+    private fun TestScope.play(midi: Int) {
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(midi)) }
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silentFrame) }
+    }
+
+    /** A view model with [items] as its tune (c1 d1 e1 by default), listening. */
+    private fun TestScope.listeningViewModel(vararg items: TuneItem = arrayOf(q(60), q(62), q(64))): FluteViewModel {
+        settings.saveTune(items.toList())
+        return viewModel().apply {
+            startListening()
+            runCurrent()
+        }
+    }
+
+    @Test
+    fun `your turn waits on the first note, skipping a leading rest, and opens the microphone`() = runTest(dispatcher) {
+        val vm = listeningViewModel(TuneRest(QUARTER), q(60), q(62))
+        assertTrue(vm.current.isListening)
+        assertTrue(vm.current.isRunning)
+        assertEquals(1, vm.current.listenIndex)
+        assertEquals(1, vm.current.litIndex)
+        assertTrue(vm.current.marks.isEmpty())
+        assertEquals(1, engine.subscriptions)
+        assertEquals(2, logger.events("flute.listen").single()["notes"])
+        assertEquals(1L, vm.current.beatPulse)
+    }
+
+    @Test
+    fun `the right note earns a star and the animal moves on, the octave too`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        val pulse = vm.current.beatPulse
+        play(72)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), vm.current.marks)
+        assertEquals(1, vm.current.listenIndex)
+        assertEquals(pulse + 1, vm.current.beatPulse)
+        val heard = logger.events("flute.heard").single()
+        assertEquals(0, heard["index"])
+        assertEquals(60, heard["expected"])
+        assertEquals(72, heard["heard"])
+        assertEquals("right", heard["verdict"])
+    }
+
+    @Test
+    fun `a wrong note shows the cross for a while and the right note then earns a faint star`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(65)
+        assertEquals(0, vm.current.wrongIndex)
+        assertEquals(0, vm.current.listenIndex)
+        assertTrue(vm.current.marks.isEmpty())
+        assertEquals("wrong", logger.events("flute.heard").single()["verdict"])
+        advanceTimeBy(FluteViewModel.WRONG_MARK_MS + 1)
+        assertNull(vm.current.wrongIndex)
+        play(60)
+        assertEquals(mapOf(0 to StepMark.RETRY), vm.current.marks)
+        assertEquals(1, vm.current.listenIndex)
+        assertEquals("retry", logger.events("flute.heard").last()["verdict"])
+    }
+
+    @Test
+    fun `the right note clears the wrong mark at once`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(65)
+        assertEquals(0, vm.current.wrongIndex)
+        play(60)
+        assertNull(vm.current.wrongIndex)
+        assertEquals(mapOf(0 to StepMark.RETRY), vm.current.marks)
+    }
+
+    @Test
+    fun `the previous note heard again is ignored, a written repeat counts after the guard`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60), q(60), q(62))
+        play(60)
+        assertEquals(1, vm.current.listenIndex)
+        play(72) // no fake time has passed: the octave pop of the note just counted
+        assertEquals(1, vm.current.listenIndex)
+        assertEquals("ignored", logger.events("flute.heard").last()["verdict"])
+        clock.now += 400
+        play(60)
+        assertEquals(2, vm.current.listenIndex)
+    }
+
+    @Test
+    fun `the last note ends listening by itself and keeps the stars`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(60)
+        play(62)
+        play(64)
+        assertFalse(vm.current.isListening)
+        assertFalse(vm.current.isRunning)
+        assertNull(vm.current.listenIndex)
+        assertEquals(3, vm.current.marks.size)
+        val done = logger.events("flute.listen_done").single()
+        assertEquals(3, done["stars"])
+        assertEquals(0, done["retries"])
+        assertTrue(logger.events("flute.listen_stop").isEmpty())
+        val after = vm.current
+        play(60) // the microphone is closed: nothing changes
+        assertEquals(after, vm.current)
+    }
+
+    @Test
+    fun `stop, erase, the speed knob and leaving the tab end listening and say why`() = runTest(dispatcher) {
+        fun ended(by: FluteViewModel.() -> Unit): Pair<FluteUiState, Any?> {
+            logger.events.clear()
+            val vm = listeningViewModel()
+            play(60)
+            vm.by()
+            runCurrent()
+            return vm.current to logger.events("flute.listen_stop").single()["reason"]
+        }
+        val (stopped, pill) = ended { stopRun() }
+        assertEquals("pill", pill)
+        assertFalse(stopped.isListening)
+        assertEquals(Hearing.CLEAR, stopped.hearing)
+        assertNull(stopped.wrongIndex)
+        assertEquals(1, stopped.marks.size)
+        val (erased, erase) = ended { eraseLast() }
+        assertEquals("erase", erase)
+        assertEquals(2, erased.tune.size)
+        assertTrue(erased.marks.isEmpty())
+        val (speed, knob) = ended { openSpeed() }
+        assertEquals("speed", knob)
+        assertFalse(speed.isListening)
+        val (left, leave) = ended { leaveTab() }
+        assertEquals("leave", leave)
+        assertFalse(left.isListening)
+        assertEquals(1, left.marks.size)
+    }
+
+    @Test
+    fun `any write to the tune clears the marks`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(60)
+        vm.stopRun()
+        assertEquals(1, vm.current.marks.size)
+        vm.onKeyPressed(67)
+        assertTrue(vm.current.marks.isEmpty())
+        vm.onKeyReleased(67)
+        val finished = listeningViewModel()
+        play(60)
+        play(62)
+        play(64)
+        assertEquals(3, finished.current.marks.size)
+        finished.eraseLast()
+        assertTrue(finished.current.marks.isEmpty())
+    }
+
+    @Test
+    fun `play is refused while listening and your turn is refused while playing or without a note`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        vm.togglePlayback()
+        assertFalse(vm.current.isPlaying)
+        assertTrue(vm.current.isListening)
+        vm.stopRun()
+        val playing = playingViewModel()
+        playing.startListening()
+        runCurrent()
+        assertFalse(playing.current.isListening)
+        playing.togglePlayback()
+        settings.saveTune(listOf(TuneRest(QUARTER)))
+        val subscriptions = engine.subscriptions
+        val rests = viewModel()
+        rests.startListening()
+        runCurrent()
+        assertFalse(rests.current.isListening)
+        assertEquals(subscriptions, engine.subscriptions)
+    }
+
+    @Test
+    fun `unclear sound is reported and cleared`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        repeat(HearingTracker.UNCLEAR_FRAMES) { emit(PitchFrame(null, 0.0, level = 0.3f)) }
+        assertEquals(Hearing.QUIET_UNCLEAR, vm.current.hearing)
+        assertEquals(Hearing.QUIET_UNCLEAR, logger.events("flute.hearing").last()["hearing"])
+        repeat(HearingTracker.UNCLEAR_FRAMES) { emit(PitchFrame(null, 0.0, level = 0.6f)) }
+        assertEquals(Hearing.LOUD_UNCLEAR, vm.current.hearing)
+        vm.stopRun()
+        assertEquals(Hearing.CLEAR, vm.current.hearing)
+    }
+
+    @Test
+    fun `a microphone failure ends listening cleanly`() = runTest(dispatcher) {
+        engine.flowOverride = flow { throw IllegalStateException("Microphone is busy") }
+        settings.saveTune(listOf(q(60)))
+        val vm = viewModel()
+        vm.startListening()
+        runCurrent()
+        assertFalse(vm.current.isListening)
+        assertFalse(vm.current.isRunning)
+        assertEquals("Microphone is busy", logger.events("flute.listen_error").single()["message"])
+    }
+
+    @Test
+    fun `a summary line is logged every SUMMARY_FRAMES frames`() = runTest(dispatcher) {
+        listeningViewModel()
+        repeat(TunerViewModel.SUMMARY_FRAMES) { emit(silentFrame) }
+        val summary = logger.events("flute.listen_summary").single()
+        assertEquals(TunerViewModel.SUMMARY_FRAMES, summary["silent"])
+        assertEquals(60, summary["expected"])
+        assertEquals(TunerViewModel.MIN_PROBABILITY, summary["gate"])
+    }
+
+    @Test
+    fun `the microphone result starts listening or marks the denial`() = runTest(dispatcher) {
+        settings.saveTune(listOf(q(60)))
+        val vm = viewModel()
+        vm.onMicResult(false)
+        assertTrue(vm.current.micDenied)
+        assertEquals(false, logger.events("flute.mic").single()["granted"])
+        vm.dismissMic()
+        assertFalse(vm.current.micDenied)
+        vm.onMicResult(true)
+        runCurrent()
+        assertTrue(vm.current.isListening)
+        assertFalse(vm.current.micDenied)
     }
 }

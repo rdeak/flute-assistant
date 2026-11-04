@@ -156,6 +156,57 @@ tab with the panel open drops it (`MainScreen` composes only the open tab, so `c
 with `FluteContent`, as the notes picker's does): the child comes back to the tune, and no
 `flute.speed_done` is logged for it.
 
+"Your turn" (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`,
+the first right-or-wrong outside the notes game, kept the child's by being opt-in, child-paced and
+score-free): the second big button beside Play (`flute_your_turn`, a drawn `AppIcons.Microphone`
+on `ActionListen` blue; the two buttons stack their icon over their word, `BigActionButton(stacked
+= true)`, because two icon-beside-word pills do not fit a phone's width; faded while the tune
+holds no note, `FluteUiState.canListen`). A tap (`FluteScreen` asks for RECORD_AUDIO first if
+need be; a no shows `MicrophonePermissionCard` in place of everything, with its quiet "Not now"
+(`mic_not_now`) the way back, `FluteUiState.micDenied`) calls `FluteViewModel.startListening()`:
+it opens the tuner's `TunerEngine`, builds a `TuneCheck` (`domain/flute/TuneCheck.kt`) over the
+tune and waits on its first `TuneNote` (`listenIndex`; rests and breaths are passed over). Frames
+go through `NoteOnsetTracker` (`ui/tuner/`, the tuner's own rules plus "a new note began": after
+a gap of `ONSET_GAP_FRAMES` = 2 uncounted frames that also dropped under half the note's loudness
+(`GAP_LEVEL_RATIO`: the gate blinking on a breathy tone keeps the loudness and is not a gap), or a
+clear step to another note without a gap; a slow sag past the halfway point moves the sounding
+note but is no new note; the same note going on is not new, so a repeated note needs a fresh
+start, which a tongued note gives; when it does not, the animal keeps waiting and the child plays
+it again; the first phone test with a repeated-note tune should watch `flute.heard` for a repeat
+counted on one held note or a tongued repeat never counted, and tune `GAP_LEVEL_RATIO` from
+`flute.listen_summary`'s levels) and each new note is judged by
+`TuneCheck.judge`: **right** is the same letter in any octave (beginners overblow, and the detector
+speaks the lower octave at an onset), earning `StepMark.FIRST_TRY` or `RETRY` after a stumble and
+moving on; **ignored** is the letter of the step just judged, in any octave, unless that letter is
+also the one waited on (a written repeat), which counts only after `REPEAT_GUARD_MS` (300) so an
+octave pop never counts the repeat; **wrong** is anything else: `wrongIndex` shows a ❌ in the
+animal's place for `WRONG_MARK_MS` (700) or until the next heard note, and the step is remembered
+as stumbled. The check waits for the right note, which is what keeps every mark under its own
+note. Pitch only; nothing is timed but the ❌ and the guard. The last note judged ends it by itself
+(`flute.listen_done`); Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
+the speed knob and leaving the tab end it early (`flute.listen_stop`); the marks stay in
+`FluteUiState.marks` until a new run or any write to the tune (`save()` clears them), are not
+saved, and show no number anywhere. `HearingTracker` feeds `FluteUiState.hearing` for the
+tuner's `AdviceLine` under the stage ("Come closer" / "Play one long, clear note", only while the
+sound stays unclear). Play is refused while listening; the keys are off screen anyway.
+
+While the tune runs, in Play as in Your turn (`FluteUiState.isRunning`), the keys and the sponge
+go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3: lines 24 dp apart, the canvas's
+original size, for a phone on a music stand at arm's length; the geometry stays one table in dp
+and a private `LocalStaffScale` multiplies every size and every `scale(density * s)`), with the
+advice line in the keys' room and the wide Stop at the bottom; the knob's disc stays in the
+corner, empty and inert (`SpeedKnob(running = true)`), because its animal is on the staff: under
+the names a marks row (`StaffGeometry.MARKS_TOP`, 26 dp, in the first beat's room so it stands
+under the head and the name; the staff grew 16 dp for it) holds, per step, the ⭐ it earned
+(`STAR_EMOJI`, faint at `RETRY_STAR_ALPHA` after a retry, both the notes game's), the ❌, or the
+animal (`StaffAnimal`: `FluteUiState.animalIndex`, the speed's emoji, the one `rememberBeatFlash`
+of the tab, `waiting` in Your turn), which bounces on every click in Play (`beatPulse` as before,
+in place on a long note, under a rest's 💤 pill too) and in Your turn jumps to the next note when
+the child gets it (`beatPulse` goes up on every advance and at the start, so it lands with a
+hop). Emoji in the row are sized in dp (`emojiSizeFor`) like the staff's other text. A screen
+reader hears a step's mark after its length ("G4, 1 beat, got it" / "got it after a retry" /
+"play this one" / "try again"; `flute_mark_*`, `flute_listen_here`).
+
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, per note ended), `flute.rest` (heldMs, length, added, per rest
@@ -165,4 +216,13 @@ or `flute.rest` before it was not the end of that step), `flute.breath` (added: 
 rests, bpm, time), `flute.play_done`, `flute.stop`
 (reason: pill, key, erase, leave or speed, so every `flute.play` has a closing line), `flute.erase`
 (left), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and
-`flute.speed_done` (bpm, time, when OK closes it; leaving the tab with the panel open logs none).
+`flute.speed_done` (bpm, time, when OK closes it; leaving the tab with the panel open logs none);
+for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard` (index, expected,
+heard, verdict: right, retry, ignored or wrong, per new note the tracker reports),
+`flute.listen_summary` every `TunerViewModel.SUMMARY_FRAMES` frames and once more at the end (the
+tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
+passed the gate at all), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
+(stars, retries, when the last note is judged), `flute.listen_stop` (reason: pill, key, erase,
+leave or speed, so every `flute.listen` has a closing line), `flute.listen_error` (message, when
+the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the
+microphone on this tab). The engine's `mic.open` / `mic.close` stay under `FA.Tuner`.

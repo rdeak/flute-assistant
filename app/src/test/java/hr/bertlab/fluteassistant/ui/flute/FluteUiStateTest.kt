@@ -4,6 +4,8 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.ui.tuner.Hearing
+import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -46,6 +48,34 @@ class FluteUiStateTest {
         assertFalse(FluteUiState(tune = tune, playingIndex = 0).restLit)
         assertEquals(60, FluteUiState(tune = tune, playingIndex = 0).litMidi)
         assertFalse(FluteUiState(tune = tune).isHolding)
+    }
+
+    @Test
+    fun `running covers playback and listening, and the lit step follows the listened one`() {
+        val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+        assertTrue(FluteUiState(tune = tune, playingIndex = 0).isRunning)
+        val listening = FluteUiState(tune = tune, isListening = true, listenIndex = 1)
+        assertTrue(listening.isRunning)
+        assertEquals(1, listening.litIndex)
+        assertEquals(1, listening.animalIndex)
+        assertEquals(0, FluteUiState(tune = tune, playingIndex = 0, listenIndex = 1).animalIndex)
+        assertNull(FluteUiState(tune = tune, heldIndex = 1).animalIndex)
+        assertEquals(1, FluteUiState(tune = tune, heldIndex = 1).litIndex)
+        assertFalse(FluteUiState().isRunning)
+    }
+
+    @Test
+    fun `only a tune with a note can be listened to`() {
+        assertFalse(FluteUiState().canListen)
+        assertFalse(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER), TuneBreath)).canListen)
+        assertTrue(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER), TuneNote(60, NoteLength.QUARTER))).canListen)
+    }
+
+    @Test
+    fun `advice follows the hearing`() {
+        assertEquals(TunerAdvice.NONE, FluteUiState(hearing = Hearing.CLEAR).advice)
+        assertEquals(TunerAdvice.COME_CLOSER, FluteUiState(hearing = Hearing.QUIET_UNCLEAR).advice)
+        assertEquals(TunerAdvice.CLEAR_NOTE, FluteUiState(hearing = Hearing.LOUD_UNCLEAR).advice)
     }
 
     @Test

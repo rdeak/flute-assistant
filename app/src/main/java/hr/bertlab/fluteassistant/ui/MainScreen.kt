@@ -104,8 +104,8 @@ fun MainScreen(
     val notesState by notesViewModel.state.collectAsStateWithLifecycle()
     val fluteState by fluteViewModel.state.collectAsStateWithLifecycle()
 
-    // A tune plays back untouched for up to a minute or two: the screen must not time out under it.
-    KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.isPlaying)
+    // A tune plays back untouched for up to a minute or two, and a child plays it back to the phone with both hands on the flute: the screen must not time out under either.
+    KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.isRunning)
 
     // One-shot messages (audio unavailable, persistence failures) as a snackbar.
     val snackbarHostState = remember { SnackbarHostState() }

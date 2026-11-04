@@ -22,10 +22,13 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -52,6 +55,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -59,6 +63,7 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.Bars
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
@@ -69,6 +74,8 @@ import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
+import hr.bertlab.fluteassistant.ui.common.facingRight
+import hr.bertlab.fluteassistant.ui.common.hopOnBeat
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteLabel
 import hr.bertlab.fluteassistant.ui.common.noteText
@@ -89,18 +96,43 @@ import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.MIDDLE_LINE_Y
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.TOP_LINE_Y
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.slotWidth
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.yOf
+import hr.bertlab.fluteassistant.ui.notes.RETRY_STAR_ALPHA
+import hr.bertlab.fluteassistant.ui.notes.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import hr.bertlab.fluteassistant.ui.theme.Nunito
 import hr.bertlab.fluteassistant.ui.theme.Sun
+import kotlin.math.roundToInt
 
-/** The staff with its names under it ([StaffGeometry.TOTAL_HEIGHT]): always the same, so nothing below it moves when notes come. */
+/** The staff with its names and marks under it ([StaffGeometry.TOTAL_HEIGHT]) at rest: always the same, so nothing below it moves when notes come. */
 val TuneStaffHeight = StaffGeometry.TOTAL_HEIGHT.dp
+
+/**
+ * How much the staff grows while the tune runs (Play or Your turn): the keys are gone, the phone
+ * lies on a table or a music stand at arm's length, and lines 24 dp apart (the canvas's original
+ * spacing) read from there.
+ */
+const val RunningStaffScale = 4f / 3f
+
+/** The staff's height at [scale]: [TuneStaffHeight] at rest, a third more while the tune runs. */
+fun tuneStaffHeight(scale: Float): Dp = (StaffGeometry.TOTAL_HEIGHT * scale).dp
+
+/**
+ * The knob's animal while the tune runs: under which step it stands, which animal, its hop
+ * ([flash], 1 just after a beat or a landing), and whether it waits for the child to play that
+ * step (Your turn) or runs with the tune (Play).
+ */
+data class StaffAnimal(val index: Int, val emoji: String, val flash: () -> Float, val waiting: Boolean)
 
 /** The rest key's sign, and a rest's name pill. */
 internal const val SLEEP_EMOJI = "💤" // zzz
 /** The breath key's sign, and a breath's over the staff. */
 internal const val BREATH_EMOJI = "😮‍💨" // face exhaling
+/** The sign for a wrong note, in the animal's place for a moment. */
+internal const val WRONG_EMOJI = "❌" // cross mark
+
+/** How much bigger than [StaffGeometry]'s dp everything on the staff is drawn: 1 at rest, [RunningStaffScale] while the tune runs. */
+private val LocalStaffScale = compositionLocalOf { 1f }
 
 /** The theme's colours as the staff uses them, read once per composition. */
 private class StaffInk(
@@ -118,7 +150,10 @@ private class StaffInk(
  * The child's tune written on a five-line staff, as the canvas drew it on 2026-11-02 and the user
  * changed it the same evening (no letters in the heads, every stem up, the staff at three
  * quarters of the drawn size), with each note's name in a pill right under it ([NameRow]: the
- * same room, so notes and names line up and scroll as one): the faint treble clef
+ * same room, so notes and names line up and scroll as one) and, under the names, a row for what
+ * each note earned in "Your turn" ([MarkRow]: a star in [marks] under the head, faint after a
+ * retry, the ❌ for a moment under the step at [wrongIndex]) where the knob's [animal] stands
+ * while the tune runs, hopping along with it. The faint treble clef
  * and the metronome tab's time signature stand at the left while the steps scroll past after
  * them, written in bars of [timeSignature] by [Bars.write]. Each note sits at its true height,
  * its head filled with its letter's colour (an open head with a coloured ring from a half note
@@ -127,10 +162,12 @@ private class StaffInk(
  * is its rest symbol in grey over a grey 💤 pill; a breath the breath mark with 😮‍💨 over the
  * staff and no pill; a bar line follows every full bar, through the names too, and a note running
  * past one is drawn as heads tied under them and pills tied under those, a rest just split. The
- * step at [litIndex] (sounding now, or held) gets a yellow ring on every head and every pill, and
- * the one at [heldIndex], still growing under a finger, a soft yellow band across its room,
- * covering its notes and its names together. The staff follows the newest step and the playing one, and the child
- * can drag it back to look. While [tune] is empty a dashed hint sits on the lines instead.
+ * step at [litIndex] (sounding now, waited for, or held) gets a yellow ring on every head and
+ * every pill, and the one at [heldIndex], still growing under a finger, a soft yellow band across
+ * its room, covering its notes and its names together. Everything is drawn [scale] times its
+ * resting size (the geometry is one table in dp, so the running staff is one multiplication).
+ * The staff follows the newest step and the lit one, and the child can drag it back to look.
+ * While [tune] is empty a dashed hint sits on the lines instead.
  */
 @Composable
 fun TuneStaff(
@@ -139,6 +176,10 @@ fun TuneStaff(
     heldIndex: Int?,
     timeSignature: TimeSignature,
     modifier: Modifier = Modifier,
+    marks: Map<Int, StepMark> = emptyMap(),
+    animal: StaffAnimal? = null,
+    wrongIndex: Int? = null,
+    scale: Float = 1f,
 ) {
     val colors = FluteTheme.colors
     val ink = StaffInk(line = colors.text, outline = colors.outline, card = colors.card, rest = colors.mutedText)
@@ -146,10 +187,10 @@ fun TuneStaff(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(TuneStaffHeight)
+            .height(tuneStaffHeight(scale))
             .drawBehind {
-                scale(density, pivot = Offset.Zero) {
-                    val width = size.width / density
+                scale(density * scale, pivot = Offset.Zero) {
+                    val width = size.width / (density * scale)
                     for (line in 0..4) {
                         val y = TOP_LINE_Y + line * StaffGeometry.STEP * 2
                         drawLine(ink.line, Offset(0f, y), Offset(width, y), StaffGeometry.LINE_WIDTH)
@@ -163,18 +204,21 @@ fun TuneStaff(
                 }
             },
     ) {
-        TimeSignatureMark(timeSignature, ink, measurer)
-        if (tune.isEmpty()) {
-            EmptyHint()
-        } else {
-            TuneMarks(tune, litIndex, heldIndex, timeSignature, ink, measurer)
+        CompositionLocalProvider(LocalStaffScale provides scale) {
+            TimeSignatureMark(timeSignature, ink, measurer)
+            if (tune.isEmpty()) {
+                EmptyHint()
+            } else {
+                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrongIndex, ink, measurer)
+            }
         }
     }
 }
 
 /**
- * [text] measured to be drawn [size] dp tall inside a drawing scaled to dp, whatever the font
- * scale: the time signature and the breath's face are part of the staff and must stay in it.
+ * [text] measured to be drawn [size] dp tall (at rest) inside a drawing scaled to dp, whatever
+ * the font scale: the time signature and the breath's face are part of the staff and must stay in
+ * it, and they grow with the drawing when the staff does.
  */
 @Composable
 private fun staffText(measurer: TextMeasurer, text: String, size: Float): TextLayoutResult {
@@ -186,6 +230,10 @@ private fun staffText(measurer: TextMeasurer, text: String, size: Float): TextLa
         )
     }
 }
+
+/** An emoji's size in sp that makes it [dp] dp tall whatever the font scale: a mark or the animal must stay in its row. */
+@Composable
+private fun emojiSizeFor(dp: Float): Int = with(LocalDensity.current) { dp.dp.toSp().value.roundToInt() }
 
 /** Draws [layout] centred on [x] with its baseline at [baseline]. */
 private fun DrawScope.drawCentred(layout: TextLayoutResult, x: Float, baseline: Float, color: Color = Color.Unspecified) {
@@ -200,17 +248,18 @@ private fun DrawScope.drawEmoji(layout: TextLayoutResult, x: Float, y: Float) {
 /** The time signature as written after the clef, its two figures each across two spaces. */
 @Composable
 private fun TimeSignatureMark(signature: TimeSignature, ink: StaffInk, measurer: TextMeasurer) {
+    val s = LocalStaffScale.current
     val description = stringResource(R.string.flute_time_signature, signature.beatsPerBar, signature.noteValue)
     val top = staffText(measurer, signature.beatsPerBar.toString(), StaffGeometry.SIGNATURE_SIZE)
     val bottom = staffText(measurer, signature.noteValue.toString(), StaffGeometry.SIGNATURE_SIZE)
     val half = StaffGeometry.SIGNATURE_SIZE / 2
     Spacer(
         modifier = Modifier
-            .offset(x = (StaffGeometry.SIGNATURE_X - half).dp, y = TOP_LINE_Y.dp)
-            .size(StaffGeometry.SIGNATURE_SIZE.dp, (BOTTOM_LINE_Y - TOP_LINE_Y).dp)
+            .offset(x = ((StaffGeometry.SIGNATURE_X - half) * s).dp, y = (TOP_LINE_Y * s).dp)
+            .size((StaffGeometry.SIGNATURE_SIZE * s).dp, ((BOTTOM_LINE_Y - TOP_LINE_Y) * s).dp)
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
-                scale(density, pivot = Offset.Zero) {
+                scale(density * s, pivot = Offset.Zero) {
                     // A figure's middle on the space between its two lines: its baseline about a third of its size below.
                     val drop = StaffGeometry.SIGNATURE_SIZE * 0.35f
                     drawCentred(top, half, StaffGeometry.SIGNATURE_TOP_Y - TOP_LINE_Y + drop, ink.line)
@@ -223,15 +272,20 @@ private fun TimeSignatureMark(signature: TimeSignature, ink: StaffInk, measurer:
 /** The dashed hint on the empty staff, after the time signature. */
 @Composable
 private fun EmptyHint() {
+    val s = LocalStaffScale.current
     val colors = FluteTheme.colors
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .padding(start = StaffGeometry.HINT_START.dp, end = StaffGeometry.HINT_END_PADDING.dp, top = StaffGeometry.HINT_TOP.dp)
+            .padding(
+                start = (StaffGeometry.HINT_START * s).dp,
+                end = (StaffGeometry.HINT_END_PADDING * s).dp,
+                top = (StaffGeometry.HINT_TOP * s).dp,
+            )
             .fillMaxWidth()
-            .height(StaffGeometry.HINT_HEIGHT.dp)
+            .height((StaffGeometry.HINT_HEIGHT * s).dp)
             .drawBehind {
-                val radius = CornerRadius(StaffGeometry.HINT_RADIUS.dp.toPx())
+                val radius = CornerRadius((StaffGeometry.HINT_RADIUS * s).dp.toPx())
                 drawRoundRect(colors.card, cornerRadius = radius)
                 drawRoundRect(
                     colors.border,
@@ -258,38 +312,45 @@ private fun TuneMarks(
     litIndex: Int?,
     heldIndex: Int?,
     signature: TimeSignature,
+    marks: Map<Int, StepMark>,
+    animal: StaffAnimal?,
+    wrongIndex: Int?,
     ink: StaffInk,
     measurer: TextMeasurer,
 ) {
+    val s = LocalStaffScale.current
     val notes = tune.count { it is TuneNote }
     val description = pluralStringResource(R.plurals.flute_tune_line, notes, notes)
-    val marks = remember(tune, signature) { Bars.write(tune, signature) }
+    val lineMarks = remember(tune, signature) { Bars.write(tune, signature) }
     // The lit step's mark, else the staff's end (a bar line, once a bar is full).
-    val target = marks.indexOfFirst { it is LineMark.Step && it.index == litIndex }.takeIf { it >= 0 } ?: marks.lastIndex
+    val target = lineMarks.indexOfFirst { it is LineMark.Step && it.index == litIndex }.takeIf { it >= 0 } ?: lineMarks.lastIndex
     val listState = rememberLazyListState()
     // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
-    LaunchedEffect(target, marks) {
+    LaunchedEffect(target, lineMarks) {
         listState.animateScrollToItem(target)
     }
     LazyRow(
         state = listState,
         // The row starts a little before the first step, so a ring round it is never cut off.
         modifier = Modifier
-            .padding(start = StaffGeometry.NOTES_CLIP.dp)
+            .padding(start = (StaffGeometry.NOTES_CLIP * s).dp)
             .fillMaxSize()
             .semantics { contentDescription = description },
         contentPadding = PaddingValues(
-            start = (StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP).dp,
-            end = StaffGeometry.NOTES_END_PADDING.dp,
+            start = ((StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP) * s).dp,
+            end = (StaffGeometry.NOTES_END_PADDING * s).dp,
         ),
     ) {
-        items(marks) { mark ->
+        items(lineMarks) { mark ->
             when (mark) {
                 is LineMark.Step -> StepMark(
                     item = tune[mark.index],
                     parts = mark.parts,
                     lit = mark.index == litIndex,
                     growing = mark.index == heldIndex,
+                    mark = marks[mark.index],
+                    animal = animal?.takeIf { it.index == mark.index },
+                    wrong = mark.index == wrongIndex,
                     ink = ink,
                 )
                 is LineMark.Breath -> BreathMark(ink, measurer)
@@ -313,9 +374,11 @@ private fun partWidth(part: StepPart): Float = when (part) {
 
 /**
  * One note or rest as written: its [parts], a piece per length with a bar line between two of
- * them where it crosses one, a note's heads tied, and its names under them ([NameRow]). A screen
- * reader hears it once, by its whole length. The lit step is drawn under its neighbours, so its
- * yellow rings never cover the edge of the head or the pill beside it.
+ * them where it crosses one, a note's heads tied, its names under them ([NameRow]) and, under
+ * those, what it earned ([MarkRow]: [mark], or the [animal] standing here, or the ❌ while
+ * [wrong]). A screen reader hears it once, by its whole length, then what it earned. The lit step
+ * is drawn under its neighbours, so its yellow rings never cover the edge of the head or the pill
+ * beside it.
  */
 @Composable
 private fun StepMark(
@@ -323,26 +386,69 @@ private fun StepMark(
     parts: List<StepPart>,
     lit: Boolean,
     growing: Boolean,
+    mark: StepMark?,
+    animal: StaffAnimal?,
+    wrong: Boolean,
     ink: StaffInk,
 ) {
-    val description = when (item) {
+    val s = LocalStaffScale.current
+    val name = when (item) {
         is TuneNote -> lengthDescription(noteLabel(item.midi), item.length)
         is TuneRest -> lengthDescription(stringResource(R.string.flute_rest), item.length)
         TuneBreath -> stringResource(R.string.flute_breath_here)
     }
+    val earned = when {
+        wrong -> stringResource(R.string.flute_mark_wrong)
+        animal != null && animal.waiting -> stringResource(R.string.flute_listen_here)
+        mark == StepMark.FIRST_TRY -> stringResource(R.string.flute_mark_first_try)
+        mark == StepMark.RETRY -> stringResource(R.string.flute_mark_retry)
+        else -> null
+    }
+    val description = if (earned == null) name else "$name, $earned"
     val width = parts.fold(0f) { sum, part -> sum + partWidth(part) }
     Box(
         modifier = Modifier
             .zIndex(if (lit || growing) -1f else 0f)
-            .size(width.dp, TuneStaffHeight)
+            .size((width * s).dp, tuneStaffHeight(s))
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
-                scale(density, pivot = Offset.Zero) {
+                scale(density * s, pivot = Offset.Zero) {
                     drawStep(item, parts, lit, growing, width, ink)
                 }
             },
     ) {
-        NameRow(item, parts, lit, Modifier.offset(y = StaffGeometry.NAMES_TOP.dp))
+        NameRow(item, parts, lit, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
+        MarkRow(mark, animal, wrong, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
+    }
+}
+
+/**
+ * The marks row of one step, in the first beat's room so what stands there stands under the head
+ * and the name: the ❌ while [wrong], else the [animal] (facing right, hopping on its flash), else
+ * the star the step earned ([mark], faint after a retry), else nothing. Sized in dp like the
+ * staff's other text, so large text never pushes it out of the row.
+ */
+@Composable
+private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, wrong: Boolean, modifier: Modifier = Modifier) {
+    val s = LocalStaffScale.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size((StaffGeometry.BEAT_WIDTH * s).dp, (StaffGeometry.MARKS_HEIGHT * s).dp),
+    ) {
+        when {
+            wrong -> Emoji(WRONG_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            animal != null -> Emoji(
+                animal.emoji,
+                fontSize = emojiSizeFor(StaffGeometry.ANIMAL_SIZE * s),
+                modifier = Modifier.facingRight().hopOnBeat(animal.flash),
+            )
+            mark == StepMark.FIRST_TRY -> Emoji(STAR_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            mark == StepMark.RETRY -> Emoji(
+                STAR_EMOJI,
+                fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s),
+                modifier = Modifier.alpha(RETRY_STAR_ALPHA),
+            )
+        }
     }
 }
 
@@ -354,19 +460,20 @@ private fun StepMark(
  */
 @Composable
 private fun NameRow(item: TuneItem, parts: List<StepPart>, lit: Boolean, modifier: Modifier = Modifier) {
+    val s = LocalStaffScale.current
     val colors = FluteTheme.colors
     val tied = item is TuneNote && parts.count { it is StepPart.Length } > 1
     Row(
         modifier = modifier
-            .height(StaffGeometry.PILL_HEIGHT.dp)
-            .then(if (tied) Modifier.drawBehind { scale(density, pivot = Offset.Zero) { drawPillTies(parts, colors.mutedText) } } else Modifier),
+            .height((StaffGeometry.PILL_HEIGHT * s).dp)
+            .then(if (tied) Modifier.drawBehind { scale(density * s, pivot = Offset.Zero) { drawPillTies(parts, colors.mutedText) } } else Modifier),
     ) {
         for (part in parts) {
             when (part) {
-                is StepPart.Length -> Box(Modifier.width(slotWidth(part.length).dp).fillMaxHeight()) {
-                    NamePill(item, part.length, lit, Modifier.padding(start = (StaffGeometry.PILL_GAP / 2).dp))
+                is StepPart.Length -> Box(Modifier.width((slotWidth(part.length) * s).dp).fillMaxHeight()) {
+                    NamePill(item, part.length, lit, Modifier.padding(start = (StaffGeometry.PILL_GAP / 2 * s).dp))
                 }
-                LineMark.BarLine -> Box(Modifier.width(BAR_SLOT.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+                LineMark.BarLine -> Box(Modifier.width((BAR_SLOT * s).dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     PillBarLine()
                 }
             }
@@ -377,13 +484,14 @@ private fun NameRow(item: TuneItem, parts: List<StepPart>, lit: Boolean, modifie
 /** One pill: the note's name in its letter's colour, or 💤 on grey for a rest. */
 @Composable
 private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier: Modifier = Modifier) {
+    val s = LocalStaffScale.current
     val colors = FluteTheme.colors
-    val shape = RoundedCornerShape(StaffGeometry.PILL_RADIUS.dp)
+    val shape = RoundedCornerShape((StaffGeometry.PILL_RADIUS * s).dp)
     val fill = (item as? TuneNote)?.let { noteColor(it.midi) } ?: colors.track
     Box(
         modifier = modifier
-            .size((slotWidth(length) - StaffGeometry.PILL_GAP).dp, StaffGeometry.PILL_HEIGHT.dp)
-            .drawBehind { if (lit) drawPillRing() }
+            .size(((slotWidth(length) - StaffGeometry.PILL_GAP) * s).dp, (StaffGeometry.PILL_HEIGHT * s).dp)
+            .drawBehind { if (lit) drawPillRing(s) }
             .clip(shape)
             .background(fill)
             .border(OutlineWidth, colors.outline, shape),
@@ -392,7 +500,7 @@ private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier:
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .width((StaffGeometry.BEAT_WIDTH - StaffGeometry.PILL_GAP).dp)
+                .width(((StaffGeometry.BEAT_WIDTH - StaffGeometry.PILL_GAP) * s).dp)
                 .fillMaxHeight()
                 .padding(horizontal = OutlineWidth), // inside the outline, so the octave figure never meets it
         ) {
@@ -402,10 +510,10 @@ private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier:
                     style = MaterialTheme.typography.titleMedium,
                     color = InkOnFill,
                     maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = 17.sp),
+                    autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = (17 * s).sp),
                 )
             } else {
-                Emoji(SLEEP_EMOJI, fontSize = 14)
+                Emoji(SLEEP_EMOJI, fontSize = (14 * s).roundToInt())
             }
         }
     }
@@ -414,23 +522,24 @@ private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier:
 /** A bar line through the names, as tall as a pill, in the text colour like the staff's. */
 @Composable
 private fun PillBarLine() {
+    val s = LocalStaffScale.current
     Box(
         modifier = Modifier
-            .size(3.dp, StaffGeometry.PILL_HEIGHT.dp)
+            .size(3.dp, (StaffGeometry.PILL_HEIGHT * s).dp)
             .clip(RoundedCornerShape(1.5.dp))
             .background(FluteTheme.colors.text),
     )
 }
 
-/** The yellow ring round a lit pill, a little outside it. */
-private fun DrawScope.drawPillRing() {
+/** The yellow ring round a lit pill, a little outside it, its corners following the pill's at [s]. */
+private fun DrawScope.drawPillRing(s: Float) {
     val stroke = 4.dp.toPx()
     val outset = 2.dp.toPx() + stroke / 2
     drawRoundRect(
         color = Sun,
         topLeft = Offset(-outset, -outset),
         size = Size(size.width + outset * 2, size.height + outset * 2),
-        cornerRadius = CornerRadius(StaffGeometry.PILL_RADIUS.dp.toPx() + outset),
+        cornerRadius = CornerRadius((StaffGeometry.PILL_RADIUS * s).dp.toPx() + outset),
         style = Stroke(stroke),
     )
 }
@@ -603,31 +712,33 @@ private fun DrawScope.drawRest(cx: Float, length: NoteLength, color: Color) {
 /** A bar line across the staff, and through the names under it. */
 @Composable
 private fun BarLineMark(ink: StaffInk) {
+    val s = LocalStaffScale.current
     Box(
         contentAlignment = Alignment.TopCenter,
         modifier = Modifier
-            .size(BAR_SLOT.dp, TuneStaffHeight)
+            .size((BAR_SLOT * s).dp, tuneStaffHeight(s))
             .drawBehind {
-                scale(density, pivot = Offset.Zero) {
+                scale(density * s, pivot = Offset.Zero) {
                     drawLine(ink.line, Offset(BAR_SLOT / 2, TOP_LINE_Y), Offset(BAR_SLOT / 2, BOTTOM_LINE_Y), BAR_LINE_WIDTH)
                 }
             },
     ) {
-        Box(Modifier.offset(y = StaffGeometry.NAMES_TOP.dp)) { PillBarLine() }
+        Box(Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp)) { PillBarLine() }
     }
 }
 
 /** A breath: no time, only a little room for the breath mark in the top space and the breathing face over the staff; no name. */
 @Composable
 private fun BreathMark(ink: StaffInk, measurer: TextMeasurer) {
+    val s = LocalStaffScale.current
     val description = stringResource(R.string.flute_breath_here)
     val face = staffText(measurer, BREATH_EMOJI, BREATH_FACE_SIZE)
     Spacer(
         modifier = Modifier
-            .size(BREATH_SLOT.dp, TuneStaffHeight)
+            .size((BREATH_SLOT * s).dp, tuneStaffHeight(s))
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
-                scale(density, pivot = Offset.Zero) {
+                scale(density * s, pivot = Offset.Zero) {
                     val x = BREATH_SLOT / 2
                     drawPath(
                         Path().apply {

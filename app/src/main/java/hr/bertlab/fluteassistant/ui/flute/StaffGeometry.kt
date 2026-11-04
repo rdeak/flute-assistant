@@ -48,8 +48,20 @@ internal object StaffGeometry {
     const val PILL_HEIGHT = 36f
     const val PILL_GAP = 3f
     const val PILL_RADIUS = 13f
-    const val NAMES_HEIGHT = 52f
-    const val TOTAL_HEIGHT = NAMES_TOP + NAMES_HEIGHT
+
+    /**
+     * The marks row under the names (since 2026-11-04, "Your turn"): under each name, in the
+     * first beat's room so it stands under the head, the star a note earned, or the ❌ for a
+     * moment after a wrong note, or the knob's animal while the tune runs ([ANIMAL_SIZE], with
+     * room above it for its 8 dp hop). [TOTAL_HEIGHT] is the staff, its names and its marks: 16
+     * more than before the row, the air under the pills used.
+     */
+    const val MARKS_GAP = 6f
+    const val MARKS_TOP = NAMES_TOP + PILL_HEIGHT + MARKS_GAP
+    const val MARKS_HEIGHT = 26f
+    const val MARK_SIZE = 20f
+    const val ANIMAL_SIZE = 24f
+    const val TOTAL_HEIGHT = MARKS_TOP + MARKS_HEIGHT
 
     /** A tie between two pills of one note: [PILL_TIE_GAP] under them, dipping [PILL_TIE_DIP]. */
     const val PILL_TIE_GAP = 4f

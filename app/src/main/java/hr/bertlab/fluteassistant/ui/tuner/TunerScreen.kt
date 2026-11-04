@@ -10,25 +10,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,11 +29,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -52,18 +43,17 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
+import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
-import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
-import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteLabel
-import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
@@ -151,7 +141,7 @@ fun TunerContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (!state.permissionGranted) {
-                PermissionCard(
+                MicrophonePermissionCard(
                     onRequestPermission = onRequestPermission,
                     onOpenSettings = onOpenSettings,
                     modifier = Modifier
@@ -351,87 +341,3 @@ private fun pitchWindowDescription(state: TunerUiState): String {
         else -> stringResource(if (low) R.string.pitch_low else R.string.pitch_high, homeName)
     }
 }
-
-/**
- * The quieter line under the status saying what to change: roll the flute, the air, the
- * fingers, come closer, or play a clear note. Empty text for [TunerAdvice.NONE] keeps the
- * line's height, so nothing above it moves when advice comes and goes.
- */
-@Composable
-private fun AdviceLine(advice: TunerAdvice) {
-    Text(
-        text = advice.labelRes()?.let { stringResource(it) } ?: "",
-        style = MaterialTheme.typography.bodyLarge,
-        color = FluteTheme.colors.mutedText,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = 22.sp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(28.dp),
-    )
-}
-
-/**
- * Shown until the microphone may be used: a big friendly microphone, one question, one
- * reassuring line, a big "Yes" that asks the phone, and a quieter way to the app's settings
- * for when the phone will not ask again.
- */
-@Composable
-private fun PermissionCard(onRequestPermission: () -> Unit, onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
-    val colors = FluteTheme.colors
-    Stage(modifier = modifier) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterVertically),
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState()),
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(160.dp)
-                    .chunky(CircleShape, Sun, colors.outline, depth = 8.dp),
-            ) {
-                Emoji(MICROPHONE_EMOJI, fontSize = 80)
-            }
-            Text(
-                text = stringResource(R.string.mic_permission_title),
-                style = MaterialTheme.typography.headlineMedium.copy(fontSize = 34.sp, lineHeight = 42.sp),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 12.dp),
-            )
-            Text(
-                text = stringResource(R.string.mic_permission_body),
-                style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 30.sp),
-                textAlign = TextAlign.Center,
-                color = colors.mutedText,
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        BigActionButton(
-            icon = AppIcons.Done,
-            text = stringResource(R.string.allow_microphone),
-            color = ActionGo,
-            onClick = onRequestPermission,
-        )
-        Spacer(Modifier.height(20.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .height(56.dp)
-                .clip(CircleShape)
-                .border(OutlineWidth, colors.border, CircleShape)
-                .clickable(role = Role.Button, onClick = onOpenSettings)
-                .padding(horizontal = 24.dp),
-        ) {
-            Emoji(GEAR_EMOJI, fontSize = 22)
-            Text(stringResource(R.string.open_settings), style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp))
-        }
-    }
-}
-
-private const val MICROPHONE_EMOJI = "\uD83C\uDFA4" // microphone
-private const val GEAR_EMOJI = "\u2699\uFE0F" // gear

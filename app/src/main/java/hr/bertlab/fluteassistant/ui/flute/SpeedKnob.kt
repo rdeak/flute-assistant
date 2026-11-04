@@ -22,9 +22,10 @@ val SpeedKnobSize: Dp = 54.dp
 
 /**
  * The metronome's yellow knob at the flute staff's top left, where printed music writes the tempo:
- * the animal of the speed at [bpm], facing right and hopping on the beat as [flash] rises while the
- * tune plays. A tap is [onClick]. A screen reader hears the animal's name ("Speed: Rabbit, tap to
- * change"), never a number.
+ * the animal of the speed at [bpm], facing right and hopping as [flash] rises. A tap is [onClick].
+ * While the tune is [running] (Play or Your turn) the animal is away on the staff, walking the
+ * tune: the disc stays, empty, faded and not pressable, and the animal comes home when the run
+ * ends. A screen reader hears the animal's name ("Speed: Rabbit, tap to change"), never a number.
  */
 @Composable
 fun SpeedKnob(
@@ -32,6 +33,7 @@ fun SpeedKnob(
     flash: () -> Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    running: Boolean = false,
 ) {
     val band = tempoBand(bpm)
     val description = stringResource(R.string.flute_speed_knob, stringResource(band.labelRes))
@@ -40,10 +42,11 @@ fun SpeedKnob(
         shape = CircleShape,
         color = Sun,
         depth = 5.dp,
+        enabled = !running,
         modifier = modifier
             .size(SpeedKnobSize)
             .semantics { contentDescription = description },
     ) {
-        Emoji(band.emoji, fontSize = 26, modifier = Modifier.facingRight().hopOnBeat(flash))
+        if (!running) Emoji(band.emoji, fontSize = 26, modifier = Modifier.facingRight().hopOnBeat(flash))
     }
 }

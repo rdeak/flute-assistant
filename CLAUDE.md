@@ -85,7 +85,7 @@ point there.
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
   when the notes tab is left, so the child always comes back to a zero score. `MainScreen` also
   keeps the screen on (`ui/common/KeepScreenOn`) while the metronome plays, the tuner listens or
-  the flute plays the tune back. While the metronome plays, the bottom bar's 🥁 hops on every beat
+  the flute's tune runs (Play, or "Your turn" listening). While the metronome plays, the bottom bar's 🥁 hops on every beat
   on every tab (since 2026-11-03: `TabBar` with `rememberBeatFlash` / `hopOnBeat` from
   `ui/common/BeatFlash.kt`, the same hop as the ring's animal), so a running drum is visible
   everywhere and one tap on it reaches Stop; a screen reader hears that tab as "Playing"
@@ -107,11 +107,13 @@ point there.
   bright fill is always `InkOnFill`. Everything pressable is a `ChunkyButton` / `Modifier.chunky`
   (thick ink outline, solid shadow, sinks 3 dp when pressed); big actions are `BigActionButton`,
   the one place with white on colour: a drawn icon and the word in `OnAction` on `ActionGo` (deep
-  green: Play, OK, Again, Yes) or `ActionStop` (deep red: Stop), for contrast (canvas, 2026-10-24).
+  green: Play, OK, Again, Yes), `ActionStop` (deep red: Stop) or `ActionListen` (deep blue: the
+  flute's Your turn), for contrast (canvas, 2026-10-24); the flute's Play and Your turn stack the
+  icon over the word (`stacked`), since two pills with the word beside the icon do not fit a phone.
   The font is Nunito (three static weights in `res/font`, licence in `docs/licenses/`); the canvas
   used Fredoka, which has no č, ć or đ. Icons are emoji (`Emoji`, hidden from accessibility), plus
-  the chevrons, arrows and tick of the tuner and the big buttons' play, stop, done and again icons
-  in `AppIcons`. The app icon's picture is one vector, `@drawable/ic_app_art` (a robot
+  the chevrons, arrows and tick of the tuner and the big buttons' play, stop, done, again and
+  microphone icons in `AppIcons`. The app icon's picture is one vector, `@drawable/ic_app_art` (a robot
   over a flute, from the canvas's "App icon" board): the launcher insets it into the adaptive icon's
   safe zone, `AppLogo` puts it on the golden rounded square in the top bar, and `tools/IconGen.java`
   draws the same shapes for the PNGs and the Play listing. Note names are shown with the octave raised as every canvas board draws it, a `sup` at 0.48 of the
@@ -188,9 +190,18 @@ the fifteen keys in three octave rows highest on top (each in its letter's colou
 for as long as it is held) with, at the end of the top row beside c³, a 😮‍💨 breath key and a
 💤 rest key (two keys wide each, icon only; the rest is held like a note and grows the same way,
 on the staff its rest symbol in grey with 💤 under the staff, in the line a grey 💤 pill; a breath has no length, on the staff the breath mark with 😮‍💨 over it, and playback
-goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, one big Play pill ("Play" / "Stop", at the
-metronome's tempo) with a round erase button beside it (it sinks while held and repeats like a
-keyboard's backspace): no record button, no clear-all, no tempo control but that knob and the metronome's
+goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, two big buttons that stack their
+icon over their word, "Play" (the tune at the metronome's tempo) and, since 2026-11-04, "Your turn"
+(blue, a microphone: the phone listens to the child's real flute and waits for each written note,
+the same letter in any octave; under the note a star for a first try, a faint star after a stumble,
+a ❌ for a moment under a wrong one, never a number and no summary; the first right-or-wrong outside
+the notes game, kept the child's by being opt-in and child-paced; spec
+`docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`, details in `ui/flute/CLAUDE.md`),
+with a round erase button beside them (it sinks while held and repeats like a keyboard's
+backspace); while the tune runs, by Play or by Your turn, the keys and the sponge hide, the staff
+grows by a third for a phone on a music stand, the knob's animal walks a marks row under the names
+(bouncing with the beats in Play, waiting under the next note in Your turn, the knob empty
+meanwhile) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's
 stage it opens in place, and no note lengths as a
 control (lengths come only from how long a key is held; the user drew this on 2026-10-24). The user rejected a wider
 layout (−/+ beside the ring, a ten-button signature scroller, flags in the content area) as too
@@ -231,6 +242,7 @@ Unit tests use hand-written fakes from `app/src/test/.../fakes/Fakes.kt` (`FakeM
 `FakeBackgroundPlayback`, `FakeReferenceTonePlayer`, `FakeFluteTonePlayer`, `FakeLogger`); there is no mocking library. ViewModel tests run under
 `StandardTestDispatcher` with `Dispatchers.setMain` and drive time with `advanceTimeBy` /
 `advanceUntilIdle`. Instrumented tests cover the `*Content` composables (`MetronomeScreenTest`, `TunerScreenTest`,
-`NotesScreenTest`, `FluteScreenTest`), the flag buttons (`LanguageSwitchTest`) and
-locale-dependent resources (`LabelsTest`). The `config_summary`, `subdivision_*` and `sound_*` strings must stay
+`NotesScreenTest`, `FluteScreenTest`), the flag buttons (`LanguageSwitchTest`), the pieces the
+tuner and the flute share (`SharedActionsTest`: the microphone card's "Not now", the stacked big
+button) and locale-dependent resources (`LabelsTest`). The `config_summary`, `subdivision_*` and `sound_*` strings must stay
 even though the screens no longer show them: the playback notification and `LabelsTest` use them.

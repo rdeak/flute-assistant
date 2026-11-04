@@ -51,6 +51,26 @@ it) and ignores microphone frames meanwhile. `FluteFingerings.keysFor(midi)` is 
 Boehm chart (Woodwind Fingering Guide basic fingerings; no entry for MIDI 94 and 95) that
 `FingeringDiagram` draws.
 
+Two pieces of this path are shared with the flute's "Your turn" (`ui/flute/CLAUDE.md`, since
+2026-11-04): `NoteOnsetTracker`, a pure class that applies the same frame rules as this view
+model's "Which?" mode (the probability gate, the lock, the median, the drift-and-switch of
+`identify`) and additionally says when a *new* note begins: after a gap, or by a clear step to
+another note without one (a slur, a fingered change). Two rules there are the flute's own, from the
+review of 2026-11-04: a gap is `ONSET_GAP_FRAMES` uncounted frames that also fell under
+`GAP_LEVEL_RATIO` (half) of the sounding note's mean level, because the 0.85 gate blinks on a
+breathy tone and a blink that keeps the loudness must not split one held note in two (it would
+count a written repeat as played); and a drift past the halfway point that switches the sounding
+note after `SWITCH_FRAMES` (a long note sagging as the breath runs out) is no new note, since
+nobody played one, where the tuner's ring simply moves. Both are starting values to be read
+against `flute.heard` and `flute.listen_summary` on a phone. The other piece is `FrameSummary` (its own file now, `internal`),
+the body of `tuner.summary` and of the flute's `flute.listen_summary`. `TunerViewModel` still
+runs its own copy of those rules; moving it onto the tracker is a refactor for another day, and
+the constants (`MIN_PROBABILITY`, `LOCK_FRAMES`, `LOCK_CENTS`, `SMOOTHING_WINDOW`,
+`SWITCH_FRAMES`, `NEAR_TARGET_CENTS`) are referenced, never copied. The microphone card
+(`ui/common/MicrophonePermissionCard`) and the advice line (`ui/common/AdviceLine`) moved out of
+`TunerScreen` for the same reason; the tuner shows them unchanged. Only the open tab holds the
+microphone, so the tuner and the flute never listen at once.
+
 Log events (tag `FA.Tuner`): `mic.open` (source, rate, buffer), `mic.close`, `tuner.permission`,
 `tuner.frame` (verbose: f, p, level, `FrameDecision`), `tuner.summary` every
 `TunerViewModel.SUMMARY_FRAMES` frames (counts per decision, pMin/pMax/pMean against `gate`,

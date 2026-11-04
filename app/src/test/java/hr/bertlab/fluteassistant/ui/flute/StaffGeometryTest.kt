@@ -35,10 +35,21 @@ class StaffGeometryTest {
         assertTrue(StaffGeometry.MIDDLE_LINE_Y + StaffGeometry.REST_LIT_RADIUS <= StaffGeometry.HEIGHT)
         assertTrue(StaffGeometry.BAND_TOP >= 0f && StaffGeometry.BAND_BOTTOM <= StaffGeometry.TOTAL_HEIGHT)
         assertTrue(StaffGeometry.BAND_BOTTOM >= StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT)
-        // What reaches below the staff (c¹'s ring and tie) stops short of the names, and a tie under the pills fits.
+        // What reaches below the staff (c¹'s ring and tie) stops short of the names, and a tie under the pills starts above the marks row.
         assertTrue(StaffGeometry.HEIGHT + StaffGeometry.OVERFLOW_BOTTOM <= StaffGeometry.NAMES_TOP)
-        val pillTie = StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT + StaffGeometry.PILL_TIE_GAP + StaffGeometry.PILL_TIE_DIP + 1f
-        assertTrue(pillTie <= StaffGeometry.TOTAL_HEIGHT)
+        assertTrue(StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT + StaffGeometry.PILL_TIE_GAP <= StaffGeometry.MARKS_TOP)
+        assertEquals(StaffGeometry.TOTAL_HEIGHT, StaffGeometry.MARKS_TOP + StaffGeometry.MARKS_HEIGHT)
+    }
+
+    @Test
+    fun `the marks row sits under the names and the whole staff grew by sixteen`() {
+        assertEquals(StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT + StaffGeometry.MARKS_GAP, StaffGeometry.MARKS_TOP)
+        assertEquals(257f, StaffGeometry.TOTAL_HEIGHT)
+        assertTrue(StaffGeometry.MARK_SIZE <= StaffGeometry.MARKS_HEIGHT)
+        assertTrue(StaffGeometry.ANIMAL_SIZE <= StaffGeometry.MARKS_HEIGHT)
+        // The animal at the top of its hop (8 dp) still stands under the pills, not over them.
+        val animalTop = StaffGeometry.MARKS_TOP + (StaffGeometry.MARKS_HEIGHT - StaffGeometry.ANIMAL_SIZE) / 2 - 8f
+        assertTrue(animalTop >= StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT - 2f)
     }
 
     @Test

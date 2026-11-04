@@ -19,6 +19,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -130,7 +131,11 @@ fun ChunkyButton(
 /**
  * The big full-width action at the bottom of a screen: a drawn icon and one word, both white,
  * on a deep pill ([ActionGo] for Play, OK, Again and Yes, [ActionStop] for Stop), so the most
- * important button on each screen has the strongest contrast.
+ * important button on each screen has the strongest contrast. Two such pills do not fit side by
+ * side on a phone with the word beside the icon; [stacked] puts the icon over the word, as the
+ * tab bar's buttons stack an emoji over a word, at the same height, the word shrinking a step
+ * or two at a narrow width or large text rather than being cut short (the flute's Play and
+ * Your turn).
  */
 @Composable
 fun BigActionButton(
@@ -140,6 +145,7 @@ fun BigActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    stacked: Boolean = false,
 ) {
     ChunkyButton(
         onClick = onClick,
@@ -151,15 +157,29 @@ fun BigActionButton(
             .fillMaxWidth()
             .height(84.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(32.dp))
-            Text(
-                text,
-                style = MaterialTheme.typography.headlineMedium,
-                color = OnAction,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        if (stacked) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(28.dp))
+                Text(
+                    text,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = OnAction,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 18.sp),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(32.dp))
+                Text(
+                    text,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = OnAction,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

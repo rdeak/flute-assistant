@@ -93,6 +93,8 @@
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
     <string name="allow_microphone">Yes</string>
     <string name="open_settings">Settings</string>
+    <!-- The quiet way back from the microphone card on the flute tab, which works without the microphone -->
+    <string name="mic_not_now">Not now</string>
     <!-- Note reading game (ui/notes): the staff, feedback, the round and the note picker -->
     <string name="notes_correct">🎉 That\'s it!</string>
     <string name="notes_wrong">🙈 Try again</string>
@@ -133,6 +135,8 @@
     <!-- Digital flute (ui/flute): keys that sound while held, a line of the notes played, one Play button -->
     <string name="flute_hint">👆 Tap or hold a note</string>
     <string name="flute_play">Play</string>
+    <!-- The second big button: the phone listens to the child playing the tune on a real flute and marks each note -->
+    <string name="flute_your_turn">Your turn</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
     <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->
@@ -158,6 +162,11 @@
         <item quantity="other">%1$s, %2$d beats</item>
     </plurals>
     <string name="flute_note_half_beat">%1$s, half a beat</string>
+    <!-- "Your turn": appended to a note's accessibility name on the flute staff while the flute listens or after it did -->
+    <string name="flute_mark_first_try">got it</string>
+    <string name="flute_mark_retry">got it after a retry</string>
+    <string name="flute_mark_wrong">try again</string>
+    <string name="flute_listen_here">play this one</string>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>

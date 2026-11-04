@@ -26,7 +26,7 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
 /** A star for a note that took more than one try: still earned, but faint. */
-private const val RETRY_STAR_ALPHA = 0.35f
+const val RETRY_STAR_ALPHA = 0.35f
 
 /**
  * One place per note of the round: a star when found on the first try, a faint star when it
