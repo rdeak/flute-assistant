@@ -125,15 +125,29 @@ The speed knob and its panel (the user's pick of 2026-11-03 from three mockups, 
 `docs/superpowers/specs/2026-11-03-flute-speed-knob-design.md`): the tune plays at the metronome
 tab's tempo and in its time signature, and the flute now shows and sets both. `SpeedKnob` is the
 ring's knob moved to the staff, where printed music writes the tempo: a `ChunkyButton` in `Sun`,
-`CircleShape`, `SpeedKnobSize` (54 dp) across with a 5 dp shadow, carrying the animal of the
-speed (`tempoBand(bpm).emoji` at 26 sp, `facingRight`), laid by `FluteContent` over `TuneStaff`'s
+`CircleShape`, `SpeedKnobSize` (54 dp) across with a 5 dp shadow, laid by `FluteContent` over `TuneStaff`'s
 box at its top left so it touches only the faint clef's tip (the clef's top is `TOP_LINE_Y -
 LINE_GAP`, 57 dp, the signature stands clear of it below, and `NOTES_CLIP`, also 57 dp, keeps
 every note, stem, ring and band from running under it); nothing on the staff moved for it, and it
-shows on an empty tune too. Its bpm is `MetronomeUiState.config.bpm`, hoisted from `MainScreen`
+shows on an empty tune too. Since the evening of 2026-11-04 it carries two pictures: the tab bar's drum
+(`AppTab.METRONOME.emoji`, `StaffGeometry.KNOB_DRUM`, 26 dp, `KNOB_DRUM_SHIFT` up and left of the
+middle), which says what it opens, and in `AnimalBadge` at its lower right the animal of the speed
+(`tempoBand(bpm).emoji`, `KNOB_BADGE_ANIMAL`, 19 dp, `facingRight`), which says how fast. Before that it
+carried the animal alone at 26 sp, and with the flute now the first tab a child met that animal before
+ever seeing the metronome. The user asked for a drum; a drum alone would hide the speed while the child
+writes, though a held key is counted at it and each book has its own, so true-size mockups
+(`.superpowers/brainstorm/*/content/knob-drum.html`, `knob-drum-v2.html`) went from the animal with a drum
+badge, which the user liked with the two swapped, to this: "E" of the second page, because on the first
+swap's white 24 dp badge the near-white rabbit disappeared, so the badge is `Sun` and `KNOB_BADGE` (29 dp)
+across with a `KNOB_BADGE_EDGE` outline. Both emoji are sized in dp (`emojiSizeFor`), so a large font
+scale cannot push them out. The badge is the button's sibling, not its content, because `ChunkyButton`
+clips to its disc and the badge reaches `KNOB_BADGE_OVERHANG` (3 dp) past the box, to `NOTES_CLIP` and
+the clef's tip and no further (`StaffGeometryTest`); it has no gesture, so a tap on it goes through to
+the knob, and it sinks with the knob through a shared `MutableInteractionSource` and `PressDepth`. The
+emoji have no semantics, so `FluteScreenTest` checks them through the knob's pixels. Its bpm is `MetronomeUiState.config.bpm`, hoisted from `MainScreen`
 through `FluteScreen` into `FluteContent`, so a change made on the metronome tab shows the
 moment the child comes back; a screen reader hears "Speed: Rabbit, tap to change"
-(`flute_speed_knob`), never a number. While the tune plays back the animal hops once per click:
+(`flute_speed_knob`), never a number. While the tune plays back the walking animal (below) hops once per click:
 the playback loop itself adds one to `FluteUiState.beatPulse` on every click that falls inside the
 step playing (the half beats `h` into it where `(start + h) % Pulse.halfBeatsPerClick == 0`: 2 in
 x/4, 1 in x/8, 4 in x/2), timed from that step's own start, so a hop always lands with its note
@@ -145,8 +159,8 @@ and nothing said which beat of a long note a click fell on). Each click also set
 gap before the next step, is in the same timeline and always after its last click. `FluteContent`
 turns the counter into the hop with `rememberBeatFlash(beatPulse, isPlaying)` and `hopOnBeat`
 (`ui/common/BeatFlash.kt`, `HopDistance` 8 dp, `FLASH_DURATION_MS` 220, the ring's own hop). The
-knob never hops for a running metronome, only for the tune's own playback; the tab bar's drum does
-that (`MainScreen`). `beatPulse` is not reset when playback ends, only the hopping stops.
+knob itself never hops: the walking animal does for the tune's own playback and the tab bar's drum for a
+running metronome (`MainScreen`). `beatPulse` is not reset when playback ends, only the hopping stops.
 
 A tap on the knob opens the panel. `FluteContent` keeps `choosingSpeed` in `rememberSaveable`, as
 `NotesContent` keeps `choosingNotes`, so rotation and the language switch keep it open, and while
@@ -216,8 +230,8 @@ While the tune runs, in Play as in Your turn (`FluteUiState.isRunning`), the key
 go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3: lines 24 dp apart, the canvas's
 original size, for a phone on a music stand at arm's length; the geometry stays one table in dp
 and a private `LocalStaffScale` multiplies every size and every `scale(density * s)`), with the
-advice line in the keys' room and the wide Stop at the bottom; the knob's disc stays in the
-corner, empty and inert (`SpeedKnob(running = true)`), because its animal is on the staff, walking
+advice line in the keys' room and the wide Stop at the bottom; the knob stays in the
+corner, its drum faded and inert and its badge gone (`SpeedKnob(running = true)`), because its animal is on the staff, walking
 it at the knob's height (`WalkingAnimal` in `TuneStaff.kt`; since the evening of 2026-11-04, the
 user's "move metronome animal to top so it moves on top line where it stands during notes entering
 phase; when a note has longer duration the animal should not jump more than once in one place", and

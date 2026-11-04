@@ -95,6 +95,21 @@ internal object StaffGeometry {
     const val CORNER_SHADOW = 5f
 
     /**
+     * What stands on the speed knob (since the evening of 2026-11-04, the user's pick "E" from
+     * true-size mockups): the tab bar's drum, [KNOB_DRUM] tall, [KNOB_DRUM_SHIFT] up and left of the
+     * disc's middle to leave the badge its corner, and the speed's animal, [KNOB_BADGE_ANIMAL] tall,
+     * in a round badge [KNOB_BADGE] across with a [KNOB_BADGE_EDGE] edge at the disc's lower right. The
+     * badge reaches [KNOB_BADGE_OVERHANG] past the knob's box to the right and below: to
+     * [NOTES_CLIP], so no note runs under it, and to the clef's tip, no further.
+     */
+    const val KNOB_DRUM = 26f
+    const val KNOB_DRUM_SHIFT = 4f
+    const val KNOB_BADGE = 29f
+    const val KNOB_BADGE_EDGE = 2.25f
+    const val KNOB_BADGE_ANIMAL = 19f
+    const val KNOB_BADGE_OVERHANG = 3f
+
+    /**
      * The knob's animal while the tune runs (since the evening of 2026-11-04, the user's pick "A"
      * from a moving true-size mockup; it walked the marks row before): it leaves the knob and walks
      * the staff at the knob's height, its middle [ANIMAL_Y] from the top of the staff's box at

@@ -270,7 +270,7 @@ fun FluteContent(
             val fits = maxHeight >= FitsHeight
             val running = state.isRunning
             val staffScale = if (running) RunningStaffScale else 1f
-            // One flash for the animal wherever it is: the knob at rest (still), the staff while the tune runs.
+            // The walking animal's hop: it hops only on the staff, so only while the tune runs.
             val flash = rememberBeatFlash(state.beatPulse, running)
             val animal = if (running) {
                 state.animalIndex?.let {
@@ -301,7 +301,6 @@ fun FluteContent(
                         )
                         SpeedKnob(
                             bpm = metronome.config.bpm,
-                            flash = flash,
                             running = running,
                             onClick = {
                                 onSpeedOpen()

@@ -43,6 +43,7 @@ import hr.bertlab.fluteassistant.ui.common.DISABLED_ALPHA
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.fadedUnless
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 import kotlin.math.roundToInt
@@ -219,7 +220,7 @@ private fun LittleBook(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = FluteTheme.colors
-    Box(modifier.alpha(if (enabled) 1f else DISABLED_ALPHA)) {
+    Box(modifier.fadedUnless(enabled, look.depth)) {
         Box(
             Modifier
                 .align(Alignment.CenterEnd)

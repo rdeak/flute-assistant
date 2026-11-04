@@ -12,9 +12,11 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -28,7 +30,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
@@ -60,6 +65,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class FluteScreenTest {
@@ -462,6 +468,77 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Brzina: Zec, dodirni za promjenu").assertIsDisplayed()
     }
 
+    /** The knob as it is drawn; the emoji have no semantics, so its pixels are how a test sees them. */
+    private fun knobPixels(animal: String): PixelMap =
+        compose.onNodeWithContentDescription("Speed: $animal, tap to change").captureToImage().toPixelMap()
+
+    private fun setSpeed(bpm: Int) = compose.runOnIdle { metronome.value = MetronomeUiState(config = MetronomeConfig(bpm = bpm)) }
+
+    /** Where the badge starts in a [knob] of 54 dp: 28 dp from its top and from its left. */
+    private fun badgeStart(knob: PixelMap) = knob.width * 28 / 54
+
+    @Test
+    fun the_speed_changes_only_the_knobs_badge_and_the_drum_stays_as_it_is() {
+        show(FluteUiState())
+        val rabbit = knobPixels("Rabbit")
+        setSpeed(60)
+        val turtle = knobPixels("Turtle")
+        val start = badgeStart(rabbit)
+        for (x in 0 until start) {
+            for (y in 0 until start) assertEquals("($x, $y) is the drum's", rabbit[x, y], turtle[x, y])
+        }
+        val badge = (start until rabbit.width).flatMap { x -> (start until rabbit.height).map { y -> x to y } }
+        assertTrue("the badge should show the speed's animal", badge.any { (x, y) -> rabbit[x, y] != turtle[x, y] })
+    }
+
+    @Test
+    fun the_knob_keeps_its_drum_and_loses_its_animal_while_the_tune_runs() {
+        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        val rabbit = knobPixels("Rabbit")
+        setSpeed(60)
+        val turtle = knobPixels("Turtle")
+        for (x in 0 until rabbit.width) {
+            for (y in 0 until rabbit.height) assertEquals("($x, $y) should not follow the speed", rabbit[x, y], turtle[x, y])
+        }
+        // An empty disc is one colour inside its ring; the drum is not.
+        val middle = rabbit.width / 3 until rabbit.width * 2 / 3
+        val colours = middle.flatMap { x -> middle.map { y -> rabbit[x, y] } }.toSet()
+        assertTrue("the drum should stay on the knob, found ${colours.size} colour(s)", colours.size > 1)
+    }
+
+    @Test
+    fun a_tap_on_the_knobs_badge_opens_the_speed_panel() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performTouchInput {
+            click(Offset(width * 0.78f, height * 0.78f)) // the badge's middle, 42 dp in
+        }
+        assertEquals(1, speedOpens)
+    }
+
+    @Test
+    fun the_knobs_badge_sinks_with_the_knob() {
+        show(FluteUiState())
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
+        val top = knob.getBoundsInRoot().top
+        val rest = knob.captureToImage().toPixelMap()
+        knob.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(200) // past the press delay of a scrolling column
+        assertTrue("the knob should sink", knob.getBoundsInRoot().top > top)
+        // The capture follows the sunk knob, so a badge that went with it lands on the same pixels.
+        val pressed = knob.captureToImage().toPixelMap()
+        knob.performTouchInput { up() }
+        val start = badgeStart(rest)
+        val width = minOf(rest.width, pressed.width)
+        val height = minOf(rest.height, pressed.height)
+        val badge = (start until width).flatMap { x -> (start until height).map { y -> x to y } }
+        val moved = badge.count { (x, y) ->
+            val a = rest[x, y]
+            val b = pressed[x, y]
+            abs(a.red - b.red) + abs(a.green - b.green) + abs(a.blue - b.blue) > 0.5f
+        }
+        assertTrue("$moved of ${badge.size} pixels of the badge stayed behind", moved < badge.size / 12)
+    }
+
     @Test
     fun the_book_button_shows_the_open_books_sweet_and_opens_the_shelf() {
         show(FluteUiState(openBook = 1))
@@ -770,8 +847,37 @@ class FluteScreenTest {
         compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
     }
 
+    /** A faded button's shadow, [depth] deep, must show right down under the middle of its bottom edge. */
+    private fun assertWholeShadowUnder(button: SemanticsNodeInteraction, depth: Dp) {
+        val bounds = button.getBoundsInRoot()
+        val screen = compose.onRoot().captureToImage().toPixelMap()
+        val pixels = { dp: Dp -> with(compose.density) { dp.toPx() }.roundToInt() }
+        val x = pixels((bounds.left + bounds.right) / 2)
+        val shadow = screen[x, pixels(bounds.bottom + depth - 1.dp)]
+        val under = screen[x, pixels(bounds.bottom + depth + 3.dp)]
+        assertTrue(
+            "the shadow's last row $shadow should be darker than what is under it $under",
+            shadow.luminance() < under.luminance() - 0.1f,
+        )
+    }
+
     @Test
-    fun the_knob_is_empty_and_inert_while_the_tune_runs() {
+    fun the_faded_knob_and_book_keep_their_whole_shadow_while_the_tune_runs() {
+        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        assertWholeShadowUnder(compose.onNodeWithContentDescription("Speed: Rabbit, tap to change"), 5.dp)
+        assertWholeShadowUnder(compose.onNodeWithContentDescription("Tune: Lollipop, tap to change"), 5.dp)
+    }
+
+    @Test
+    fun the_faded_keys_and_buttons_of_an_empty_tune_keep_their_whole_shadow() {
+        show(FluteUiState())
+        assertWholeShadowUnder(compose.onNodeWithContentDescription("Erase the last note"), 5.dp)
+        assertWholeShadowUnder(compose.onNodeWithText("Play"), 8.dp)
+        assertWholeShadowUnder(compose.onNodeWithText("Listen to me"), 8.dp)
+    }
+
+    @Test
+    fun the_knob_is_inert_while_the_tune_runs() {
         show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
         val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
         knob.assertIsDisplayed()

@@ -251,7 +251,7 @@ private fun staffText(measurer: TextMeasurer, text: String, size: Float): TextLa
 
 /** An emoji's size in sp that makes it [dp] dp tall whatever the font scale: a mark or the animal must stay in its row. */
 @Composable
-private fun emojiSizeFor(dp: Float): Int = with(LocalDensity.current) { dp.dp.toSp().value.roundToInt() }
+internal fun emojiSizeFor(dp: Float): Int = with(LocalDensity.current) { dp.dp.toSp().value.roundToInt() }
 
 /** Draws [layout] centred on [x] with its baseline at [baseline]. */
 private fun DrawScope.drawCentred(layout: TextLayoutResult, x: Float, baseline: Float, color: Color = Color.Unspecified) {

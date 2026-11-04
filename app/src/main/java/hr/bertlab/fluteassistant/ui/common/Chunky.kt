@@ -30,10 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.LayerOutsets
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
@@ -55,10 +55,25 @@ import hr.bertlab.fluteassistant.ui.theme.OnAction
 val OutlineWidth = 3.dp
 
 /** How far a pressed thing sinks onto its shadow. */
-private val PressDepth = 3.dp
+internal val PressDepth = 3.dp
 
 /** Opacity of something that cannot be pressed right now. */
 const val DISABLED_ALPHA = 0.45f
+
+/**
+ * Fades this to [DISABLED_ALPHA] unless [enabled], with the [chunky] shadow [depth] below it. A faded
+ * layer is drawn through an offscreen buffer that stops at its bounds, so the buffer is made that
+ * much taller; `Modifier.alpha` would cut the shadow off flat along the bottom edge.
+ */
+internal fun Modifier.fadedUnless(enabled: Boolean, depth: Dp): Modifier =
+    if (enabled) {
+        this
+    } else {
+        graphicsLayer {
+            alpha = DISABLED_ALPHA
+            outsets = LayerOutsets(bottom = depth)
+        }
+    }
 
 /**
  * The app's one pressable look: a [color] fill in [shape] with a thick [outline] and a solid
@@ -123,7 +138,7 @@ fun ChunkyButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .alpha(if (enabled || !fade) 1f else DISABLED_ALPHA)
+            .fadedUnless(enabled || !fade, depth)
             .chunky(shape, color, colors.outline, depth, pressed && enabled)
             .then(gesture),
     ) {

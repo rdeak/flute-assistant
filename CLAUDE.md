@@ -109,7 +109,7 @@ point there.
   never change are `Sun` (yellow = chosen), `Go` (the Sound switch), `Stop` and `NoteLetterColors`, one per letter,
   which `noteColor(midi)` applies wherever a note appears (a sharp takes the letter below). Text on a
   bright fill is always `InkOnFill`. Everything pressable is a `ChunkyButton` / `Modifier.chunky`
-  (thick ink outline, solid shadow, sinks 3 dp when pressed); big actions are `BigActionButton`,
+  (thick ink outline, solid shadow, sinks 3 dp when pressed; a faded one goes through `fadedUnless`, as `Modifier.alpha` cuts the shadow off flat); big actions are `BigActionButton`,
   the one place with white on colour: a drawn icon and the word in `OnAction` on `ActionGo` (deep
   green: Play, OK, Again, Yes), `ActionStop` (deep red: Stop) or `ActionListen` (deep blue: the
   flute's Your turn), for contrast (canvas, 2026-10-24); the flute's Play and Your turn stack the
@@ -185,9 +185,11 @@ the names too, a rest a grey 💤 pill, a breath no pill; the held step's yellow
 and its names together; the names went from a single-name bubble to a separate pill line (with
 length symbols, then without) to this, all on 2026-11-02; the flute tab shows no
 fingering any more, the tuner still does; at the staff's top left, since 2026-11-03 (chosen by
-the user from three mockups), the metronome's yellow knob with the speed's animal on it (`SpeedKnob`,
-54 dp, touching only the faint clef's tip, never a note or the signature; it hops on each click while
-the tune plays back), whose tap swaps the stage, the keys and the Play row, in place, for the
+the user from three mockups), the metronome's yellow knob (`SpeedKnob`, 54 dp, touching only the faint
+clef's tip, never a note or the signature), since the evening of 2026-11-04 the tab bar's 🥁 on it, so it
+says what it opens, with the speed's animal small in a yellow badge at its lower right, so it still says
+how fast (the user's pick from true-size mockups; a drum alone would hide the speed while the child
+writes), whose tap swaps the stage, the keys and the Play row, in place, for the
 metronome tab's own stage (`MetronomeStage`: the beat bubbles with − / + and the ring exactly as
 drawn there, its tempo figure the one number the panel shows) over one big green OK, the only way
 back; at the staff's bottom left, under the clef and beside the names, since 2026-11-04 (chosen by
@@ -224,7 +226,7 @@ grows by a third for a phone on a music stand, the knob's animal walks the staff
 height (since the evening of 2026-11-04, the user's pick from moving mockups: in Play it hops on to
 each beat's place on every click, like the metronome's beat bubbles, so a long note is never hopped
 on twice in one place; in Your turn it waits over the next note and hops on when the child plays it;
-the knob empty and the book button faded meanwhile; the stars and the heard note stay in a marks row
+the knob's badge gone with it, its drum and the book button faded meanwhile; the stars and the heard note stay in a marks row
 under the names) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's
 stage it opens in place, and no note lengths as a
 control (lengths come only from how long a key is held; the user drew this on 2026-10-24). The user rejected a wider

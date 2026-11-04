@@ -95,6 +95,14 @@ class StaffGeometryTest {
     }
 
     @Test
+    fun `the knob's badge stops where the notes start and at the clef's tip, and holds its animal`() {
+        val badgeEnd = StaffGeometry.CORNER_BUTTON + StaffGeometry.KNOB_BADGE_OVERHANG
+        assertTrue("no note may run under it", badgeEnd <= StaffGeometry.NOTES_CLIP)
+        assertTrue("it may only touch the clef's tip", badgeEnd <= StaffGeometry.TOP_LINE_Y - StaffGeometry.LINE_GAP)
+        assertTrue(StaffGeometry.KNOB_BADGE_ANIMAL <= StaffGeometry.KNOB_BADGE - 2 * StaffGeometry.KNOB_BADGE_EDGE)
+    }
+
+    @Test
     fun `the book button sits under the clef, left of the notes, inside the staff, at rest and while running`() {
         for (s in listOf(1f, RunningStaffScale)) {
             val top = StaffGeometry.bookButtonTop(s)

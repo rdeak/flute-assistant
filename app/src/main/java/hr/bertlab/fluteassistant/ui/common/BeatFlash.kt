@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * One beat, one hop: how long the flash takes to fade from 1 (just hit) to 0, shared by the
- * ring's knob, the flute's knob and the tab bar so every animal moves in step.
+ * ring's knob, the flute's walking animal and the tab bar so every animal moves in step.
  */
 const val FLASH_DURATION_MS = 220
 
