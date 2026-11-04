@@ -113,7 +113,13 @@ plays the tune from the start at the metronome's tempo, each note for its length
 on the staff, on its name and on its key, silent for each rest's whole length (its symbol and
 its pill ringed, the rest key sunk: `restLit`) and straight past each breath, and
 stops at once on the pill, on a key press, on `openSpeed()`, on `openShelf()` or `openBook()` or on `eraseLast()`, which drops the
-last step (the erase button repeats while held).
+last step (the erase key repeats while held). The erase key (🧽, `EraseKey` in `FluteKeys.kt`) is the
+top row's last key, after the breath and the rest key and as wide as each, ending where h² does, so
+the three plain keys fill the row after c³ and Play and Your turn share the Play row's width (since
+2026-11-04, at the user's "move erase button to right of rest button and extend play / listen
+buttons"; it was a round 84 dp button at the end of the Play row). It is faded and inert while the
+tune is empty, and its gesture is attached only while it is enabled, so a hold that empties the tune
+stops repeating and lets the key up.
 
 The speed knob and its panel (the user's pick of 2026-11-03 from three mockups, spec
 `docs/superpowers/specs/2026-11-03-flute-speed-knob-design.md`): the tune plays at the metronome

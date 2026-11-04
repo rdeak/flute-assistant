@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,10 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -34,6 +35,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -42,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.ui.common.DISABLED_ALPHA
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -50,6 +53,9 @@ import hr.bertlab.fluteassistant.ui.common.noteText
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import hr.bertlab.fluteassistant.ui.theme.Sun
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * A key's height: a sure target for a small finger, and the canvas's 58 at every screen height
@@ -65,8 +71,14 @@ private val KeyDepth = 5.dp
 val FluteKeysMinHeight: Dp = (KeyHeight + KeyDepth) * 3 + KeyRowGap * 2
 
 
-/** The breath and the rest key each span this many note keys (and the gap between them). */
+/** The breath, the rest and the erase key each span this many note keys (and the gap between them). */
 private const val SignKeySpan = 2
+
+private const val SPONGE_EMOJI = "\uD83E\uDDFD" // sponge
+
+/** After this long held, the erase key starts repeating, then every [EraseRepeatMs]: a phone keyboard's backspace. */
+private const val EraseRepeatDelayMs = 400L
+private const val EraseRepeatMs = 120L
 
 /**
  * The fifteen keys ([StaffNotes.ALL]) in three rows, one per octave, highest on top as on
@@ -77,9 +89,12 @@ private const val SignKeySpan = 2
  * screen reader activates a key through [onActivate]. Every row is [KeyHeight] tall, as on the
  * canvas, and the three rows sit centred in the height they are given.
  *
- * The top row's free end holds two plain keys, each two note keys wide: the breath key (😮‍💨),
- * which calls [onBreath] as the finger goes down, and the rest key (💤), held like a note key
- * ([onRestPress], [onRestRelease], [onRestActivate]) and sunk while [restLit].
+ * After c3 the top row holds three plain keys, each two note keys wide, filling it to the end: the
+ * breath key (😮‍💨), which calls [onBreath] as the finger goes down, the rest key (💤), held like a
+ * note key ([onRestPress], [onRestRelease], [onRestActivate]) and sunk while [restLit], and the
+ * erase key (🧽), which calls [onErase] as the finger goes down and again and again while it stays,
+ * like a keyboard's backspace, faded and inert while [eraseEnabled] is false (since 2026-11-04, at
+ * the user's request; it was a round button at the end of the Play row).
  */
 @Composable
 fun FluteKeys(
@@ -92,6 +107,8 @@ fun FluteKeys(
     onRestRelease: () -> Unit,
     onRestActivate: () -> Unit,
     onBreath: () -> Unit,
+    eraseEnabled: Boolean,
+    onErase: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
@@ -128,8 +145,9 @@ fun FluteKeys(
                         )
                     }
                     if (row.size < keysPerRow) {
-                        // The short top row: c3, a gap, then the breath and the rest key at its end.
-                        Spacer(Modifier.weight(1f))
+                        // The short top row: c3, then the breath, the rest and the erase key, each two
+                        // note keys wide, so the row is full (no spacer: spacedBy would put a gap on
+                        // each side of even an empty one, and the row would run over).
                         BreathKey(
                             onBreath = onBreath,
                             modifier = Modifier
@@ -143,6 +161,15 @@ fun FluteKeys(
                             onActivate = onRestActivate,
                             modifier = Modifier
                                 .width(signKeyWidth)
+                                .fillMaxHeight(),
+                        )
+                        EraseKey(
+                            enabled = eraseEnabled,
+                            onErase = onErase,
+                            // The rest of the row, two keys' width: it takes up the rounding, so it
+                            // ends exactly where h2 does.
+                            modifier = Modifier
+                                .weight(1f)
                                 .fillMaxHeight(),
                         )
                     }
@@ -208,7 +235,58 @@ private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
     )
 }
 
-/** A plain (not a note's colour) key showing [emoji], named [label] for a screen reader; sunk in a yellow ring while [pressed]. */
+/**
+ * The erase key: a plain key with a sponge that erases the last step as the finger goes down and
+ * keeps erasing while it stays, so a long line is cleared by holding; it sinks while held, like the
+ * breath key. Faded and inert while [enabled] is false; the gesture is attached only while it is
+ * enabled, so a hold that empties the tune stops repeating and lets the key up at once.
+ */
+@Composable
+private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.flute_erase)
+    val scope = rememberCoroutineScope()
+    val currentOnErase by rememberUpdatedState(onErase)
+    var pressed by remember { mutableStateOf(false) }
+    SignKey(
+        emoji = SPONGE_EMOJI,
+        label = label,
+        pressed = pressed,
+        onActivate = { currentOnErase() },
+        enabled = enabled,
+        modifier = modifier.then(
+            if (enabled) {
+                Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            pressed = true
+                            currentOnErase()
+                            val repeat = scope.launch {
+                                delay(EraseRepeatDelayMs)
+                                while (isActive) {
+                                    currentOnErase()
+                                    delay(EraseRepeatMs)
+                                }
+                            }
+                            try {
+                                tryAwaitRelease()
+                            } finally {
+                                pressed = false
+                                repeat.cancel()
+                            }
+                        },
+                    )
+                }
+            } else {
+                Modifier
+            },
+        ),
+    )
+}
+
+/**
+ * A plain (not a note's colour) key showing [emoji], named [label] for a screen reader; sunk in a
+ * yellow ring while [pressed]; faded, and refusing [onActivate], while [enabled] is false.
+ */
 @Composable
 private fun SignKey(
     emoji: String,
@@ -216,17 +294,20 @@ private fun SignKey(
     pressed: Boolean,
     onActivate: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val colors = FluteTheme.colors
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
+            .alpha(if (enabled) 1f else DISABLED_ALPHA)
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = label
+                if (!enabled) disabled()
                 onClick {
-                    onActivate()
-                    true
+                    if (enabled) onActivate()
+                    enabled
                 }
             }
             .drawBehind { if (pressed) drawKeyRing() }

@@ -201,11 +201,12 @@ name, no delete (a book is emptied only by wiping its tune with the sponge) and 
 picture, and the old single tune moved into the first book on update (spec
 `docs/superpowers/specs/2026-11-04-flute-songbook-design.md`, details in `ui/flute/CLAUDE.md`);
 the fifteen keys in three octave rows highest on top (each in its letter's colour; a key sounds
-for as long as it is held) with, at the end of the top row beside c³, a 😮‍💨 breath key and a
-💤 rest key (two keys wide each, icon only; the rest is held like a note and grows the same way,
+for as long as it is held) with, filling the top row after c³, a 😮‍💨 breath key, a
+💤 rest key and a 🧽 erase key (two keys wide each, icon only; the rest is held like a note and grows the same way,
 on the staff its rest symbol in grey with 💤 under the staff, in the line a grey 💤 pill; a breath has no length, on the staff the breath mark with 😮‍💨 over it, and playback
-goes past it; asked for on 2026-11-02 in a brainstorm, not on the canvas) and, at the bottom, two big buttons that stack their
-icon over their word, "Play" (the tune at the metronome's tempo) and, since 2026-11-04, "Your turn"
+goes past it; the breath and rest keys were asked for on 2026-11-02 in a brainstorm, not on the canvas; the erase key sinks while held and repeats like a
+keyboard's backspace, moved there from the Play row at the user's request on 2026-11-04) and, at the bottom, two big buttons that
+share the row's width and stack their icon over their word, "Play" (the tune at the metronome's tempo) and, since 2026-11-04, "Your turn"
 (labelled "Listen to me" / "Poslušaj me", the child speaking to the phone, as is Croatian
 "Odsviraj" for Play; blue, a microphone: the phone listens to the child's real flute and waits for each written note,
 the same letter in any octave; under the note a star for a first try, a faint star after a stumble,
@@ -214,9 +215,8 @@ note (since 2026-11-04 evening, in place of a ❌ for a moment: it tells the chi
 user's first idea, the note name in green under every note, was turned down with them because the
 name is already in the pill above and green is F's colour), never a number and no summary; the first right-or-wrong outside
 the notes game, kept the child's by being opt-in and child-paced; spec
-`docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`, details in `ui/flute/CLAUDE.md`),
-with a round erase button beside them (it sinks while held and repeats like a keyboard's
-backspace); while the tune runs, by Play or by Your turn, the keys and the sponge hide, the staff
+`docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`, details in `ui/flute/CLAUDE.md`);
+while the tune runs, by Play or by Your turn, the keys and the sponge hide, the staff
 grows by a third for a phone on a music stand, the knob's animal walks a marks row under the names
 (bouncing with the beats in Play, waiting under the next note in Your turn, the knob empty and the
 book button faded meanwhile) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's

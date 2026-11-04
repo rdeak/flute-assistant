@@ -7,7 +7,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,30 +17,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
@@ -50,11 +36,8 @@ import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
-import hr.bertlab.fluteassistant.ui.common.DISABLED_ALPHA
-import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.Stage
-import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeMinHeight
@@ -67,10 +50,6 @@ import hr.bertlab.fluteassistant.ui.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.ActionListen
 import hr.bertlab.fluteassistant.ui.theme.ActionStop
-import hr.bertlab.fluteassistant.ui.theme.FluteTheme
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 /**
  * Stateful entry point: opens the flute's sound while the screen is started (visible) and
@@ -160,11 +139,11 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * in the last "Your turn", and over the staff's top left the [SpeedKnob], the
  * metronome's animal for the tempo in [metronome], where printed music writes the tempo, and under
  * the clef, beside the names, the [BookButton], the sweet of the open book ([FluteUiState.openBook]),
- * whose tap is [onShelfOpen]; then the octave rows of [FluteKeys], with the breath and the rest
- * key at the end of the top row, taking the height left, and the Play row: two big buttons
- * stacking their icon over their word, "Play" (green, [onTogglePlayback], faded while the tune is
- * empty) and "Your turn" (blue, [onYourTurn], faded while the tune holds no note), and a round
- * erase button. On an ordinary phone held
+ * whose tap is [onShelfOpen]; then the octave rows of [FluteKeys], with the breath, the rest and
+ * the erase key ([onEraseLast], faded while the tune is empty) after c3 in the top row, taking the
+ * height left, and the Play row: two big buttons sharing its width, each stacking its icon over its
+ * word, "Play" (green, [onTogglePlayback], faded while the tune is empty) and "Your turn" (blue,
+ * [onYourTurn], faded while the tune holds no note). On an ordinary phone held
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
  * and the whole screen scrolls.
  *
@@ -371,6 +350,8 @@ fun FluteContent(
                         onRestRelease = onRestReleased,
                         onRestActivate = onRestActivated,
                         onBreath = onBreath,
+                        eraseEnabled = !state.isEmpty,
+                        onErase = onEraseLast,
                         modifier = Modifier
                             .fillMaxWidth()
                             .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
@@ -399,7 +380,6 @@ fun FluteContent(
                             stacked = true,
                             modifier = Modifier.weight(1f),
                         )
-                        EraseButton(enabled = !state.isEmpty, onErase = onEraseLast, modifier = Modifier.size(PlayRowHeight))
                     }
                 }
             }
@@ -409,71 +389,3 @@ fun FluteContent(
 
 /** The advice line's own height, for the short screen where the keys' room is not spread by weight. */
 private val AdviceLineHeight = 28.dp
-
-private const val SPONGE_EMOJI = "\uD83E\uDDFD" // sponge
-
-/** After this long held, the erase button starts repeating, then every [EraseRepeatMs]: a phone keyboard's backspace. */
-private const val EraseRepeatDelayMs = 400L
-private const val EraseRepeatMs = 120L
-
-/**
- * One round chunky button with a sponge that erases the last note on a tap and keeps erasing
- * while held, so a long line is cleared by holding; it sinks while a finger is on it, like a
- * key. Faded and inert while [enabled] is false.
- */
-@Composable
-private fun EraseButton(
-    enabled: Boolean,
-    onErase: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val description = stringResource(R.string.flute_erase)
-    val scope = rememberCoroutineScope()
-    val currentOnErase by rememberUpdatedState(onErase)
-    var pressed by remember { mutableStateOf(false) }
-    val colors = FluteTheme.colors
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
-            .semantics {
-                role = Role.Button
-                contentDescription = description
-                if (!enabled) disabled()
-                onClick {
-                    if (enabled) currentOnErase()
-                    enabled
-                }
-            }
-            .chunky(CircleShape, colors.raised, colors.outline, PlayShadow, pressed)
-            .then(
-                if (enabled) {
-                    Modifier.pointerInput(Unit) {
-                        detectTapGestures(
-                            onPress = {
-                                pressed = true
-                                currentOnErase()
-                                val repeat = scope.launch {
-                                    delay(EraseRepeatDelayMs)
-                                    while (isActive) {
-                                        currentOnErase()
-                                        delay(EraseRepeatMs)
-                                    }
-                                }
-                                try {
-                                    tryAwaitRelease()
-                                } finally {
-                                    pressed = false
-                                    repeat.cancel()
-                                }
-                            },
-                        )
-                    }
-                } else {
-                    Modifier
-                },
-            ),
-    ) {
-        Emoji(SPONGE_EMOJI, fontSize = 34)
-    }
-}

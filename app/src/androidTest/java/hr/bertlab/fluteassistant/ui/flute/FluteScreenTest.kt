@@ -325,18 +325,26 @@ class FluteScreenTest {
     }
 
     @Test
-    fun the_breath_and_rest_keys_end_the_top_row() {
+    fun the_breath_rest_and_erase_keys_fill_the_top_row() {
         show(FluteUiState())
         val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
         val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
+        val d5 = compose.onNodeWithContentDescription("D5").getBoundsInRoot()
         val b5 = compose.onNodeWithContentDescription("B5").getBoundsInRoot()
         val breath = compose.onNodeWithContentDescription("Breathe").getBoundsInRoot()
         val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
-        assertTrue("the keys should sit in C6's row: $c6 $breath $rest", abs((breath.top - c6.top).value) <= 1f && abs((rest.top - c6.top).value) <= 1f)
-        assertTrue("Breathe $breath should come after C6 $c6, Rest $rest after it", c6.right < breath.left && breath.right < rest.left)
-        assertTrue("Rest $rest should end where B5 $b5 does", abs((rest.right - b5.right).value) <= 1f)
+        val erase = compose.onNodeWithContentDescription("Erase the last note").getBoundsInRoot()
+        for (key in listOf(breath, rest, erase)) {
+            assertTrue("$key should sit in C6's row $c6", abs((key.top - c6.top).value) <= 1f && abs((key.bottom - c6.bottom).value) <= 1f)
+            assertTrue("$key should be two keys wide, C5 is $c5", key.width > c5.width * 2)
+        }
+        assertTrue(
+            "C6 $c6, then Breathe $breath, Rest $rest and the sponge $erase, in that order",
+            c6.right < breath.left && breath.right < rest.left && rest.right < erase.left,
+        )
+        assertTrue("Breathe $breath should start where D5 $d5 does", abs((breath.left - d5.left).value) <= 1f)
+        assertTrue("the sponge $erase should end where B5 $b5 does", abs((erase.right - b5.right).value) <= 1f)
         assertTrue("C6 $c6 should be as wide as C5 $c5", abs((c6.width - c5.width).value) <= 1f)
-        assertTrue("Rest $rest should be two keys wide", rest.width > c5.width * 2)
     }
 
     @Test
@@ -661,10 +669,14 @@ class FluteScreenTest {
         compose.onNodeWithText("Listen to me").assertIsNotEnabled()
         val play = compose.onNodeWithText("Play").getBoundsInRoot()
         val yourTurn = compose.onNodeWithText("Listen to me").getBoundsInRoot()
-        val erase = compose.onNodeWithContentDescription("Erase the last note").getBoundsInRoot()
+        val keys = compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot()
         assertTrue("Your turn $yourTurn should sit right of Play $play", yourTurn.left >= play.right)
-        assertTrue("Your turn $yourTurn should sit left of the sponge $erase", yourTurn.right <= erase.left)
         assertEquals("both big buttons share the height", play.height, yourTurn.height)
+        assertTrue("both big buttons share the width: $play $yourTurn", abs((play.width - yourTurn.width).value) <= 1f)
+        assertTrue(
+            "Play $play and Your turn $yourTurn should span the keys' width $keys",
+            abs((play.left - keys.left).value) <= 1f && abs((yourTurn.right - keys.right).value) <= 1f,
+        )
         state.value = state.value.copy(tune = twoNotes)
         compose.onNodeWithText("Listen to me").assertIsEnabled()
         compose.onNodeWithText("Listen to me").performClick()
