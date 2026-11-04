@@ -151,7 +151,9 @@ fun TempoDial(
                 modifier = Modifier
                     .offset(centre.x, centre.y)
                     .size(48.dp)
-                    .clickable(role = Role.Button, onClickLabel = label) {
+                    // No ripple: it filled the square tap box as a see-through rectangle, and the
+                    // knob jumping to the band already shows the tap.
+                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = label) {
                         val target = each.jumpFrom(currentBpm)
                         if (target != currentBpm) currentOnBpmChange(target)
                     }
