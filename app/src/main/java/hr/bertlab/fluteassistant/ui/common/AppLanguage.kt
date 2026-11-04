@@ -8,7 +8,7 @@ import java.util.Locale
  * needing a translation (a child who cannot read the current language still finds theirs).
  */
 enum class AppLanguage(val tag: String, val flag: String, val endonym: String) {
-    ENGLISH("en", "🇬🇧", "English"), // flag: United Kingdom
+    ENGLISH("en", "🇺🇸", "English"), // flag: United States
     CROATIAN("hr", "🇭🇷", "Hrvatski"); // flag: Croatia
 
     companion object {
