@@ -40,6 +40,11 @@ tap() { # $1 exact label; or "text <regex>" / "desc <regex>" for a pattern on th
   r=$(find_node "$mode" "$want"); [ -n "$r" ] || { echo "no node: $1" >&2; return 1; }
   read -r x y _ <<<"$r"; $ADB shell input tap "$x" "$y"; $ADB shell sleep 0.4
 }
+wait_node() { # $1 exact label: waits for it to appear (the first start after an install is slow)
+  local i
+  for i in $(seq 20); do [ -n "$(find_node exact "$1")" ] && { echo "$1 up after $i dump(s)"; return 0; }; $ADB shell sleep 0.5; done
+  echo "never appeared: $1" >&2; return 1
+}
 hold() { # $1 exact label, $2 ms: keeps a finger on it that long without moving
   local r x y
   r=$(find_node exact "$1"); [ -n "$r" ] || { echo "no node: $1" >&2; return 1; }
@@ -68,37 +73,43 @@ print(\"CDEFGAB\".index(letter) + 7 * (octave - lowest) + 1)" "$name")
   echo "$name -> staff position $pos"
 }
 
-run_language() { # lang, tuner tab, notes tab, flute tab, play, stop, target-mode pill, tune notes...
-  local L=$1 TAB_TUNER=$2 TAB_NOTES=$3 TAB_FLUTE=$4 PLAY=$5 STOP=$6 TARGET=$7; shift 7
+run_language() { # lang, flute tab, metronome tab, tuner tab, notes tab, play, stop, target-mode pill, tune notes...
+  local L=$1 TAB_FLUTE=$2 TAB_METRONOME=$3 TAB_TUNER=$4 TAB_NOTES=$5 PLAY=$6 STOP=$7 TARGET=$8; shift 8
   local TUNE=("$@") last i n r x y
   last=${TUNE[$((${#TUNE[@]} - 1))]}
   $ADB shell pm clear $PKG >/dev/null
   $ADB shell pm grant $PKG android.permission.RECORD_AUDIO
   $ADB shell pm grant $PKG android.permission.POST_NOTIFICATIONS
   $ADB shell cmd locale set-app-locales $PKG --user 0 --locales "$L"
-  $ADB shell am start -n $PKG/.MainActivity >/dev/null; $ADB shell sleep 3
-  # Metronome, running so a beat bubble is lit with the speed's animal on it.
-  tap "$PLAY"; $ADB shell sleep 1.3; shot "$L" 1-metronome; tap "$STOP"
-  # Tuner in "Tune" mode: the target note in its pitch window and its fingering show without a microphone.
-  tap "$TAB_TUNER"; $ADB shell sleep 1; tap "text .*$TARGET"; $ADB shell sleep 1; shot "$L" 2-tuner
-  # Notes: three right answers, then the fourth caught during its feedback (the note in colour, flames).
-  tap "$TAB_NOTES"; $ADB shell sleep 1
-  for i in 1 2 3; do answer_note; $ADB shell sleep 1.6; done
-  answer_note; $ADB shell sleep 0.3; shot "$L" 3-notes; $ADB shell sleep 1.5
-  # Flute: the first notes of a tune played, the last one held while the shot is taken.
+  $ADB shell am start -n $PKG/.MainActivity >/dev/null
+  # The shots follow the tab bar's order, so the listing leads with the tab the app opens on. Each
+  # tab is tapped, never assumed open: in English the flute's Play and the metronome's share a label.
+  # Flute: the first notes of a tune played, the last one held while the shot is taken. The keys
+  # are held right after the start, so wait for the screen: a key held too early is lost.
+  wait_node "$TAB_FLUTE" || return 1; $ADB shell sleep 1
   tap "$TAB_FLUTE"; $ADB shell sleep 1
   # A note is as long as its key is held, in beats of the metronome's tempo (120 after pm clear,
   # so 500 ms is a beat): each a quarter note, then the last held past two beats during the shot,
-  # so its pill is a half note and two hold dots are filled, as on the canvas board.
+  # so the held step's yellow band has grown to a half note, as on the canvas board.
   for n in "${TUNE[@]:0:$((${#TUNE[@]} - 1))}"; do hold "$n" 500; done
   r=$(find_node exact "$last"); read -r x y _ <<<"$r"
-  $ADB shell input swipe "$x" "$y" "$x" "$y" 2500 & $ADB shell sleep 1.0; shot "$L" 4-flute; wait
+  $ADB shell input swipe "$x" "$y" "$x" "$y" 2500 & $ADB shell sleep 1.0; shot "$L" 1-flute; wait
+  # Metronome, running so a beat bubble is lit with the speed's animal on it.
+  tap "$TAB_METRONOME"; $ADB shell sleep 1
+  tap "$PLAY"; $ADB shell sleep 1.3; shot "$L" 2-metronome; tap "$STOP"
+  # Tuner in "Tune" mode: the target note in its pitch window and its fingering show without a microphone.
+  tap "$TAB_TUNER"; $ADB shell sleep 1; tap "text .*$TARGET"; $ADB shell sleep 1; shot "$L" 3-tuner
+  # Notes: three right answers, then the fourth caught during its feedback (the note in colour, flames).
+  tap "$TAB_NOTES"; $ADB shell sleep 1
+  for i in 1 2 3; do answer_note; $ADB shell sleep 1.6; done
+  answer_note; $ADB shell sleep 0.3; shot "$L" 4-notes; $ADB shell sleep 1.5
 }
 
 $ADB install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null || exit 1
 $ADB shell cmd uimode night no >/dev/null
-run_language en Tuner Notes Flute Play Stop Tune C4 C4 G4 G4 A4 A4 G4
-run_language hr Štimer Note Flauta Sviraj Stani Ugodi c1 c1 g1 g1 a1 a1 g1
+rm -f "$OUT"/*/[0-9]-*.jpg # a renamed tab must not leave its old shot behind
+run_language en Flute Metronome Tuner Notes Play Stop Tune C4 C4 G4 G4 A4 A4 G4
+run_language hr Flauta Metronom Štimer Note Sviraj Stani Ugodi c1 c1 g1 g1 a1 a1 g1
 $ADB shell pm clear $PKG >/dev/null
 $ADB shell cmd locale set-app-locales $PKG --user 0 --locales en
 rm -rf "$RAW"

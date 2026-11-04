@@ -1,11 +1,12 @@
 # Play Console answers for Flute Assistant
 
 Facts the answers rest on: the app is made for primary-school children learning the flute and
-runs entirely on the device. It has four tabs: a metronome, a tuner, a note reading game and a
-digital flute. The microphone is used only while the Tuner tab is open; audio is analysed in
-memory for pitch and never stored, logged or transmitted. The other tabs only play sound. There
-is no account, no network access, no analytics, no ads, no SDK that collects data. Settings and
-the child's tune are stored locally on the device.
+runs entirely on the device. It has four tabs: a digital flute, a metronome, a tuner and a note
+reading game. The microphone is used only while the Tuner tab is open and while the flute tab
+listens after its "Listen to me" button is pressed; audio is analysed in memory for pitch and
+never stored, logged or transmitted. The metronome and the note reading game only play sound.
+There is no account, no network access, no analytics, no ads, no SDK that collects data.
+Settings and the child's tunes are stored locally on the device.
 
 ## Store listing
 
@@ -40,8 +41,10 @@ Full description, English:
 > and let go. Ten notes a round, flames for hits in a row and stars at the end. Choose which
 > notes to practise.
 >
-> FLUTE. Fifteen colourful note keys in three octave rows. Press a key to hear the note and see its
-> fingering, play a tune, then hear it played back.
+> FLUTE. Fifteen colourful note keys in three octave rows. Hold a key to hear the note: the longer
+> you hold it, the longer the note, and your tune is written on a real staff with the note names
+> under it. Hear it played back, or press "Listen to me" and play it on your own flute for a star
+> under every note you get right. Six little books keep six tunes.
 >
 > In English and Croatian. No account, no ads, no data leaves your device.
 
@@ -64,8 +67,10 @@ digitalna flauta za male flautiste."):
 > pusti. Deset nota po krugu, plamičci za pogotke zaredom i zvjezdice na kraju. Sam biraš koje
 > note vježbaš.
 >
-> FLAUTA. Petnaest šarenih tipki u tri reda. Pritisni tipku da čuješ ton i vidiš prstomet, odsviraj
-> pjesmicu, a zatim je poslušaj.
+> FLAUTA. Petnaest šarenih tipki u tri reda. Drži tipku da čuješ ton: što je dulje držiš, to je
+> nota dulja, a tvoja se pjesmica zapisuje na pravo crtovlje s imenima nota ispod. Poslušaj je ili
+> pritisni „Poslušaj me“ i odsviraj je na svojoj flauti, za zvjezdicu ispod svake pogođene note.
+> Šest knjižica čuva šest pjesmica.
 >
 > Na hrvatskom i engleskom. Bez računa, bez oglasa, nikakvi podaci ne napuštaju uređaj.
 
@@ -101,7 +106,7 @@ optional "Teacher Approved" badge can be applied for after launch.
 - Does your app collect or share any of the required user data types? **No.**
   Play defines collection as transmitting data off the device. Microphone audio is processed
   on the device in memory and discarded; nothing is stored or sent, so no data type is
-  collected or shared. Settings, the chosen practice notes and the child's tune stay in the
+  collected or shared. Settings, the chosen practice notes and the child's tunes stay in the
   app's private storage on the device.
 - Encryption in transit and deletion requests are not asked when nothing is collected.
   Uninstalling removes everything.
@@ -140,13 +145,13 @@ Not requested. **No.**
 
 | Permission | Why |
 |---|---|
-| `RECORD_AUDIO` | Chromatic tuner (runtime permission, requested when the Tuner tab opens) |
+| `RECORD_AUDIO` | Chromatic tuner and the flute's "Listen to me" (runtime permission, requested when the Tuner tab opens or when "Listen to me" is first pressed) |
 | `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | Metronome keeps playing in the background |
 | `POST_NOTIFICATIONS` | Playback notification with Stop (runtime permission on Android 13+) |
 
 None of these needs a separate sensitive-permission declaration form, apart from the
-foreground service type above. The Notes and Flute tabs need no permission: they only play
-tones through the speaker.
+foreground service type above. The Notes tab needs no permission: it only plays tones through
+the speaker. The Flute tab plays tones too and needs `RECORD_AUDIO` only for "Listen to me".
 
 ## Testing requirement for newer personal developer accounts
 

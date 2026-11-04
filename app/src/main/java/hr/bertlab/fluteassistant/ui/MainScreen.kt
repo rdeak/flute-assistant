@@ -75,18 +75,22 @@ import hr.bertlab.fluteassistant.ui.tuner.TunerScreen
 import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
 import java.util.Locale
 
-/** The four top-level destinations, each with the emoji that stands for it in the tab bar. */
+/**
+ * The four top-level destinations in tab bar order, each with the emoji that stands for it. The
+ * flute comes first and is where the app opens: it is where a child practises (the songbook, Play,
+ * Your turn, the metronome behind the speed knob). The drum sits beside it, the tab its knob opens.
+ */
 enum class AppTab(@StringRes val labelRes: Int, val emoji: String) {
+    FLUTE(R.string.tab_flute, "\uD83E\uDE88"), // flute
     METRONOME(R.string.tab_metronome, "\uD83E\uDD41"), // drum
     TUNER(R.string.tab_tuner, "\uD83D\uDC42"), // ear
     NOTES(R.string.tab_notes, "\uD83C\uDFBC"), // musical score
-    FLUTE(R.string.tab_flute, "\uD83E\uDE88"), // flute
 }
 
 /**
  * Root of the UI: a [Scaffold] with the tab's title and the language switch on top and a bottom
- * tab bar that switches between the metronome, the tuner, the note reading game and
- * the digital flute. All four ViewModels are scoped to the Activity, so settings, playback and
+ * tab bar that switches between the digital flute, the metronome, the tuner and the note reading
+ * game. All four ViewModels are scoped to the Activity, so settings, playback and
  * the flute's tune survive switching tabs, rotation and the re-creation that a language change
  * triggers. The game's round is the exception: leaving its tab resets the score, so the child
  * always comes back to a fresh start.
@@ -98,7 +102,7 @@ fun MainScreen(
     notesViewModel: NotesViewModel = hiltViewModel(),
     fluteViewModel: FluteViewModel = hiltViewModel(),
 ) {
-    var selectedTab by rememberSaveable { mutableStateOf(AppTab.METRONOME) }
+    var selectedTab by rememberSaveable { mutableStateOf(AppTab.entries.first()) }
     val metronomeState by metronomeViewModel.state.collectAsStateWithLifecycle()
     val tunerState by tunerViewModel.state.collectAsStateWithLifecycle()
     val notesState by notesViewModel.state.collectAsStateWithLifecycle()

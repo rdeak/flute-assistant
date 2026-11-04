@@ -81,7 +81,10 @@ point there.
   the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus the `LanguageSwitch`: two flag
   buttons over `ui/common/AppLanguage`; selecting one calls
   `AppCompatDelegate.setApplicationLocales`, which re-creates the Activity) and a bottom bar
-  switching between the four tabs (`AppTab`: metronome, tuner, notes, flute). All ViewModels are
+  switching between the four tabs (`AppTab`: flute, metronome, tuner, notes; since 2026-11-04 the
+  flute is first and the app opens on it, the first entry always being the start tab, and the drum
+  sits beside it as the tab the speed knob opens; before that the order was just the build order,
+  never a decision; Play screenshots follow the same order). All ViewModels are
   Activity-scoped so state and playback survive tab switches, rotation and that re-creation;
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
   when the notes tab is left, so the child always comes back to a zero score. `MainScreen` also

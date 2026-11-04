@@ -1,23 +1,23 @@
 # Flute Assistant
 
-An Android app for primary-school children learning the flute. It has a metronome, a chromatic
-tuner, a note reading game and a digital flute, in English and Croatian.
+An Android app for primary-school children learning the flute. It has a digital flute, a
+metronome, a chromatic tuner and a note reading game, in English and Croatian.
 
 <p align="center">
-  <img src="docs/release/play-listing/screenshots/en/1-metronome.jpg" width="200" alt="Metronome tab">
-  <img src="docs/release/play-listing/screenshots/en/2-tuner.jpg" width="200" alt="Tuner tab">
-  <img src="docs/release/play-listing/screenshots/en/3-notes.jpg" width="200" alt="Notes tab">
-  <img src="docs/release/play-listing/screenshots/en/4-flute.jpg" width="200" alt="Flute tab">
+  <img src="docs/release/play-listing/screenshots/en/1-flute.jpg" width="200" alt="Flute tab">
+  <img src="docs/release/play-listing/screenshots/en/2-metronome.jpg" width="200" alt="Metronome tab">
+  <img src="docs/release/play-listing/screenshots/en/3-tuner.jpg" width="200" alt="Tuner tab">
+  <img src="docs/release/play-listing/screenshots/en/4-notes.jpg" width="200" alt="Notes tab">
 </p>
 
 ## What it does
 
-| Tab       | What the child does                                                                                                                                                                                                                                                            |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Metronome | Drags an animal round the tempo ring (snail to cheetah) or taps one to jump to its speed, sets two to six beats in a bar and watches the animal hop on the beats. The click keeps going while the phone is in a pocket or another app is open, with a notification to stop it. |
-| Tuner     | Plays a note and sees it float above or below its home ring, with "Too high" or "Too low" and one tip on what to change, until it settles in the ring for "Perfect!". Or picks the note to play, hears it, sees the fingering and tunes to it.                                 |
-| Notes     | Reads a note name, slides a finger to its place on the treble staff and lets go. Ten notes a round, flames for hits in a row, stars and an animal for speed at the end. The child chooses which notes to practise.                                                             |
-| Flute     | Holds down any of fifteen keys, from middle C up two octaves, to sound a note. The fingering is drawn, the notes played are collected in a line, and the tune plays back.                                                                                                      |
+| Tab       | What the child does                                                                                                                                                                                                                                                                                                                                                         |
+|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Flute     | Holds any of fifteen keys, from middle C up two octaves, to sound a note: the longer the hold, the longer the note. The tune is written on a five-line staff with the note names under it and plays back at the metronome's speed; with "Listen to me" the phone hears the child's own flute and puts a star under each note played right. Six little books keep six tunes. |
+| Metronome | Drags an animal round the tempo ring (snail to cheetah) or taps one to jump to its speed, sets two to six beats in a bar and watches the animal hop on the beats. The click keeps going while the phone is in a pocket or another app is open, with a notification to stop it.                                                                                              |
+| Tuner     | Plays a note and sees it float above or below its home ring, with "Too high" or "Too low" and one tip on what to change, until it settles in the ring for "Perfect!". Or picks the note to play, hears it, sees the fingering and tunes to it.                                                                                                                              |
+| Notes     | Reads a note name, slides a finger to its place on the treble staff and lets go. Ten notes a round, flames for hits in a row, stars and an animal for speed at the end. The child chooses which notes to practise.                                                                                                                                                          |
 
 The screens show no jargon and almost no numbers: no BPM, hertz or cents (the only figures are the
 tempo in the middle of the ring and the small octave on note names). Tempo is an animal on the ring,
@@ -27,9 +27,9 @@ metronome engine already supports tap tempo, subdivisions, click sounds and pres
 supports other A4 references. None of that is exposed, and it is kept for a later advanced mode.
 
 The app asks for no account and has no network permission, analytics or ads. The microphone is open
-only while the tuner tab is on screen, and the audio is analysed in memory and discarded. Settings
-and the child's tune stay on the device. The [privacy policy](docs/release/privacy-policy.md) says
-the same in full.
+only while the tuner tab is on screen or the flute listens after "Listen to me" is pressed, and the
+audio is analysed in memory and discarded. Settings and the child's tunes stay on the device. The
+[privacy policy](docs/release/privacy-policy.md) says the same in full.
 
 ## At a glance
 
