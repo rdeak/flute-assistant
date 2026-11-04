@@ -183,7 +183,8 @@
     <!-- "Your turn": appended to a note's accessibility name on the flute staff while the flute listens or after it did -->
     <string name="flute_mark_first_try">got it</string>
     <string name="flute_mark_retry">got it after a retry</string>
-    <string name="flute_mark_wrong">try again</string>
+    <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
+    <string name="flute_mark_heard">heard %1$s</string>
     <string name="flute_listen_here">play this one</string>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->

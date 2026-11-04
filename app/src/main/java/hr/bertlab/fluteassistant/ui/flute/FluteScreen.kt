@@ -315,7 +315,7 @@ fun FluteContent(
                             timeSignature = state.timeSignature,
                             marks = state.marks,
                             animal = animal,
-                            wrongIndex = state.wrongIndex,
+                            wrong = state.wrong,
                             scale = staffScale,
                         )
                         SpeedKnob(

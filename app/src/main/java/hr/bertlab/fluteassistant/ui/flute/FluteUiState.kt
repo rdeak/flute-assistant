@@ -19,6 +19,9 @@ sealed interface Shown {
     data object Breath : Shown
 }
 
+/** A wrong note heard in "Your turn": [midi] came out for the step at [index] of the tune. */
+data class WrongNote(val index: Int, val midi: Int)
+
 /** Immutable snapshot of everything the flute tab renders. */
 data class FluteUiState(
     /** The child's tune, oldest first; saved on every change. */
@@ -49,8 +52,11 @@ data class FluteUiState(
     val listenIndex: Int? = null,
     /** What each step earned in the last "Your turn", by its index in [tune]; cleared by a new run and by any change to the tune. */
     val marks: Map<Int, StepMark> = emptyMap(),
-    /** The step whose ❌ shows now, for a moment after a wrong note; null otherwise. */
-    val wrongIndex: Int? = null,
+    /**
+     * The wrong note last heard for the step waited on, shown as a bubble in its colour under that
+     * step until the next note is judged (no timer: the child reads it at their own pace); null otherwise.
+     */
+    val wrong: WrongNote? = null,
     /** What the microphone makes of sound that yields no note while listening; [Hearing.CLEAR] otherwise. */
     val hearing: Hearing = Hearing.CLEAR,
     /** True after the phone said no to the microphone on this tab, while the microphone card is shown. */

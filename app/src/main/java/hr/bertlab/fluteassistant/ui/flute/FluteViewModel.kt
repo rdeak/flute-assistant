@@ -83,11 +83,11 @@ import kotlin.math.roundToLong
  * tuner's "Which?" mode does and says when a new one begins, [TuneCheck] judges each against the
  * note waited on ([FluteUiState.listenIndex]; the same letter in any octave is right, the check
  * waits for the right note, pitch only) and keeps the marks ([FluteUiState.marks]: a star for a
- * first try, a faint one after a stumble); a wrong note shows a ❌ for [WRONG_MARK_MS]
- * ([FluteUiState.wrongIndex]). The last note judged ends it by itself; Stop ([stopRun]), erase,
+ * first try, a faint one after a stumble); a wrong note shows the note heard under the step
+ * ([FluteUiState.wrong]) until the next note is judged. The last note judged ends it by itself; Stop ([stopRun]), erase,
  * the speed knob, the book button, a key and leaving the tab end it early and keep the marks so
  * far; any change to the tune clears them. [HearingTracker] judges sound that never becomes a note
- * ([FluteUiState.hearing]) for the advice line. Nothing is timed but the ❌: the child sets the
+ * ([FluteUiState.hearing]) for the advice line. Nothing is timed: the child sets the
  * pace. [onMicResult] receives the phone's answer about the microphone; a no shows the
  * microphone card ([FluteUiState.micDenied]) until [dismissMic].
  *
@@ -142,8 +142,6 @@ class FluteViewModel @Inject constructor(
 
     /** The microphone, while "Your turn" listens. */
     private var listenJob: Job? = null
-    /** Clears the ❌ after [WRONG_MARK_MS]. */
-    private var wrongJob: Job? = null
     /** The check of the tune in progress; null when not listening. */
     private var check: TuneCheck? = null
     private val tracker = NoteOnsetTracker()
@@ -340,7 +338,7 @@ class FluteViewModel @Inject constructor(
                 isListening = true,
                 listenIndex = check.index,
                 marks = emptyMap(),
-                wrongIndex = null,
+                wrong = null,
                 hearing = Hearing.CLEAR,
                 beatPulse = it.beatPulse + 1, // the animal lands on the first note with a hop
             )
@@ -436,7 +434,7 @@ class FluteViewModel @Inject constructor(
                 books = s.books.toMutableList().also { it[open] = leaving },
                 timeSignature = if (target.isEmpty) s.timeSignature else target.timeSignature,
                 marks = emptyMap(),
-                wrongIndex = null,
+                wrong = null,
                 shown = null,
             )
         }
@@ -495,12 +493,10 @@ class FluteViewModel @Inject constructor(
     private fun endListening() {
         listenJob?.cancel()
         listenJob = null
-        wrongJob?.cancel()
-        wrongJob = null
         if (listenSummary.frames > 0) logListenSummary() // the last partial second
         hearingTracker.reset()
         check = null
-        _state.update { it.copy(isListening = false, listenIndex = null, wrongIndex = null, hearing = Hearing.CLEAR) }
+        _state.update { it.copy(isListening = false, listenIndex = null, wrong = null, hearing = Hearing.CLEAR) }
     }
 
     /** One microphone frame while listening: a note that began is judged; sound that stays unclear is reported; a summary line now and then. */
@@ -523,10 +519,8 @@ class FluteViewModel @Inject constructor(
         logger.d(LogTags.FLUTE, "flute.heard", "index" to index, "expected" to expected, "heard" to heard, "verdict" to verdict.name.lowercase())
         when (verdict) {
             Verdict.RIGHT, Verdict.RETRY -> {
-                wrongJob?.cancel()
-                wrongJob = null
                 val marks = check.marks.toMap()
-                _state.update { it.copy(marks = marks, listenIndex = check.index, wrongIndex = null, beatPulse = it.beatPulse + 1) }
+                _state.update { it.copy(marks = marks, listenIndex = check.index, wrong = null, beatPulse = it.beatPulse + 1) }
                 if (check.isDone) {
                     logger.d(
                         LogTags.FLUTE,
@@ -537,14 +531,9 @@ class FluteViewModel @Inject constructor(
                     endListening()
                 }
             }
-            Verdict.WRONG -> {
-                _state.update { it.copy(wrongIndex = index) }
-                wrongJob?.cancel()
-                wrongJob = viewModelScope.launch {
-                    delay(WRONG_MARK_MS)
-                    _state.update { it.copy(wrongIndex = null) }
-                }
-            }
+            // The note heard stays under the step until the next note is judged: no timer, so there
+            // is time to read it; an ignored note (the last step's tail or octave pop) leaves it.
+            Verdict.WRONG -> _state.update { it.copy(wrong = WrongNote(index, heard)) }
             Verdict.IGNORED -> Unit
         }
     }
@@ -738,14 +727,10 @@ class FluteViewModel @Inject constructor(
         activationJob?.cancel()
         growJob?.cancel()
         listenJob?.cancel()
-        wrongJob?.cancel()
         tonePlayer.close()
     }
 
     companion object {
-        /** How long the ❌ stands in the animal's place after a wrong note, unless the next heard note ends it sooner. */
-        const val WRONG_MARK_MS = 700L
-
         /**
          * A note key let go of and pressed again within this long is one hold, not two notes. A
          * touch screen can report one hold as several: its palm rejection cancels a flat finger and

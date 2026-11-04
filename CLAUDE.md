@@ -209,7 +209,10 @@ icon over their word, "Play" (the tune at the metronome's tempo) and, since 2026
 (labelled "Listen to me" / "Poslušaj me", the child speaking to the phone, as is Croatian
 "Odsviraj" for Play; blue, a microphone: the phone listens to the child's real flute and waits for each written note,
 the same letter in any octave; under the note a star for a first try, a faint star after a stumble,
-a ❌ for a moment under a wrong one, never a number and no summary; the first right-or-wrong outside
+and under a wrong one the note that was heard as a bubble in its own letter colour until the next
+note (since 2026-11-04 evening, in place of a ❌ for a moment: it tells the child what came out; the
+user's first idea, the note name in green under every note, was turned down with them because the
+name is already in the pill above and green is F's colour), never a number and no summary; the first right-or-wrong outside
 the notes game, kept the child's by being opt-in and child-paced; spec
 `docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`, details in `ui/flute/CLAUDE.md`),
 with a round erase button beside them (it sinks while held and repeats like a keyboard's

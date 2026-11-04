@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
@@ -128,8 +129,6 @@ data class StaffAnimal(val index: Int, val emoji: String, val flash: () -> Float
 internal const val SLEEP_EMOJI = "💤" // zzz
 /** The breath key's sign, and a breath's over the staff. */
 internal const val BREATH_EMOJI = "😮‍💨" // face exhaling
-/** The sign for a wrong note, in the animal's place for a moment. */
-internal const val WRONG_EMOJI = "❌" // cross mark
 
 /** How much bigger than [StaffGeometry]'s dp everything on the staff is drawn: 1 at rest, [RunningStaffScale] while the tune runs. */
 private val LocalStaffScale = compositionLocalOf { 1f }
@@ -152,7 +151,8 @@ private class StaffInk(
  * quarters of the drawn size), with each note's name in a pill right under it ([NameRow]: the
  * same room, so notes and names line up and scroll as one) and, under the names, a row for what
  * each note earned in "Your turn" ([MarkRow]: a star in [marks] under the head, faint after a
- * retry, the ❌ for a moment under the step at [wrongIndex]) where the knob's [animal] stands
+ * retry, and under the step a wrong note was heard for ([wrong]) that note as a bubble in its
+ * own colour until the next note is judged) where the knob's [animal] stands
  * while the tune runs, hopping along with it. The faint treble clef
  * and the metronome tab's time signature stand at the left while the steps scroll past after
  * them, written in bars of [timeSignature] by [Bars.write]. Each note sits at its true height,
@@ -178,7 +178,7 @@ fun TuneStaff(
     modifier: Modifier = Modifier,
     marks: Map<Int, StepMark> = emptyMap(),
     animal: StaffAnimal? = null,
-    wrongIndex: Int? = null,
+    wrong: WrongNote? = null,
     scale: Float = 1f,
 ) {
     val colors = FluteTheme.colors
@@ -209,7 +209,7 @@ fun TuneStaff(
             if (tune.isEmpty()) {
                 EmptyHint()
             } else {
-                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrongIndex, ink, measurer)
+                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, ink, measurer)
             }
         }
     }
@@ -314,7 +314,7 @@ private fun TuneMarks(
     signature: TimeSignature,
     marks: Map<Int, StepMark>,
     animal: StaffAnimal?,
-    wrongIndex: Int?,
+    wrong: WrongNote?,
     ink: StaffInk,
     measurer: TextMeasurer,
 ) {
@@ -350,7 +350,7 @@ private fun TuneMarks(
                     growing = mark.index == heldIndex,
                     mark = marks[mark.index],
                     animal = animal?.takeIf { it.index == mark.index },
-                    wrong = mark.index == wrongIndex,
+                    heard = wrong?.takeIf { it.index == mark.index }?.midi,
                     ink = ink,
                 )
                 is LineMark.Breath -> BreathMark(ink, measurer)
@@ -375,8 +375,8 @@ private fun partWidth(part: StepPart): Float = when (part) {
 /**
  * One note or rest as written: its [parts], a piece per length with a bar line between two of
  * them where it crosses one, a note's heads tied, its names under them ([NameRow]) and, under
- * those, what it earned ([MarkRow]: [mark], or the [animal] standing here, or the ❌ while
- * [wrong]). A screen reader hears it once, by its whole length, then what it earned. The lit step
+ * those, what it earned ([MarkRow]: [mark], or the [animal] standing here, or the wrong note
+ * [heard] for it). A screen reader hears it once, by its whole length, then what it earned. The lit step
  * is drawn under its neighbours, so its yellow rings never cover the edge of the head or the pill
  * beside it.
  */
@@ -388,7 +388,7 @@ private fun StepMark(
     growing: Boolean,
     mark: StepMark?,
     animal: StaffAnimal?,
-    wrong: Boolean,
+    heard: Int?,
     ink: StaffInk,
 ) {
     val s = LocalStaffScale.current
@@ -398,7 +398,7 @@ private fun StepMark(
         TuneBreath -> stringResource(R.string.flute_breath_here)
     }
     val earned = when {
-        wrong -> stringResource(R.string.flute_mark_wrong)
+        heard != null -> stringResource(R.string.flute_mark_heard, noteLabel(heard))
         animal != null && animal.waiting -> stringResource(R.string.flute_listen_here)
         mark == StepMark.FIRST_TRY -> stringResource(R.string.flute_mark_first_try)
         mark == StepMark.RETRY -> stringResource(R.string.flute_mark_retry)
@@ -418,25 +418,25 @@ private fun StepMark(
             },
     ) {
         NameRow(item, parts, lit, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
-        MarkRow(mark, animal, wrong, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
+        MarkRow(mark, animal, heard, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
     }
 }
 
 /**
  * The marks row of one step, in the first beat's room so what stands there stands under the head
- * and the name: the ❌ while [wrong], else the [animal] (facing right, hopping on its flash), else
- * the star the step earned ([mark], faint after a retry), else nothing. Sized in dp like the
- * staff's other text, so large text never pushes it out of the row.
+ * and the name: the wrong note [heard] for it as a bubble, else the [animal] (facing right,
+ * hopping on its flash), else the star the step earned ([mark], faint after a retry), else
+ * nothing. Sized in dp like the staff's other text, so large text never pushes it out of the row.
  */
 @Composable
-private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, wrong: Boolean, modifier: Modifier = Modifier) {
+private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, heard: Int?, modifier: Modifier = Modifier) {
     val s = LocalStaffScale.current
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.size((StaffGeometry.BEAT_WIDTH * s).dp, (StaffGeometry.MARKS_HEIGHT * s).dp),
     ) {
         when {
-            wrong -> Emoji(WRONG_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            heard != null -> HeardBubble(heard)
             animal != null -> Emoji(
                 animal.emoji,
                 fontSize = emojiSizeFor(StaffGeometry.ANIMAL_SIZE * s),
@@ -449,6 +449,35 @@ private fun MarkRow(mark: StepMark?, animal: StaffAnimal?, wrong: Boolean, modif
                 modifier = Modifier.alpha(RETRY_STAR_ALPHA),
             )
         }
+    }
+}
+
+/**
+ * The wrong note heard for a step, in the animal's place until the next note is judged: a round
+ * bubble as tall as the marks row, filled in the heard letter's colour with its name, the way the
+ * tuner shows another note under the home ring. The child reads "written G, heard A" from the pill
+ * and the bubble. Chosen on 2026-11-04 over the ❌ (which said nothing about what came out) and
+ * over the names in green (which doubled the pill above and broke the one-colour-per-letter code).
+ */
+@Composable
+private fun HeardBubble(midi: Int) {
+    val s = LocalStaffScale.current
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size((StaffGeometry.MARKS_HEIGHT * s).dp)
+            .clip(CircleShape)
+            .background(noteColor(midi))
+            .border(OutlineWidth, FluteTheme.colors.outline, CircleShape)
+            .padding(horizontal = OutlineWidth), // inside the outline, so the octave figure never meets it
+    ) {
+        Text(
+            noteText(midi),
+            style = MaterialTheme.typography.titleMedium,
+            color = InkOnFill,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = (14 * s).sp),
+        )
     }
 }
 

@@ -160,7 +160,7 @@
     <string name="flute_note_half_beat">%1$s, pola dobe</string>
     <string name="flute_mark_first_try">pogodak</string>
     <string name="flute_mark_retry">pogodak iz drugog puta</string>
-    <string name="flute_mark_wrong">pokušaj opet</string>
+    <string name="flute_mark_heard">čujem %1$s</string>
     <string name="flute_listen_here">sviraj ovu</string>
     <!-- Croatian music schools name octaves c1, c2, c3 (jednocrtna, dvocrtna, trocrtna), with
          the one-lined octave starting at middle C -->

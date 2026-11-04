@@ -979,29 +979,36 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `a wrong note shows the cross for a while and the right note then earns a faint star`() = runTest(dispatcher) {
+    fun `a wrong note shows the note heard until the right note, which then earns a faint star`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         play(65)
-        assertEquals(0, vm.current.wrongIndex)
+        assertEquals(WrongNote(index = 0, midi = 65), vm.current.wrong)
         assertEquals(0, vm.current.listenIndex)
         assertTrue(vm.current.marks.isEmpty())
         assertEquals("wrong", logger.events("flute.heard").single()["verdict"])
-        advanceTimeBy(FluteViewModel.WRONG_MARK_MS + 1)
-        assertNull(vm.current.wrongIndex)
+        advanceTimeBy(10_000) // no timer takes it away: the child reads it at their own pace
+        assertEquals(WrongNote(index = 0, midi = 65), vm.current.wrong)
         play(60)
+        assertNull(vm.current.wrong)
         assertEquals(mapOf(0 to StepMark.RETRY), vm.current.marks)
         assertEquals(1, vm.current.listenIndex)
         assertEquals("retry", logger.events("flute.heard").last()["verdict"])
     }
 
     @Test
-    fun `the right note clears the wrong mark at once`() = runTest(dispatcher) {
+    fun `another wrong note replaces the note heard, the previous note heard again leaves it`() = runTest(dispatcher) {
         val vm = listeningViewModel()
-        play(65)
-        assertEquals(0, vm.current.wrongIndex)
         play(60)
-        assertNull(vm.current.wrongIndex)
-        assertEquals(mapOf(0 to StepMark.RETRY), vm.current.marks)
+        play(65)
+        assertEquals(WrongNote(index = 1, midi = 65), vm.current.wrong)
+        play(67)
+        assertEquals(WrongNote(index = 1, midi = 67), vm.current.wrong)
+        play(60) // the step just judged, ignored
+        assertEquals("ignored", logger.events("flute.heard").last()["verdict"])
+        assertEquals(WrongNote(index = 1, midi = 67), vm.current.wrong)
+        play(62)
+        assertNull(vm.current.wrong)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY), vm.current.marks)
     }
 
     @Test
@@ -1050,7 +1057,7 @@ class FluteViewModelTest {
         assertEquals("pill", pill)
         assertFalse(stopped.isListening)
         assertEquals(Hearing.CLEAR, stopped.hearing)
-        assertNull(stopped.wrongIndex)
+        assertNull(stopped.wrong)
         assertEquals(1, stopped.marks.size)
         val (erased, erase) = ended { eraseLast() }
         assertEquals("erase", erase)
@@ -1316,7 +1323,7 @@ class FluteViewModelTest {
         assertEquals(1, vm.current.marks.size)
         vm.openBook(1)
         assertTrue(vm.current.marks.isEmpty())
-        assertNull(vm.current.wrongIndex)
+        assertNull(vm.current.wrong)
         assertNull(vm.current.shown)
     }
 

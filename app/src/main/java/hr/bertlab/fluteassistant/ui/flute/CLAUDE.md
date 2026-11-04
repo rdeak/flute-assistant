@@ -184,10 +184,16 @@ counted on one held note or a tongued repeat never counted, and tune `GAP_LEVEL_
 speaks the lower octave at an onset), earning `StepMark.FIRST_TRY` or `RETRY` after a stumble and
 moving on; **ignored** is the letter of the step just judged, in any octave, unless that letter is
 also the one waited on (a written repeat), which counts only after `REPEAT_GUARD_MS` (300) so an
-octave pop never counts the repeat; **wrong** is anything else: `wrongIndex` shows a ❌ in the
-animal's place for `WRONG_MARK_MS` (700) or until the next heard note, and the step is remembered
-as stumbled. The check waits for the right note, which is what keeps every mark under its own
-note. Pitch only; nothing is timed but the ❌ and the guard. The last note judged ends it by itself
+octave pop never counts the repeat; **wrong** is anything else: `FluteUiState.wrong` (a
+`WrongNote`: the step and the MIDI heard) shows the note heard as a round bubble in its own letter
+colour in the animal's place until the next note is judged (a right note clears it, another wrong
+note replaces it, an ignored one leaves it; no timer, so the child has time to read "written G,
+heard A" off the pill and the bubble; since the evening of 2026-11-04, in place of a ❌ for 700 ms,
+which said nothing about what came out; the user had asked for note names in the stars' place,
+green when right, and agreed to this instead: the right name already stands in the pill above,
+green is F's colour in the letter code, and colour alone must not carry right and wrong), and the
+step is remembered as stumbled. The check waits for the right note, which is what keeps every mark
+under its own note. Pitch only; nothing is timed but the guard. The last note judged ends it by itself
 (`flute.listen_done`); Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
 the speed knob, the book button and leaving the tab end it early (`flute.listen_stop`); the marks stay in
 `FluteUiState.marks` until a new run, a switch to another book or any write to the tune (`save()` clears them), are not
@@ -203,14 +209,17 @@ advice line in the keys' room and the wide Stop at the bottom; the knob's disc s
 corner, empty and inert (`SpeedKnob(running = true)`), because its animal is on the staff: under
 the names a marks row (`StaffGeometry.MARKS_TOP`, 26 dp, in the first beat's room so it stands
 under the head and the name; the staff grew 16 dp for it) holds, per step, the ⭐ it earned
-(`STAR_EMOJI`, faint at `RETRY_STAR_ALPHA` after a retry, both the notes game's), the ❌, or the
+(`STAR_EMOJI`, faint at `RETRY_STAR_ALPHA` after a retry, both the notes game's), the heard note's
+bubble (`HeardBubble`: a round bubble as tall as the row, `noteColor` fill, the ink outline, the
+name in `noteText` at up to 14 sp times the scale, the tuner's way of showing another note), or the
 animal (`StaffAnimal`: `FluteUiState.animalIndex`, the speed's emoji, the one `rememberBeatFlash`
 of the tab, `waiting` in Your turn), which bounces on every click in Play (`beatPulse` as before,
 in place on a long note, under a rest's 💤 pill too) and in Your turn jumps to the next note when
 the child gets it (`beatPulse` goes up on every advance and at the start, so it lands with a
 hop). Emoji in the row are sized in dp (`emojiSizeFor`) like the staff's other text. A screen
 reader hears a step's mark after its length ("G4, 1 beat, got it" / "got it after a retry" /
-"play this one" / "try again"; `flute_mark_*`, `flute_listen_here`).
+"play this one" / "heard A4"; `flute_mark_*`, `flute_mark_heard` taking the heard note's
+`noteLabel`, `flute_listen_here`).
 
 The songbook (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-songbook-design.md`;
 the user: "child needs to practice more than two tunes and dont want to type notes over again when
