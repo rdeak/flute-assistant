@@ -9,8 +9,10 @@ import hr.bertlab.fluteassistant.audio.tuner.TunerEngine
 import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
+import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Pulse
+import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.Tune
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -57,8 +59,9 @@ import kotlin.math.roundToLong
  * of the same silence, so no piece the screen makes of a hold is ever a rest of its own. The tempo is the metronome tab's, read from
  * [SettingsStore] at each press and at Play, counted in its time signature's beats as the
  * metronome clicks them ([Pulse]: in 6/8 a click is an eighth note); the time signature, which
- * the staff is written in, is also read when the tab opens. The tune is saved through [SettingsStore] on every
- * change and restored, sanitised, on creation. Activity-scoped, so the tune survives tab
+ * the staff is written in, is also read when the tab opens. The tune is saved to the open book of
+ * [SettingsStore]'s shelf (with the metronome's speed and beat) on every change, and the open
+ * book's tune is restored, sanitised, on creation. Activity-scoped, so the tune survives tab
  * switches and rotation; [enterTab] and [leaveTab] follow the tab's visibility so the player is
  * open only while the flute is on screen.
  *
@@ -67,6 +70,14 @@ import kotlin.math.roundToLong
  * place: [openSpeed] stops the playback and ends a held key, [closeSpeed] (OK) reads the
  * time signature again, which may have changed there.
  *
+ * The book button opens the shelf of [Songbook.SIZE] books in place: [openShelf] ends the
+ * playback, the listening and a held key, and [openBook] switches to a book of it
+ * ([FluteUiState.openBook], [FluteUiState.books]). The book left keeps the metronome's speed and
+ * beat as they are at that moment, so the screen must call the metronome's setters only after
+ * [openBook] returns; what it returns is the [Pulse] those setters must take, or null when the
+ * metronome stays as it is (the open book picked again, an empty book, an index off the shelf).
+ * The marks of the last "Your turn" go with a switch, as with any write to the tune.
+ *
  * "Your turn" ([startListening]) opens the tuner's microphone ([TunerEngine]) and waits for the
  * child to play the tune on a real flute: [NoteOnsetTracker] turns frames into notes as the
  * tuner's "Which?" mode does and says when a new one begins, [TuneCheck] judges each against the
@@ -74,8 +85,8 @@ import kotlin.math.roundToLong
  * waits for the right note, pitch only) and keeps the marks ([FluteUiState.marks]: a star for a
  * first try, a faint one after a stumble); a wrong note shows a ❌ for [WRONG_MARK_MS]
  * ([FluteUiState.wrongIndex]). The last note judged ends it by itself; Stop ([stopRun]), erase,
- * the speed knob, a key and leaving the tab end it early and keep the marks so far; any change
- * to the tune clears them. [HearingTracker] judges sound that never becomes a note
+ * the speed knob, the book button, a key and leaving the tab end it early and keep the marks so
+ * far; any change to the tune clears them. [HearingTracker] judges sound that never becomes a note
  * ([FluteUiState.hearing]) for the advice line. Nothing is timed but the ❌: the child sets the
  * pace. [onMicResult] receives the phone's answer about the microphone; a no shows the
  * microphone card ([FluteUiState.micDenied]) until [dismissMic].
@@ -84,12 +95,15 @@ import kotlin.math.roundToLong
  * at the cap), `flute.rest` per rest ended (heldMs, length, added), `flute.rejoin` (midi, none
  * for the rest, gapMs) when a key let go of goes on, `flute.breath` (added: false
  * at the cap or right after a breath), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
- * `flute.stop` (reason: pill, key, erase, leave or speed), `flute.erase` (left), `flute.speed_open`
- * and `flute.speed_done` (bpm, time); while listening, `flute.listen` (notes), `flute.heard`
+ * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left),
+ * `flute.speed_open` and `flute.speed_done` (bpm, time), `flute.shelf_open` (book: the open
+ * one's index), `flute.book_open` (from, to, notes: the steps in the book opened, bpm and time:
+ * what the metronome must be set to, none for an empty book, which leaves it alone) and
+ * `flute.shelf_close` (book, when the open book was picked again and nothing changed); while listening, `flute.listen` (notes), `flute.heard`
  * (index, expected, heard, verdict: right, retry, ignored or wrong), `flute.listen_summary` every
  * [TunerViewModel.SUMMARY_FRAMES] frames (the tuner's summary fields, gate, expected, hearing),
  * `flute.hearing` (hearing, levelMean) when it changes, `flute.listen_done` (stars, retries),
- * `flute.listen_stop` (reason: pill, key, erase, leave or speed), `flute.listen_error` (message)
+ * `flute.listen_stop` (reason: pill, key, erase, leave, speed or book), `flute.listen_error` (message)
  * and `flute.mic` (granted).
  */
 @HiltViewModel
@@ -101,9 +115,20 @@ class FluteViewModel @Inject constructor(
     private val logger: Logger,
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(
-        FluteUiState(tune = Tune.sanitize(settings.loadTune()), timeSignature = settings.loadMetronomeConfig().timeSignature),
-    )
+    private val _state: MutableStateFlow<FluteUiState>
+
+    init {
+        val shelf = settings.loadShelf()
+        _state = MutableStateFlow(
+            FluteUiState(
+                tune = Tune.sanitize(shelf.books[shelf.open].tune),
+                timeSignature = settings.loadMetronomeConfig().timeSignature,
+                openBook = shelf.open,
+                books = shelf.books,
+            ),
+        )
+    }
+
     val state: StateFlow<FluteUiState> = _state.asStateFlow()
 
     /** When the held key (a note or the rest) went down, so its release can record how long it was held. */
@@ -369,6 +394,68 @@ class FluteViewModel @Inject constructor(
         logger.d(LogTags.FLUTE, "flute.speed_done", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
     }
 
+    /**
+     * The book button was tapped and the shelf is about to take the stage: end the playback, the
+     * listening and any held key, as [openSpeed] does (the tone player stays open).
+     */
+    fun openShelf() {
+        stopPlayback(reason = "book")
+        stopListening(reason = "book")
+        endHeld()
+        logger.d(LogTags.FLUTE, "flute.shelf_open", "book" to _state.value.openBook)
+    }
+
+    /**
+     * A book of the shelf was picked: the book left keeps its tune with the metronome's speed and
+     * beat as they are now, and the staff shows the book at [index]. Returns the speed and beat the
+     * metronome must take for it (its bpm brought onto the ring's range), or null when it must stay
+     * as it is: the open book picked again (nothing changes), an empty book (the child writes it at
+     * the speed and beat the metronome has; the book records them when it is left) or an [index] off
+     * the shelf. The metronome's config is read here, so the screen must call the metronome's
+     * setters only after this returns.
+     */
+    fun openBook(index: Int): Pulse? {
+        if (index !in 0 until Songbook.SIZE) return null
+        val open = _state.value.openBook
+        if (index == open) {
+            logger.d(LogTags.FLUTE, "flute.shelf_close", "book" to open)
+            return null
+        }
+        stopPlayback(reason = "book")
+        stopListening(reason = "book")
+        endHeld() // before the tune is read: a held note is part of the book left
+        val config = settings.loadMetronomeConfig()
+        val leaving = Book(_state.value.tune, config.bpm, config.timeSignature)
+        settings.saveBook(open, leaving)
+        settings.saveOpenBook(index)
+        val target = _state.value.books[index]
+        _state.update { s ->
+            s.copy(
+                tune = Tune.sanitize(target.tune),
+                openBook = index,
+                books = s.books.toMutableList().also { it[open] = leaving },
+                timeSignature = if (target.isEmpty) s.timeSignature else target.timeSignature,
+                marks = emptyMap(),
+                wrongIndex = null,
+                shown = null,
+            )
+        }
+        letGo = null
+        val pulse = if (target.isEmpty) null else {
+            Pulse(target.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM), target.timeSignature)
+        }
+        logger.d(
+            LogTags.FLUTE,
+            "flute.book_open",
+            "from" to open,
+            "to" to index,
+            "notes" to target.tune.size,
+            "bpm" to pulse?.bpm,
+            "time" to pulse?.timeSignature?.label,
+        )
+        return pulse
+    }
+
     /** Drops the last step of the tune; ignored while a key is held or the tune is empty. Stops playback and listening first. */
     fun eraseLast() {
         stopPlayback(reason = "erase")
@@ -382,8 +469,8 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * Ends a playback in progress, saying what ended it (`pill`, `key`, `erase`, `leave` or
-     * `speed`); its beat hops end with it. Nothing playing: nothing happens.
+     * Ends a playback in progress, saying what ended it (`pill`, `key`, `erase`, `leave`, `speed`
+     * or `book`); its beat hops end with it. Nothing playing: nothing happens.
      */
     private fun stopPlayback(reason: String) {
         if (!_state.value.isPlaying) return
@@ -395,8 +482,8 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * Ends the listening early, saying what ended it (`pill`, `key`, `erase`, `leave` or `speed`);
-     * the marks so far stay. Not listening: nothing happens.
+     * Ends the listening early, saying what ended it (`pill`, `key`, `erase`, `leave`, `speed` or
+     * `book`); the marks so far stay. Not listening: nothing happens.
      */
     private fun stopListening(reason: String) {
         if (!_state.value.isListening) return
@@ -635,10 +722,15 @@ class FluteViewModel @Inject constructor(
         _state.update { it.copy(timeSignature = settings.loadMetronomeConfig().timeSignature) }
     }
 
-    /** Every write to the tune comes through here: it is saved, and the marks of the last "Your turn", keyed by step, no longer fit it. */
+    /**
+     * Every write to the tune comes through here: it is saved to the open book, with the
+     * metronome's speed and beat it is written at, and the marks of the last "Your turn", keyed
+     * by step, no longer fit it.
+     */
     private fun save() {
         if (_state.value.marks.isNotEmpty()) _state.update { it.copy(marks = emptyMap()) }
-        settings.saveTune(_state.value.tune)
+        val config = settings.loadMetronomeConfig()
+        settings.saveBook(_state.value.openBook, Book(_state.value.tune, config.bpm, config.timeSignature))
     }
 
     override fun onCleared() {

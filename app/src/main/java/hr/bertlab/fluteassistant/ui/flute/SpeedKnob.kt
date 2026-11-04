@@ -18,7 +18,7 @@ import hr.bertlab.fluteassistant.ui.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
 /** Width and height of [SpeedKnob]; the staff's tune starts further in, so it never covers a note. */
-val SpeedKnobSize: Dp = 54.dp
+val SpeedKnobSize: Dp = StaffGeometry.CORNER_BUTTON.dp
 
 /**
  * The metronome's yellow knob at the flute staff's top left, where printed music writes the tempo:
@@ -41,7 +41,7 @@ fun SpeedKnob(
         onClick = onClick,
         shape = CircleShape,
         color = Sun,
-        depth = 5.dp,
+        depth = StaffGeometry.CORNER_SHADOW.dp,
         enabled = !running,
         modifier = modifier
             .size(SpeedKnobSize)

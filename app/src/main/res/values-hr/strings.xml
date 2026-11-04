@@ -123,6 +123,20 @@
     <string name="flute_keys">Tipke flaute</string>
     <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>
     <string name="speed_done">U redu</string>
+    <string name="flute_book_button">Pjesmica: %1$s, dodirni za promjenu</string>
+    <string name="book_lollipop">Lizalica</string>
+    <string name="book_cookie">Keks</string>
+    <string name="book_cupcake">Muffin</string>
+    <string name="book_donut">Krafna</string>
+    <string name="book_ice_cream">Sladoled</string>
+    <string name="book_candy">Bombon</string>
+    <string name="flute_book_open">%1$s, otvorena pjesmica</string>
+    <string name="flute_book_empty">%1$s, prazna pjesmica</string>
+    <plurals name="flute_book_notes">
+        <item quantity="one">%1$s, %2$d nota</item>
+        <item quantity="few">%1$s, %2$d note</item>
+        <item quantity="other">%1$s, %2$d nota</item>
+    </plurals>
     <!-- Stanka, as music schools name a rest (cijela, polovinka, četvrtinka, osminka) -->
     <string name="flute_rest">Stanka</string>
     <string name="flute_breath">Udahni</string>

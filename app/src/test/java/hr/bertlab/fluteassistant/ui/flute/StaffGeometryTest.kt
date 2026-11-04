@@ -53,6 +53,16 @@ class StaffGeometryTest {
     }
 
     @Test
+    fun `the book button sits under the clef, left of the notes, inside the staff, at rest and while running`() {
+        for (s in listOf(1f, RunningStaffScale)) {
+            val top = StaffGeometry.bookButtonTop(s)
+            assertTrue("scale $s: top $top", top >= StaffGeometry.CLEF_BOTTOM * s + 4f)
+            assertTrue("scale $s", top + StaffGeometry.CORNER_BUTTON + StaffGeometry.CORNER_SHADOW <= StaffGeometry.TOTAL_HEIGHT * s)
+            assertTrue("scale $s", StaffGeometry.CORNER_BUTTON <= StaffGeometry.NOTES_CLIP * s)
+        }
+    }
+
+    @Test
     fun `space grows with the length, 29 per beat, and heads never touch`() {
         assertEquals(listOf(29f, 29f, 58f, 87f, 116f), NoteLength.entries.map(StaffGeometry::slotWidth))
         val head = StaffGeometry.WHOLE_RX * 2 + StaffGeometry.HEAD_EDGE * 2 // the widest head, a whole note

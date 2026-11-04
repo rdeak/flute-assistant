@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -75,7 +76,10 @@ import kotlinx.coroutines.launch
  * Stateful entry point: opens the flute's sound while the screen is started (visible) and
  * closes it when it stops, the way the tuner holds the microphone, then renders the stateless
  * [FluteContent]. The [metronome] state and view model are the metronome tab's own: the speed knob
- * on the staff shows its tempo and the panel the knob opens sets it. "Your turn" needs the
+ * on the staff shows its tempo and the panel the knob opens sets it, and a book picked on the shelf
+ * with a tune in it gives the metronome that tune's speed and beat ([FluteViewModel.openBook] first
+ * reads the metronome's for the book left, so the metronome's setters run only after it returns;
+ * an empty book or the open one leaves the metronome as it is). "Your turn" needs the
  * microphone: a tap with RECORD_AUDIO granted starts listening at once, without it the tap asks
  * the phone and the answer goes to [FluteViewModel.onMicResult] (a yes listens, a no shows the
  * microphone card, whose "Yes" asks again and whose "Settings" opens the app's page). The tab never
@@ -119,6 +123,14 @@ fun FluteScreen(
         onTimeSignatureChange = metronomeViewModel::setTimeSignature,
         onSpeedOpen = viewModel::openSpeed,
         onSpeedDone = viewModel::closeSpeed,
+        onShelfOpen = viewModel::openShelf,
+        onBookChosen = { index ->
+            // openBook reads the metronome's speed and beat for the book left, so the setters come after it.
+            viewModel.openBook(index)?.let { pulse ->
+                metronomeViewModel.setBpm(pulse.bpm)
+                metronomeViewModel.setTimeSignature(pulse.timeSignature)
+            }
+        },
         onRequestMic = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
         onOpenSettings = {
             context.startActivity(
@@ -146,11 +158,13 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * notes and its names) with every note's name in a pill right under it, in the same room, so
  * notes and names line up and scroll together, under the names the row of what each note earned
  * in the last "Your turn", and over the staff's top left the [SpeedKnob], the
- * metronome's animal for the tempo in [metronome], where printed music writes the tempo; then the
- * octave rows of [FluteKeys], with the breath and the rest key at the end of the top row, taking
- * the height left, and the Play row: two big buttons stacking their icon over their word, "Play"
- * (green, [onTogglePlayback], faded while the tune is empty) and "Your turn" (blue, [onYourTurn],
- * faded while the tune holds no note), and a round erase button. On an ordinary phone held
+ * metronome's animal for the tempo in [metronome], where printed music writes the tempo, and under
+ * the clef, beside the names, the [BookButton], the sweet of the open book ([FluteUiState.openBook]),
+ * whose tap is [onShelfOpen]; then the octave rows of [FluteKeys], with the breath and the rest
+ * key at the end of the top row, taking the height left, and the Play row: two big buttons
+ * stacking their icon over their word, "Play" (green, [onTogglePlayback], faded while the tune is
+ * empty) and "Your turn" (blue, [onYourTurn], faded while the tune holds no note), and a round
+ * erase button. On an ordinary phone held
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
  * and the whole screen scrolls.
  *
@@ -158,7 +172,8 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]), so it
  * reads from a music stand at arm's length, with the knob's animal walking the marks row under
  * the names ([StaffAnimal]: under the playing step, hopping on each click, or waiting under the
- * step the child is to play), the knob itself empty and inert; between the stage and the bottom
+ * step the child is to play), the knob itself empty and inert, and the book button faded and inert,
+ * still showing its sweet, which does not walk the staff; between the stage and the bottom
  * row the tuner's advice line speaks only while the sound stays unclear, and the bottom row is one
  * wide red Stop ([onStop]) where Play was, so the thumb finds it. The marks stay when the run
  * ends. The microphone's permission is the stateful entry's business ([onRequestMic],
@@ -170,6 +185,13 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * is the only way back, as the notes tab's picker is; the choice survives rotation. The panel
  * lays out as the metronome tab does, shrinking its ring to a short screen and scrolling only
  * below [MetronomeMinHeight].
+ *
+ * A tap on the book button ([onShelfOpen]) swaps the stage, the keys and the Play row, in place,
+ * for the [TuneShelf]: the six books ([FluteUiState.shelf]), the open one's cover yellow. One tap
+ * on a book closes the shelf and is [onBookChosen] with its index, the open book's too (which
+ * changes nothing). Unlike the speed panel there is no OK; as in the panel and the notes picker,
+ * the back button is not handled. An open shelf survives rotation as the panel does. Its three rows share the height and scroll only
+ * below [ShelfMinHeight].
  */
 @Composable
 fun FluteContent(
@@ -190,12 +212,15 @@ fun FluteContent(
     onTimeSignatureChange: (TimeSignature) -> Unit,
     onSpeedOpen: () -> Unit,
     onSpeedDone: () -> Unit,
+    onShelfOpen: () -> Unit,
+    onBookChosen: (Int) -> Unit,
     onRequestMic: () -> Unit,
     onOpenSettings: () -> Unit,
     onMicDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var choosingSpeed by rememberSaveable { mutableStateOf(false) }
+    var choosingBook by rememberSaveable { mutableStateOf(false) }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         if (state.micDenied) {
@@ -244,9 +269,28 @@ fun FluteContent(
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
+        } else if (choosingBook) {
+            Column(
+                modifier = Modifier
+                    .fitOrScroll(fits = maxHeight >= ShelfMinHeight, minHeight = ShelfMinHeight)
+                    .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+            ) {
+                TuneShelf(
+                    books = state.shelf,
+                    openBook = state.openBook,
+                    onChoose = { index ->
+                        choosingBook = false
+                        onBookChosen(index)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            }
         } else {
             val fits = maxHeight >= FitsHeight
             val running = state.isRunning
+            val staffScale = if (running) RunningStaffScale else 1f
             // One flash for the animal wherever it is: the knob at rest (still), the staff while the tune runs.
             val flash = rememberBeatFlash(state.beatPulse, running)
             val animal = if (running) {
@@ -272,7 +316,7 @@ fun FluteContent(
                             marks = state.marks,
                             animal = animal,
                             wrongIndex = state.wrongIndex,
-                            scale = if (running) RunningStaffScale else 1f,
+                            scale = staffScale,
                         )
                         SpeedKnob(
                             bpm = metronome.config.bpm,
@@ -283,6 +327,17 @@ fun FluteContent(
                                 choosingSpeed = true
                             },
                             modifier = Modifier.align(Alignment.TopStart),
+                        )
+                        BookButton(
+                            sweet = Sweet.entries[state.openBook],
+                            running = running,
+                            onClick = {
+                                onShelfOpen()
+                                choosingBook = true
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .offset(y = StaffGeometry.bookButtonTop(staffScale).dp),
                         )
                     }
                 }

@@ -30,6 +30,7 @@ configuration cache is on.
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.ui.tuner.TunerScreenTest
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.ui.notes.NotesScreenTest
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.ui.flute.FluteScreenTest
+./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.data.settings.SharedPreferencesSettingsStoreTest
 ./gradlew testDebugUnitTest lintRelease bundleRelease     # pre-upload check (docs/release/README.md)
 ```
 
@@ -71,7 +72,7 @@ Each feature's design, thresholds and the reasons behind them live in a CLAUDE.m
 code, which loads when you work in that folder; read the one for the feature you are changing:
 `audio/metronome/` (metronome audio path, player contract), `playback/` (background playback),
 `ui/tuner/` (tuner path), `ui/notes/` (note reading game), `ui/flute/` (digital flute: tune,
-rests and breaths, bars and ties). The matching `audio/`, `domain/` and `ui/metronome/` folders
+rests and breaths, bars and ties, the songbook of six tunes). The matching `audio/`, `domain/` and `ui/metronome/` folders
 point there.
 
 ### UI conventions
@@ -93,7 +94,7 @@ point there.
 - Each screen is split into a stateful `MetronomeScreen` / `TunerScreen` / `NotesScreen` /
   `FluteScreen` (ViewModel, permissions, lifecycle) and a stateless `MetronomeContent` /
   `TunerContent` / `NotesContent` / `FluteContent` taking state plus callbacks (`FluteScreen` is also handed the metronome's state and
-  ViewModel, for the flute's speed knob and its panel). The `*Content` composables are what the Compose
+  ViewModel, for the flute's speed knob, its panel and the book switch). The `*Content` composables are what the Compose
   UI tests render, wrapped in the test-only `LocaleProvider` to pin the language.
 - Every user-visible string is a resource in both `values/strings.xml` and
   `values-hr/strings.xml`. Domain enums stay language-free; `ui/common/Labels.kt` maps them to
@@ -164,7 +165,7 @@ highest on top, the "Sound" switch row and a big OK, the only way back. The end-
 has no numbers on screen either: a trophy, ten stars, and tiles for the best streak (flames), the
 aim (one to three stars) and the speed (an animal). The flute tab has a stage (the user's canvas of
 2026-11-02, replacing the hold dots and the line of pills, then changed by the user the same
-evening) with two things, the staff and the names, and since 2026-11-03 a third, the speed knob over the staff: the tune on a real five-line staff (`TuneStaff`, geometry in `StaffGeometry`, lines
+evening) with two things, the staff and the names, and since 2026-11-03 a third, the speed knob over the staff, and since 2026-11-04 a fourth, the book button under its clef: the tune on a real five-line staff (`TuneStaff`, geometry in `StaffGeometry`, lines
 18 dp apart: the faint treble clef and the metronome tab's time signature fixed at the left, each
 note at its true height drawn as printed music draws it, the whole note (head, stem, flag, dot,
 tie) in its letter's colour, the tilted oval head with a thin ink edge and no letter in it, every
@@ -185,7 +186,17 @@ the user from three mockups), the metronome's yellow knob with the speed's anima
 the tune plays back), whose tap swaps the stage, the keys and the Play row, in place, for the
 metronome tab's own stage (`MetronomeStage`: the beat bubbles with − / + and the ring exactly as
 drawn there, its tempo figure the one number the panel shows) over one big green OK, the only way
-back;
+back; at the staff's bottom left, under the clef and beside the names, since 2026-11-04 (chosen by
+the user from true-size mockups, the top right covered the newest notes' stems), a round white
+button carrying the open tune's sweet (`BookButton`: 🍭 🍪 🧁 🍩 🍦 🍬, one for each of six books), whose
+tap swaps the stage, the keys and the Play row, in place, for a shelf of six little books
+(`TuneShelf`, always in the same order, the open one yellow, each a sweet over the tune's first five
+notes, no word and no number on it) where one tap opens a book and closes the shelf: the flute
+keeps six tunes at once, each with its own speed and beat (opening one with notes in it sets the speed knob and the
+metronome tab to them), with no save step (every change to the tune is kept in the open book), no
+name, no delete (a book is emptied only by wiping its tune with the sponge) and no choice of
+picture, and the old single tune moved into the first book on update (spec
+`docs/superpowers/specs/2026-11-04-flute-songbook-design.md`, details in `ui/flute/CLAUDE.md`);
 the fifteen keys in three octave rows highest on top (each in its letter's colour; a key sounds
 for as long as it is held) with, at the end of the top row beside c³, a 😮‍💨 breath key and a
 💤 rest key (two keys wide each, icon only; the rest is held like a note and grows the same way,
@@ -200,8 +211,8 @@ the notes game, kept the child's by being opt-in and child-paced; spec
 with a round erase button beside them (it sinks while held and repeats like a keyboard's
 backspace); while the tune runs, by Play or by Your turn, the keys and the sponge hide, the staff
 grows by a third for a phone on a music stand, the knob's animal walks a marks row under the names
-(bouncing with the beats in Play, waiting under the next note in Your turn, the knob empty
-meanwhile) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's
+(bouncing with the beats in Play, waiting under the next note in Your turn, the knob empty and the
+book button faded meanwhile) and one wide red Stop takes the row: no record button, no clear-all, no tempo control but that knob and the metronome's
 stage it opens in place, and no note lengths as a
 control (lengths come only from how long a key is held; the user drew this on 2026-10-24). The user rejected a wider
 layout (−/+ beside the ring, a ten-button signature scroller, flags in the content area) as too
@@ -244,5 +255,7 @@ Unit tests use hand-written fakes from `app/src/test/.../fakes/Fakes.kt` (`FakeM
 `advanceUntilIdle`. Instrumented tests cover the `*Content` composables (`MetronomeScreenTest`, `TunerScreenTest`,
 `NotesScreenTest`, `FluteScreenTest`), the flag buttons (`LanguageSwitchTest`), the pieces the
 tuner and the flute share (`SharedActionsTest`: the microphone card's "Not now", the stacked big
-button) and locale-dependent resources (`LabelsTest`). The `config_summary`, `subdivision_*` and `sound_*` strings must stay
+button), the settings store with the songbook's one-time migration of the old single tune
+(`SharedPreferencesSettingsStoreTest`, over a throwaway preferences file so the app's own settings
+are never touched) and locale-dependent resources (`LabelsTest`). The `config_summary`, `subdivision_*` and `sound_*` strings must stay
 even though the screens no longer show them: the playback notification and `LabelsTest` use them.

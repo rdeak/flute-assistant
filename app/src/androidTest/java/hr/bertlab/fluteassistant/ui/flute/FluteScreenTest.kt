@@ -23,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.Modifier
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -76,6 +78,8 @@ class FluteScreenTest {
     private var chosenSignature: TimeSignature? = null
     private var speedOpens = 0
     private var speedDones = 0
+    private var shelfOpens = 0
+    private val chosenBooks = mutableListOf<Int>()
     private var yourTurns = 0
     private var stops = 0
     private var micRequests = 0
@@ -117,6 +121,8 @@ class FluteScreenTest {
                         onTimeSignatureChange = { chosenSignature = it },
                         onSpeedOpen = { speedOpens++ },
                         onSpeedDone = { speedDones++ },
+                        onShelfOpen = { shelfOpens++ },
+                        onBookChosen = { chosenBooks += it },
                         onYourTurn = { yourTurns++ },
                         onStop = { stops++ },
                         onRequestMic = { micRequests++ },
@@ -259,6 +265,8 @@ class FluteScreenTest {
                             onTimeSignatureChange = {},
                             onSpeedOpen = {},
                             onSpeedDone = {},
+                            onShelfOpen = {},
+                            onBookChosen = {},
                             onYourTurn = {},
                             onStop = {},
                             onRequestMic = {},
@@ -442,6 +450,117 @@ class FluteScreenTest {
     fun the_knob_speaks_croatian() {
         show(FluteUiState(), Locale("hr"))
         compose.onNodeWithContentDescription("Brzina: Zec, dodirni za promjenu").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_book_button_shows_the_open_books_sweet_and_opens_the_shelf() {
+        show(FluteUiState(openBook = 1))
+        compose.onNodeWithContentDescription("Tune: Cookie, tap to change").assertIsEnabled().performClick()
+        assertEquals(1, shelfOpens)
+    }
+
+    @Test
+    fun the_book_button_is_inert_while_the_tune_runs() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), playingIndex = 0))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").assertIsNotEnabled().performClick()
+        assertEquals(0, shelfOpens)
+        compose.onNodeWithContentDescription("Lollipop, open now").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_book_button_speaks_croatian() {
+        show(FluteUiState(openBook = 3), locale = Locale("hr"))
+        compose.onNodeWithContentDescription("Pjesmica: Krafna, dodirni za promjenu").assertExists()
+    }
+
+    @Test
+    fun the_book_button_sits_under_the_clef_left_of_the_notes() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        val book = compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").getBoundsInRoot()
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").getBoundsInRoot()
+        // The tune's row starts NOTES_CLIP (57 dp) into the staff; the button, the knob's twin one corner
+        // down, stands in the same column left of it, under the time signature, beside the names.
+        val tuneRow = compose.onNodeWithContentDescription("Your tune, 1 note").getBoundsInRoot()
+        val signature = compose.onNodeWithContentDescription("Time signature 4/4").getBoundsInRoot()
+        assertTrue("the book button $book should sit below the time signature $signature", book.top >= signature.bottom - 1.dp)
+        assertTrue("the book button $book should end before the notes start $tuneRow", book.right <= tuneRow.left + 1.dp)
+        assertTrue("the book button $book should end no further right than the knob $knob", book.right <= knob.right + 1.dp)
+        assertTrue("the book button should be 54 dp, was ${book.width}", abs((book.width - 54.dp).value) <= 0.5f)
+    }
+
+    // ---- The shelf ----
+
+    /** Six books, all empty but the cookie's, which holds three notes. */
+    private val threeNoteCookie = List(6) { Book() }.toMutableList().also {
+        it[1] = Book(listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER)))
+    }
+
+    @Test
+    fun the_shelf_takes_the_stage_with_six_books() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        assertEquals(1, shelfOpens)
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Your tune, 1 note").assertDoesNotExist()
+        compose.onNodeWithText("Play").assertDoesNotExist()
+        listOf("Lollipop, open now", "Cookie, 3 notes", "Cupcake, empty", "Donut, empty", "Ice cream, empty", "Candy, empty")
+            .forEach { compose.onNodeWithContentDescription(it).assertExists() }
+    }
+
+    @Test
+    fun a_tap_on_a_book_chooses_it_and_closes_the_shelf() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Cookie, 3 notes").performClick()
+        assertEquals(listOf(1), chosenBooks)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithContentDescription("Cookie, 3 notes").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_tap_on_the_open_book_closes_the_shelf() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Lollipop, open now").performClick()
+        assertEquals(listOf(0), chosenBooks)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithContentDescription("Lollipop, open now").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_shelf_survives_re_creation() {
+        val restoration = StateRestorationTester(compose)
+        show(FluteUiState(), restoration = restoration)
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithContentDescription("Lollipop, open now").assertExists()
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_shelf_speaks_croatian() {
+        show(FluteUiState(books = threeNoteCookie), locale = Locale("hr"))
+        compose.onNodeWithContentDescription("Pjesmica: Lizalica, dodirni za promjenu").performClick()
+        compose.onNodeWithContentDescription("Lizalica, otvorena pjesmica").assertExists()
+        compose.onNodeWithContentDescription("Keks, 3 note").assertExists()
+        compose.onNodeWithContentDescription("Muffin, prazna pjesmica").assertExists()
+    }
+
+    @Test
+    fun the_shelf_fits_a_short_phone_without_scrolling() {
+        // 470 dp is about what a 360 x 640 dp phone leaves the tab: above the shelf's minimum, so all six show.
+        show(FluteUiState(books = threeNoteCookie), height = 470.dp)
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Lollipop, open now").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Candy, empty").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_shelf_reaches_its_last_book_on_a_short_screen() {
+        // Below the shelf's minimum the books keep their height and the shelf scrolls.
+        show(FluteUiState(books = threeNoteCookie), height = 340.dp)
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Candy, empty").performScrollTo().assertIsDisplayed()
     }
 
     @Test

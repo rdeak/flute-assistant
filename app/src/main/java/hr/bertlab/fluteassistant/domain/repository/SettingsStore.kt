@@ -1,13 +1,14 @@
 package hr.bertlab.fluteassistant.domain.repository
 
-import hr.bertlab.fluteassistant.domain.flute.TuneItem
+import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 
 /**
  * Small key-value persistence for "where the user left off": the last metronome settings,
  * the volume, the tuner's reference pitch and the note it tunes to, the notes the reading
- * game asks, the flute tab's tune. Synchronous by design
+ * game asks, the flute tab's shelf of tunes. Synchronous by design
  * (tiny values, read once at ViewModel creation).
  */
 interface SettingsStore {
@@ -28,7 +29,14 @@ interface SettingsStore {
     /** Whether the reading game sounds the note when it is found; true by default. */
     fun loadNoteSound(): Boolean
     fun saveNoteSound(enabled: Boolean)
-    /** The flute tab's tune, as stored (decoded leniently, see Tune.decode); the caller sanitises. */
-    fun loadTune(): List<TuneItem>
-    fun saveTune(items: List<TuneItem>)
+    /**
+     * The flute tab's shelf: its books, as stored (decoded leniently, see Songbook), and the open
+     * one; the caller sanitises a tune. The first load after the update that added the shelf moves
+     * the old single `tune` into book 0 and stores the result, so that never runs again.
+     */
+    fun loadShelf(): Shelf
+    /** Stores [book] as the book at [index], 0 until Songbook.SIZE. */
+    fun saveBook(index: Int, book: Book)
+    /** Stores which book is open, 0 until Songbook.SIZE. */
+    fun saveOpenBook(index: Int)
 }

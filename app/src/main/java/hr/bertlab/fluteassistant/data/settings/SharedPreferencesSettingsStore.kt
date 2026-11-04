@@ -3,8 +3,9 @@ package hr.bertlab.fluteassistant.data.settings
 import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
-import hr.bertlab.fluteassistant.domain.flute.Tune
-import hr.bertlab.fluteassistant.domain.flute.TuneItem
+import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Shelf
+import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import hr.bertlab.fluteassistant.domain.model.Subdivision
@@ -69,12 +70,34 @@ class SharedPreferencesSettingsStore @Inject constructor(
 
     override fun saveNoteSound(enabled: Boolean) = prefs.edit { putBoolean(KEY_NOTE_SOUND, enabled) }
 
-    // A tune saved before lengths were snapped holds times in ms; they become lengths at the
-    // metronome's stored tempo, the one the flute counts beats in.
-    override fun loadTune(): List<TuneItem> =
-        Tune.decode(prefs.getString(KEY_TUNE, null) ?: "", legacyBpm = loadMetronomeConfig().bpm)
+    // The shelf is six strings and the open index. No open index yet means the shelf was never
+    // stored: Songbook.restore moves the old single tune (key "tune") into book 0 at the
+    // metronome's stored speed and beat, and that result is written at once, with the old key
+    // removed, so the migration runs once and a later empty book is not mistaken for no shelf.
+    override fun loadShelf(): Shelf {
+        val open = if (prefs.contains(KEY_OPEN_BOOK)) prefs.getInt(KEY_OPEN_BOOK, 0) else null
+        val shelf = Songbook.restore(
+            open = open,
+            stored = List(Songbook.SIZE) { prefs.getString(bookKey(it), null) },
+            legacyTune = prefs.getString(KEY_TUNE, null),
+            config = loadMetronomeConfig(),
+        )
+        if (open == null) {
+            prefs.edit {
+                putInt(KEY_OPEN_BOOK, shelf.open)
+                putString(bookKey(0), Songbook.encode(shelf.books[0]))
+                remove(KEY_TUNE)
+            }
+        }
+        return shelf
+    }
 
-    override fun saveTune(items: List<TuneItem>) = prefs.edit { putString(KEY_TUNE, Tune.encode(items)) }
+    override fun saveBook(index: Int, book: Book) =
+        prefs.edit { putString(bookKey(index), Songbook.encode(book)) }
+
+    override fun saveOpenBook(index: Int) = prefs.edit { putInt(KEY_OPEN_BOOK, index) }
+
+    private fun bookKey(index: Int) = "book_$index"
 
     private inline fun <reified T : Enum<T>> enumOrDefault(name: String?, default: T): T =
         enumValues<T>().firstOrNull { it.name == name } ?: default
@@ -91,6 +114,9 @@ class SharedPreferencesSettingsStore @Inject constructor(
         const val KEY_TUNER_MODE = "tuner_mode"
         const val KEY_PRACTICE_NOTES = "practice_notes"
         const val KEY_NOTE_SOUND = "note_sound"
+        const val KEY_OPEN_BOOK = "open_book"
+
+        /** The single tune of builds before the shelf; read once to migrate it into book 0, then removed. */
         const val KEY_TUNE = "tune"
         const val DEFAULT_VOLUME = 0.8f
     }

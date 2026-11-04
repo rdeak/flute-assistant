@@ -1,6 +1,8 @@
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
@@ -84,5 +86,30 @@ class FluteUiStateTest {
         assertNull(FluteUiState(shown = Shown.Rest).shownMidi)
         assertNull(FluteUiState(shown = Shown.Breath).shownMidi)
         assertNull(FluteUiState().shownMidi)
+    }
+
+    @Test
+    fun `the shelf shows the open book's live tune and the others as stored`() {
+        val books = List(6) { Book() }.toMutableList().also { it[2] = Book(listOf(TuneNote(64, NoteLength.QUARTER))) }
+        val state = FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), openBook = 0, books = books)
+        assertEquals(listOf(TuneNote(60, NoteLength.QUARTER)), state.shelf[0].tune)
+        assertEquals(books[2], state.shelf[2])
+        assertEquals(Songbook.SIZE, state.shelf.size)
+    }
+
+    @Test
+    fun `the shelf keeps the open book's speed and beat as stored`() {
+        val stored = Book(listOf(TuneNote(64, NoteLength.QUARTER)), bpm = 90)
+        val books = List(6) { Book() }.toMutableList().also { it[3] = stored }
+        val state = FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), openBook = 3, books = books)
+        assertEquals(stored.copy(tune = state.tune), state.shelf[3])
+        assertEquals(books[0], state.shelf[0])
+    }
+
+    @Test
+    fun `a fresh state is on the first of six empty books`() {
+        val state = FluteUiState()
+        assertEquals(0, state.openBook)
+        assertEquals(List(Songbook.SIZE) { Book() }, state.books)
     }
 }

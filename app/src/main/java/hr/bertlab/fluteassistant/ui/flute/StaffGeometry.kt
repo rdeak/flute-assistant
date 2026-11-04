@@ -79,6 +79,23 @@ internal object StaffGeometry {
     const val CLEF_STROKE = 0.14f
     const val CLEF_ALPHA = 0.45f
 
+    /**
+     * The lowest control point of `drawTrebleClef`'s hook (5.12 units under the top line): a bound
+     * the clef's stroke never passes, so the book button may stand under it.
+     */
+    const val CLEF_BOTTOM = TOP_LINE_Y + 5.12f * CLEF_UNIT
+
+    /**
+     * The round buttons in the staff's left corner (since 2026-11-04): the speed knob at the top
+     * and, under the clef, beside the names row, the open book's sweet. [CORNER_BUTTON] across
+     * ([NOTES_CLIP] is no less, so no note runs under either) with a [CORNER_SHADOW] shadow.
+     */
+    const val CORNER_BUTTON = 54f
+    const val CORNER_SHADOW = 5f
+
+    /** Where the book button's top is at [scale] (1 at rest, [RunningStaffScale] while the tune runs): centred on the names' pills. */
+    fun bookButtonTop(scale: Float): Float = (NAMES_TOP + PILL_HEIGHT / 2) * scale - CORNER_BUTTON / 2
+
     /** The time signature's figures: centred at this x, each across two spaces of the staff. */
     const val SIGNATURE_X = 48f
     const val SIGNATURE_TOP_Y = TOP_LINE_Y + LINE_GAP

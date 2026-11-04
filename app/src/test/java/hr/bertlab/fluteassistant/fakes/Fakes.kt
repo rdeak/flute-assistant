@@ -9,6 +9,9 @@ import hr.bertlab.fluteassistant.audio.tuner.ReferenceTonePlayer
 import hr.bertlab.fluteassistant.audio.tuner.TunerEngine
 import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.Logger
+import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Shelf
+import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.Preset
@@ -168,8 +171,14 @@ class FakeSettingsStore(
     var tunerMode: TunerMode = TunerMode.IDENTIFY,
     var practiceNotes: Set<Int> = StaffNotes.DEFAULT_PRACTICE,
     var noteSound: Boolean = true,
-    var tune: List<TuneItem> = emptyList(),
+    val books: MutableList<Book> = MutableList(Songbook.SIZE) { Book() },
+    var openBook: Int = 0,
 ) : SettingsStore {
+    /** The tune of the open book, so a test can set or read it without going through the shelf. */
+    var tune: List<TuneItem>
+        get() = books[openBook].tune
+        set(value) { books[openBook] = books[openBook].copy(tune = value) }
+
     override fun loadMetronomeConfig() = config
     override fun saveMetronomeConfig(config: MetronomeConfig) { this.config = config }
     override fun loadVolume() = volume
@@ -184,8 +193,9 @@ class FakeSettingsStore(
     override fun savePracticeNotes(notes: Set<Int>) { practiceNotes = notes }
     override fun loadNoteSound() = noteSound
     override fun saveNoteSound(enabled: Boolean) { noteSound = enabled }
-    override fun loadTune() = tune
-    override fun saveTune(items: List<TuneItem>) { tune = items }
+    override fun loadShelf() = Shelf(openBook, books.toList())
+    override fun saveBook(index: Int, book: Book) { books[index] = book }
+    override fun saveOpenBook(index: Int) { openBook = index }
 }
 
 class FakeClock(var now: Long = 0L) : MonotonicClock {

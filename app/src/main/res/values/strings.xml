@@ -141,6 +141,22 @@
     <string name="flute_keys">Flute keys</string>
     <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->
     <string name="flute_speed_knob">Speed: %1$s, tap to change</string>
+    <!-- The white sweet button under the staff's clef (its content description; the argument is the open book's sweet, e.g. "Cookie"): a tap opens the shelf of tunes -->
+    <string name="flute_book_button">Tune: %1$s, tap to change</string>
+    <!-- The screen reader's names for the six books on the flute's shelf, each the sweet that marks its book (the book button shows the open one's) -->
+    <string name="book_lollipop">Lollipop</string>
+    <string name="book_cookie">Cookie</string>
+    <string name="book_cupcake">Cupcake</string>
+    <string name="book_donut">Donut</string>
+    <string name="book_ice_cream">Ice cream</string>
+    <string name="book_candy">Candy</string>
+    <!-- The shelf's books (each one's content description; the argument is its sweet, e.g. "Cookie"): the open one, an empty one, and one holding notes -->
+    <string name="flute_book_open">%1$s, open now</string>
+    <string name="flute_book_empty">%1$s, empty</string>
+    <plurals name="flute_book_notes">
+        <item quantity="one">%1$s, %2$d note</item>
+        <item quantity="other">%1$s, %2$d notes</item>
+    </plurals>
     <!-- The big button under the ring that opens in place over the flute's staff, closing it -->
     <string name="speed_done">OK</string>
     <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->

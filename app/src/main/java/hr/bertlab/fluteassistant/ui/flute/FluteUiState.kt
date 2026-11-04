@@ -1,6 +1,8 @@
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.Tune
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
@@ -53,7 +55,15 @@ data class FluteUiState(
     val hearing: Hearing = Hearing.CLEAR,
     /** True after the phone said no to the microphone on this tab, while the microphone card is shown. */
     val micDenied: Boolean = false,
+    /** Which of the [Songbook.SIZE] books of the shelf is open: the one [tune] belongs to and every change is saved to. */
+    val openBook: Int = 0,
+    /** The shelf as last stored; the open entry may lag behind [tune], so the shelf draws [shelf]. */
+    val books: List<Book> = List(Songbook.SIZE) { Book() },
 ) {
+    /** [books] with the open entry's tune replaced by [tune], the tune as the child sees it now. */
+    val shelf: List<Book>
+        get() = books.mapIndexed { index, book -> if (index == openBook) book.copy(tune = tune) else book }
+
     val isPlaying: Boolean get() = playingIndex != null
     val isEmpty: Boolean get() = tune.isEmpty()
     val atCap: Boolean get() = tune.size >= Tune.MAX_NOTES

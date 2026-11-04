@@ -21,11 +21,14 @@ halting): a silence is only ever a rest the child put there. The stored string
 (`"60:2,r:2,b,67:4"`: a note's MIDI or `r` for a rest, then half beats, and `b` for a breath;
 `decode` is lenient and ignores a third field, `sanitize` keeps only `StaffNotes.ALL` notes and
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
-snapped (never under 300), converted at the stored tempo; `SettingsStore.saveTune` keeps it
-under `tune` across restarts. `Bars.write` (`domain/flute/Bars.kt`, since 2026-11-02) is how the
+snapped (never under 300), converted at the stored tempo; since 2026-11-04 the tune is one of the
+songbook's six books (below), each stored as `"<bpm>;<time signature name>;<that string>"` under
+`book_0` to `book_5`, and `SettingsStore.saveBook` keeps the open one across restarts (before that
+the single tune lived under the key `tune`, which the migration below moves into the first book).
+`Bars.write` (`domain/flute/Bars.kt`, since 2026-11-02) is how the
 staff writes the tune in bars of the metronome tab's time signature (`FluteUiState.timeSignature`,
 read at creation, in `enterTab()` and when OK closes the speed panel, all through
-`syncTimeSignature()`; a bar is `beatsPerBar * 8 / noteValue` half beats of the
+`syncTimeSignature()`, and set to the book's when a book with a tune in it is opened; a bar is `beatsPerBar * 8 / noteValue` half beats of the
 flute's quarter-note beat, so 6/8 holds three quarters): `LineMark.Step` / `Breath` / `BarLine`, a
 bar line after every full bar (the last too), a note or rest that runs past one split there into
 `StepPart`s (the longest lengths that fit, a 2½-beat piece as a half and an eighth) that the staff
@@ -33,7 +36,7 @@ ties (a note) or just splits (a rest); the tune itself is never changed.
 
 The stage (the user's canvas of 2026-11-02, boards `Flute*.dc.html`, then changed by the user the
 same evening) holds `TuneStaff`, with the speed knob over its top left (described after this
-paragraph): the staff and, under each note in the place the canvas gave
+paragraph) and the book button under its clef (see "The songbook"): the staff and, under each note in the place the canvas gave
 the fingering, its name (`NameRow` / `NamePill`, `StaffGeometry.NAMES_TOP`): a pill in its letter's
 colour as wide as the note's room on the staff less a 3 dp gap, the name in the first beat's room
 under the head, a grey 💤 pill for a rest, no pill for a breath, the bar line drawn through the
@@ -109,7 +112,7 @@ the last step is one (a breath at the cap or after a breath is only shown); `tog
 plays the tune from the start at the metronome's tempo, each note for its length, lighting it
 on the staff, on its name and on its key, silent for each rest's whole length (its symbol and
 its pill ringed, the rest key sunk: `restLit`) and straight past each breath, and
-stops at once on the pill, on a key press, on `openSpeed()` or on `eraseLast()`, which drops the
+stops at once on the pill, on a key press, on `openSpeed()`, on `openShelf()` or `openBook()` or on `eraseLast()`, which drops the
 last step (the erase button repeats while held).
 
 The speed knob and its panel (the user's pick of 2026-11-03 from three mockups, spec
@@ -184,8 +187,8 @@ animal's place for `WRONG_MARK_MS` (700) or until the next heard note, and the s
 as stumbled. The check waits for the right note, which is what keeps every mark under its own
 note. Pitch only; nothing is timed but the ❌ and the guard. The last note judged ends it by itself
 (`flute.listen_done`); Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
-the speed knob and leaving the tab end it early (`flute.listen_stop`); the marks stay in
-`FluteUiState.marks` until a new run or any write to the tune (`save()` clears them), are not
+the speed knob, the book button and leaving the tab end it early (`flute.listen_stop`); the marks stay in
+`FluteUiState.marks` until a new run, a switch to another book or any write to the tune (`save()` clears them), are not
 saved, and show no number anywhere. `HearingTracker` feeds `FluteUiState.hearing` for the
 tuner's `AdviceLine` under the stage ("Come closer" / "Play one long, clear note", only while the
 sound stays unclear). Play is refused while listening; the keys are off screen anyway.
@@ -207,6 +210,114 @@ hop). Emoji in the row are sized in dp (`emojiSizeFor`) like the staff's other t
 reader hears a step's mark after its length ("G4, 1 beat, got it" / "got it after a retry" /
 "play this one" / "try again"; `flute_mark_*`, `flute_listen_here`).
 
+The songbook (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-songbook-design.md`;
+the user: "child needs to practice more than two tunes and dont want to type notes over again when
+tune changes"): the flute keeps six tunes at once, so a child types each school tune in once and
+afterwards only switches between them. A `Book` (`domain/flute/Songbook.kt`) is a tune (the same
+`List<TuneItem>`, the same `MAX_NOTES` cap, sanitised on load) with its own bpm and time signature,
+a `Shelf` is the six books and the index of the open one, and the books sit in six fixed places,
+each with a fixed picture that never changes, so a child who cannot read yet learns "my school tune
+is the cookie": `Sweet` (`Shelf.kt`) is 🍭 🍪 🧁 🍩 🍦 🍬 in that order, six sweets that share no
+shape or colour (the user asked for "dedicated number of slots, eg 6 with pictures", then "sweets
+and cookies"; the six themselves were chosen in the 2026-11-04 brainstorm and approved by the user). There are no names, no typing, no choice of
+picture, no built-in songs, no delete button, no more than six places and no save step: every change
+to the tune goes through `save()`, which writes the open book (`FluteUiState.openBook`; `books` is
+the shelf as last stored, `shelf` the same with the open book's tune as the child sees it), exactly
+as the single tune was kept before. A screen reader hears the sweets as Lollipop, Cookie, Cupcake,
+Donut, Ice cream and Candy (the spec's table says Doughnut and Sweet; the strings follow the US
+spellings, as the English flag did the same day) and in Croatian Lizalica, Keks, Muffin, Krafna,
+Sladoled and Bombon (`book_*`, used for the screen reader only).
+
+While a book is open its speed and beat are the metronome's: the speed knob, its panel and the
+metronome tab change them as before, and `save()` writes the metronome's current bpm and time
+signature with the tune, so a change made on the metronome tab while the cookie is open is the
+cookie tune's new speed (intended, "yes, each tune keeps its own speed and beat"). Opening another
+book is `FluteViewModel.openBook(index)`, and its order matters because `FluteViewModel` and
+`MetronomeViewModel` never reference each other: `openBook` first reads the metronome's config from
+`SettingsStore` and saves it with the tune of the book being left (also when that book is empty,
+where the speed is never used), then switches `tune`, `openBook`, `timeSignature` (the staff is
+written in the new book's beat; an empty book keeps the current one), clears the marks of the last
+Your turn and forgets the key let go of, and only then returns the `Pulse` the metronome must take;
+`FluteScreen`, which holds both view models as it does for the speed panel, calls
+`MetronomeViewModel.setBpm` and `setTimeSignature` with it afterwards (never `SettingsStore`
+directly: those calls update the metronome state the knob and the metronome tab draw, save the
+config and pass it to a running metronome, so a drum clicking in the background jumps to the new
+tempo, which is acceptable). Were the setters to run first, the book left would record the new
+book's speed. The returned bpm is the book's brought onto the ring's 40 to 200 (`TempoBand.MIN_BPM`
+and `MAX_BPM`). It is null, and the metronome stays as it is, for an empty book (the child writes the
+new tune at whatever speed and beat the metronome has, and the book records them when it is left),
+for the open book picked again (logged as `flute.shelf_close`, nothing else changes) and for an index
+off the shelf. Wiping a tune with the sponge until nothing is left empties its book, which stays
+open, the staff blank and the button showing its sweet; there is no other way to empty one, so with
+all six full the child wipes one to reuse it. After a restart the stored open book is opened and its
+speed and beat are already the metronome's, so nothing needs applying.
+
+Storage is `SettingsStore.loadShelf`, `saveBook(index, book)` and `saveOpenBook(index)`
+(`SharedPreferencesSettingsStore`): each book is one string `"<bpm>;<time signature name>;<tune>"`
+(`Songbook.encode` / `decode`, the tune in `Tune.encode`'s format, which has no `;`) under `book_0` to
+`book_5`, and `open_book` is the open index. Reading is lenient, so a damaged book never loses the
+other five: what cannot be read becomes the metronome's bpm and time signature, or an empty book, and
+the tune is decoded with the book's own bpm as `legacyBpm`, so a tune from before lengths were
+snapped keeps its rhythm. The migration from the single tune is decided by `open_book` alone: when
+the key is missing the shelf was never stored (an update from before the songbook, or a fresh
+install), the old `tune` key becomes book 0 (🍭) at the metronome's stored bpm and time signature,
+book 0 is opened, and `book_0` and `open_book` are written and `tune` removed in one edit, so it
+runs once. It is never decided by whether the books are empty: a child who wipes all six must not
+get the old tune back on the next start, and once `open_book` exists a `tune` key is ignored
+(`Songbook.restore`, `SongbookTest`; `SharedPreferencesSettingsStoreTest` in `androidTest` runs the
+store over a throwaway preferences file, the first test of the store, and its "fresh store" gets the
+process's cached preferences, so it checks the key layout and encoding, not the disk write).
+
+The button (`BookButton`, `Shelf.kt`) is a round `ChunkyButton` in `colors.raised` (white: it is
+not "chosen", so not `Sun`, which marks the open book on the shelf), `SpeedKnobSize` (54 dp,
+`StaffGeometry.CORNER_BUTTON`) across with a 5 dp shadow, carrying the open book's sweet at 26 sp,
+the speed knob's twin one corner down: the knob above says how fast, the button below it says which
+tune. It stands at the staff's bottom left, under the clef, beside the names row, at
+`StaffGeometry.bookButtonTop`: centred on the names' pills (`NAMES_TOP + PILL_HEIGHT / 2`), in the
+column left of `NOTES_CLIP` (57 dp) that is empty from under the clef (`CLEF_BOTTOM`, 167 dp, the
+hook's lowest control point, a bound the stroke never passes) down to the bottom of the marks row
+(`TOTAL_HEIGHT`, 257 dp), so nothing moves and nothing is covered (`StaffGeometryTest` checks it at
+both scales). At `RunningStaffScale` the cell grows and the button does not; only its position
+follows the scaled geometry. It shows on an empty tune too, and while the tune runs it stays, faded
+and not pressable, still showing its sweet (the knob is inert then too; the sweet stays because,
+unlike the animal, it does not walk the staff). It was first sketched at the staff's top right
+(approved from the sketch, "A is fine"), and turned down on the real staff for two reasons: the tune
+is shown scrolled to its end with `NOTES_END_PADDING` at 4 dp, and every note from c² up has its stem
+top inside the button's 0 to 59 dp, so it covered the newest notes' stems; keeping the staff's end
+clear instead (about 60 dp of end padding) made every long tune show about two beats less. True-size
+mockups of the three places (`button-fit.html`) went back to the user, who chose bottom left, under
+the clef, beside the names, on 2026-11-04 ("C is fine"). A screen reader hears "Tune: Cookie, tap to
+change" (`flute_book_button`), never a number. A tap calls `FluteViewModel.openShelf()`, which ends a
+playback (`flute.stop`, reason `book`), a Your turn (`flute.listen_stop`, reason `book`) and a held
+key as `openSpeed()` does and leaves the tone player open, and then `FluteContent` sets
+`choosingBook`.
+
+The shelf (`TuneShelf`, `Shelf.kt`): `FluteContent` keeps `choosingBook` in `rememberSaveable`, as it
+keeps `choosingSpeed`, so rotation and the language switch keep it open, and while it is true the
+shelf takes the place of the stage, the keys and the Play row (leaving the tab drops it, and logs no
+closing line, as for the speed panel). Six `BookCover`s stand in two columns and three rows, always
+in the sweets' order (🍭 🍪 / 🧁 🍩 / 🍦 🍬), each a little book: a cover square at the spine and round
+at the edge that opens (`BookShape`), a dark spine down its left edge, page edges (thin lines on
+paper) showing past its right edge, the sweet large in the middle and under it a white label with
+the tune's first five notes (`Book.coverNotes`, rests and breaths skipped) as small `NoteBubble`s in
+their letters' colours, the label always five bubbles wide so every label is the same size (the
+bubbles shrink on a 360 dp phone, where five of 22 dp do not fit). The open book's cover is `Sun`,
+the others `colors.raised`, and dark mode follows `FluteColors` as every other card. An empty book
+has its sweet faded and a blank label; there is no number and no word anywhere on the shelf. One tap
+on a book is `onChoose(index)`, which closes the shelf and, in `FluteScreen`, calls `openBook` and
+then the metronome's setters; the open book's tap only closes it; there is no OK and the back button
+is not handled, as in the speed panel and the notes picker, and a stray tap loses nothing, since
+every tune is kept as it is. The sweet is sized from its cover, not set: `sweetSize` is 0.32 of the
+cover's height (the mockup's 36 px sweet on a 112 px cover, a third of its height), at least 40 dp
+(`SweetMinSize`, on the shortest cover) and at most half the room between the spine and the cover's
+other edge, in dp rather than sp so a large font scale cannot push it out or onto the label; a third
+leaves the label and the gap under the sweet their room at every height from `BookMinHeight`
+(116 dp) up. The column is `fitOrScroll` at `ShelfMinHeight` (three `BookMinHeight` rows, two 16 dp
+gaps and the column's 20 dp), so it fits a 360 x 640 dp phone with large text and scrolls only below
+that. A screen reader hears each cover as one node, "Cookie, 3 notes" (`flute_book_notes`, the
+note-count plural), "Cupcake, empty" or "Lollipop, open now", and the bubbles on it stay silent
+(the wording was chosen in the same brainstorm and approved by the user).
+
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, per note ended), `flute.rest` (heldMs, length, added, per rest
@@ -214,15 +325,20 @@ ended), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pr
 `HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
 or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
 rests, bpm, time), `flute.play_done`, `flute.stop`
-(reason: pill, key, erase, leave or speed, so every `flute.play` has a closing line), `flute.erase`
+(reason: pill, key, erase, leave, speed or book, so every `flute.play` has a closing line), `flute.erase`
 (left), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and
 `flute.speed_done` (bpm, time, when OK closes it; leaving the tab with the panel open logs none);
+for the songbook, `flute.shelf_open` (book: the index of the open one, when the button opens the
+shelf), `flute.book_open` (from, to, notes, bpm, time: `to` is the book opened and `notes` its steps,
+rests and breaths counted, `bpm` and `time` what the metronome was set to, `none` when an empty
+book left it alone) and `flute.shelf_close` (book, when the open book was picked again and nothing
+changed), so every `flute.shelf_open` has a closing line but for a tab left with the shelf open;
 for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard` (index, expected,
 heard, verdict: right, retry, ignored or wrong, per new note the tracker reports),
 `flute.listen_summary` every `TunerViewModel.SUMMARY_FRAMES` frames and once more at the end (the
 tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
 passed the gate at all), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
 (stars, retries, when the last note is judged), `flute.listen_stop` (reason: pill, key, erase,
-leave or speed, so every `flute.listen` has a closing line), `flute.listen_error` (message, when
+leave, speed or book, so every `flute.listen` has a closing line), `flute.listen_error` (message, when
 the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the
 microphone on this tab). The engine's `mic.open` / `mic.close` stay under `FA.Tuner`.

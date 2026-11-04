@@ -1,10 +1,12 @@
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.DOTTED_HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
+import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -95,6 +97,23 @@ class FluteViewModelTest {
         val vm = viewModel()
         assertEquals(listOf(TuneNote(60, HALF), TuneNote(84, WHOLE)), vm.current.tune)
         assertNull(vm.current.shownMidi)
+    }
+
+    @Test
+    fun `a tune written is kept in the open book with the metronome's speed and beat`() {
+        settings.openBook = 2
+        settings.config = MetronomeConfig(bpm = 100, timeSignature = TimeSignature.THREE_FOUR)
+        val vm = viewModel()
+        vm.tap(60, 600) // one beat at 100 bpm: a quarter
+        assertEquals(Book(listOf(TuneNote(60, QUARTER)), 100, TimeSignature.THREE_FOUR), settings.books[2])
+        assertTrue(settings.books[0].isEmpty)
+    }
+
+    @Test
+    fun `creation opens the stored open book`() {
+        settings.books[4] = Book(listOf(TuneNote(67, HALF)))
+        settings.openBook = 4
+        assertEquals(listOf(TuneNote(67, HALF)), viewModel().current.tune)
     }
 
     @Test
@@ -924,7 +943,7 @@ class FluteViewModelTest {
 
     /** A view model with [items] as its tune (c1 d1 e1 by default), listening. */
     private fun TestScope.listeningViewModel(vararg items: TuneItem = arrayOf(q(60), q(62), q(64))): FluteViewModel {
-        settings.saveTune(items.toList())
+        settings.tune = items.toList()
         return viewModel().apply {
             startListening()
             runCurrent()
@@ -1076,7 +1095,7 @@ class FluteViewModelTest {
         runCurrent()
         assertFalse(playing.current.isListening)
         playing.togglePlayback()
-        settings.saveTune(listOf(TuneRest(QUARTER)))
+        settings.tune = listOf(TuneRest(QUARTER))
         val subscriptions = engine.subscriptions
         val rests = viewModel()
         rests.startListening()
@@ -1100,7 +1119,7 @@ class FluteViewModelTest {
     @Test
     fun `a microphone failure ends listening cleanly`() = runTest(dispatcher) {
         engine.flowOverride = flow { throw IllegalStateException("Microphone is busy") }
-        settings.saveTune(listOf(q(60)))
+        settings.tune = listOf(q(60))
         val vm = viewModel()
         vm.startListening()
         runCurrent()
@@ -1121,7 +1140,7 @@ class FluteViewModelTest {
 
     @Test
     fun `the microphone result starts listening or marks the denial`() = runTest(dispatcher) {
-        settings.saveTune(listOf(q(60)))
+        settings.tune = listOf(q(60))
         val vm = viewModel()
         vm.onMicResult(false)
         assertTrue(vm.current.micDenied)
@@ -1132,5 +1151,193 @@ class FluteViewModelTest {
         runCurrent()
         assertTrue(vm.current.isListening)
         assertFalse(vm.current.micDenied)
+    }
+
+    // ---- The songbook: opening the shelf and switching books ----
+
+    @Test
+    fun `creation fills the open book and the books of the state from the shelf`() {
+        settings.books[2] = Book(listOf(TuneNote(64, HALF)), bpm = 90, timeSignature = TimeSignature.TWO_FOUR)
+        settings.openBook = 2
+        val vm = viewModel()
+        assertEquals(2, vm.current.openBook)
+        assertEquals(settings.books.toList(), vm.current.books)
+    }
+
+    @Test
+    fun `opening another book shows its tune and hands back its speed and beat`() {
+        settings.books[1] = Book(listOf(TuneNote(62, HALF)), bpm = 70, timeSignature = TimeSignature.THREE_FOUR)
+        val vm = viewModel()
+        assertEquals(Pulse(70, TimeSignature.THREE_FOUR), vm.openBook(1))
+        assertEquals(listOf(TuneNote(62, HALF)), vm.current.tune)
+        assertEquals(1, vm.current.openBook)
+        assertEquals(1, settings.openBook)
+        assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
+    }
+
+    @Test
+    fun `the book left keeps the metronome's speed and beat as they are now`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        settings.config = MetronomeConfig(bpm = 150, timeSignature = TimeSignature.TWO_FOUR) // changed on the metronome tab
+        vm.openBook(3)
+        assertEquals(Book(listOf(TuneNote(60, QUARTER)), 150, TimeSignature.TWO_FOUR), settings.books[0])
+        assertEquals(settings.books[0], vm.current.books[0])
+    }
+
+    @Test
+    fun `opening an empty book leaves the metronome alone and shows an empty staff`() {
+        settings.config = MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT)
+        val vm = viewModel()
+        vm.tap(60, 500)
+        assertNull(vm.openBook(5))
+        assertTrue(vm.current.isEmpty)
+        assertEquals(5, vm.current.openBook)
+        assertEquals(5, settings.openBook)
+        assertEquals(TimeSignature.SIX_EIGHT, vm.current.timeSignature)
+        assertEquals(MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT), settings.config)
+    }
+
+    @Test
+    fun `opening a book brings its bpm onto the ring`() {
+        settings.books[1] = Book(listOf(TuneNote(60, QUARTER)), bpm = 30)
+        assertEquals(40, viewModel().openBook(1)!!.bpm)
+        settings.books[2] = Book(listOf(TuneNote(60, QUARTER)), bpm = 260)
+        assertEquals(200, viewModel().openBook(2)!!.bpm)
+    }
+
+    @Test
+    fun `tapping the open book changes nothing and says so`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        val before = vm.current
+        assertNull(vm.openBook(0))
+        assertEquals(before, vm.current)
+        assertEquals(listOf(TuneNote(60, QUARTER)), vm.current.tune)
+        assertEquals(0, logger.events("flute.shelf_close").single()["book"])
+        assertTrue(logger.events("flute.book_open").isEmpty())
+    }
+
+    @Test
+    fun `an index off the shelf changes nothing`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        val before = vm.current
+        assertNull(vm.openBook(-1))
+        assertNull(vm.openBook(6))
+        assertEquals(before, vm.current)
+        assertEquals(0, settings.openBook)
+        assertTrue(logger.events("flute.book_open").isEmpty())
+        assertTrue(logger.events("flute.shelf_close").isEmpty())
+    }
+
+    @Test
+    fun `a book opened is sanitized like the one opened at creation`() {
+        settings.books[1] = Book(listOf(TuneNote(60, HALF), TuneNote(61, QUARTER), TuneNote(84, WHOLE)))
+        val vm = viewModel()
+        vm.openBook(1)
+        assertEquals(listOf(TuneNote(60, HALF), TuneNote(84, WHOLE)), vm.current.tune)
+    }
+
+    @Test
+    fun `a switch logs where from, where to and what the metronome was set to`() {
+        settings.books[1] = Book(
+            listOf(TuneNote(62, HALF), TuneRest(QUARTER), TuneNote(64, QUARTER)),
+            bpm = 70,
+            timeSignature = TimeSignature.THREE_FOUR,
+        )
+        val vm = viewModel()
+        vm.openBook(1)
+        val opened = logger.events("flute.book_open").single()
+        assertEquals(0, opened["from"])
+        assertEquals(1, opened["to"])
+        assertEquals(3, opened["notes"])
+        assertEquals(70, opened["bpm"])
+        assertEquals("3/4", opened["time"])
+        vm.openBook(5)
+        val empty = logger.events("flute.book_open").last()
+        assertEquals(1, empty["from"])
+        assertEquals(5, empty["to"])
+        assertEquals(0, empty["notes"])
+        assertNull(empty["bpm"])
+        assertNull(empty["time"])
+    }
+
+    @Test
+    fun `switching back restores the first tune`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.openBook(1)
+        vm.tap(67, 1000)
+        vm.openBook(0)
+        assertEquals(listOf(TuneNote(60, QUARTER)), vm.current.tune)
+        assertEquals(0, vm.current.openBook)
+        assertEquals(listOf(TuneNote(67, HALF)), settings.books[1].tune)
+        assertEquals(listOf(TuneNote(67, HALF)), vm.current.books[1].tune)
+    }
+
+    @Test
+    fun `opening the shelf stops playback and listening and says why`() = runTest(dispatcher) {
+        val playing = playingViewModel()
+        advanceTimeBy(100)
+        playing.openShelf()
+        assertFalse(playing.current.isPlaying)
+        assertNull(tonePlayer.sounding)
+        assertEquals("book", logger.events("flute.stop").single()["reason"])
+        assertEquals(0, logger.events("flute.shelf_open").single()["book"])
+        logger.events.clear()
+        val listening = listeningViewModel()
+        play(60)
+        listening.openShelf()
+        runCurrent()
+        assertFalse(listening.current.isListening)
+        assertEquals("book", logger.events("flute.listen_stop").single()["reason"])
+        assertEquals(0, logger.events("flute.shelf_open").single()["book"])
+    }
+
+    @Test
+    fun `opening the shelf ends a held key and keeps its note in the book left`() {
+        val vm = viewModel()
+        vm.onKeyPressed(60)
+        clock.now += 500
+        vm.openShelf()
+        assertFalse(vm.current.isHolding)
+        assertNull(tonePlayer.sounding)
+        vm.openBook(1)
+        assertEquals(listOf(TuneNote(60, QUARTER)), settings.books[0].tune)
+        assertTrue(vm.current.isEmpty)
+    }
+
+    @Test
+    fun `a switch clears the marks of the last Your turn`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(60)
+        vm.stopRun()
+        assertEquals(1, vm.current.marks.size)
+        vm.openBook(1)
+        assertTrue(vm.current.marks.isEmpty())
+        assertNull(vm.current.wrongIndex)
+        assertNull(vm.current.shown)
+    }
+
+    @Test
+    fun `a switch while listening ends it with the reason book`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(60)
+        vm.openBook(1)
+        runCurrent()
+        assertFalse(vm.current.isListening)
+        assertTrue(vm.current.marks.isEmpty())
+        assertEquals("book", logger.events("flute.listen_stop").single()["reason"])
+    }
+
+    @Test
+    fun `wiping a tune to nothing leaves its book empty and open`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.eraseLast()
+        assertTrue(settings.books[0].isEmpty)
+        assertEquals(0, vm.current.openBook)
+        assertTrue(vm.current.isEmpty)
     }
 }
