@@ -818,6 +818,67 @@ class FluteViewModelTest {
     }
 
     @Test
+    fun `the rest key pressed again after a pause goes on with its rest from the length it has`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.rest(300) // an eighth rest: 250 ms of the 500 ms beat
+        clock.now += 500 // far past HOLD_REJOIN_MS: a pause the child did not ask silence for
+        advanceTimeBy(500)
+        vm.onRestPressed()
+        assertTrue(vm.current.restHeld)
+        assertEquals(0, vm.current.heldIndex)
+        assertEquals(listOf(TuneRest(EIGHTH)), vm.current.tune) // still the one rest
+        assertEquals(EIGHTH, vm.current.heldLength)
+        advanceTimeBy(126) // 250 ms into the rest, it grows at ¾ of a beat: 125 ms on
+        runCurrent()
+        assertEquals(QUARTER, vm.current.heldLength)
+        clock.now += 300 // 550 ms of rest all told: a quarter
+        advanceTimeBy(174)
+        vm.onRestReleased()
+        assertEquals(listOf(TuneRest(QUARTER)), vm.current.tune)
+        assertEquals(vm.current.tune, settings.tune)
+        val rejoin = logger.events("flute.rejoin").single()
+        assertNull(rejoin["midi"])
+        assertEquals(500L, rejoin["gapMs"])
+        assertEquals(listOf(300L, 550L), logger.events("flute.rest").map { it["heldMs"] })
+    }
+
+    @Test
+    fun `a whole rest pressed again stays one whole rest`() {
+        val vm = viewModel()
+        vm.rest(2000) // four beats: as long as a rest gets
+        clock.now += 500
+        vm.rest(500)
+        assertEquals(listOf(TuneRest(WHOLE)), vm.current.tune) // a second rest takes a note or a breath before it
+        assertEquals(1, logger.events("flute.rejoin").size)
+        vm.onBreath()
+        clock.now += 100
+        vm.rest(300)
+        assertEquals(listOf(TuneRest(WHOLE), TuneBreath, TuneRest(EIGHTH)), vm.current.tune)
+    }
+
+    @Test
+    fun `a rest let go of is not gone on with after a note, a breath or an erase`() {
+        val vm = viewModel()
+        vm.rest(300)
+        clock.now += 100
+        vm.tap(60, 300)
+        clock.now += 100
+        vm.rest(300)
+        assertEquals(listOf(TuneRest(EIGHTH), TuneNote(60, EIGHTH), TuneRest(EIGHTH)), vm.current.tune)
+        clock.now += 100
+        vm.onBreath()
+        clock.now += 100
+        vm.rest(300)
+        val withBreath = listOf(TuneRest(EIGHTH), TuneNote(60, EIGHTH), TuneRest(EIGHTH), TuneBreath, TuneRest(EIGHTH))
+        assertEquals(withBreath, vm.current.tune)
+        vm.eraseLast()
+        clock.now += 100
+        vm.rest(300)
+        assertEquals(withBreath, vm.current.tune)
+        assertTrue(logger.events("flute.rejoin").isEmpty())
+    }
+
+    @Test
     fun `at the cap a note gone on with is still not added`() {
         settings.tune = List(200) { TuneNote(60, QUARTER) }
         val vm = viewModel()

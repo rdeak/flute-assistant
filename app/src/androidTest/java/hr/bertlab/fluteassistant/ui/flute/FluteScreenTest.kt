@@ -143,6 +143,20 @@ class FluteScreenTest {
     }
 
     @Test
+    fun a_press_the_system_cancels_still_lets_go_of_the_key() {
+        // Palm rejection or a system gesture ends a touch with a cancel, not an up; the ViewModel
+        // must hear the release all the same, or the next piece of the hold could not go on with it.
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("G4").performTouchInput { down(center) }
+        compose.onNodeWithContentDescription("G4").performTouchInput { cancel() }
+        assertEquals(listOf(67), pressed)
+        assertEquals(listOf(67), released)
+        compose.onNodeWithContentDescription("Rest").performTouchInput { down(center) }
+        compose.onNodeWithContentDescription("Rest").performTouchInput { cancel() }
+        assertEquals(listOf("press", "release"), restEvents)
+    }
+
+    @Test
     fun the_held_note_is_on_the_staff_and_named_in_the_line() {
         show(
             FluteUiState(

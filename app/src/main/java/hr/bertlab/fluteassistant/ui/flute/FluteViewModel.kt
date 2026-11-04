@@ -41,8 +41,10 @@ import kotlin.math.roundToLong
  * (never two in a row). One Play button plays the tune back at the metronome's tempo, silent
  * through each rest and straight past each breath; erase drops the last step. A press of any
  * key ends whatever key was held before, so the newest press wins. A key let go of and pressed
- * again within [HOLD_REJOIN_MS], nothing else having happened, goes on with the same note or rest
- * ([rejoin]): a touch screen can report one hold as several pieces. The tempo is the metronome tab's, read from
+ * again within [HOLD_REJOIN_MS], nothing else having happened, goes on with the same note
+ * ([rejoin]): a touch screen can report one hold as several pieces. The rest key goes on with its
+ * rest however long the pause, from the length the rest has: more of the rest key is only more
+ * of the same silence, so no piece the screen makes of a hold is ever a rest of its own. The tempo is the metronome tab's, read from
  * [SettingsStore] at each press and at Play, counted in its time signature's beats as the
  * metronome clicks them ([Pulse]: in 6/8 a click is an eighth note); the time signature, which
  * the staff is written in, is also read when the tab opens. The tune is saved through [SettingsStore] on every
@@ -86,12 +88,20 @@ class FluteViewModel @Inject constructor(
 
     /**
      * The key the finger let go of last, while a press of the same key may still go on with its
-     * hold ([HOLD_REJOIN_MS]): the key (a note's midi, null for the rest), its step in the tune
-     * (null at the cap), and when and in which pulse it went down and when it was let go. Cleared
-     * as soon as anything else happens: a new hold, a hold ended by something other than the
-     * finger ([endHeld]: another key, a breath, Play, the speed panel, leaving the tab) or an erase.
+     * hold (a note within [HOLD_REJOIN_MS], the rest at any time): the key (a note's midi, null
+     * for the rest), its step in the tune (null at the cap), when and in which pulse it went down,
+     * when it was let go and the length that made. Cleared as soon as anything else happens: a new
+     * hold, a hold ended by something other than the finger ([endHeld]: another key, a breath,
+     * Play, the speed panel, leaving the tab) or an erase.
      */
-    private data class LetGo(val midi: Int?, val index: Int?, val pressedAt: Long, val pulse: Pulse, val at: Long)
+    private data class LetGo(
+        val midi: Int?,
+        val index: Int?,
+        val pressedAt: Long,
+        val pulse: Pulse,
+        val at: Long,
+        val length: NoteLength,
+    )
     private var letGo: LetGo? = null
 
     /**
@@ -309,25 +319,32 @@ class FluteViewModel @Inject constructor(
 
     /**
      * The hold a press of the key [midi] (null: the rest key) at [now] goes on with: the one the
-     * finger let go of within [HOLD_REJOIN_MS], if nothing happened since and no key is held; else null.
+     * finger let go of, if it was this key, nothing happened since and no key is held; a note
+     * only within [HOLD_REJOIN_MS] (later it is a repeat of the note), the rest however long ago
+     * (more silence is the same silence); else null.
      */
     private fun rejoinable(midi: Int?, now: Long): LetGo? {
         val last = letGo ?: return null
-        val same = last.midi == midi && now - last.at <= HOLD_REJOIN_MS && !_state.value.isHolding
-        return if (same) last else null
+        if (last.midi != midi || _state.value.isHolding) return null
+        val inTime = midi == null || now - last.at <= HOLD_REJOIN_MS
+        return if (inTime) last else null
     }
 
     /**
-     * The key let go of a moment ago ([again]) is down again at [now]: the same hold goes on from
-     * the press that began it, at the length the whole hold has made so far and growing from there.
-     * A touch screen can report one hold as several (its palm rejection cancelling a flat finger
-     * and starting it over, or a bounce), and each piece used to become a note of its own.
+     * The key let go of ([again]) is down again at [now]: the same hold goes on. Let go of within
+     * [HOLD_REJOIN_MS], it goes on from the press that began it, at the length the whole hold has
+     * made so far, gap included: a touch screen can report one hold as several (its palm rejection
+     * cancelling a flat finger and starting it over, or a bounce), and each piece used to become a
+     * note of its own. Let go of longer ago (only the rest key gets here), it goes on from the
+     * length its rest has, as if the key had been held just that long: the pause was not silence
+     * the child asked for. Either way it grows from there.
      */
     private fun rejoin(again: LetGo, now: Long) {
-        pressedAt = again.pressedAt
+        val gap = now - again.at
+        val elapsed = if (gap <= HOLD_REJOIN_MS) now - again.pressedAt else Tune.durationMs(again.length, again.pulse)
+        pressedAt = now - elapsed
         pressPulse = again.pulse
         letGo = null
-        val elapsed = now - again.pressedAt
         val length = Tune.lengthOf(elapsed, pressPulse)
         _state.update { s ->
             val held = s.copy(
@@ -340,7 +357,7 @@ class FluteViewModel @Inject constructor(
             held.copy(tune = held.withHeldLength(length))
         }
         growFrom(elapsed)
-        logger.d(LogTags.FLUTE, "flute.rejoin", "midi" to again.midi, "gapMs" to now - again.at)
+        logger.d(LogTags.FLUTE, "flute.rejoin", "midi" to again.midi, "gapMs" to gap)
     }
 
     /** Grows the held key's note or rest at each of [Tune.growAtMs] still ahead, [elapsedMs] into its hold, while the key stays down. */
@@ -386,7 +403,7 @@ class FluteViewModel @Inject constructor(
         _state.update { s -> s.copy(tune = s.withHeldLength(length), heldLength = length) }
     }
 
-    /** Records the held note or rest at the length [heldMs] makes and lets go of the key, which a press within [HOLD_REJOIN_MS] may go on with. */
+    /** Records the held note or rest at the length [heldMs] makes and lets go of the key, which a press of it may go on with ([rejoinable]). */
     private fun record(heldMs: Long) {
         growJob?.cancel()
         growJob = null
@@ -397,7 +414,7 @@ class FluteViewModel @Inject constructor(
             s.copy(tune = s.withHeldLength(length), heldMidi = null, restHeld = false, heldIndex = null, heldLength = null)
         }
         val now = clock.nowMillis()
-        letGo = LetGo(held.heldMidi, held.heldIndex, pressedAt ?: (now - heldMs), pressPulse, at = now)
+        letGo = LetGo(held.heldMidi, held.heldIndex, pressedAt ?: (now - heldMs), pressPulse, at = now, length = length)
         pressedAt = null
         save()
         val midi = held.heldMidi
@@ -444,11 +461,13 @@ class FluteViewModel @Inject constructor(
 
     companion object {
         /**
-         * A key let go of and pressed again within this long is one hold, not two notes. A touch
-         * screen can report one hold as several: its palm rejection cancels a flat finger and
+         * A note key let go of and pressed again within this long is one hold, not two notes. A
+         * touch screen can report one hold as several: its palm rejection cancels a flat finger and
          * starts it over, or the contact bounces, a few frames apart. A child's quickest deliberate
          * repeat of a note takes well over 100 ms, and Android itself takes an up and a down under
-         * 40 ms (`ViewConfiguration.getDoubleTapMinTime`) for jitter rather than a second tap.
+         * 40 ms (`ViewConfiguration.getDoubleTapMinTime`) for jitter rather than a second tap. The
+         * rest key is not bound by it (see [rejoinable]): within it a hold's gap counts as held,
+         * past it the rest goes on from the length it has.
          */
         const val HOLD_REJOIN_MS = 60L
     }

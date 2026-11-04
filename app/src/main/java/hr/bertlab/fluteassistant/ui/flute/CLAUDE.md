@@ -88,11 +88,19 @@ unless that key is the one held (the newest press wins; sliding off a key releas
 finger let go of and pressed again within `HOLD_REJOIN_MS` (60 ms), nothing else having happened
 since (a new hold, a hold ended by another key, a breath, Play, the speed panel or leaving the tab,
 or an erase all forget it), goes on with the same note from its first press, at the length the
-whole hold has made and growing from there (`rejoin`, logged as `flute.rejoin`; the rest key the same): since
+whole hold has made and growing from there (`rejoin`, logged as `flute.rejoin`): since
 2026-11-03, because a touch screen can report one hold as several pieces (its palm rejection
 cancelling a flat finger and starting it over, or a bounce), and each piece became an eighth note
 of its own, the user's "bunch of short notes" when holding a key; a deliberate repeat of a note is
-far slower than the window, and Android itself takes an up and a down under 40 ms for jitter;
+far slower than the window, and Android itself takes an up and a down under 40 ms for jitter
+(Compose turns a system cancel into a release too, `FluteScreenTest` checks); the rest key goes on
+with its rest however long the pause, since 2026-11-04: on the user's phone a long hold of the
+rest key still came out as many rests, the pieces further apart than the window, and more of the
+rest key is only more of the same silence (two eighth rests are a quarter rest), so a press of it
+while its rest is still the last thing done never starts a rest of its own: within the window the
+gap counts as held, as for a note, past it the rest goes on from the length it has, the pause not
+counted, and grows from there (a whole rest no further: a second rest takes a note or a breath
+before it); a note past the window is a repeat, a new note;
 `onKeyActivated(midi)` is the screen-reader path (one beat: a quarter note);
 `onRestPressed` / `onRestReleased` / `onRestActivated` are the same for the rest key without a
 sound (`restHeld`; a rest that takes over a held note silences it, since a note taking over a
@@ -152,8 +160,8 @@ Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, per note ended), `flute.rest` (heldMs, length, added, per rest
 ended), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pressed again within
-`HOLD_REJOIN_MS` went on with its note or rest, so the `flute.note` before it was not the end of
-that note), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
+`HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
+or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
 rests, bpm, time), `flute.play_done`, `flute.stop`
 (reason: pill, key, erase, leave or speed, so every `flute.play` has a closing line), `flute.erase`
 (left), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and
