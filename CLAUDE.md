@@ -218,8 +218,11 @@ name, no delete (a book is emptied only by wiping its tune with the sponge) and 
 picture, and the old single tune moved into the first book on update (spec
 `docs/superpowers/specs/2026-11-04-flute-songbook-design.md`, details in `ui/flute/CLAUDE.md`);
 the fifteen keys in three octave rows highest on top (each in its letter's colour; a key sounds
-for as long as it is held) with, filling the top row after c³, a 😮‍💨 breath key, a
-💤 rest key and a 🧽 erase key (two keys wide each, icon only; the rest is held like a note and grows the same way,
+for as long as it is held) with, at the end of the top row and a clear gap after c³, a 💤 rest key, a
+😮‍💨 breath key and a 🧽 erase key (in that order since 2026-11-05, the user's "swap order of rest and breath button", the
+breath first before; the same day each became one note key wide, standing over g², a² and h² with the row empty
+between c³ and them, so a tool is never bigger than a note, the three read as one group apart from the notes and a slip
+off c³ lands on nothing; before that they were two keys wide each and filled the row; icon only; the rest is held like a note and grows the same way,
 on the staff its rest symbol in grey with 💤 under the staff, in the line a grey 💤 pill; a breath has no length, on the staff the breath mark with 😮‍💨 over it, and playback
 goes past it; the breath and rest keys were asked for on 2026-11-02 in a brainstorm, not on the canvas; the erase key sinks while held and repeats like a
 keyboard's backspace, moved there from the Play row at the user's request on 2026-11-04) and, at the bottom, two big buttons that

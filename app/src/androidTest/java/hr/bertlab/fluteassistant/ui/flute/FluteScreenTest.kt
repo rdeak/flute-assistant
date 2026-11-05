@@ -332,24 +332,26 @@ class FluteScreenTest {
     }
 
     @Test
-    fun the_breath_rest_and_erase_keys_fill_the_top_row() {
+    fun the_rest_breath_and_erase_keys_stand_one_key_wide_at_the_top_row_end() {
         show(FluteUiState())
         val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
         val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
-        val d5 = compose.onNodeWithContentDescription("D5").getBoundsInRoot()
+        val g5 = compose.onNodeWithContentDescription("G5").getBoundsInRoot()
         val b5 = compose.onNodeWithContentDescription("B5").getBoundsInRoot()
         val breath = compose.onNodeWithContentDescription("Breathe").getBoundsInRoot()
         val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
         val erase = compose.onNodeWithContentDescription("Erase the last note").getBoundsInRoot()
         for (key in listOf(breath, rest, erase)) {
             assertTrue("$key should sit in C6's row $c6", abs((key.top - c6.top).value) <= 1f && abs((key.bottom - c6.bottom).value) <= 1f)
-            assertTrue("$key should be two keys wide, C5 is $c5", key.width > c5.width * 2)
+            assertTrue("$key should be one key wide, C5 is $c5", abs((key.width - c5.width).value) <= 1f)
         }
         assertTrue(
-            "C6 $c6, then Breathe $breath, Rest $rest and the sponge $erase, in that order",
-            c6.right < breath.left && breath.right < rest.left && rest.right < erase.left,
+            "C6 $c6, then Rest $rest, Breathe $breath and the sponge $erase, in that order",
+            c6.right < rest.left && rest.right < breath.left && breath.right < erase.left,
         )
-        assertTrue("Breathe $breath should start where D5 $d5 does", abs((breath.left - d5.left).value) <= 1f)
+        // The three stand apart from c3 by more than a key: a tool, not a note, and a slip off c3 reaches nothing.
+        assertTrue("Rest $rest should stand clear of C6 $c6 by more than a key", rest.left - c6.right > c5.width)
+        assertTrue("Rest $rest should start where G5 $g5 does", abs((rest.left - g5.left).value) <= 1f)
         assertTrue("the sponge $erase should end where B5 $b5 does", abs((erase.right - b5.right).value) <= 1f)
         assertTrue("C6 $c6 should be as wide as C5 $c5", abs((c6.width - c5.width).value) <= 1f)
     }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +32,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -69,9 +71,11 @@ private val KeyDepth = 5.dp
 /** The keys' height when the screen is too short to give them more: three rows at their minimum. */
 val FluteKeysMinHeight: Dp = (KeyHeight + KeyDepth) * 3 + KeyRowGap * 2
 
+/** The breath, rest and erase emoji, in dp so a large font scale cannot push the breath emoji out of a 40 dp key. */
+private const val SIGN_EMOJI_DP = 24f
 
-/** The breath, the rest and the erase key each span this many note keys (and the gap between them). */
-private const val SignKeySpan = 2
+/** The plain keys at the end of the top row: breath, rest, erase. */
+private const val SignKeyCount = 3
 
 private const val SPONGE_EMOJI = "\uD83E\uDDFD" // sponge
 
@@ -88,12 +92,16 @@ private const val EraseRepeatMs = 120L
  * screen reader activates a key through [onActivate]. Every row is [KeyHeight] tall, as on the
  * canvas, and the three rows sit centred in the height they are given.
  *
- * After c3 the top row holds three plain keys, each two note keys wide, filling it to the end: the
- * breath key (😮‍💨), which calls [onBreath] as the finger goes down, the rest key (💤), held like a
- * note key ([onRestPress], [onRestRelease], [onRestActivate]) and sunk while [restLit], and the
- * erase key (🧽), which calls [onErase] as the finger goes down and again and again while it stays,
- * like a keyboard's backspace, faded and inert while [eraseEnabled] is false (since 2026-11-04, at
- * the user's request; it was a round button at the end of the Play row).
+ * At the end of the top row, apart from c3 with the rest of the row empty between, stand three
+ * plain keys, each one note key wide and over a note key of the row below (g2, a2, h2), so a tool is
+ * never bigger than a note and a slip off c3 lands on nothing (since 2026-11-05; before that they
+ * were two keys wide each and filled the row): the rest key (💤), held like a note key ([onRestPress],
+ * [onRestRelease], [onRestActivate]) and sunk while [restLit], the breath key (😮‍💨), which calls
+ * [onBreath] as the finger goes down (the rest before the breath since 2026-11-05, at the user's
+ * request; the other way round before), and the erase key (🧽), which calls [onErase] as the
+ * finger goes down and again and again while it stays, like a keyboard's backspace, faded and inert
+ * while [eraseEnabled] is false (in the key row since 2026-11-04, at the user's request; it was a
+ * round button at the end of the Play row).
  */
 @Composable
 fun FluteKeys(
@@ -114,9 +122,13 @@ fun FluteKeys(
     val rows = remember { StaffNotes.ALL.groupBy { Math.floorDiv(it, 12) }.toSortedMap().values.reversed() }
     val keysPerRow = remember(rows) { rows.maxOf { it.size } }
     BoxWithConstraints(modifier = modifier) {
-        // One note key's width, so the short top row lines up with the full rows below it.
-        val keyWidth = (maxWidth - KeyGap * (keysPerRow - 1)) / keysPerRow
-        val signKeyWidth = keyWidth * SignKeySpan + KeyGap * (SignKeySpan - 1)
+        // One note key's width, in whole pixels: seven keys that each rounded up ran 4 px over the
+        // row on a 420 dpi phone, so the rows are measured in pixels and centred, and the top row's
+        // tools stand exactly over the columns below (the rows end up to 6 px short, split between
+        // the sides).
+        val keyWidth = with(LocalDensity.current) {
+            ((constraints.maxWidth - KeyGap.roundToPx() * (keysPerRow - 1)) / keysPerRow).toDp()
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -129,7 +141,7 @@ fun FluteKeys(
                         .fillMaxWidth()
                         .height(KeyHeight + KeyDepth)
                         .padding(bottom = KeyDepth),
-                    horizontalArrangement = Arrangement.spacedBy(KeyGap),
+                    horizontalArrangement = Arrangement.spacedBy(KeyGap, Alignment.CenterHorizontally),
                 ) {
                     row.forEach { midi ->
                         FluteKey(
@@ -144,31 +156,34 @@ fun FluteKeys(
                         )
                     }
                     if (row.size < keysPerRow) {
-                        // The short top row: c3, then the breath, the rest and the erase key, each two
-                        // note keys wide, so the row is full (no spacer: spacedBy would put a gap on
-                        // each side of even an empty one, and the row would run over).
-                        BreathKey(
-                            onBreath = onBreath,
-                            modifier = Modifier
-                                .width(signKeyWidth)
-                                .fillMaxHeight(),
-                        )
+                        // The short top row: c3, the empty middle, then the rest, the breath and the
+                        // erase key, each one note key wide. The middle is as wide as the key columns
+                        // it covers, so the row measures as the full rows do and the three stand over
+                        // the last three keys of the row below, the sponge ending where h2 does.
+                        val emptyColumns = keysPerRow - row.size - SignKeyCount
+                        if (emptyColumns > 0) {
+                            Spacer(Modifier.width(keyWidth * emptyColumns + KeyGap * (emptyColumns - 1)))
+                        }
                         RestKey(
                             lit = restLit,
                             onPress = onRestPress,
                             onRelease = onRestRelease,
                             onActivate = onRestActivate,
                             modifier = Modifier
-                                .width(signKeyWidth)
+                                .width(keyWidth)
+                                .fillMaxHeight(),
+                        )
+                        BreathKey(
+                            onBreath = onBreath,
+                            modifier = Modifier
+                                .width(keyWidth)
                                 .fillMaxHeight(),
                         )
                         EraseKey(
                             enabled = eraseEnabled,
                             onErase = onErase,
-                            // The rest of the row, two keys' width: it takes up the rounding, so it
-                            // ends exactly where h2 does.
                             modifier = Modifier
-                                .weight(1f)
+                                .width(keyWidth)
                                 .fillMaxHeight(),
                         )
                     }
@@ -312,7 +327,7 @@ private fun SignKey(
             .drawBehind { if (pressed) drawKeyRing() }
             .chunky(KeyShape, colors.raised, colors.outline, KeyDepth, pressed = pressed),
     ) {
-        Emoji(emoji, fontSize = 28)
+        Emoji(emoji, fontSize = emojiSizeFor(SIGN_EMOJI_DP))
     }
 }
 

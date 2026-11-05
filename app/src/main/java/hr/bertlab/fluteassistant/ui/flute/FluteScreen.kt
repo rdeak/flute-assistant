@@ -139,9 +139,9 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * in the last "Your turn", and over the staff's top left the [SpeedKnob], the
  * metronome's animal for the tempo in [metronome], where printed music writes the tempo, and under
  * the clef, beside the names, the [BookButton], the sweet of the open book ([FluteUiState.openBook]),
- * whose tap is [onShelfOpen]; then the octave rows of [FluteKeys], with the breath, the rest and
- * the erase key ([onEraseLast], faded while the tune is empty) after c3 in the top row, taking the
- * height left, and the Play row: two big buttons sharing its width, each stacking its icon over its
+ * whose tap is [onShelfOpen]; then the octave rows of [FluteKeys], with the rest, the breath and
+ * the erase key ([onEraseLast], faded while the tune is empty) at the end of the top row, apart
+ * from c3, taking the height left, and the Play row: two big buttons sharing its width, each stacking its icon over its
  * word, "Play" (green, [onTogglePlayback], faded while the tune is empty) and "Your turn" (blue,
  * [onYourTurn], faded while the tune holds no note). On an ordinary phone held
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
