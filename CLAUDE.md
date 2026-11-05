@@ -218,7 +218,12 @@ the same letter in any octave; under the note a star for a first try, a faint st
 and under a wrong one the note that was heard as a bubble in its own letter colour until the next
 note (since 2026-11-04 evening, in place of a ❌ for a moment: it tells the child what came out; the
 user's first idea, the note name in green under every note, was turned down with them because the
-name is already in the pill above and green is F's colour), never a number and no summary; the first right-or-wrong outside
+name is already in the pill above and green is F's colour); since the night of 2026-11-04, after a
+child's tongued repeat went unheard and nothing on screen said so, the same bubble under the waited
+note is live (the note the phone hears right now, grey "…" dots in silence, so the child always sees
+it listening), a repeat held on instead of tongued gets the advice "Stop, then play it again", a
+repeat the phone could not hear is forgiven with a faint star when the next note comes, and the
+run ends only when the last note's sound ends, never a number and no summary; the first right-or-wrong outside
 the notes game, kept the child's by being opt-in and child-paced; spec
 `docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`, details in `ui/flute/CLAUDE.md`);
 while the tune runs, by Play or by Your turn, the keys and the sponge hide, the staff

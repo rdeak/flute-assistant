@@ -3,8 +3,14 @@
 Loaded when working in this folder; moved here from the root CLAUDE.md on 2026-11-02 so it is read only when needed.
 
 `AudioRecordTunerEngine` exposes a cold `Flow<PitchFrame>`: collecting opens the microphone
-(UNPROCESSED source when available, 4096-sample window advanced by 2048, conflated on
-Dispatchers.IO) and cancelling releases it; it throws `SecurityException` without RECORD_AUDIO.
+(UNPROCESSED source when available, 4096-sample window advanced by 2048, on Dispatchers.IO,
+whose channel buffers the frames rather than conflating them: since the night of 2026-11-04 the
+flute's "Your turn" counts frames, a gap being two in a row, and a busy main thread must delay a
+frame, never lose one; the tuner processes every frame too, cheaply) and cancelling releases it; it
+throws `SecurityException` without RECORD_AUDIO. A frame's `level` and `minLevel` come from
+`FrameLevels` (pure Kotlin, shared with the tests that frame synthetic sound the engine's way):
+the window's RMS on the dB-style 0..1 scale, and the quietest 21 ms stretch of the newest hop,
+which a tongued stop between two notes of one pitch drops where the window's level barely moves.
 `YinPitchDetector` (pure Kotlin: YIN plus a silence gate and period refinement for high notes)
 produces the estimate; the engine uses `YinPitchDetector.forFlute`, which searches only one
 semitone beyond `FluteRange` (so voices and mains hum below the flute cannot register as low
@@ -59,15 +65,19 @@ Boehm chart (Woodwind Fingering Guide basic fingerings; no entry for MIDI 94 and
 Two pieces of this path are shared with the flute's "Your turn" (`ui/flute/CLAUDE.md`, since
 2026-11-04): `NoteOnsetTracker`, a pure class that applies the same frame rules as this view
 model's "Which?" mode (the probability gate, the lock, the median, the drift-and-switch of
-`identify`) and additionally says when a *new* note begins: after a gap, or by a clear step to
-another note without one (a slur, a fingered change). Two rules there are the flute's own, from the
-review of 2026-11-04: a gap is `ONSET_GAP_FRAMES` uncounted frames that also fell under
-`GAP_LEVEL_RATIO` (half) of the sounding note's mean level, because the 0.85 gate blinks on a
-breathy tone and a blink that keeps the loudness must not split one held note in two (it would
-count a written repeat as played); and a drift past the halfway point that switches the sounding
-note after `SWITCH_FRAMES` (a long note sagging as the breath runs out) is no new note, since
-nobody played one, where the tuner's ring simply moves. Both are starting values to be read
-against `flute.heard` and `flute.listen_summary` on a phone. The other piece is `FrameSummary` (its own file now, `internal`),
+`identify`) and additionally says when a *new* note begins (an `Onset`, `fresh` or by a step):
+after a gap, after a tongued stop inside the same pitch, or by a clear step to another note
+without one (a slur, a fingered change). The rules there are the flute's own, from the review of
+2026-11-04 and the first child test the same night (`ui/flute/CLAUDE.md` has the story and every
+threshold): a gap is `ONSET_GAP_FRAMES` uncounted frames that also fell under `GAP_LEVEL_RATIO`
+(half) of the sounding note's mean level or back to the room's floor the tracker learns between
+notes, because the 0.85 gate blinks on a breathy tone and a blink that keeps the loudness must not
+split one held note in two (it would count a written repeat as played), while `HOLD_FRAMES` of
+them at any level are a pause; a tongued stop is heard in `PitchFrame.minLevel`; and a drift past
+the halfway point that switches the sounding note after `SWITCH_FRAMES` (a long note sagging as
+the breath runs out) is no new note, since nobody played one, where the tuner's ring simply moves.
+All are read against `flute.heard` and `flute.listen_summary` on a phone and pinned by
+`ListenPathTest` on synthetic sound. The other piece is `FrameSummary` (its own file now, `internal`),
 the body of `tuner.summary` and of the flute's `flute.listen_summary`. `TunerViewModel` still
 runs its own copy of those rules; moving it onto the tracker is a refactor for another day, and
 the constants (`MIN_PROBABILITY`, `LOCK_FRAMES`, `LOCK_CENTS`, `SMOOTHING_WINDOW`,

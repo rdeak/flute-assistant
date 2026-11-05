@@ -65,6 +65,25 @@ data class FluteUiState(
     val wrong: WrongNote? = null,
     /** What the microphone makes of sound that yields no note while listening; [Hearing.CLEAR] otherwise. */
     val hearing: Hearing = Hearing.CLEAR,
+    /**
+     * The note the phone hears right now, shown live as a bubble under the step waited on so the
+     * child sees it listening; null in silence, when not listening, and while the note just counted
+     * goes on (its tail is not what the next step hears), unless that next step is a written
+     * repeat of it, which is just when the child must see it.
+     */
+    val heardNow: Int? = null,
+    /**
+     * True while the step waited on is a written repeat of the note just counted and that note is
+     * still going on, a second or more after it began: the child is holding it instead of starting
+     * it again, which the phone can only hear as one note; the advice line says what to do.
+     */
+    val repeatHeld: Boolean = false,
+    /**
+     * True from the last note being counted until its sound ends (or a moment passes): the run
+     * goes on, the keys stay away and the animal stays over the last note with its star, so the
+     * screen does not snap back while the child is still playing.
+     */
+    val finishing: Boolean = false,
     /** True after the phone said no to the microphone on this tab, while the microphone card is shown. */
     val micDenied: Boolean = false,
     /** Which of the [Songbook.SIZE] books of the shelf is open: the one [tune] belongs to and every change is saved to. */
@@ -98,20 +117,28 @@ data class FluteUiState(
     /** Whether the rest key is drawn pressed: held, or its rest playing. */
     val restLit: Boolean get() = restHeld || playingIndex?.let { tune.getOrNull(it) is TuneRest } == true
 
-    /** The step of the staff ringed in yellow: the playing step, else the one waited for, else the held key's. */
-    val litIndex: Int? get() = playingIndex ?: listenIndex ?: heldIndex
+    /** The step of the staff ringed in yellow: the playing step, else the one waited for (none once the last is counted), else the held key's. */
+    val litIndex: Int? get() = playingIndex ?: listenIndex.takeUnless { finishing } ?: heldIndex
 
-    /** The step the knob's animal stands over while the tune runs: the playing step, else the one waited for; null at rest. */
+    /** The step the knob's animal stands over while the tune runs: the playing step, else the one waited for, or the last counted while its sound ends; null at rest. */
     val animalIndex: Int? get() = playingIndex ?: listenIndex
+
+    /** Whether the animal waits for the child to play [listenIndex]: listening, and not finishing. */
+    val waiting: Boolean get() = isListening && !finishing && listenIndex != null
 
     /** How many half beats into [animalIndex]'s step the animal stands: the last click's in Play, the step's start while listening. */
     val animalHalfBeat: Int get() = if (playingIndex != null) playingHalfBeat else 0
 
-    /** The one line under the staff while listening: come closer or play one clear note when the sound stays unclear, else nothing. */
+    /**
+     * The one line under the staff while listening: stop and play it again when a written repeat
+     * is held on instead, else come closer or play one clear note when the sound stays unclear,
+     * else nothing.
+     */
     val advice: TunerAdvice
-        get() = when (hearing) {
-            Hearing.CLEAR -> TunerAdvice.NONE
-            Hearing.QUIET_UNCLEAR -> TunerAdvice.COME_CLOSER
-            Hearing.LOUD_UNCLEAR -> TunerAdvice.CLEAR_NOTE
+        get() = when {
+            repeatHeld -> TunerAdvice.PLAY_AGAIN
+            hearing == Hearing.QUIET_UNCLEAR -> TunerAdvice.COME_CLOSER
+            hearing == Hearing.LOUD_UNCLEAR -> TunerAdvice.CLEAR_NOTE
+            else -> TunerAdvice.NONE
         }
 }

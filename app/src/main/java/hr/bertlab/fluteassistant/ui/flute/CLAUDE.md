@@ -196,35 +196,75 @@ need be; a no shows `MicrophonePermissionCard` in place of everything, with its 
 (`mic_not_now`) the way back, `FluteUiState.micDenied`) calls `FluteViewModel.startListening()`:
 it opens the tuner's `TunerEngine`, builds a `TuneCheck` (`domain/flute/TuneCheck.kt`) over the
 tune and waits on its first `TuneNote` (`listenIndex`; rests and breaths are passed over). Frames
-go through `NoteOnsetTracker` (`ui/tuner/`, the tuner's own rules plus "a new note began": after
-a gap of `ONSET_GAP_FRAMES` = 2 uncounted frames that also dropped under half the note's loudness
-(`GAP_LEVEL_RATIO`: the gate blinking on a breathy tone keeps the loudness and is not a gap), or a
-clear step to another note without a gap; a slow sag past the halfway point moves the sounding
-note but is no new note; the same note going on is not new, so a repeated note needs a fresh
-start, which a tongued note gives; when it does not, the animal keeps waiting and the child plays
-it again; the first phone test with a repeated-note tune should watch `flute.heard` for a repeat
-counted on one held note or a tongued repeat never counted, and tune `GAP_LEVEL_RATIO` from
-`flute.listen_summary`'s levels) and each new note is judged by
-`TuneCheck.judge`: **right** is the same letter in any octave (beginners overblow, and the detector
+go through `NoteOnsetTracker` (`ui/tuner/`, the tuner's own rules plus "a new note began", an
+`Onset` with its MIDI and whether it was `fresh`: after a gap, or the same note started again
+after a tongued stop, as against a step to another note without a gap, a slur, a fingered
+change or an octave pop; a slow sag past the halfway point moves the sounding note but is no new
+note; the same note merely going on is not new). The rules were rewritten on the night of
+2026-11-04 after the first child test with a repeated-note tune ("h1 h1 long h1": the tongued
+second h1 was never heard, the long h1 was counted as the second, and the run sat waiting for a
+third the child had already played; the child read it as "it does not hear my long note"), and
+`ListenPathTest` (synthetic flute sound in a synthetic room through the real detector, tracker and
+check, since the emulator has no microphone) now pins every case below: a note ends by a gap of
+`ONSET_GAP_FRAMES` = 2 uncounted frames that also fell under half its loudness (`GAP_LEVEL_RATIO`;
+the gate blinking on a breathy tone keeps the loudness and is not a gap) *or* back to the room's
+own level (the tracker's `floor`, the quietest uncounted frame heard between notes, within
+`FLOOR_MARGIN`, rising `FLOOR_RISE` a frame: for a note at -36 dBFS over a -46 dBFS room half the
+level lies under the floor, so by the ratio alone such a note never ended and its repeat never
+counted, even after two seconds), or by `HOLD_FRAMES` uncounted frames at any level (a pause, not
+a blink); and a tongued repeat, 40 to 80 ms of stop that the window's level barely shows and the
+pitch gate often misses (the smallest gap the two-frame rule could see was about 160 ms in a dry
+room, 250 ms and more with the room ringing), is heard in `PitchFrame.minLevel`, the quietest 21 ms
+stretch of the newest hop (`FrameLevels`): a stretch `STOP_DROP` (7 dB) under the note's last
+`RECENT_FRAMES` levels, not in the note's first `ATTACK_FRAMES`, is a stop, and the tone back
+`RESTART_RISE` (6 dB) over the stop's floor within `RESTART_FRAMES` is the note started again, a
+fresh onset of whatever pitch locks. Each new note is judged by
+`TuneCheck.judge(heard, fresh)`: **right** is the same letter in any octave (beginners overblow, and the detector
 speaks the lower octave at an onset), earning `StepMark.FIRST_TRY` or `RETRY` after a stumble and
 moving on; **ignored** is the letter of the step just judged, in any octave, unless that letter is
-also the one waited on (a written repeat), which counts only after `REPEAT_GUARD_MS` (300) so an
-octave pop never counts the repeat; **wrong** is anything else: `FluteUiState.wrong` (a
-`WrongNote`: the step and the MIDI heard) shows the note heard as a round bubble in its own letter
+also the one waited on (a written repeat) *and* the onset was fresh: a repeat can only be played by
+stopping and starting again, so an octave pop (a step) never counts it, however long after
+(`REPEAT_GUARD_MS` is gone: it also ignored a real repeat that came within 300 ms, and an ignored
+sustained note was never judged again); **wrong** is anything else, with one forgiveness
+(`TuneCheck.forgiven`, logged `flute.repeat_forgiven`): when the step waited on repeats the note just
+judged and the heard note is the one written after it (or after a run of such repeats), the repeat
+was slurred on to or skipped, which the phone cannot tell apart, so it gets `RETRY` and the heard
+note is judged for the step after, rather than the run dead-ending on a note the phone may not be
+able to hear. A wrong note sets `FluteUiState.wrong` (a
+`WrongNote`: the step and the MIDI heard), the note heard as a round bubble in its own letter
 colour in the marks row under the step until the next note is judged (a right note clears it, another wrong
 note replaces it, an ignored one leaves it; no timer, so the child has time to read "written G,
 heard A" off the pill and the bubble; since the evening of 2026-11-04, in place of a ❌ for 700 ms,
 which said nothing about what came out; the user had asked for note names in the stars' place,
 green when right, and agreed to this instead: the right name already stands in the pill above,
 green is F's colour in the letter code, and colour alone must not carry right and wrong), and the
-step is remembered as stumbled. The check waits for the right note, which is what keeps every mark
-under its own note. Pitch only; nothing is timed but the guard. The last note judged ends it by itself
-(`flute.listen_done`); Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
+step is remembered as stumbled. Since the night of 2026-11-04 the same bubble is also live: the
+note the phone hears right now (`FluteUiState.heardNow`, the tracker's sounding note; null in
+silence, and null while the note just counted goes on and something else is waited on, since that
+tail is not what the next step hears, but shown when the next step is its written repeat, just
+when the child must see it) stands under the step waited on, and in silence the grey listening
+dots (`ListeningBubble`, the tuner's "…") do, so the child always sees the phone listening and
+what it makes of their sound; the sticky wrong note shows only when nothing sounds. The marks row
+of the waited step is live bubble, else wrong note, else dots; a screen reader hears none of the
+live part. When the step waited on is a written repeat and the note just counted goes on for
+`REPEAT_ADVICE_FRAMES` (about a second) with nothing new (`FluteUiState.repeatHeld`), the advice
+line says "Stop, then play it again" (`advice_play_again`, `TunerAdvice.PLAY_AGAIN`, the flute's
+only advice of its own, over the hearing ones), the one case the phone cannot hear turned into a
+tonguing lesson; it goes when the sound stops or a note begins. The check waits for the right
+note, which is what keeps every mark under its own note. Pitch only; nothing is timed. The last note
+judged logs `flute.listen_done` at once but does not end the run at once: `FluteUiState.finishing`
+keeps the microphone open and the animal over the last note with its star (`litIndex` and
+`waiting` drop it, so nothing is ringed or "play this one") until that note's sound ends or
+`FINISH_FRAMES` (about 1.5 s) pass, so the keys do not snap back while the child is still blowing
+the last note; Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
 the speed knob, the book button and leaving the tab end it early (`flute.listen_stop`); the marks stay in
 `FluteUiState.marks` until a new run, a switch to another book or any write to the tune (`save()` clears them), are not
 saved, and show no number anywhere. `HearingTracker` feeds `FluteUiState.hearing` for the
 tuner's `AdviceLine` under the stage ("Come closer" / "Play one long, clear note", only while the
-sound stays unclear). Play is refused while listening; the keys are off screen anyway.
+sound stays unclear). Play is refused while listening; the keys are off screen anyway. The engine's
+frames are buffered, never conflated (`ui/tuner/CLAUDE.md`): the tracker counts frames, and the
+main thread is busiest right after a judged note, when the staff scrolls and the animal hops, which
+is just when the next note's gap frames arrive.
 
 While the tune runs, in Play as in Your turn (`FluteUiState.isRunning`), the keys and the sponge
 go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3: lines 24 dp apart, the canvas's
@@ -415,7 +455,10 @@ rests and breaths counted, `bpm` and `time` what the metronome was set to, `none
 book left it alone) and `flute.shelf_close` (book, when the open book was picked again and nothing
 changed), so every `flute.shelf_open` has a closing line but for a tab left with the shelf open;
 for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard` (index, expected,
-heard, verdict: right, retry, ignored or wrong, per new note the tracker reports),
+heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
+retry, ignored or wrong, per new note the tracker reports), `flute.repeat_forgiven` (index: a
+written repeat of the note just judged passed over with a faint star because the note after it
+was heard, once per such step),
 `flute.listen_summary` every `TunerViewModel.SUMMARY_FRAMES` frames and once more at the end (the
 tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
 passed the gate at all), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`

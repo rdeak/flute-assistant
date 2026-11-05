@@ -150,6 +150,8 @@ class FluteViewModel @Inject constructor(
     private val tracker = NoteOnsetTracker()
     private val hearingTracker = HearingTracker()
     private val listenSummary = FrameSummary()
+    /** Frames since the last note was counted while its sound goes on; [FINISH_FRAMES] of them end the run. */
+    private var finishFrames = 0
 
     /**
      * The key the finger let go of last, while a press of the same key may still go on with its
@@ -342,6 +344,7 @@ class FluteViewModel @Inject constructor(
         tracker.reset()
         hearingTracker.reset()
         listenSummary.reset()
+        finishFrames = 0
         _state.update {
             it.copy(
                 isListening = true,
@@ -349,12 +352,19 @@ class FluteViewModel @Inject constructor(
                 marks = emptyMap(),
                 wrong = null,
                 hearing = Hearing.CLEAR,
+                heardNow = null,
+                repeatHeld = false,
+                finishing = false,
                 beatPulse = it.beatPulse + 1, // the animal lands on the first note with a hop
             )
         }
         logger.d(LogTags.FLUTE, "flute.listen", "notes" to _state.value.tune.count { it is TuneNote })
         listenJob = viewModelScope.launch {
             try {
+                // Every frame, in order (the engine buffers, it does not conflate): the tracker
+                // counts frames, a gap being two in a row, and the main thread is busiest right
+                // after a judged note, when the staff scrolls and the animal hops, which is just
+                // when the next note's gap frames arrive.
                 engine.pitchFrames().collect(::onListenFrame)
             } catch (e: CancellationException) {
                 throw e
@@ -505,10 +515,19 @@ class FluteViewModel @Inject constructor(
         if (listenSummary.frames > 0) logListenSummary() // the last partial second
         hearingTracker.reset()
         check = null
-        _state.update { it.copy(isListening = false, listenIndex = null, wrong = null, hearing = Hearing.CLEAR) }
+        _state.update {
+            it.copy(
+                isListening = false, listenIndex = null, wrong = null, hearing = Hearing.CLEAR,
+                heardNow = null, repeatHeld = false, finishing = false,
+            )
+        }
     }
 
-    /** One microphone frame while listening: a note that began is judged; sound that stays unclear is reported; a summary line now and then. */
+    /**
+     * One microphone frame while listening: a note that began is judged; sound that stays unclear
+     * is reported; a summary line now and then; then what the phone hears now is shown, or, once
+     * the last note is counted, the run is ended when its sound ends.
+     */
     private fun onListenFrame(frame: PitchFrame) {
         val result = tracker.onFrame(frame)
         val runMean = hearingTracker.levelMean // read before onFrame, which empties the window when the run ends
@@ -516,28 +535,73 @@ class FluteViewModel @Inject constructor(
         updateHearing(hearing, if (hearing == Hearing.CLEAR) runMean else hearingTracker.levelMean)
         listenSummary.add(frame, result.decision)
         if (listenSummary.frames >= TunerViewModel.SUMMARY_FRAMES) logListenSummary()
+        val wasFinishing = _state.value.finishing
         result.onset?.let(::judge)
+        when {
+            !_state.value.isListening -> Unit
+            wasFinishing -> if (tracker.sounding == null || ++finishFrames >= FINISH_FRAMES) endListening()
+            !_state.value.finishing -> followSound()
+        }
     }
 
-    /** A new note of MIDI [heard] began: judge it against the note waited on and show what it earned. */
-    private fun judge(heard: Int) {
+    /**
+     * What the step waited on hears right now ([FluteUiState.heardNow]): the sounding note,
+     * unless it is the tail of the note just counted and something else is waited on; and
+     * whether that tail is a written repeat held on instead of started again
+     * ([FluteUiState.repeatHeld]), once it has gone on for [REPEAT_ADVICE_FRAMES].
+     */
+    private fun followSound() {
         val check = check ?: return
         val index = check.index ?: return
         val expected = (_state.value.tune[index] as TuneNote).midi
-        val verdict = check.judge(heard, clock.nowMillis())
-        logger.d(LogTags.FLUTE, "flute.heard", "index" to index, "expected" to expected, "heard" to heard, "verdict" to verdict.name.lowercase())
+        val sounding = tracker.sounding
+        val previous = check.previous
+        val ofPrevious = sounding != null && previous != null && TuneCheck.sameLetter(sounding, previous)
+        val ofExpected = sounding != null && TuneCheck.sameLetter(sounding, expected)
+        val heardNow = sounding.takeUnless { ofPrevious && !ofExpected }
+        val repeatHeld = ofPrevious && ofExpected && tracker.framesSinceOnset >= REPEAT_ADVICE_FRAMES
+        val current = _state.value
+        if (heardNow != current.heardNow || repeatHeld != current.repeatHeld) {
+            _state.update { it.copy(heardNow = heardNow, repeatHeld = repeatHeld) }
+        }
+    }
+
+    /** A new note began ([onset]): judge it against the note waited on and show what it earned. */
+    private fun judge(onset: NoteOnsetTracker.Onset) {
+        val check = check ?: return
+        val index = check.index ?: return
+        val expected = (_state.value.tune[index] as TuneNote).midi
+        val heard = onset.midi
+        val verdict = check.judge(heard, onset.fresh)
+        logger.d(
+            LogTags.FLUTE, "flute.heard",
+            "index" to index, "expected" to expected, "heard" to heard, "fresh" to onset.fresh, "verdict" to verdict.name.lowercase(),
+        )
+        for (forgiven in check.forgiven) logger.d(LogTags.FLUTE, "flute.repeat_forgiven", "index" to forgiven)
         when (verdict) {
             Verdict.RIGHT, Verdict.RETRY -> {
                 val marks = check.marks.toMap()
-                _state.update { it.copy(marks = marks, listenIndex = check.index, wrong = null, beatPulse = it.beatPulse + 1) }
-                if (check.isDone) {
+                val done = check.isDone
+                _state.update {
+                    it.copy(
+                        marks = marks,
+                        // Done: the animal stays over the last note while its sound ends.
+                        listenIndex = if (done) index else check.index,
+                        finishing = done,
+                        wrong = null,
+                        heardNow = null,
+                        repeatHeld = false,
+                        beatPulse = it.beatPulse + 1,
+                    )
+                }
+                if (done) {
+                    finishFrames = 0
                     logger.d(
                         LogTags.FLUTE,
                         "flute.listen_done",
                         "stars" to marks.count { it.value == StepMark.FIRST_TRY },
                         "retries" to marks.count { it.value == StepMark.RETRY },
                     )
-                    endListening()
                 }
             }
             // The note heard stays under the step until the next note is judged: no timer, so there
@@ -750,5 +814,18 @@ class FluteViewModel @Inject constructor(
          * past it the rest goes on from the length it has.
          */
         const val HOLD_REJOIN_MS = 60L
+
+        /**
+         * Counted frames a note must go on after being counted, with its written repeat waited
+         * on, before the advice line asks the child to stop and play it again: about a second,
+         * longer than any note the child means as one before a repeat at the ring's tempos.
+         */
+        const val REPEAT_ADVICE_FRAMES = 25
+
+        /**
+         * Frames after the last note is counted after which the run ends even though its sound
+         * goes on: about 1.5 s, so a child holding the last note long still gets the keys back.
+         */
+        const val FINISH_FRAMES = 35
     }
 }

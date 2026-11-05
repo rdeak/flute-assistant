@@ -82,10 +82,23 @@ class FluteUiStateTest {
     }
 
     @Test
-    fun `advice follows the hearing`() {
+    fun `advice follows the hearing, and a repeat held on instead of started again comes first`() {
         assertEquals(TunerAdvice.NONE, FluteUiState(hearing = Hearing.CLEAR).advice)
         assertEquals(TunerAdvice.COME_CLOSER, FluteUiState(hearing = Hearing.QUIET_UNCLEAR).advice)
         assertEquals(TunerAdvice.CLEAR_NOTE, FluteUiState(hearing = Hearing.LOUD_UNCLEAR).advice)
+        assertEquals(TunerAdvice.PLAY_AGAIN, FluteUiState(repeatHeld = true).advice)
+        assertEquals(TunerAdvice.PLAY_AGAIN, FluteUiState(repeatHeld = true, hearing = Hearing.LOUD_UNCLEAR).advice)
+    }
+
+    @Test
+    fun `while the last note sounds the animal stays over it but nothing is lit or waited on`() {
+        val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+        val finishing = FluteUiState(tune = tune, isListening = true, listenIndex = 1, finishing = true)
+        assertTrue(finishing.isRunning)
+        assertEquals(1, finishing.animalIndex)
+        assertNull(finishing.litIndex)
+        assertFalse(finishing.waiting)
+        assertTrue(FluteUiState(tune = tune, isListening = true, listenIndex = 1).waiting)
     }
 
     @Test

@@ -54,6 +54,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import hr.bertlab.fluteassistant.ui.tuner.Hearing
 import org.junit.Assert.assertEquals
@@ -805,6 +806,40 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("C4, 1 beat, got it").assertExists()
         compose.onNodeWithContentDescription("G4, 1 beat, got it after a retry").assertExists()
         compose.onNodeWithContentDescription("Flute keys").assertExists()
+    }
+
+    /**
+     * The pixels of the marks row under the first beat of a captured step: where its star, the
+     * note heard or the listening dots are drawn, [StaffGeometry.MARKS_TOP] down and
+     * [StaffGeometry.BEAT_WIDTH] wide, at the running scale.
+     */
+    private fun marksRow(step: PixelMap): List<Color> {
+        val s = RunningStaffScale
+        val density = compose.density
+        val top = with(density) { (StaffGeometry.MARKS_TOP * s).dp.roundToPx() }
+        val bottom = minOf(step.height, with(density) { ((StaffGeometry.MARKS_TOP + StaffGeometry.MARKS_HEIGHT) * s).dp.roundToPx() })
+        val right = minOf(step.width, with(density) { (StaffGeometry.BEAT_WIDTH * s).dp.roundToPx() })
+        return (0 until right).flatMap { x -> (top until bottom).map { y -> step[x, y] } }
+    }
+
+    private fun Color.near(other: Color) = abs(red - other.red) + abs(green - other.green) + abs(blue - other.blue) < 0.15f
+
+    @Test
+    fun the_note_heard_now_shows_live_under_the_waited_step_and_dots_while_nothing_is_heard() {
+        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 1, marks = mapOf(0 to StepMark.FIRST_TRY)))
+        val waited = compose.onNodeWithContentDescription("G4, 1 beat, play this one")
+        val a = noteColor(69)
+        val silent = marksRow(waited.captureToImage().toPixelMap())
+        val card = silent.first()
+        assertTrue("in silence the row holds the listening dots, not an A bubble", silent.none { it.near(a) })
+        assertTrue("in silence the row shows the listening dots' ring, not nothing", silent.count { !it.near(card) } > silent.size / 20)
+        state.value = state.value.copy(heardNow = 69)
+        val hearing = marksRow(waited.captureToImage().toPixelMap())
+        assertTrue("the A heard now should fill a bubble under the waited step", hearing.count { it.near(a) } > hearing.size / 3)
+        compose.onNodeWithContentDescription("G4, 1 beat, play this one").assertExists() // a screen reader is not told of the passing note
+        state.value = state.value.copy(heardNow = null, isListening = false, listenIndex = null)
+        val rest = marksRow(compose.onNodeWithContentDescription("G4, 1 beat").captureToImage().toPixelMap())
+        assertTrue("at rest the row under a step with no mark is empty", rest.all { it.near(rest.first()) })
     }
 
     @Test

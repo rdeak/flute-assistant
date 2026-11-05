@@ -24,6 +24,7 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.ui.tuner.Hearing
 import hr.bertlab.fluteassistant.ui.tuner.HearingTracker
 import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
+import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.TestScope
 import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
@@ -1071,35 +1072,116 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `the previous note heard again is ignored, a written repeat counts after the guard`() = runTest(dispatcher) {
+    fun `the previous note heard again is ignored, a written repeat counts only once started again`() = runTest(dispatcher) {
         val vm = listeningViewModel(q(60), q(60), q(62))
-        play(60)
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) }
         assertEquals(1, vm.current.listenIndex)
-        play(72) // no fake time has passed: the octave pop of the note just counted
+        // The note just counted pops up an octave without a gap: a step inside one note, not the repeat.
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(72)) }
         assertEquals(1, vm.current.listenIndex)
         assertEquals("ignored", logger.events("flute.heard").last()["verdict"])
-        clock.now += 400
+        // Let go of and started again: the repeat, played.
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silentFrame) }
         play(60)
         assertEquals(2, vm.current.listenIndex)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), vm.current.marks)
     }
 
     @Test
-    fun `the last note ends listening by itself and keeps the stars`() = runTest(dispatcher) {
+    fun `a repeat the phone could not hear is forgiven when the next note comes, and said so`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60), q(60), q(62))
+        play(60)
+        play(62)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY, 2 to StepMark.FIRST_TRY), vm.current.marks)
+        assertEquals(1, logger.events("flute.repeat_forgiven").single()["index"])
+        assertEquals("right", logger.events("flute.heard").last()["verdict"])
+    }
+
+    @Test
+    fun `the note heard now shows under the waited step and goes with the sound`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        assertNull(vm.current.heardNow)
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(65)) } // a wrong note, still sounding
+        assertEquals(65, vm.current.heardNow)
+        assertEquals(WrongNote(index = 0, midi = 65), vm.current.wrong)
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silentFrame) }
+        assertNull("silence: nothing is heard now", vm.current.heardNow)
+        assertEquals("the wrong note stays to be read", WrongNote(index = 0, midi = 65), vm.current.wrong)
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) } // the right note, counted, still sounding
+        assertEquals(1, vm.current.listenIndex)
+        assertNull("the tail of the note just counted is not what the next step hears", vm.current.heardNow)
+    }
+
+    @Test
+    fun `the note heard now stays shown when it is the written repeat waited on`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60), q(60))
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) }
+        assertEquals(1, vm.current.listenIndex)
+        assertEquals(60, vm.current.heardNow)
+    }
+
+    @Test
+    fun `holding the note on instead of starting it again asks to stop and play it again`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60), q(60))
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) }
+        assertEquals(TunerAdvice.NONE, vm.current.advice)
+        repeat(FluteViewModel.REPEAT_ADVICE_FRAMES - 1) { emit(pitched(60)) }
+        assertEquals(TunerAdvice.NONE, vm.current.advice)
+        emit(pitched(60))
+        assertEquals(TunerAdvice.PLAY_AGAIN, vm.current.advice)
+        assertEquals(1, vm.current.listenIndex)
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silentFrame) }
+        assertEquals(TunerAdvice.NONE, vm.current.advice)
+        play(60) // started again: the repeat
+        assertFalse(vm.current.isListening)
+    }
+
+    @Test
+    fun `the last note ends listening once its sound ends, and keeps the stars`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         play(60)
         play(62)
-        play(64)
-        assertFalse(vm.current.isListening)
-        assertFalse(vm.current.isRunning)
-        assertNull(vm.current.listenIndex)
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(64)) } // the last note, counted, still sounding
         assertEquals(3, vm.current.marks.size)
+        assertTrue("the run goes on while the last note sounds", vm.current.isListening)
+        assertTrue(vm.current.finishing)
+        assertEquals("the animal stays over the last note", 2, vm.current.animalIndex)
+        assertNull("but nothing is waited on", vm.current.litIndex)
         val done = logger.events("flute.listen_done").single()
         assertEquals(3, done["stars"])
         assertEquals(0, done["retries"])
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silentFrame) }
+        assertFalse(vm.current.isListening)
+        assertFalse(vm.current.isRunning)
+        assertFalse(vm.current.finishing)
+        assertNull(vm.current.listenIndex)
+        assertEquals(3, vm.current.marks.size)
         assertTrue(logger.events("flute.listen_stop").isEmpty())
         val after = vm.current
         play(60) // the microphone is closed: nothing changes
         assertEquals(after, vm.current)
+    }
+
+    @Test
+    fun `the last note ends listening by itself when the child plays on`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60))
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) }
+        assertTrue(vm.current.finishing)
+        repeat(FluteViewModel.FINISH_FRAMES - 1) { emit(pitched(60)) }
+        assertTrue(vm.current.isListening)
+        emit(pitched(60))
+        assertFalse(vm.current.isListening)
+        assertFalse(vm.current.finishing)
+    }
+
+    @Test
+    fun `stop while the last note sounds ends the run at once`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60))
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) }
+        vm.stopRun()
+        assertFalse(vm.current.isListening)
+        assertFalse(vm.current.finishing)
+        assertEquals("pill", logger.events("flute.listen_stop").single()["reason"])
     }
 
     @Test

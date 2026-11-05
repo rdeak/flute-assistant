@@ -159,5 +159,7 @@ enum class Hearing { CLEAR, QUIET_UNCLEAR, LOUD_UNCLEAR }
  * above the chosen note, or check the fingers for any other note.
  */
 enum class TunerAdvice {
-    NONE, COME_CLOSER, CLEAR_NOTE, ROLL_OUT, ROLL_IN, FASTER_AIR, GENTLER_AIR, CHECK_FINGERS
+    NONE, COME_CLOSER, CLEAR_NOTE, ROLL_OUT, ROLL_IN, FASTER_AIR, GENTLER_AIR, CHECK_FINGERS,
+    /** The flute's only: a written repeat held on instead of started again. */
+    PLAY_AGAIN,
 }

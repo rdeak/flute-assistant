@@ -59,6 +59,7 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.FASTER_AIR -> R.string.advice_faster_air
     TunerAdvice.GENTLER_AIR -> R.string.advice_gentler_air
     TunerAdvice.CHECK_FINGERS -> R.string.advice_check_fingers
+    TunerAdvice.PLAY_AGAIN -> R.string.advice_play_again
 }
 
 /** One line for preset lists and the playback notification, e.g. "120 BPM · 4/4 · Quarter · Woodblock". */

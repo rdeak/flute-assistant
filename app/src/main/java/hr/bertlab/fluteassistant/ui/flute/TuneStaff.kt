@@ -167,8 +167,9 @@ private class StaffInk(
  * quarters of the drawn size), with each note's name in a pill right under it ([NameRow]: the
  * same room, so notes and names line up and scroll as one) and, under the names, a row for what
  * each note earned in "Your turn" ([MarkRow]: a star in [marks] under the head, faint after a
- * retry, and under the step a wrong note was heard for ([wrong]) that note as a bubble in its
- * own colour until the next note is judged). While the tune runs the knob's [animal] walks the
+ * retry; under the step waited on the note the phone hears right now ([heardNow]) as a bubble in
+ * its own colour, so the child sees it listening, else the wrong note last heard for it
+ * ([wrong]) until the next note is judged, else grey listening dots). While the tune runs the knob's [animal] walks the
  * staff at the knob's height ([WalkingAnimal]), hopping on to each beat's place. The faint treble clef
  * and the metronome tab's time signature stand at the left while the steps scroll past after
  * them, written in bars of [timeSignature] by [Bars.write]. Each note sits at its true height,
@@ -197,6 +198,7 @@ fun TuneStaff(
     marks: Map<Int, StepMark> = emptyMap(),
     animal: StaffAnimal? = null,
     wrong: WrongNote? = null,
+    heardNow: Int? = null,
     scale: Float = 1f,
 ) {
     val colors = FluteTheme.colors
@@ -227,7 +229,7 @@ fun TuneStaff(
             if (tune.isEmpty()) {
                 EmptyHint()
             } else {
-                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, ink, measurer)
+                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, ink, measurer)
             }
         }
     }
@@ -333,6 +335,7 @@ private fun TuneMarks(
     marks: Map<Int, StepMark>,
     animal: StaffAnimal?,
     wrong: WrongNote?,
+    heardNow: Int?,
     ink: StaffInk,
     measurer: TextMeasurer,
 ) {
@@ -362,16 +365,20 @@ private fun TuneMarks(
         ) {
             items(lineMarks) { mark ->
                 when (mark) {
-                    is LineMark.Step -> StepMark(
-                        item = tune[mark.index],
-                        parts = mark.parts,
-                        lit = mark.index == litIndex,
-                        growing = mark.index == heldIndex,
-                        mark = marks[mark.index],
-                        waiting = animal?.waiting == true && animal.index == mark.index,
-                        heard = wrong?.takeIf { it.index == mark.index }?.midi,
-                        ink = ink,
-                    )
+                    is LineMark.Step -> {
+                        val waiting = animal?.waiting == true && animal.index == mark.index
+                        StepMark(
+                            item = tune[mark.index],
+                            parts = mark.parts,
+                            lit = mark.index == litIndex,
+                            growing = mark.index == heldIndex,
+                            mark = marks[mark.index],
+                            waiting = waiting,
+                            heard = wrong?.takeIf { it.index == mark.index }?.midi,
+                            heardNow = heardNow.takeIf { waiting },
+                            ink = ink,
+                        )
+                    }
                     is LineMark.Breath -> BreathMark(ink, measurer)
                     LineMark.BarLine -> BarLineMark(ink)
                 }
@@ -463,6 +470,7 @@ private fun StepMark(
     mark: StepMark?,
     waiting: Boolean,
     heard: Int?,
+    heardNow: Int?,
     ink: StaffInk,
 ) {
     val s = LocalStaffScale.current
@@ -492,25 +500,28 @@ private fun StepMark(
             },
     ) {
         NameRow(item, parts, lit, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
-        MarkRow(mark, heard, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
+        MarkRow(mark, heard, heardNow, waiting, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
     }
 }
 
 /**
  * The marks row of one step, in the first beat's room so what stands there stands under the head
- * and the name: the wrong note [heard] for it as a bubble, else the star the step earned ([mark],
- * faint after a retry), else nothing. Sized in dp like the staff's other text, so large text
- * never pushes it out of the row.
+ * and the name: under the step waited on, the note the phone hears right now ([heardNow]) as a
+ * bubble, else the wrong note [heard] for it as a bubble, else, while [waiting] in silence, the
+ * grey listening dots; otherwise the star the step earned ([mark], faint after a retry), else
+ * nothing. Sized in dp like the staff's other text, so large text never pushes it out of the row.
  */
 @Composable
-private fun MarkRow(mark: StepMark?, heard: Int?, modifier: Modifier = Modifier) {
+private fun MarkRow(mark: StepMark?, heard: Int?, heardNow: Int?, waiting: Boolean, modifier: Modifier = Modifier) {
     val s = LocalStaffScale.current
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.size((StaffGeometry.BEAT_WIDTH * s).dp, (StaffGeometry.MARKS_HEIGHT * s).dp),
     ) {
         when {
+            heardNow != null -> HeardBubble(heardNow)
             heard != null -> HeardBubble(heard)
+            waiting -> ListeningBubble()
             mark == StepMark.FIRST_TRY -> Emoji(STAR_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.RETRY -> Emoji(
                 STAR_EMOJI,
@@ -522,11 +533,15 @@ private fun MarkRow(mark: StepMark?, heard: Int?, modifier: Modifier = Modifier)
 }
 
 /**
- * The wrong note heard for a step, under it in the marks row until the next note is judged (the
- * animal waits over the step meanwhile): a round bubble as tall as the marks row, filled in the
- * heard letter's colour with its name, the way the tuner shows another note under the home ring.
- * The child reads "written G, heard A" from the pill and the bubble. Chosen on 2026-11-04 over the ❌ (which said nothing about what came out) and
- * over the names in green (which doubled the pill above and broke the one-colour-per-letter code).
+ * A note heard for a step, under it in the marks row: the note the phone hears right now while
+ * the animal waits over the step (the child sees the phone listening, and what it makes of their
+ * sound, before anything is judged), or the wrong note last heard for it, left until the next
+ * note is judged so there is time to read it: a round bubble as tall as the marks row, filled in
+ * the heard letter's colour with its name, the way the tuner shows another note under the home
+ * ring. The child reads "written G, heard A" from the pill and the bubble. Chosen on 2026-11-04
+ * over the ❌ (which said nothing about what came out) and over the names in green (which doubled
+ * the pill above and broke the one-colour-per-letter code); live since the same night, after a
+ * child whose repeat went unheard saw nothing happen at all.
  */
 @Composable
 private fun HeardBubble(midi: Int) {
@@ -544,6 +559,33 @@ private fun HeardBubble(midi: Int) {
             noteText(midi),
             style = MaterialTheme.typography.titleMedium,
             color = InkOnFill,
+            maxLines = 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = (14 * s).sp),
+        )
+    }
+}
+
+/**
+ * The phone listening and hearing nothing yet, under the step the animal waits over: the
+ * [HeardBubble]'s shape in grey with "…", the tuner's home ring in silence, so the child sees the
+ * phone is listening even before a sound reaches it.
+ */
+@Composable
+private fun ListeningBubble() {
+    val s = LocalStaffScale.current
+    val colors = FluteTheme.colors
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size((StaffGeometry.MARKS_HEIGHT * s).dp)
+            .clip(CircleShape)
+            .background(colors.card)
+            .border(OutlineWidth, colors.border, CircleShape),
+    ) {
+        Text(
+            "…",
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.mutedText,
             maxLines = 1,
             autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = (14 * s).sp),
         )

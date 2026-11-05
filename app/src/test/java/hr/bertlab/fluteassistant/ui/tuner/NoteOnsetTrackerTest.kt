@@ -17,7 +17,7 @@ class NoteOnsetTrackerTest {
 
     private fun feed(tracker: NoteOnsetTracker, frames: List<PitchFrame>): List<NoteOnsetTracker.Result> = frames.map(tracker::onFrame)
 
-    private fun List<NoteOnsetTracker.Result>.onsets() = map { it.onset }
+    private fun List<NoteOnsetTracker.Result>.onsets() = map { it.onset?.midi }
     private fun List<NoteOnsetTracker.Result>.decisions() = map { it.decision }
 
     @Test
@@ -47,6 +47,17 @@ class NoteOnsetTrackerTest {
         val afterTwo = feed(two, List(3) { pitched(60) })
         assertEquals(listOf(FrameDecision.UNSTEADY, FrameDecision.UNSTEADY, FrameDecision.SHOWN), afterTwo.decisions())
         assertEquals(listOf(null, null, 60), afterTwo.onsets())
+    }
+
+    @Test
+    fun `an onset after a gap is a fresh start, one by a step without a gap is not`() {
+        // The flute's check needs the difference: a written repeat is played only by stopping and
+        // starting again, while an octave pop inside one note is a step and must not count as it.
+        val tracker = NoteOnsetTracker()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), feed(tracker, List(3) { pitched(60) }).last().onset)
+        assertEquals(NoteOnsetTracker.Onset(72, fresh = false), feed(tracker, List(3) { pitched(72) }).last().onset)
+        feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { silent })
+        assertEquals(NoteOnsetTracker.Onset(72, fresh = true), feed(tracker, List(3) { pitched(72) }).last().onset)
     }
 
     @Test
@@ -90,6 +101,86 @@ class NoteOnsetTrackerTest {
         feed(tracker, List(2) { PitchFrame(null, 0.0, 0.1f) })
         assertNull(tracker.sounding)
         assertEquals(listOf(null, null, 60), feed(tracker, List(3) { PitchFrame(NoteMath.midiToFrequency(60), 0.97, loud) }).onsets())
+    }
+
+    @Test
+    fun `a pause the level never falls under still ends the note after HOLD_FRAMES, so its repeat is new`() {
+        // Soft or distant playing over a room's noise: the pause stays over half the note's level,
+        // so by level it is no gap, and the note would never end. The tuner's own hold count ends
+        // it instead, so a repeat after a real pause is a new note however quiet the child plays.
+        val tracker = NoteOnsetTracker()
+        val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.4f)
+        val room = PitchFrame(null, 0.0, level = 0.3f)
+        feed(tracker, List(3) { note })
+        feed(tracker, List(TunerViewModel.HOLD_FRAMES - 1) { room })
+        assertEquals("not yet: a blink of this length is still inside the note", 60, tracker.sounding)
+        feed(tracker, listOf(room))
+        assertNull(tracker.sounding)
+        assertEquals(listOf(null, null, 60), feed(tracker, List(3) { note }).onsets())
+    }
+
+    @Test
+    fun `a pause at the room's floor ends a note that stays over half its level`() {
+        // The room is heard before the child plays, so the tracker knows its floor; a pause that
+        // falls back to it is a gap even for a soft note, where half the level is under the floor.
+        val tracker = NoteOnsetTracker()
+        val room = PitchFrame(null, 0.0, level = 0.23f)
+        val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.4f)
+        feed(tracker, List(10) { room })
+        feed(tracker, List(3) { note })
+        // A blink inside the note keeps its loudness, well over the floor: not a gap.
+        feed(tracker, List(2) { PitchFrame(null, 0.0, level = 0.4f) })
+        assertEquals(60, tracker.sounding)
+        feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { room })
+        assertNull(tracker.sounding)
+        assertEquals(listOf(null, null, 60), feed(tracker, List(3) { note }).onsets())
+    }
+
+    private fun note(midi: Int, level: Float, minLevel: Float = level) =
+        PitchFrame(NoteMath.midiToFrequency(midi), 0.97, level, minLevel)
+
+    @Test
+    fun `a tongued stop inside the newest hop starts the same note again`() {
+        // "ta ta": the tongue stops the air for 50 ms, too short for the window's level or the
+        // pitch gate to notice, but the quietest stretch of that hop falls to the room's floor;
+        // once the tone is back at its loudness, the note has started again.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(4) { note(60, 0.6f) })
+        val stop = feed(tracker, listOf(note(60, 0.55f, minLevel = 0.2f)))
+        assertEquals(listOf(null), stop.onsets())
+        val again = feed(tracker, listOf(note(60, 0.6f)))
+        assertEquals(listOf(NoteOnsetTracker.Onset(60, fresh = true)), again.map { it.onset })
+        assertEquals(60, tracker.sounding)
+        assertTrue("the note going on is not new again", feed(tracker, List(3) { note(60, 0.6f) }).all { it.onset == null })
+    }
+
+    @Test
+    fun `a wobble that never falls far is no new note`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(4) { note(60, 0.6f) })
+        val wobble = feed(tracker, listOf(note(60, 0.58f, minLevel = 0.5f), note(60, 0.6f), note(60, 0.6f)))
+        assertTrue(wobble.all { it.onset == null })
+    }
+
+    @Test
+    fun `a stop in the first frames of a note is its attack, not a note started again`() {
+        // The hop of the onset frame and of the one after it still hold the swell from nothing.
+        val tracker = NoteOnsetTracker()
+        val results = feed(
+            tracker,
+            listOf(note(60, 0.4f), note(60, 0.5f), note(60, 0.6f, minLevel = 0.2f), note(60, 0.6f, minLevel = 0.2f), note(60, 0.6f), note(60, 0.6f)),
+        )
+        assertEquals(listOf(null, null, 60, null, null, null), results.onsets())
+    }
+
+    @Test
+    fun `a stop followed by silence is the end of the note, not a note started again`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(4) { note(60, 0.6f) })
+        feed(tracker, listOf(note(60, 0.55f, minLevel = 0.2f)))
+        val gone = feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { PitchFrame(null, 0.0, 0.1f) })
+        assertTrue(gone.all { it.onset == null })
+        assertNull(tracker.sounding)
     }
 
     @Test

@@ -15,15 +15,12 @@ import hr.bertlab.fluteassistant.core.log.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
 
 /**
  * Captures microphone audio with [AudioRecord] and runs the flute-tuned [YinPitchDetector]
@@ -32,8 +29,10 @@ import kotlin.math.sqrt
  * - Prefers the UNPROCESSED source (no AGC / noise suppression) when the device supports it,
  *   because automatic gain and suppression distort the signal a tuner wants to analyse.
  * - Analysis window: 4096 samples, advanced by 2048 per frame (~43 ms at 48 kHz).
- * - Runs on [Dispatchers.IO] (the reads block) and conflates, so a slow collector always
- *   sees the newest frame; the microphone is released when the collector cancels.
+ * - Runs on [Dispatchers.IO] (the reads block), which buffers the frames (64 deep) rather than
+ *   conflating them, so a busy main thread delays a frame but never loses one: the flute's "Your
+ *   turn" counts frames (a gap is two in a row). The microphone is released when the collector
+ *   cancels.
  * - Logs `mic.open` (source, rate, buffer) and `mic.close` under [LogTags.TUNER]; failures
  *   propagate to the collector, which logs them.
  */
@@ -80,7 +79,8 @@ class AudioRecordTunerEngine @Inject constructor(
                     PitchFrame(
                         frequency = estimate?.frequency,
                         probability = estimate?.probability ?: 0.0,
-                        level = levelOf(window),
+                        level = FrameLevels.level(window),
+                        minLevel = FrameLevels.minLevel(window, HOP_SIZE),
                     ),
                 )
             }
@@ -89,7 +89,7 @@ class AudioRecordTunerEngine @Inject constructor(
             record.release()
             logger.i(LogTags.TUNER, "mic.close", "frames" to frames)
         }
-    }.conflate().flowOn(Dispatchers.IO) // blocking reads belong on IO; the UI only wants the newest frame
+    }.flowOn(Dispatchers.IO) // blocking reads belong on IO; each collector decides whether to conflate or buffer
 
     private fun pickSampleRate(): Int =
         PREFERRED_SAMPLE_RATES.firstOrNull { rate ->
@@ -132,15 +132,6 @@ class AudioRecordTunerEngine @Inject constructor(
         MediaRecorder.AudioSource.UNPROCESSED -> "UNPROCESSED"
         MediaRecorder.AudioSource.MIC -> "MIC"
         else -> source.toString()
-    }
-
-    private fun levelOf(window: FloatArray): Float {
-        var energy = 0.0
-        for (v in window) energy += v.toDouble() * v
-        val rms = sqrt(energy / window.size)
-        // Rough dB-style mapping: -60 dBFS -> 0, 0 dBFS -> 1.
-        val db = 20.0 * kotlin.math.log10(rms + 1e-9)
-        return min(1f, max(0f, ((db + 60.0) / 60.0).toFloat()))
     }
 
     private companion object {

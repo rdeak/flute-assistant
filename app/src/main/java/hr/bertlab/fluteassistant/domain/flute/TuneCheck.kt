@@ -16,13 +16,19 @@ enum class Verdict { RIGHT, RETRY, IGNORED, WRONG }
  *   heard for it first, and the check moves to the next note; the last note ends it ([isDone]);
  * - **ignored**: the heard note is the letter of the step just judged, in any octave (the child
  *   is still holding it, a glitch split it, or its lower octave locked first and then popped up),
- *   unless that letter is also the one waited on, a written repeat, which is right after
- *   [REPEAT_GUARD_MS] and ignored before it, so an octave pop never counts a repeat as played;
- * - **wrong**: anything else; the place is kept, and the step is remembered as stumbled.
+ *   unless that letter is also the one waited on, a written repeat, *and* the note was a fresh
+ *   start after a gap: a repeat can only be played by stopping and starting again, so a step
+ *   without a gap (the octave pop of the note just counted) never counts a repeat as played;
+ * - **wrong**: anything else; the place is kept, and the step is remembered as stumbled. One
+ *   exception, [forgiven]: when the step waited on repeats the note just judged and the heard
+ *   note is the one written after it, the repeat was slurred on to or skipped, which the phone
+ *   cannot tell apart, so it gets [StepMark.RETRY] and the heard note is judged for the step
+ *   after it (several repeats in a row the same way), rather than the run stopping on a note the
+ *   phone may not be able to hear.
  *
  * Waiting for the right note is what keeps every mark under the note it is about: a skipped or
- * extra note cannot shift the ones after it. Nothing here is timed but the repeat guard; the
- * child sets the pace. Pure Kotlin; the view model feeds it heard notes and reads [marks].
+ * extra note cannot shift the ones after it. Nothing here is timed; the child sets the pace.
+ * Pure Kotlin; the view model feeds it heard notes and reads [marks].
  */
 class TuneCheck(private val tune: List<TuneItem>) {
 
@@ -39,17 +45,41 @@ class TuneCheck(private val tune: List<TuneItem>) {
 
     /** Whether a wrong note has been heard for the step waited on. */
     private var stumbled = false
-    /** The written note of the step judged right last, and when. */
-    private var previous: Int? = null
-    private var judgedAt = 0L
+    /** The written note of the step judged right last; null before the first. */
+    var previous: Int? = null
+        private set
+    /** The steps the last [judge] passed over as repeats the phone could not hear; empty when none. */
+    var forgiven: List<Int> = emptyList()
+        private set
 
-    /** Judges the note [heard] (MIDI) at [nowMs] against the step waited on. */
-    fun judge(heard: Int, nowMs: Long): Verdict {
-        val current = index ?: return Verdict.IGNORED
-        val expected = (tune[current] as TuneNote).midi
+    /**
+     * Judges the note [heard] (MIDI) against the step waited on; [fresh] says it began after a
+     * gap rather than by a step from the note sounding before it.
+     */
+    fun judge(heard: Int, fresh: Boolean): Verdict {
+        forgiven = emptyList()
+        var current = index ?: return Verdict.IGNORED
+        var expected = (tune[current] as TuneNote).midi
         val last = previous
-        if (last != null && sameLetter(heard, last) && (!sameLetter(heard, expected) || nowMs - judgedAt < REPEAT_GUARD_MS)) {
+        if (last != null && sameLetter(heard, last) && !(fresh && sameLetter(heard, expected))) {
             return Verdict.IGNORED
+        }
+        // Repeats of the note just judged that were not heard before the note after them: forgiven.
+        if (!sameLetter(heard, expected) && last != null && sameLetter(expected, last)) {
+            val repeats = mutableListOf<Int>()
+            var after: Int? = current
+            while (after != null && sameLetter((tune[after] as TuneNote).midi, last)) {
+                repeats += after
+                after = nextNoteFrom(after + 1)
+            }
+            if (after != null && sameLetter(heard, (tune[after] as TuneNote).midi)) {
+                for (repeat in repeats) earned[repeat] = StepMark.RETRY
+                forgiven = repeats
+                stumbled = false
+                current = after
+                expected = (tune[current] as TuneNote).midi
+                index = current
+            }
         }
         if (!sameLetter(heard, expected)) {
             stumbled = true
@@ -58,7 +88,6 @@ class TuneCheck(private val tune: List<TuneItem>) {
         val mark = if (stumbled) StepMark.RETRY else StepMark.FIRST_TRY
         earned[current] = mark
         previous = expected
-        judgedAt = nowMs
         stumbled = false
         index = nextNoteFrom(current + 1)
         return if (mark == StepMark.RETRY) Verdict.RETRY else Verdict.RIGHT
@@ -67,14 +96,8 @@ class TuneCheck(private val tune: List<TuneItem>) {
     private fun nextNoteFrom(start: Int): Int? =
         (start until tune.size).firstOrNull { tune[it] is TuneNote }
 
-    private fun sameLetter(a: Int, b: Int): Boolean = Math.floorMod(a, 12) == Math.floorMod(b, 12)
-
     companion object {
-        /**
-         * A new note of the letter just judged within this long of the judgement is ignored even
-         * when a repeat is written: a note that locks in its lower octave and pops up a few frames
-         * later must not count its own repeat. A child's deliberate repeat is slower than this.
-         */
-        const val REPEAT_GUARD_MS = 300L
+        /** Whether two MIDI notes are the same letter, in any octave. */
+        fun sameLetter(a: Int, b: Int): Boolean = Math.floorMod(a, 12) == Math.floorMod(b, 12)
     }
 }

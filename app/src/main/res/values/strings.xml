@@ -89,6 +89,7 @@
     <string name="advice_faster_air">💨 Faster air</string>
     <string name="advice_gentler_air">🍃 Gentler air</string>
     <string name="advice_check_fingers">👀 Check your fingers</string>
+    <string name="advice_play_again">🔁 Stop, then play it again</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
     <string name="allow_microphone">Yes</string>

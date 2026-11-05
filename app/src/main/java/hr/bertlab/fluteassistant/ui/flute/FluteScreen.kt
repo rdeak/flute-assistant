@@ -274,7 +274,7 @@ fun FluteContent(
             val flash = rememberBeatFlash(state.beatPulse, running)
             val animal = if (running) {
                 state.animalIndex?.let {
-                    StaffAnimal(it, tempoBand(metronome.config.bpm).emoji, flash, waiting = state.isListening, halfBeat = state.animalHalfBeat)
+                    StaffAnimal(it, tempoBand(metronome.config.bpm).emoji, flash, waiting = state.waiting, halfBeat = state.animalHalfBeat)
                 }
             } else {
                 null
@@ -297,6 +297,7 @@ fun FluteContent(
                             marks = state.marks,
                             animal = animal,
                             wrong = state.wrong,
+                            heardNow = state.heardNow,
                             scale = staffScale,
                         )
                         SpeedKnob(
