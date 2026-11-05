@@ -3,6 +3,9 @@
 
 package hr.bertlab.fluteassistant.ui.common
 
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -33,31 +36,67 @@ class LanguageSwitchTest {
         }
     }
 
+    private fun button(name: String = "Language") = compose.onNodeWithContentDescription(name)
+
     @Test
-    fun the_current_language_is_selected_and_labelled_in_its_own_language() {
+    fun closed_it_shows_only_the_current_language() {
         show(AppLanguage.ENGLISH)
+        button().assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "English"))
+        compose.onNodeWithContentDescription("Hrvatski").assertDoesNotExist()
+    }
+
+    @Test
+    fun tapping_the_button_lists_both_flags_with_the_current_one_selected() {
+        show(AppLanguage.ENGLISH)
+        button().performClick()
         compose.onNodeWithContentDescription("English").assertIsSelected()
         compose.onNodeWithContentDescription("Hrvatski").assertIsNotSelected()
         compose.onNodeWithText(AppLanguage.CROATIAN.flag).assertExists()
     }
 
     @Test
+    fun the_list_has_flags_and_no_words() {
+        show(AppLanguage.ENGLISH)
+        button().performClick()
+        compose.onNodeWithText("English").assertDoesNotExist()
+        compose.onNodeWithText("Hrvatski").assertDoesNotExist()
+    }
+
+    @Test
     fun tapping_the_other_language_reports_it() {
         show(AppLanguage.ENGLISH)
+        button().performClick()
         compose.onNodeWithContentDescription("Hrvatski").performClick()
         assertEquals(AppLanguage.CROATIAN, chosen)
     }
 
     @Test
+    fun tapping_the_other_language_closes_the_list() {
+        show(AppLanguage.ENGLISH)
+        button().performClick()
+        compose.onNodeWithContentDescription("Hrvatski").performClick()
+        compose.onNodeWithContentDescription("Hrvatski").assertDoesNotExist()
+    }
+
+    @Test
     fun tapping_the_current_language_changes_nothing() {
         show(AppLanguage.CROATIAN, Locale("hr"))
+        button("Jezik").performClick()
         compose.onNodeWithContentDescription("Hrvatski").assertIsSelected().performClick()
         assertNull(chosen)
     }
 
     @Test
-    fun the_group_is_named_in_the_current_language() {
+    fun tapping_the_current_language_closes_the_list() {
         show(AppLanguage.CROATIAN, Locale("hr"))
-        compose.onNodeWithContentDescription("Jezik").assertExists()
+        button("Jezik").performClick()
+        compose.onNodeWithContentDescription("Hrvatski").performClick()
+        compose.onNodeWithContentDescription("Hrvatski").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_button_is_named_in_the_current_language() {
+        show(AppLanguage.CROATIAN, Locale("hr"))
+        button("Jezik").assertExists()
     }
 }

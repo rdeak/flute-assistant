@@ -27,7 +27,9 @@ Kotlin, Java, Python or shell source file starts with the two-line header (after
 ```
 
 Section 7 is why the header is there: the terms, or a pointer to them, must be in the source files.
-The source address is written in `NOTICE` and `credits_source_url`; change both together.
+The source address is written in `NOTICE` only: the app does not show it (the user dropped it on
+2026-11-05, users do not need it). The privacy policy's address is `credits_privacy_url` and the
+Play Console field, which only changes after a review.
 
 ## Commands
 
@@ -99,7 +101,8 @@ tab's CLAUDE.md; these rules hold on all of them:
 - The user rejected a wider layout (−/+ beside the ring, a ten-button signature scroller, flags in
   the content area) as too packed: keep the screens this sparse.
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
-  buttons set loudness) and, on the flute, a record button, a clear-all, a tempo control other than
+  buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
+  press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than
   the speed knob and the metronome stage it opens in place, and note lengths as a control (lengths
   come only from how long a key is held; the user drew this on 2026-10-24).
 - Tap tempo, subdivisions, click sounds, volume, presets and the A4 reference still exist in the

@@ -7,8 +7,8 @@ the root CLAUDE.md, "Kid-friendly UI constraint". User-visible strings: the root
 The top bar shows the app icon and names the open tab; the tab bar is four emoji-and-word buttons.
 
 - One Activity, which sets `volumeControlStream` to the media stream so the volume keys adjust
-  the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus the `LanguageSwitch`: two flag
-  buttons over `ui/common/AppLanguage`; selecting one calls
+  the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus the `LanguageSwitch`: since 2026-11-05 one
+  flag button that opens a list of the flags, with no words, over `ui/common/AppLanguage`; selecting one calls
   `AppCompatDelegate.setApplicationLocales`, which re-creates the Activity) and a bottom bar
   switching between the four tabs (`AppTab`: flute, metronome, tuner, notes; since 2026-11-04 the
   flute is first and the app opens on it, the first entry always being the start tab, and the drum
@@ -56,11 +56,14 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   scrolls below its own `FitsHeight` as before (its speed panel, like the metronome tab, only
   below `MetronomeMinHeight`).
 - The credits (`ui/common/Credits.kt`, the user's call on 2026-11-05): a long press on the top bar's
-  icon (`CreditsLogo`) opens a `Dialog` with the copyright, the licence and the source address. Nothing
-  on screen shows it can, and a tap does nothing, so the main screens stay as sparse as ever; a screen
+  icon (`CreditsLogo`) opens a `Dialog` with the version, the privacy policy's address, the copyright,
+  the licence and where to read it, and no repository address (the user's call: users do not need
+  it). A visible entry was drawn and turned down the same day as more load than it is worth. Nothing on
+  screen shows it can, and a tap does nothing, so the main screens stay as sparse as ever; a screen
   reader is offered the long press as an action. Keep it: section 7(b) of `NOTICE` has forks keep this
-  credit, and it is the only place the app shows it. The address stays plain text, never a link, so a
-  child cannot leave the app. It is not a main screen, so the year in the copyright line is fine.
+  credit, and it is the only place the app shows the credit or the policy, which Play asks to find
+  inside the app. The addresses stay plain text, never links, so a child cannot leave the app. It is
+  not a main screen, so its numbers are fine.
   Its strings are read before the `Dialog`, whose own window `LocaleProvider` does not reach.
 - `ui/common/ValueWheel` is the snapping three-row drum behind the metronome's `TempoWheel`. Its
   content description stays on the `LazyColumn` node: the UI tests scroll it with

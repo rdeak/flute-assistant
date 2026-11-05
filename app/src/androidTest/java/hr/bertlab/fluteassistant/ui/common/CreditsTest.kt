@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,9 +40,9 @@ class CreditsTest {
 
     private fun holder() = compose.onNodeWithText("Bertlab d.o.o.", substring = true)
 
-    private fun sourceLink() = compose.onNodeWithText("github.com/rdeak/", substring = true)
-
     private fun privacyLink() = compose.onNodeWithText("/release/privacy-policy", substring = true)
+
+    private fun licenceLink() = compose.onNodeWithText("gnu.org/licenses/gpl-3.0", substring = true)
 
     @Test
     fun a_tap_on_the_logo_opens_nothing() {
@@ -58,17 +59,10 @@ class CreditsTest {
     }
 
     @Test
-    fun a_long_press_shows_where_the_source_is() {
+    fun the_credits_leave_out_the_repository_address() {
         show()
         logo().performTouchInput { longClick() }
-        sourceLink().assertIsDisplayed()
-    }
-
-    @Test
-    fun the_source_address_is_plain_text_so_a_child_cannot_leave_the_app() {
-        show()
-        logo().performTouchInput { longClick() }
-        sourceLink().assertHasNoClickAction()
+        compose.onNodeWithText("github.com/rdeak/", substring = true).assertDoesNotExist()
     }
 
     @Test
@@ -103,6 +97,44 @@ class CreditsTest {
     }
 
     @Test
+    fun the_privacy_policy_comes_above_the_copyright() {
+        show()
+        logo().performTouchInput { longClick() }
+        val privacy = privacyLink().fetchSemanticsNode().boundsInRoot.top
+        val copyright = holder().fetchSemanticsNode().boundsInRoot.top
+        assertTrue(privacy < copyright)
+    }
+
+    @Test
+    fun the_licence_says_the_app_may_be_shared_and_changed() {
+        show()
+        logo().performTouchInput { longClick() }
+        compose.onNodeWithText("share and change", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun a_long_press_shows_where_to_read_the_licence() {
+        show()
+        logo().performTouchInput { longClick() }
+        licenceLink().assertIsDisplayed()
+    }
+
+    @Test
+    fun the_licence_address_is_plain_text_so_a_child_cannot_leave_the_app() {
+        show()
+        logo().performTouchInput { longClick() }
+        licenceLink().assertHasNoClickAction()
+    }
+
+    @Test
+    fun the_licence_lines_are_in_croatian_on_a_croatian_phone() {
+        show(Locale("hr"))
+        logo().performTouchInput { longClick() }
+        compose.onNodeWithText("dijeliti i mijenjati", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Tekst licencije", substring = true).assertIsDisplayed()
+    }
+
+    @Test
     fun ok_closes_the_credits() {
         show()
         logo().performTouchInput { longClick() }
@@ -121,7 +153,7 @@ class CreditsTest {
     fun the_credits_are_in_croatian_on_a_croatian_phone() {
         show(Locale("hr"))
         logo().performTouchInput { longClick() }
-        compose.onNodeWithText("izvorni kod", substring = true, ignoreCase = true).assertIsDisplayed()
+        compose.onNodeWithText("Autorska prava", substring = true).assertIsDisplayed()
         compose.onNodeWithText("U redu").assertIsDisplayed()
     }
 }

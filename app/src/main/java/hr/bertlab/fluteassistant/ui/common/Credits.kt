@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -14,13 +15,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -53,48 +58,41 @@ fun CreditsLogo(modifier: Modifier = Modifier) {
 }
 
 /**
- * Who holds the copyright, the licence and where the source is. The address is plain text, never
- * a link, so a child cannot leave the app from here. It scrolls for large text on a short screen.
- * The strings are read before the [Dialog]: its window has a context of its own, which the UI
- * tests' LocaleProvider does not reach.
+ * The version, where the privacy policy is (Play asks for it inside the app as well as on the
+ * listing), who holds the copyright, the licence and where to read it. The addresses are plain text,
+ * never links, so a child cannot leave the app from here. It scrolls for large text on a short
+ * screen. The strings are read before the [Dialog]: its window has a context of its own, which the
+ * UI tests' LocaleProvider does not reach.
  */
 @Composable
 private fun Credits(onClose: () -> Unit) {
+    val context = LocalContext.current
+    val installed = remember(context) {
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+    }
     val name = stringResource(R.string.app_name)
-    val notices = listOf(
-        stringResource(R.string.credits_copyright),
-        stringResource(R.string.credits_licence),
-        stringResource(R.string.credits_source),
-    )
-    val address = stringResource(R.string.credits_source_url)
+    val version = stringResource(R.string.credits_version, installed)
+    val privacy = stringResource(R.string.credits_privacy)
+    val privacyAddress = stringResource(R.string.credits_privacy_url)
+    val copyright = stringResource(R.string.credits_copyright)
+    val licence = stringResource(R.string.credits_licence)
+    val licenceText = stringResource(R.string.credits_licence_text)
+    val licenceAddress = stringResource(R.string.credits_licence_url)
     val done = stringResource(R.string.credits_done)
-    val textColor = FluteTheme.colors.text
     Dialog(onDismissRequest = onClose) {
         Stage(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.verticalScroll(rememberScrollState()),
         ) {
             AppLogo(contentDescription = null, modifier = Modifier.size(64.dp))
-            Text(
-                text = name,
-                style = MaterialTheme.typography.titleLarge,
-                color = textColor,
-                textAlign = TextAlign.Center,
-            )
-            notices.forEach { notice ->
-                Text(
-                    text = notice,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = textColor,
-                    textAlign = TextAlign.Center,
-                )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Line(name, MaterialTheme.typography.titleLarge)
+                Line(version)
             }
-            Text(
-                text = address,
-                style = MaterialTheme.typography.labelLarge,
-                color = textColor,
-                textAlign = TextAlign.Center,
-            )
+            Address(privacy, privacyAddress)
+            Line(copyright)
+            Line(licence)
+            Address(licenceText, licenceAddress)
             BigActionButton(
                 icon = AppIcons.Done,
                 text = done,
@@ -104,4 +102,18 @@ private fun Credits(onClose: () -> Unit) {
             )
         }
     }
+}
+
+/** A label with its address under it, in bolder type. */
+@Composable
+private fun Address(label: String, address: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Line(label)
+        Line(address, MaterialTheme.typography.labelLarge)
+    }
+}
+
+@Composable
+private fun Line(text: String, style: TextStyle = MaterialTheme.typography.bodyMedium) {
+    Text(text = text, style = style, color = FluteTheme.colors.text, textAlign = TextAlign.Center)
 }
