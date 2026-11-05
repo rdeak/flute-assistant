@@ -39,3 +39,15 @@ place; the found note is a head in its letter's colour with sparkles. Over the c
 column of fifteen full-width places that take no touches but are buttons for accessibility,
 named "Staff position N" counted from the bottom, never the note, so a screen reader does not
 give the answer away; their semantic click answers at once.
+
+## The tab on screen
+
+Moved here from the root CLAUDE.md on 2026-11-05.
+
+The notes tab has one hero row (the streak as up to five flames, "Find" over the note's bubble, and
+a "Pick" button with a dot per chosen letter) over a stage with the staff and one feedback line, and
+ten round places at the bottom (a star for first time, a faint star for a retry, yellow for the
+current note); "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in
+octave rows, highest on top, the "Sound" switch row and a big OK, the only way back. The
+end-of-round summary has no numbers on screen either: a trophy, ten stars, and tiles for the best
+streak (flames), the aim (one to three stars) and the speed (an animal).

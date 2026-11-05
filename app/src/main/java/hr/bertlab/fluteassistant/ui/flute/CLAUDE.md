@@ -22,9 +22,9 @@ halting): a silence is only ever a rest the child put there. The stored string
 `decode` is lenient and ignores a third field, `sanitize` keeps only `StaffNotes.ALL` notes and
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
 snapped (never under 300), converted at the stored tempo; since 2026-11-04 the tune is one of the
-songbook's six books (below), each stored as `"<bpm>;<time signature name>;<that string>"` under
+songbook's six books (`SONGBOOK.md`), each stored as `"<bpm>;<time signature name>;<that string>"` under
 `book_0` to `book_5`, and `SettingsStore.saveBook` keeps the open one across restarts (before that
-the single tune lived under the key `tune`, which the migration below moves into the first book).
+the single tune lived under the key `tune`, which the migration there moves into the first book).
 `Bars.write` (`domain/flute/Bars.kt`, since 2026-11-02) is how the
 staff writes the tune in bars of the metronome tab's time signature (`FluteUiState.timeSignature`,
 read at creation, in `enterTab()` and when OK closes the speed panel, all through
@@ -36,7 +36,7 @@ ties (a note) or just splits (a rest); the tune itself is never changed.
 
 The stage (the user's canvas of 2026-11-02, boards `Flute*.dc.html`, then changed by the user the
 same evening) holds `TuneStaff`, with the speed knob over its top left (described after this
-paragraph) and the book button under its clef (see "The songbook"): the staff and, under each note in the place the canvas gave
+paragraph) and the book button under its clef (`SONGBOOK.md`): the staff and, under each note in the place the canvas gave
 the fingering, its name (`NameRow` / `NamePill`, `StaffGeometry.NAMES_TOP`): a pill in its letter's
 colour as wide as the note's room on the staff less a 3 dp gap, the name in the first beat's room
 under the head, a grey 💤 pill for a rest, no pill for a breath, the bar line drawn through the
@@ -113,13 +113,21 @@ plays the tune from the start at the metronome's tempo, each note for its length
 on the staff, on its name and on its key, silent for each rest's whole length (its symbol and
 its pill ringed, the rest key sunk: `restLit`) and straight past each breath, and
 stops at once on the pill, on a key press, on `openSpeed()`, on `openShelf()` or `openBook()` or on `eraseLast()`, which drops the
-last step (the erase key repeats while held). The erase key (🧽, `EraseKey` in `FluteKeys.kt`) is the
-top row's last key, after the breath and the rest key and as wide as each, ending where h² does, so
-the three plain keys fill the row after c³ and Play and Your turn share the Play row's width (since
-2026-11-04, at the user's "move erase button to right of rest button and extend play / listen
-buttons"; it was a round 84 dp button at the end of the Play row). It is faded and inert while the
+last step (the erase key repeats while held). The erase key (🧽, `EraseKey` in `FluteKeys.kt`) sinks while held and
+repeats like a keyboard's backspace; it came to the top row on 2026-11-04, at the user's "move erase
+button to right of rest button and extend play / listen buttons" (it was a round 84 dp button at the
+end of the Play row), and Play and Your turn share the Play row's width. It is faded and inert while the
 tune is empty, and its gesture is attached only while it is enabled, so a hold that empties the tune
 stops repeating and lets the key up.
+
+The keys (`FluteKeys.kt`): the fifteen keys in three octave rows, highest on top, each in its
+letter's colour, a key sounding for as long as it is held. At the end of the top row, a clear gap
+after c³, stand a 💤 rest key, a 😮‍💨 breath key and a 🧽 erase key, icon only (in that order since
+2026-11-05, the user's "swap order of rest and breath button", the breath first before; the same day
+each became one note key wide, standing over g², a² and h² with the row empty between c³ and them,
+so a tool is never bigger than a note, the three read as one group apart from the notes and a slip
+off c³ lands on nothing; before that they were two keys wide each and filled the row). The breath
+and rest keys were asked for on 2026-11-02 in a brainstorm, not on the canvas.
 
 The speed knob and its panel (the user's pick of 2026-11-03 from three mockups, spec
 `docs/superpowers/specs/2026-11-03-flute-speed-knob-design.md`): the tune plays at the metronome
@@ -317,127 +325,14 @@ and the end of the line when nothing is lit; the same rule holds in Play and und
 where the list's end clamps the scroll as before. `FluteScreenTest` checks a mid-tune lit note
 with the note before it wholly on screen and the one before that not.
 
-The songbook (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-songbook-design.md`;
-the user: "child needs to practice more than two tunes and dont want to type notes over again when
-tune changes"): the flute keeps six tunes at once, so a child types each school tune in once and
-afterwards only switches between them. A `Book` (`domain/flute/Songbook.kt`) is a tune (the same
-`List<TuneItem>`, the same `MAX_NOTES` cap, sanitised on load) with its own bpm and time signature,
-a `Shelf` is the six books and the index of the open one, and the books sit in six fixed places,
-each with a fixed picture that never changes, so a child who cannot read yet learns "my school tune
-is the cookie": `Sweet` (`Shelf.kt`) is 🍭 🍪 🧁 🍩 🍦 🍬 in that order, six sweets that share no
-shape or colour (the user asked for "dedicated number of slots, eg 6 with pictures", then "sweets
-and cookies"; the six themselves were chosen in the 2026-11-04 brainstorm and approved by the user). There are no names, no typing, no choice of
-picture, no built-in songs, no delete button, no more than six places and no save step: every change
-to the tune goes through `save()`, which writes the open book (`FluteUiState.openBook`; `books` is
-the shelf as last stored, `shelf` the same with the open book's tune as the child sees it), exactly
-as the single tune was kept before. A screen reader hears the sweets as Lollipop, Cookie, Cupcake,
-Donut, Ice cream and Candy (the spec's table says Doughnut and Sweet; the strings follow the US
-spellings, as the English flag did the same day) and in Croatian Lizalica, Keks, Muffin, Krafna,
-Sladoled and Bombon (`book_*`, used for the screen reader only).
-
-While a book is open its speed and beat are the metronome's: the speed knob, its panel and the
-metronome tab change them as before, and `save()` writes the metronome's current bpm and time
-signature with the tune, so a change made on the metronome tab while the cookie is open is the
-cookie tune's new speed (intended, "yes, each tune keeps its own speed and beat"). Opening another
-book is `FluteViewModel.openBook(index)`, and its order matters because `FluteViewModel` and
-`MetronomeViewModel` never reference each other: `openBook` first reads the metronome's config from
-`SettingsStore` and saves it with the tune of the book being left (also when that book is empty,
-where the speed is never used), then switches `tune`, `openBook`, `timeSignature` (the staff is
-written in the new book's beat; an empty book keeps the current one), clears the marks of the last
-Your turn and forgets the key let go of, and only then returns the `Pulse` the metronome must take;
-`FluteScreen`, which holds both view models as it does for the speed panel, calls
-`MetronomeViewModel.setBpm` and `setTimeSignature` with it afterwards (never `SettingsStore`
-directly: those calls update the metronome state the knob and the metronome tab draw, save the
-config and pass it to a running metronome, so a drum clicking in the background jumps to the new
-tempo, which is acceptable). Were the setters to run first, the book left would record the new
-book's speed. The returned bpm is the book's brought onto the ring's 40 to 200 (`TempoBand.MIN_BPM`
-and `MAX_BPM`). It is null, and the metronome stays as it is, for an empty book (the child writes the
-new tune at whatever speed and beat the metronome has, and the book records them when it is left),
-for the open book picked again (logged as `flute.shelf_close`, nothing else changes) and for an index
-off the shelf. Wiping a tune with the sponge until nothing is left empties its book, which stays
-open, the staff blank and the button showing its sweet; there is no other way to empty one, so with
-all six full the child wipes one to reuse it. After a restart the stored open book is opened and its
-speed and beat are already the metronome's, so nothing needs applying.
-
-Storage is `SettingsStore.loadShelf`, `saveBook(index, book)` and `saveOpenBook(index)`
-(`SharedPreferencesSettingsStore`): each book is one string `"<bpm>;<time signature name>;<tune>"`
-(`Songbook.encode` / `decode`, the tune in `Tune.encode`'s format, which has no `;`) under `book_0` to
-`book_5`, and `open_book` is the open index. Reading is lenient, so a damaged book never loses the
-other five: what cannot be read becomes the metronome's bpm and time signature, or an empty book, and
-the tune is decoded with the book's own bpm as `legacyBpm`, so a tune from before lengths were
-snapped keeps its rhythm. The migration from the single tune is decided by `open_book` alone: when
-the key is missing the shelf was never stored (an update from before the songbook, or a fresh
-install), the old `tune` key becomes book 0 (🍭) at the metronome's stored bpm and time signature,
-book 0 is opened, and `book_0` and `open_book` are written and `tune` removed in one edit, so it
-runs once. It is never decided by whether the books are empty: a child who wipes all six must not
-get the old tune back on the next start, and once `open_book` exists a `tune` key is ignored
-(`Songbook.restore`, `SongbookTest`; `SharedPreferencesSettingsStoreTest` in `androidTest` runs the
-store over a throwaway preferences file, the first test of the store, and its "fresh store" gets the
-process's cached preferences, so it checks the key layout and encoding, not the disk write).
-
-The button (`BookButton`, `Shelf.kt`) is the open book itself, drawn as a little book like the
-shelf's (the user, later on 2026-11-04: "sweet icon that shows what slot is currently active should
-have same book layout with sweet same as load screen has", and from three true-size mockups,
-`book-button-shape.html`, "A is fine"): the shelf's `LittleBook` at the `CornerBook` sizes (a 7 dp
-spine, page edges 6 dp out and 4 / 2 dp in from the cover's top and bottom, corners 4 dp at the
-spine and 12 at the edge), `StaffGeometry.CORNER_BUTTON` (54 dp) wide with its page edges (the
-cover 48) and `BOOK_BUTTON_HEIGHT` (64 dp) tall, with the knob's 5 dp shadow, the open book's sweet
-at 26 dp (in dp, as on the shelf, so a large font scale cannot push it off the cover) and no label
-(the tune is on the staff beside it; five note bubbles would be 5 dp dots at this size). The cover is
-`Sun`, as the open book's is on the shelf (in dark mode too: `Sun` never changes), so the child sees
-on the staff the very book they picked, and it pairs with the yellow speed knob one corner up: the
-knob says how fast, the book under it says which tune. It replaced a round white button the same
-day (white then because it was "not chosen"; the user's "same book" overrode that). It stands at
-the staff's bottom left, under the clef, beside the names row, at
-`StaffGeometry.bookButtonTop`: centred on the names' pills (`NAMES_TOP + PILL_HEIGHT / 2`), in the
-column left of `NOTES_CLIP` (57 dp) that is empty from under the clef (`CLEF_BOTTOM`, 167 dp, the
-hook's lowest control point, a bound the stroke never passes) down to the bottom of the marks row
-(`TOTAL_HEIGHT`, 257 dp), so nothing moves and nothing is covered (`StaffGeometryTest` checks it at
-both scales). At `RunningStaffScale` the cell grows and the button does not; only its position
-follows the scaled geometry. It shows on an empty tune too, and while the tune runs it stays, faded
-and not pressable, still showing its sweet (the knob is inert then too; the sweet stays because,
-unlike the animal, it does not walk the staff). The book fades as one layer: `LittleBook` fades
-its page edges and cover together and passes `fade = false` to its `ChunkyButton`, since a cover
-faded on its own would show the page edges behind it through its open edge. Only the cover is
-pressable and carries the description; `FluteScreenTest` checks the cover's 48 x 64 and that the
-page edges, 6 dp further right, end before the notes. It was first sketched at the staff's top right
-(approved from the sketch, "A is fine"), and turned down on the real staff for two reasons: the tune
-is shown scrolled to its end with `NOTES_END_PADDING` at 4 dp, and every note from c² up has its stem
-top inside the button's 0 to 59 dp, so it covered the newest notes' stems; keeping the staff's end
-clear instead (about 60 dp of end padding) made every long tune show about two beats less. True-size
-mockups of the three places (`button-fit.html`) went back to the user, who chose bottom left, under
-the clef, beside the names, on 2026-11-04 ("C is fine"). A screen reader hears "Tune: Cookie, tap to
-change" (`flute_book_button`), never a number. A tap calls `FluteViewModel.openShelf()`, which ends a
-playback (`flute.stop`, reason `book`), a Your turn (`flute.listen_stop`, reason `book`) and a held
-key as `openSpeed()` does and leaves the tone player open, and then `FluteContent` sets
-`choosingBook`.
-
-The shelf (`TuneShelf`, `Shelf.kt`): `FluteContent` keeps `choosingBook` in `rememberSaveable`, as it
-keeps `choosingSpeed`, so rotation and the language switch keep it open, and while it is true the
-shelf takes the place of the stage, the keys and the Play row (leaving the tab drops it, and logs no
-closing line, as for the speed panel). Six `BookCover`s stand in two columns and three rows, always
-in the sweets' order (🍭 🍪 / 🧁 🍩 / 🍦 🍬), each a little book (`LittleBook` at the `ShelfBook` sizes,
-the drawing the book button shares): a cover square at the spine and round
-at the edge that opens (`BookLook.shape`), a dark spine down its left edge, page edges (thin lines on
-paper) showing past its right edge, the sweet large in the middle and under it a white label with
-the tune's first five notes (`Book.coverNotes`, rests and breaths skipped) as small `NoteBubble`s in
-their letters' colours, the label always five bubbles wide so every label is the same size (the
-bubbles shrink on a 360 dp phone, where five of 22 dp do not fit). The open book's cover is `Sun`,
-the others `colors.raised`, and dark mode follows `FluteColors` as every other card. An empty book
-has its sweet faded and a blank label; there is no number and no word anywhere on the shelf. One tap
-on a book is `onChoose(index)`, which closes the shelf and, in `FluteScreen`, calls `openBook` and
-then the metronome's setters; the open book's tap only closes it; there is no OK and the back button
-is not handled, as in the speed panel and the notes picker, and a stray tap loses nothing, since
-every tune is kept as it is. The sweet is sized from its cover, not set: `sweetSize` is 0.32 of the
-cover's height (the mockup's 36 px sweet on a 112 px cover, a third of its height), at least 40 dp
-(`SweetMinSize`, on the shortest cover) and at most half the room between the spine and the cover's
-other edge, in dp rather than sp so a large font scale cannot push it out or onto the label; a third
-leaves the label and the gap under the sweet their room at every height from `BookMinHeight`
-(116 dp) up. The column is `fitOrScroll` at `ShelfMinHeight` (three `BookMinHeight` rows, two 16 dp
-gaps and the column's 20 dp), so it fits a 360 x 640 dp phone with large text and scrolls only below
-that. A screen reader hears each cover as one node, "Cookie, 3 notes" (`flute_book_notes`, the
-note-count plural), "Cupcake, empty" or "Lollipop, open now", and the bubbles on it stay silent
-(the wording was chosen in the same brainstorm and approved by the user).
+The songbook (since 2026-11-04: six tunes, each with its own speed and beat, and the book button and
+shelf that switch between them) is in `SONGBOOK.md` in this folder; read it before changing books,
+`Shelf.kt`, `FluteViewModel.openBook` or their storage. Three rules hold everywhere: every change to
+the tune goes through `save()`, which writes the open book, and `FluteViewModel` and
+`MetronomeViewModel` never reference each other, so `openBook` saves the book being left before
+`FluteScreen` calls the metronome's setters. The migration of the old single tune is decided by the
+`open_book` key being missing, never by the books being empty: a child who wipes all six must not
+get the old tune back.
 
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
@@ -467,68 +362,14 @@ leave, speed or book, so every `flute.listen` has a closing line), `flute.listen
 the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the
 microphone on this tab). The engine's `mic.open` / `mic.close` stay under `FA.Tuner`. A debug
 build adds `session.open` (path: where this run's session folder is) and `session.error`
-(message: a write failed, the session was dropped, the run went on), from the recorder below,
+(message: a write failed, the session was dropped, the run went on), from the recorder (the `sessions` skill),
 and inside the session log alone `session.reopened` (frame, rate, source: the microphone opened
 again inside one run, which nothing in the app does today; the audio keeps the first opening's
 rate so the rows still line up with it).
 
 ## Sessions (debug builds only)
 
-Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-flute-listen-session-recorder-design.md`,
-asked for after the first child test: when a child plays and the phone does not do what was
-expected, the session must be inspectable afterwards with everything in it), the build installed
-from Android Studio records every Your turn run, automatically and with nothing on the screen,
-into `Android/data/hr.bertlab.fluteassistant/files/sessions/<yyyy-MM-dd_HH-mm-ss>/` on the phone,
-the newest `FileSessionRecorder.KEEP` (20) kept: `audio.wav` (the samples the engine analysed,
-mono 32-bit float at the microphone's rate, from the first hop after it opened, so hop `k` of the
-file is the newest hop of frame `k`), `frames.csv` (one row per frame the view model processed:
-frame, ms, f, p, level, minLevel, decision, sounding, onset `fresh`/`step`, verdict, the step
-waited on before the judgement and its note, heardNow, advice, repeatHeld, finishing, hearing,
-and the tracker's floor; what the phone actually did) and `session.log` (the app's log format:
-`session.start` with the app, device and the floor the tracker still held from the run before,
-`session.rules` with every threshold in force read from the constants, `session.pulse`, one
-`session.tune` per item, `session.audio` when the microphone opened, then every log line the app
-wrote while the run was open stamped `frame=<rows written before it> tag=<its tag> level=<d|i|w|e>`,
-so a line logged while frame 25 is processed says `frame=24`, and `session.end` with the marks; `flute.listen_stop` is
-logged before the run ends so it is in, `mic.close` comes after and is not). The audio may run a
-few hops past the last row (frames the phone never processed: a Stop with frames still buffered,
-or the run ending by `FINISH_FRAMES`); the replay says how many. Privacy: the audio is a child's
-playing; it is written only by the debug build, only into that app-private folder (gone with the
-app, excluded from Auto Backup and device transfer by `src/debug/res/xml`), leaves the phone only
-over the cable, and never goes into git (the repository is public): `/sessions/` and the pinned
-folder are ignored.
-
-How it is wired: `AudioRecordTunerEngine` has an `AudioTap` (`opened`, `samples` per hop on its IO
-thread, never for a hop read after the collector cancelled, since a run restarted within one hop
-would otherwise begin with the last hop of the run before, `closed`; `AudioRecordTunerEngineTest`
-checks that on the emulator's microphone) and `FluteViewModel` a `ListenRecorder` (`start` before `flute.listen` and the
-microphone, a `ListenFrame` per frame after the judgement and before the run may end, `end` with
-the marks); `src/debug` implements both, plus the `RecordingLogger`'s `LogSink`, in one
-`FileSessionRecorder` bound by `di/SessionModule` (`src/release` binds the plain logger and the
-no-ops, and compiles none of the recorder); the recorder logs through the plain `AndroidLogger`,
-never the recording one. `NoteOnsetTracker` takes its thresholds as `Rules` (defaults are the
-constants) and a seeded floor, for the replay. Unit tests that touch the recorder live in
-`src/testDebug`.
-
-On the laptop (every command from the repository root; the replay is a test only because that
-is what runs the app's classes on the JVM):
-
-```sh
-tools/pull-sessions.sh                                   # the phone's sessions into ./sessions (gitignored)
-./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder>
-                                                         # writes <folder>/replay.txt: the real detector, tracker and check over audio.wav,
-                                                         # the onsets and marks, and the diff against frames.csv (none: the rules did it,
-                                                         # work on them here; some: timing on the phone, the first frame says where)
-./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=stopDrop:0.08,0.12,0.2
-                                                         # also <folder>/sweep.txt: what each value would have heard
-python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
-```
-
-`ListenPath` (test source set) is the framing and judging both the synthetic `ListenPathTest`
-and the replay run on. A session can be pinned as a regression test: copy it into
-`app/src/testDebug/resources/sessions/<name>/` with a `pin marks=0:FIRST_TRY,...` line added to
-its log; `RecordedSessionsTest` replays every folder there and fails by the folder's name, for
-other marks, a missing pin line, or a folder that cannot be replayed (`frames.csv` may be left
-out of a pinned folder, the audio and the log may not; its README has the rules; the folder is
-gitignored but for the README).
-
+A debug build records every "Your turn" run on the phone: the audio, a per-frame table and the run's
+log lines. How that works and how to pull, replay, sweep and pin a session is in the `sessions`
+skill (`.claude/skills/sessions/SKILL.md`). The audio is a child's playing: it leaves the phone only
+over the cable and never goes into git (the repository is public).

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui
 
 import androidx.annotation.StringRes
@@ -54,7 +57,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.common.AppLanguage
-import hr.bertlab.fluteassistant.ui.common.AppLogo
+import hr.bertlab.fluteassistant.ui.common.CreditsLogo
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.KeepScreenOn
 import hr.bertlab.fluteassistant.ui.common.LanguageSwitch
@@ -190,7 +193,7 @@ private fun TitleBar(tab: AppTab) {
             .height(72.dp)
             .padding(horizontal = 20.dp),
     ) {
-        AppLogo(contentDescription = stringResource(R.string.app_name), modifier = Modifier.size(48.dp))
+        CreditsLogo(modifier = Modifier.size(48.dp))
         Spacer(Modifier.width(10.dp))
         Text(
             text = stringResource(tab.labelRes),

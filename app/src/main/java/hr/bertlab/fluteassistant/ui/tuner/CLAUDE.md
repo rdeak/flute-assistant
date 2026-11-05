@@ -103,3 +103,17 @@ Log events (tag `FA.Tuner`): `mic.open` (source, rate, buffer), `mic.close`, `tu
 levelMean, reading, target, mode, hearing), `tuner.reading` when the shown note changes,
 `tuner.hearing` (hearing, levelMean) when it changes, `tuner.target`, `tuner.mode`,
 `tuner.reference`, `tuner.error`, `reference.error`.
+
+## The tab on screen
+
+Moved here from the root CLAUDE.md on 2026-11-05.
+
+The tuner has the two mode pills on top ("Which?" / "Tune"), then a stage with the pitch window
+(since 2026-10-24, replacing a face meter): a dashed home ring holding the note to play on a dotted
+up-down guide, and the child's sound as a bubble floating above it when too high and below when too
+low, with an arrow pointing home; another note shows as that note filled in its colour, in tune the
+bubble fills, sits in the ring and gets a tick and sparkles, and in "Which?" silence the ring is
+grey with "…". In "Tune" the window sits between ‹ › with a "Hear" pill under it (spec:
+`docs/superpowers/specs/2026-10-22-tuner-target-note-design.md`); then the fingering for the ring's
+note, one status line and, under it, one quieter advice line that says what to change (roll the
+flute, air, fingers, come closer, a clear note), never a number.

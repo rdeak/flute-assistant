@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 # Play Store phone screenshots: one per tab, English and Croatian, light mode, padded to 9:16.
 #
 # Needs the headless emulator (AVD Medium_Phone_API_37.0, 1080x2400, started with -no-audio, see

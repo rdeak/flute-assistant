@@ -145,7 +145,7 @@ One-time setup:
 
 ```sh
 PROJECT_ID=flute-assistent-ci
-REPO=rdeak/flaute-tempo
+REPO=rdeak/flute-assistant
 SA=github-play-upload@${PROJECT_ID}.iam.gserviceaccount.com
 
 gcloud services enable androidpublisher.googleapis.com --project="$PROJECT_ID"

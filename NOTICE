@@ -1,0 +1,18 @@
+Flute Assistant
+Copyright (C) 2026 Bertlab d.o.o.
+https://github.com/rdeak/flute-assistant
+
+Free software under the GNU General Public License, version 3 or any
+later version (see LICENSE). It comes with no warranty.
+
+Additional terms under GPLv3 section 7:
+(b) Keep this notice, the author credit and the source link above in
+    the source files and in any credits shown in the app.
+(c) Mark modified versions as changed, and do not present them as the
+    original Flute Assistant.
+(e) No trademark rights are granted in the name "Flute Assistant" or
+    its icon.
+
+Third party: Nunito font (SIL OFL 1.1, docs/licenses/Nunito-OFL.txt);
+AndroidX, Hilt, Kotlin, kotlinx.coroutines and the Gradle wrapper
+(Apache-2.0).

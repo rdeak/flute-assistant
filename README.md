@@ -202,3 +202,11 @@ description of the internals, kept in step with the code.
   user data is stored there today, but a migration has to be written before they ship.
 - Tap tempo, subdivisions, click sounds, presets and the A4 reference are built but have no screen.
   The advanced mode that would hold them is not started.
+
+## Licence
+
+Flute Assistant is free software under the [GNU General Public License, version 3 or later](LICENSE),
+with the additional terms in [NOTICE](NOTICE). Anyone who distributes a modified version must share
+its source under the same licence, keep the credit and the link to this repository, and mark it as
+changed. The Nunito font stays under the [SIL Open Font License](docs/licenses/Nunito-OFL.txt).
+Changes are welcome back here: see [CONTRIBUTING](CONTRIBUTING.md).

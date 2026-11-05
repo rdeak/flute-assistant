@@ -1,4 +1,6 @@
 #!/bin/bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 # Release helpers behind .github/workflows/release.yml; every subcommand also runs locally.
 #
 #   tools/release.sh version          name, code, tag and whether v<name> is still untagged, as key=value lines

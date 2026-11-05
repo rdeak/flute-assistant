@@ -1,4 +1,6 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 # Pulls the "Your turn" sessions a debug build recorded on the attached phone (or the device
 # ANDROID_SERIAL names) into a folder here, ./sessions by default, which git ignores: the audio
 # is a child's playing. What a session holds and how to replay, sweep, pin and picture it:

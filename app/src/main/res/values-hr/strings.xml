@@ -19,6 +19,13 @@
 
     <string name="language">Jezik</string>
 
+    <!-- Credits: a long press on the app icon opens them. The address stays plain text, never a link. -->
+    <string name="credits_open">Prikaži zasluge</string>
+    <string name="credits_copyright">Autorska prava © 2026 Bertlab d.o.o.</string>
+    <string name="credits_licence">Slobodan softver pod licencijom GNU General Public License, verzija 3 ili novija. Dolazi bez ikakvog jamstva.</string>
+    <string name="credits_source">Licencija i izvorni kod:</string>
+    <string name="credits_done">U redu</string>
+
     <string name="band_snail">Puž</string>
     <string name="band_turtle">Kornjača</string>
     <string name="band_duck">Patka</string>

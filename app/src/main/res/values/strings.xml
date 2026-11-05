@@ -21,6 +21,14 @@
     <!-- In-app language switch (the language names themselves are endonyms in ui/common/AppLanguage.kt) -->
     <string name="language">Language</string>
 
+    <!-- Credits: a long press on the app icon opens them. The address stays plain text, never a link. -->
+    <string name="credits_open">Show credits</string>
+    <string name="credits_copyright">Copyright © 2026 Bertlab d.o.o.</string>
+    <string name="credits_licence">Free software under the GNU General Public License, version 3 or later. It comes with no warranty.</string>
+    <string name="credits_source">Licence and source code:</string>
+    <string name="credits_source_url" translatable="false">github.com/rdeak/flute-assistant</string>
+    <string name="credits_done">OK</string>
+
     <!-- The tempo ring's five speeds, slowest first, each with an animal emoji (ui/metronome/MetronomeUiState.kt) -->
     <string name="band_snail">Snail</string>
     <string name="band_turtle">Turtle</string>
