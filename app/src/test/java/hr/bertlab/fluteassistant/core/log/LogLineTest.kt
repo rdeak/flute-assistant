@@ -12,6 +12,14 @@ class LogLineTest {
     }
 
     @Test
+    fun `parse splits an event and its fields, unquoting text`() {
+        val (event, fields) = LogLine.parse("session.start at=2026-11-05T18:32:10+01:00 device=\"Google Pixel 7\" floor=none n=2")
+        assertEquals("session.start", event)
+        assertEquals(mapOf("at" to "2026-11-05T18:32:10+01:00", "device" to "Google Pixel 7", "floor" to "none", "n" to "2"), fields)
+        assertEquals("mic.close" to emptyMap<String, String>(), LogLine.parse("mic.close"))
+    }
+
+    @Test
     fun `fields are key=value pairs in the given order`() {
         assertEquals(
             "tuner.frame f=440.12 p=0.80 level=0.40 frames=25 ok=true mode=TARGET reading=none",

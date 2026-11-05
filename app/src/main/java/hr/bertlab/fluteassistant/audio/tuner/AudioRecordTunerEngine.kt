@@ -40,6 +40,7 @@ import kotlin.math.max
 class AudioRecordTunerEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val logger: Logger,
+    private val tap: AudioTap,
 ) : TunerEngine {
 
     override fun pitchFrames(): Flow<PitchFrame> = flow {
@@ -61,13 +62,19 @@ class AudioRecordTunerEngine @Inject constructor(
             "rate" to record.sampleRate, "bufferFrames" to record.bufferSizeInFrames,
             "window" to WINDOW_SIZE, "hop" to HOP_SIZE,
         )
+        tap.opened(record.sampleRate, sourceName(record.audioSource))
 
         try {
             record.startRecording()
             check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microphone is busy" }
             while (currentCoroutineContext().isActive) {
                 val read = record.read(chunk, 0, HOP_SIZE, AudioRecord.READ_BLOCKING)
+                // The collector may have cancelled during the read: that hop is nobody's, least of
+                // all the tap's, where it would open the next run's recording (if one started
+                // within 43 ms) with a hop of this one.
+                if (!currentCoroutineContext().isActive) break
                 if (read <= 0) throw IllegalStateException("Microphone read failed (code $read)")
+                tap.samples(chunk, read)
 
                 // Slide the analysis window left and append the new samples.
                 System.arraycopy(window, read, window, 0, WINDOW_SIZE - read)
@@ -87,6 +94,7 @@ class AudioRecordTunerEngine @Inject constructor(
         } finally {
             runCatching { record.stop() }
             record.release()
+            tap.closed()
             logger.i(LogTags.TUNER, "mic.close", "frames" to frames)
         }
     }.flowOn(Dispatchers.IO) // blocking reads belong on IO; each collector decides whether to conflate or buffer
@@ -134,9 +142,11 @@ class AudioRecordTunerEngine @Inject constructor(
         else -> source.toString()
     }
 
-    private companion object {
+    companion object {
+        /** Samples the detector sees at once; public so the replay of a recorded session frames audio the same way. */
         const val WINDOW_SIZE = 4096
+        /** Samples read, and the window advanced, per frame: about 43 ms at 48 kHz. */
         const val HOP_SIZE = 2048
-        val PREFERRED_SAMPLE_RATES = intArrayOf(48_000, 44_100)
+        private val PREFERRED_SAMPLE_RATES = intArrayOf(48_000, 44_100)
     }
 }

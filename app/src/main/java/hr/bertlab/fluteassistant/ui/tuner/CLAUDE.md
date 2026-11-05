@@ -7,7 +7,13 @@ Loaded when working in this folder; moved here from the root CLAUDE.md on 2026-1
 whose channel buffers the frames rather than conflating them: since the night of 2026-11-04 the
 flute's "Your turn" counts frames, a gap being two in a row, and a busy main thread must delay a
 frame, never lose one; the tuner processes every frame too, cheaply) and cancelling releases it; it
-throws `SecurityException` without RECORD_AUDIO. A frame's `level` and `minLevel` come from
+throws `SecurityException` without RECORD_AUDIO. Its `WINDOW_SIZE` (4096) and `HOP_SIZE` (2048)
+are public: the replay of a recorded session frames audio with them (`ui/flute/CLAUDE.md`,
+"Sessions"). It hands every hop to an `AudioTap` on its IO thread (`opened`, `samples`,
+`closed`): the debug build's session recorder, which keeps the samples of a "Your turn" run;
+the release build binds `AudioTap.None`. A hop whose blocking read the collector cancelled
+during is dropped before the tap (`AudioRecordTunerEngineTest`, on the emulator): the recorder
+may already be on the next run, and that run must not begin with a hop of this one. A frame's `level` and `minLevel` come from
 `FrameLevels` (pure Kotlin, shared with the tests that frame synthetic sound the engine's way):
 the window's RMS on the dB-style 0..1 scale, and the quietest 21 ms stretch of the newest hop,
 which a tongued stop between two notes of one pitch drops where the window's level barely moves.
@@ -77,7 +83,12 @@ them at any level are a pause; a tongued stop is heard in `PitchFrame.minLevel`;
 the halfway point that switches the sounding note after `SWITCH_FRAMES` (a long note sagging as
 the breath runs out) is no new note, since nobody played one, where the tuner's ring simply moves.
 All are read against `flute.heard` and `flute.listen_summary` on a phone and pinned by
-`ListenPathTest` on synthetic sound. The other piece is `FrameSummary` (its own file now, `internal`),
+`ListenPathTest` on synthetic sound. Since 2026-11-05 the tracker takes every threshold it
+applies as a `Rules` value whose defaults are the constants (`NoteOnsetTracker.Rules`, with
+`fields()` for the session log and `with(name, value)` for a sweep) and can be built with a
+seeded room floor (`floor`, readable: the view model's tracker keeps it from one run to the
+next, and a replay must start where the phone started); the app builds it with the defaults, so
+nothing about the rules changed. The other piece is `FrameSummary` (its own file now, `internal`),
 the body of `tuner.summary` and of the flute's `flute.listen_summary`. `TunerViewModel` still
 runs its own copy of those rules; moving it onto the tracker is a refactor for another day, and
 the constants (`MIN_PROBABILITY`, `LOCK_FRAMES`, `LOCK_CENTS`, `SMOOTHING_WINDOW`,

@@ -21,3 +21,6 @@ keystore.properties
 
 superpowers
 .superpowers
+
+# "Your turn" sessions pulled from a debug phone (tools/pull-sessions.sh): a child's audio, never in git
+/sessions/

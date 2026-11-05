@@ -116,6 +116,7 @@ class FluteViewModel @Inject constructor(
     private val engine: TunerEngine,
     private val clock: MonotonicClock,
     private val logger: Logger,
+    private val recorder: ListenRecorder,
 ) : ViewModel() {
 
     private val _state: MutableStateFlow<FluteUiState>
@@ -358,6 +359,8 @@ class FluteViewModel @Inject constructor(
                 beatPulse = it.beatPulse + 1, // the animal lands on the first note with a hop
             )
         }
+        // The session opens first, so the flute.listen line and the first hop are in it.
+        recorder.start(_state.value.tune, pulse(), tracker.floor)
         logger.d(LogTags.FLUTE, "flute.listen", "notes" to _state.value.tune.count { it is TuneNote })
         listenJob = viewModelScope.launch {
             try {
@@ -504,8 +507,8 @@ class FluteViewModel @Inject constructor(
      */
     private fun stopListening(reason: String) {
         if (!_state.value.isListening) return
+        logger.d(LogTags.FLUTE, "flute.listen_stop", "reason" to reason) // before the session closes, so it is in it
         endListening()
-        logger.d(LogTags.FLUTE, "flute.listen_stop", "reason" to reason)
     }
 
     /** Closes the microphone and clears everything of the listening but the marks; no log line of its own. */
@@ -514,6 +517,7 @@ class FluteViewModel @Inject constructor(
         listenJob = null
         if (listenSummary.frames > 0) logListenSummary() // the last partial second
         hearingTracker.reset()
+        recorder.end(check?.marks.orEmpty())
         check = null
         _state.update {
             it.copy(
@@ -536,12 +540,23 @@ class FluteViewModel @Inject constructor(
         listenSummary.add(frame, result.decision)
         if (listenSummary.frames >= TunerViewModel.SUMMARY_FRAMES) logListenSummary()
         val wasFinishing = _state.value.finishing
-        result.onset?.let(::judge)
-        when {
-            !_state.value.isListening -> Unit
-            wasFinishing -> if (tracker.sounding == null || ++finishFrames >= FINISH_FRAMES) endListening()
-            !_state.value.finishing -> followSound()
-        }
+        val waited = check?.index
+        val verdict = result.onset?.let(::judge)
+        if (!wasFinishing && _state.value.isListening && !_state.value.finishing) followSound()
+        record(frame, result, verdict, waited)
+        if (wasFinishing && _state.value.isListening && (tracker.sounding == null || ++finishFrames >= FINISH_FRAMES)) endListening()
+    }
+
+    /** The row of this frame for the session recorder (debug builds): what the tracker, the check and the screen made of it. */
+    private fun record(frame: PitchFrame, result: NoteOnsetTracker.Result, verdict: Verdict?, waited: Int?) {
+        val s = _state.value
+        recorder.frame(
+            ListenFrame(
+                frame = frame, decision = result.decision, sounding = tracker.sounding, onset = result.onset, floor = tracker.floor,
+                verdict = verdict, waited = waited, expected = waited?.let { (s.tune[it] as TuneNote).midi },
+                heardNow = s.heardNow, advice = s.advice, repeatHeld = s.repeatHeld, finishing = s.finishing, hearing = s.hearing,
+            ),
+        )
     }
 
     /**
@@ -566,10 +581,10 @@ class FluteViewModel @Inject constructor(
         }
     }
 
-    /** A new note began ([onset]): judge it against the note waited on and show what it earned. */
-    private fun judge(onset: NoteOnsetTracker.Onset) {
-        val check = check ?: return
-        val index = check.index ?: return
+    /** A new note began ([onset]): judge it against the note waited on and show what it earned; null when nothing is waited on. */
+    private fun judge(onset: NoteOnsetTracker.Onset): Verdict? {
+        val check = check ?: return null
+        val index = check.index ?: return null
         val expected = (_state.value.tune[index] as TuneNote).midi
         val heard = onset.midi
         val verdict = check.judge(heard, onset.fresh)
@@ -609,6 +624,7 @@ class FluteViewModel @Inject constructor(
             Verdict.WRONG -> _state.update { it.copy(wrong = WrongNote(index, heard)) }
             Verdict.IGNORED -> Unit
         }
+        return verdict
     }
 
     /** Mirrors the tracker's verdict into the state; `flute.hearing` only when it changes, with the mean that decided it. */

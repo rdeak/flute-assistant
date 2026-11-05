@@ -16,6 +16,39 @@ object LogLine {
         return line.toString()
     }
 
+    /**
+     * The reverse of [format]: the event name and its fields as text, quotes removed, `none` kept
+     * as the text `none`. What the replay of a recorded session reads `session.log` with.
+     */
+    fun parse(line: String): Pair<String, Map<String, String>> {
+        val tokens = tokens(line)
+        val fields = LinkedHashMap<String, String>()
+        for (token in tokens.drop(1)) {
+            val at = token.indexOf('=')
+            if (at > 0) fields[token.substring(0, at)] = token.substring(at + 1)
+        }
+        return tokens.firstOrNull().orEmpty() to fields
+    }
+
+    /** Splits on spaces outside quotes, dropping the quotes. */
+    private fun tokens(line: String): List<String> {
+        val out = mutableListOf<String>()
+        val token = StringBuilder()
+        var quoted = false
+        for (c in line) {
+            when {
+                c == '"' -> quoted = !quoted
+                c == ' ' && !quoted -> if (token.isNotEmpty()) {
+                    out += token.toString()
+                    token.clear()
+                }
+                else -> token.append(c)
+            }
+        }
+        if (token.isNotEmpty()) out += token.toString()
+        return out
+    }
+
     private fun render(value: Any?): String = when (value) {
         null -> "none"
         is Double -> String.format(Locale.ROOT, "%.2f", value)

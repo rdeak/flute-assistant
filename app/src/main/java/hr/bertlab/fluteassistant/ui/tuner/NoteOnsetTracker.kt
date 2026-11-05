@@ -35,7 +35,72 @@ import kotlin.math.log2
  * note, as the tuner's ring would move, but is no new note either: nobody played one. Unsteady
  * frames do not count towards the gap: a wobble inside a held note must not make it two.
  */
-class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
+class NoteOnsetTracker(
+    private val referenceA4: Double = NoteMath.DEFAULT_A4,
+    val rules: Rules = Rules(),
+    floor: Float? = null,
+) {
+
+    /**
+     * Every threshold the tracker applies, as a value whose defaults are the constants: the app
+     * builds the tracker with the defaults, and a replay of a recorded session (debug builds
+     * record every "Your turn" run; `ui/flute/CLAUDE.md`) builds one with a rule changed to see
+     * what it would have heard. [fields] renders them for the session's log at full precision,
+     * [with] sets one by its field name.
+     */
+    data class Rules(
+        val gate: Double = TunerViewModel.MIN_PROBABILITY,
+        val lockFrames: Int = TunerViewModel.LOCK_FRAMES,
+        val lockCents: Double = TunerViewModel.LOCK_CENTS,
+        val smoothing: Int = TunerViewModel.SMOOTHING_WINDOW,
+        val switchFrames: Int = TunerViewModel.SWITCH_FRAMES,
+        val holdFrames: Int = TunerViewModel.HOLD_FRAMES,
+        val nearCents: Double = TunerUiState.NEAR_TARGET_CENTS,
+        val onsetGapFrames: Int = ONSET_GAP_FRAMES,
+        val gapLevelRatio: Float = GAP_LEVEL_RATIO,
+        val floorMargin: Float = FLOOR_MARGIN,
+        val floorRise: Float = FLOOR_RISE,
+        val recentFrames: Int = RECENT_FRAMES,
+        val attackFrames: Int = ATTACK_FRAMES,
+        val stopDrop: Float = STOP_DROP,
+        val restartRise: Float = RESTART_RISE,
+        val restartFrames: Int = RESTART_FRAMES,
+    ) {
+        /** Name and value of every rule, in declaration order, the value as Kotlin prints it. */
+        fun fields(): List<Pair<String, String>> = listOf(
+            "gate" to gate.toString(), "lockFrames" to lockFrames.toString(), "lockCents" to lockCents.toString(),
+            "smoothing" to smoothing.toString(), "switchFrames" to switchFrames.toString(), "holdFrames" to holdFrames.toString(),
+            "nearCents" to nearCents.toString(), "onsetGapFrames" to onsetGapFrames.toString(),
+            "gapLevelRatio" to gapLevelRatio.toString(), "floorMargin" to floorMargin.toString(), "floorRise" to floorRise.toString(),
+            "recentFrames" to recentFrames.toString(), "attackFrames" to attackFrames.toString(), "stopDrop" to stopDrop.toString(),
+            "restartRise" to restartRise.toString(), "restartFrames" to restartFrames.toString(),
+        )
+
+        /** These rules with the one named [name] set to [value] (rounded for a frame count); an unknown name is refused. */
+        fun with(name: String, value: Double): Rules {
+            val n = Math.round(value).toInt()
+            val f = value.toFloat()
+            return when (name) {
+                "gate" -> copy(gate = value)
+                "lockFrames" -> copy(lockFrames = n)
+                "lockCents" -> copy(lockCents = value)
+                "smoothing" -> copy(smoothing = n)
+                "switchFrames" -> copy(switchFrames = n)
+                "holdFrames" -> copy(holdFrames = n)
+                "nearCents" -> copy(nearCents = value)
+                "onsetGapFrames" -> copy(onsetGapFrames = n)
+                "gapLevelRatio" -> copy(gapLevelRatio = f)
+                "floorMargin" -> copy(floorMargin = f)
+                "floorRise" -> copy(floorRise = f)
+                "recentFrames" -> copy(recentFrames = n)
+                "attackFrames" -> copy(attackFrames = n)
+                "stopDrop" -> copy(stopDrop = f)
+                "restartRise" -> copy(restartRise = f)
+                "restartFrames" -> copy(restartFrames = n)
+                else -> throw IllegalArgumentException("no rule named $name")
+            }
+        }
+    }
 
     /** What became of one frame, and the note that began on it, if one did. */
     data class Result(val decision: FrameDecision, val onset: Onset?)
@@ -60,9 +125,11 @@ class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
      * The room's own level: the lowest level of the frames that did not count while no note
      * sounded, rising by [FLOOR_RISE] a frame so a louder room is learned again within seconds;
      * null until the room has been heard. A note's frame that falls back to it is a gap, however
-     * soft the note. It survives [reset], which ends a note, not the room.
+     * soft the note. It survives [reset], which ends a note, not the room, so it is also what a
+     * run starts with from the run before; a replay seeds it through the constructor.
      */
-    private var floor: Float? = null
+    var floor: Float? = floor
+        private set
     /** Shown frames in a row whose note is a neighbour of [sounding] within reach; see [identify]. */
     private var driftFrames = 0
     /** Whether the last [identify] moved [sounding] by a drift rather than a clear step or a fresh start. */
@@ -83,22 +150,22 @@ class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
     fun onFrame(frame: PitchFrame): Result {
         noticeStop(frame)
         val frequency = frame.frequency ?: return uncounted(FrameDecision.SILENT, frame.level)
-        if (frame.probability < TunerViewModel.MIN_PROBABILITY) return uncounted(FrameDecision.LOW_PROBABILITY, frame.level)
+        if (frame.probability < rules.gate) return uncounted(FrameDecision.LOW_PROBABILITY, frame.level)
         gap = 0
         unheard = 0
         levelSum += frame.level
         levelCount++
         recentLevels.addLast(frame.level)
-        while (recentLevels.size > RECENT_FRAMES) recentLevels.removeFirst()
+        while (recentLevels.size > rules.recentFrames) recentLevels.removeFirst()
         if (sounding != null) framesSinceOnset++
         recent.addLast(frequency)
-        while (recent.size > TunerViewModel.SMOOTHING_WINDOW) recent.removeFirst()
+        while (recent.size > rules.smoothing) recent.removeFirst()
         if (!isSteady()) return Result(FrameDecision.UNSTEADY, onset = null).also { ageStop() }
         val median = recent.sorted()[recent.size / 2]
         val before = sounding
         val identified = identify(NoteMath.frequencyToNote(median, referenceA4).midi, median)
         // The tone is back after a stop: the note started again, whatever pitch locked.
-        val restarted = stopAge in 1..RESTART_FRAMES && frame.minLevel >= stopFloor + RESTART_RISE
+        val restarted = stopAge in 1..rules.restartFrames && frame.minLevel >= stopFloor + rules.restartRise
         val onset = when {
             identified != before && !drifted -> Onset(identified, fresh = before == null || restarted)
             identified == before && restarted -> Onset(identified, fresh = true)
@@ -139,9 +206,9 @@ class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
      * first frames, whose hops still hold its attack. A stop already pending only deepens.
      */
     private fun noticeStop(frame: PitchFrame) {
-        if (sounding == null || framesSinceOnset < ATTACK_FRAMES || recentLevels.isEmpty()) return
+        if (sounding == null || framesSinceOnset < rules.attackFrames || recentLevels.isEmpty()) return
         val recentMean = recentLevels.sum() / recentLevels.size
-        if (frame.minLevel < recentMean - STOP_DROP) {
+        if (frame.minLevel < recentMean - rules.stopDrop) {
             stopFloor = if (stopAge < 0) frame.minLevel else minOf(stopFloor, frame.minLevel)
             stopAge = 0
         }
@@ -149,7 +216,7 @@ class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
 
     /** A frame has passed since the stop; past [RESTART_FRAMES] it was the end of the note, not a stop in it. */
     private fun ageStop() {
-        if (stopAge >= 0 && ++stopAge > RESTART_FRAMES) stopAge = -1
+        if (stopAge >= 0 && ++stopAge > rules.restartFrames) stopAge = -1
     }
 
     /**
@@ -162,21 +229,21 @@ class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
     private fun uncounted(decision: FrameDecision, level: Float): Result {
         val note = sounding
         if (note == null) {
-            floor = floor?.let { minOf(level, it + FLOOR_RISE) } ?: level
+            floor = floor?.let { minOf(level, it + rules.floorRise) } ?: level
         }
         val quiet = note == null || levelCount == 0 ||
-            level < (levelSum / levelCount) * GAP_LEVEL_RATIO ||
-            floor?.let { level <= it + FLOOR_MARGIN } == true
-        if ((quiet && ++gap >= ONSET_GAP_FRAMES) || ++unheard >= TunerViewModel.HOLD_FRAMES) reset()
+            level < (levelSum / levelCount) * rules.gapLevelRatio ||
+            floor?.let { level <= it + rules.floorMargin } == true
+        if ((quiet && ++gap >= rules.onsetGapFrames) || ++unheard >= rules.holdFrames) reset()
         ageStop()
         return Result(decision, onset = null)
     }
 
     /** True once the last [TunerViewModel.LOCK_FRAMES] frames agree within [TunerViewModel.LOCK_CENTS]. */
     private fun isSteady(): Boolean {
-        if (recent.size < TunerViewModel.LOCK_FRAMES) return false
-        val last = recent.takeLast(TunerViewModel.LOCK_FRAMES)
-        return 1200.0 * log2(last.max() / last.min()) <= TunerViewModel.LOCK_CENTS
+        if (recent.size < rules.lockFrames) return false
+        val last = recent.takeLast(rules.lockFrames)
+        return 1200.0 * log2(last.max() / last.min()) <= rules.lockCents
     }
 
     /**
@@ -193,11 +260,11 @@ class NoteOnsetTracker(private val referenceA4: Double = NoteMath.DEFAULT_A4) {
             return heard
         }
         val reach = abs(NoteMath.centsBetween(median, current, referenceA4))
-        if (reach > TunerUiState.NEAR_TARGET_CENTS) {
+        if (reach > rules.nearCents) {
             driftFrames = 0
             return heard
         }
-        if (++driftFrames >= TunerViewModel.SWITCH_FRAMES) {
+        if (++driftFrames >= rules.switchFrames) {
             driftFrames = 0
             drifted = true
             return heard

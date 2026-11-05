@@ -31,7 +31,12 @@ configuration cache is on.
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.ui.notes.NotesScreenTest
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.ui.flute.FluteScreenTest
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.data.settings.SharedPreferencesSettingsStoreTest
+./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngineTest
 ./gradlew testDebugUnitTest lintRelease bundleRelease     # pre-upload check (docs/release/README.md)
+tools/pull-sessions.sh                                    # a debug phone's recorded "Your turn" sessions into ./sessions (gitignored)
+./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> [-Psweep=stopDrop:0.08,0.12]
+                                                          # replay one on the JVM: <folder>/replay.txt (and sweep.txt)
+python3 tools/session-report.py sessions/<folder>         # <folder>/report.html, the run on a timeline
 ```
 
 ### Emulator
@@ -54,6 +59,13 @@ bundled Kotlin to the catalog's `kotlin` version, and the Compose compiler plugi
 same version ref; keep the two equal. KSP is the standalone 2.3.x line; Hilt must stay >= 2.59.
 Room exports schemas to `app/schemas` (database version 1, destructive fallback migration for
 now). `localeFilters` strips every library locale except en and hr.
+
+The build types differ in source: `app/src/debug` holds the "Your turn" session recorder
+(`debug/session`, the `RecordingLogger` and the `di/SessionModule` that binds them, plus backup
+rules that keep the recordings out of Auto Backup) and `app/src/release` the `di/SessionModule`
+that binds the plain logger and no-ops, so the Play build compiles none of the recorder. Unit
+tests that touch the recorder live in `app/src/testDebug` (shared `app/src/test` is also compiled
+for the release variant's unit tests). Details: `ui/flute/CLAUDE.md`, "Sessions".
 
 `androidx.appcompat` is in the build only for the in-app language switch:
 `AppCompatDelegate.setApplicationLocales` is the per-app-language backport below Android 13, so
@@ -258,7 +270,9 @@ through `android.util.Log` directly, never log user-identifying data, and keep e
 stable: they are the interface a logcat session is read with.
 
 Each subsystem's events are listed in its folder's CLAUDE.md: `ui/tuner/` (`FA.Tuner`),
-`audio/metronome/` (`FA.Metronome`, `FA.Playback`), `ui/flute/` (`FA.Flute`).
+`audio/metronome/` (`FA.Metronome`, `FA.Playback`), `ui/flute/` (`FA.Flute`). A debug build also
+keeps every "Your turn" run on the phone (the audio, a per-frame table and the run's log lines
+aligned to it) for replay on the laptop: `ui/flute/CLAUDE.md`, "Sessions".
 
 ```sh
 adb logcat -s FA.Tuner FA.Metronome FA.Playback FA.Flute   # everything structured, debug build
@@ -277,5 +291,7 @@ Unit tests use hand-written fakes from `app/src/test/.../fakes/Fakes.kt` (`FakeM
 tuner and the flute share (`SharedActionsTest`: the microphone card's "Not now", the stacked big
 button), the settings store with the songbook's one-time migration of the old single tune
 (`SharedPreferencesSettingsStoreTest`, over a throwaway preferences file so the app's own settings
-are never touched) and locale-dependent resources (`LabelsTest`). The `config_summary`, `subdivision_*` and `sound_*` strings must stay
+are never touched), the microphone engine's tap on the emulator's silent microphone
+(`AudioRecordTunerEngineTest`: every hop reaches the tap, none after the collector cancels) and
+locale-dependent resources (`LabelsTest`). The `config_summary`, `subdivision_*` and `sound_*` strings must stay
 even though the screens no longer show them: the playback notification and `LabelsTest` use them.

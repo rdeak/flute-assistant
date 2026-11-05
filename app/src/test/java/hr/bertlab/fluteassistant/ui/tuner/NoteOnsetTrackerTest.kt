@@ -4,6 +4,7 @@ import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.pow
@@ -209,5 +210,44 @@ class NoteOnsetTrackerTest {
         tracker.reset()
         assertNull(tracker.sounding)
         assertEquals(listOf(null, null, 60), feed(tracker, List(3) { pitched(60) }).onsets())
+    }
+
+    // --- rules: the thresholds as a value, so a replay can try another ---
+
+    @Test
+    fun `a smaller stop drop hears a shallower tongued stop`() {
+        // A dip of 0.09 under the note's level: too shallow for STOP_DROP (0.12), a stop for 0.08.
+        fun run(tracker: NoteOnsetTracker): List<Int?> {
+            feed(tracker, List(4) { note(60, 0.6f) })
+            return feed(tracker, listOf(note(60, 0.58f, minLevel = 0.51f), note(60, 0.65f))).onsets()
+        }
+        assertEquals(listOf(null, null), run(NoteOnsetTracker()))
+        assertEquals(listOf(null, 60), run(NoteOnsetTracker(rules = NoteOnsetTracker.Rules(stopDrop = 0.08f))))
+    }
+
+    @Test
+    fun `rules name every threshold with its value`() {
+        val fields = NoteOnsetTracker.Rules().fields().toMap()
+        assertEquals("0.85", fields["gate"])
+        assertEquals("0.002", fields["floorRise"])
+        assertEquals("0.12", fields["stopDrop"])
+        assertEquals("70.0", fields["nearCents"])
+        assertEquals(16, fields.size)
+    }
+
+    @Test
+    fun `a rule is changed by name`() {
+        assertEquals(0.08f, NoteOnsetTracker.Rules().with("stopDrop", 0.08).stopDrop)
+        assertEquals(3, NoteOnsetTracker.Rules().with("restartFrames", 3.0).restartFrames)
+        assertEquals(0.9, NoteOnsetTracker.Rules().with("gate", 0.9).gate, 0.0)
+        assertThrows(IllegalArgumentException::class.java) { NoteOnsetTracker.Rules().with("nope", 1.0) }
+    }
+
+    @Test
+    fun `a seeded floor is the room's level from the start`() {
+        // The view model's tracker keeps the room's floor from one run to the next; a replay of
+        // the second run must start where the phone started, not learn the room again.
+        assertEquals(0.23f, NoteOnsetTracker(floor = 0.23f).floor)
+        assertNull(NoteOnsetTracker().floor)
     }
 }

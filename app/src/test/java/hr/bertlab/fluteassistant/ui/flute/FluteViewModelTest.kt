@@ -16,11 +16,14 @@ import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.fakes.FakeClock
 import hr.bertlab.fluteassistant.fakes.FakeFluteTonePlayer
+import hr.bertlab.fluteassistant.fakes.FakeListenRecorder
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
 import hr.bertlab.fluteassistant.fakes.FakeTunerEngine
 import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.ui.tuner.FrameDecision
 import hr.bertlab.fluteassistant.ui.tuner.Hearing
 import hr.bertlab.fluteassistant.ui.tuner.HearingTracker
 import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
@@ -53,6 +56,7 @@ class FluteViewModelTest {
     private val clock = FakeClock(now = 10_000L)
     private val logger = FakeLogger()
     private val engine = FakeTunerEngine()
+    private val recorder = FakeListenRecorder()
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -60,7 +64,7 @@ class FluteViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel() = FluteViewModel(settings, tonePlayer, engine, clock, logger)
+    private fun viewModel() = FluteViewModel(settings, tonePlayer, engine, clock, logger, recorder)
 
     private fun freq(midi: Int) = NoteMath.midiToFrequency(midi)
 
@@ -1487,5 +1491,86 @@ class FluteViewModelTest {
         assertTrue(settings.books[0].isEmpty)
         assertEquals(0, vm.current.openBook)
         assertTrue(vm.current.isEmpty)
+    }
+
+    // ---- Sessions: what a debug build records of a run (ui/flute/CLAUDE.md) ----
+
+    @Test
+    fun `listening starts the recorder with the tune, the pulse and the floor before the microphone and the log line`() = runTest(dispatcher) {
+        var subscriptionsAtStart = -1
+        var listenLinesAtStart = -1
+        recorder.onStart = {
+            subscriptionsAtStart = engine.subscriptions
+            listenLinesAtStart = logger.events("flute.listen").size
+        }
+        val vm = listeningViewModel(q(60), TuneRest(QUARTER), q(62))
+        val start = recorder.started.single()
+        assertEquals(listOf(q(60), TuneRest(QUARTER), q(62)), start.tune)
+        val config = settings.loadMetronomeConfig()
+        assertEquals(Pulse(config.bpm, config.timeSignature), start.pulse)
+        assertNull("the room has not been heard yet", start.floor)
+        assertEquals("the first hop must be in the audio", 0, subscriptionsAtStart)
+        assertEquals("the flute.listen line must be in the session", 0, listenLinesAtStart)
+        play(60)
+        emit(silentFrame) // silence with nothing sounding teaches the tracker the room's floor
+        vm.stopRun()
+        vm.startListening()
+        runCurrent()
+        assertEquals("the next run starts with the floor the last one left", 0f, recorder.started[1].floor)
+    }
+
+    @Test
+    fun `every processed frame reaches the recorder with what the phone did`() = runTest(dispatcher) {
+        listeningViewModel(q(71), TuneRest(QUARTER), q(72))
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(71)) }
+        assertEquals(listOf(FrameDecision.UNSTEADY, FrameDecision.UNSTEADY, FrameDecision.SHOWN), recorder.frames.map { it.decision })
+        val locked = recorder.frames.last()
+        assertEquals(pitched(71), locked.frame)
+        assertEquals(71, locked.sounding)
+        assertEquals(NoteOnsetTracker.Onset(71, fresh = true), locked.onset)
+        assertEquals(Verdict.RIGHT, locked.verdict)
+        assertEquals("the index waited on before the judgement", 0, locked.waited)
+        assertEquals(71, locked.expected)
+        assertFalse(locked.finishing)
+        assertEquals(Hearing.CLEAR, locked.hearing)
+        assertNull(locked.floor)
+        emit(pitched(71))
+        val tail = recorder.frames.last()
+        assertEquals("the rest is skipped", 2, tail.waited)
+        assertEquals(72, tail.expected)
+        assertNull(tail.verdict)
+        assertNull(tail.onset)
+        assertNull("the counted note's tail is not shown while another is waited on", tail.heardNow)
+        assertEquals(TunerAdvice.NONE, tail.advice)
+        assertFalse(tail.repeatHeld)
+    }
+
+    @Test
+    fun `the recorder ends with the marks when the run is done or stopped, after the last frame`() = runTest(dispatcher) {
+        val done = listeningViewModel(q(60))
+        repeat(TunerViewModel.LOCK_FRAMES) { emit(pitched(60)) }
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silentFrame) }
+        assertFalse(done.current.isListening)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), recorder.ended.single())
+        assertEquals("the frame that ended the run is in", 5, recorder.frames.size)
+        val stopped = listeningViewModel(q(60), q(62))
+        play(60)
+        stopped.stopRun()
+        assertEquals(listOf(mapOf(0 to StepMark.FIRST_TRY), mapOf(0 to StepMark.FIRST_TRY)), recorder.ended)
+    }
+
+    @Test
+    fun `the stop reason and the last summary are logged before the run ends, so the session has them`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(60)
+        var stopLinesAtEnd = -1
+        var summaryLinesAtEnd = -1
+        recorder.onEnd = {
+            stopLinesAtEnd = logger.events("flute.listen_stop").size
+            summaryLinesAtEnd = logger.events("flute.listen_summary").size
+        }
+        vm.stopRun()
+        assertEquals(1, stopLinesAtEnd)
+        assertEquals(1, summaryLinesAtEnd)
     }
 }

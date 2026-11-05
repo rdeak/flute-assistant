@@ -10,8 +10,10 @@ import hr.bertlab.fluteassistant.audio.tuner.TunerEngine
 import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.flute.Songbook
+import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.Preset
@@ -22,6 +24,8 @@ import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.playback.BackgroundPlayback
+import hr.bertlab.fluteassistant.ui.flute.ListenFrame
+import hr.bertlab.fluteassistant.ui.flute.ListenRecorder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -223,5 +227,30 @@ class FakeLogger(var verbose: Boolean = false) : Logger {
     }
     override fun e(tag: String, event: String, vararg fields: Pair<String, Any?>, error: Throwable?) {
         events += Event('e', tag, event, mapOf(*fields), error)
+    }
+}
+
+/** Remembers every call of the flute's session recorder; [onStart] and [onEnd] run first, so a test can look around at that moment. */
+class FakeListenRecorder : ListenRecorder {
+    data class Start(val tune: List<TuneItem>, val pulse: Pulse, val floor: Float?)
+
+    val started = mutableListOf<Start>()
+    val frames = mutableListOf<ListenFrame>()
+    val ended = mutableListOf<Map<Int, StepMark>>()
+    var onStart: () -> Unit = {}
+    var onEnd: () -> Unit = {}
+
+    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) {
+        onStart()
+        started += Start(tune, pulse, floor)
+    }
+
+    override fun frame(frame: ListenFrame) {
+        frames += frame
+    }
+
+    override fun end(marks: Map<Int, StepMark>) {
+        onEnd()
+        ended += marks
     }
 }

@@ -74,6 +74,18 @@ android {
         // stripped, and Play lists exactly these two.
         localeFilters += listOf("en", "hr")
     }
+    testOptions {
+        unitTests.all { test ->
+            // A recorded "Your turn" session to replay on the JVM (SessionReplayTest; see
+            // ui/flute/CLAUDE.md, "Sessions"): -Psession=<folder>, relative to the repository
+            // root, and -Psweep=<rule>:<v1>,<v2>,... The task is never up to date while one is
+            // named, so a second replay of the same folder runs again.
+            val session = providers.gradleProperty("session").map { rootDir.resolve(it).absolutePath }.getOrElse("")
+            test.systemProperty("fa.session", session)
+            test.systemProperty("fa.sweep", providers.gradleProperty("sweep").getOrElse(""))
+            if (session.isNotEmpty()) test.outputs.upToDateWhen { false }
+        }
+    }
 }
 
 // Room exports each schema version to app/schemas so future migrations can be written and tested.
