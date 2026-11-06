@@ -63,6 +63,18 @@ class TunerScreenTest {
     private fun identifying(frequency: Double?) = listening(frequency, mode = TunerMode.IDENTIFY)
 
     @Test
+    fun a_microphone_failure_says_so_in_plain_words() {
+        show(listening(null).copy(isListening = false, micFailed = true))
+        compose.onNodeWithText("I can't listen right now.").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_microphone_failure_speaks_the_childs_language() {
+        show(listening(null).copy(isListening = false, micFailed = true), locale = Locale.forLanguageTag("hr"))
+        compose.onNodeWithText("Sada ne mogu slušati.").assertIsDisplayed()
+    }
+
+    @Test
     fun identify_mode_names_the_heard_note_without_the_wheel() {
         show(identifying(443.0)) // A4 played 12 cents sharp
         compose.onNodeWithContentDescription("Your sound is A4 but a little high. Go down").assertIsDisplayed()

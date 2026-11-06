@@ -38,3 +38,8 @@ the recording one. Details: the `sessions` skill.
 (`Theme.AppCompat.DayNight.NoActionBar`) and the manifest declares
 `AppLocalesMetadataHolderService` with `autoStoreLocales`. The choice is stored by the platform
 (system on 13+, AppCompat below), not by `SettingsStore`.
+
+`MainActivity` declares `android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"` so
+a turn of the phone does not re-create it and a running tune, Your turn, the tuner or the metronome go on
+(`TurningThePhoneTest` reads the flags). The locale must stay out of the list: the language switch relies
+on the re-creation.

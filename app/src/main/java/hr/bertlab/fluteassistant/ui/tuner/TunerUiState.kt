@@ -36,7 +36,8 @@ data class TunerUiState(
     val identifiedMidi: Int? = null,
     /** What the microphone makes of sound that yields no readable note; see [Hearing]. */
     val hearing: Hearing = Hearing.CLEAR,
-    val errorMessage: String? = null,
+    /** The microphone would not open or stopped: what the child sees is a string resource, the cause is in the log. */
+    val micFailed: Boolean = false,
 ) {
     /** Distance in cents from [targetMidi] to the played note (positive = sharp), or null in silence. */
     val centsOffTarget: Double?

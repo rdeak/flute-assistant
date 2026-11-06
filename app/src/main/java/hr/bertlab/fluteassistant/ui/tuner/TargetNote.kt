@@ -96,8 +96,9 @@ private val ButtonGap = 20.dp
 /** The smallest the window gets before the tab scrolls instead. */
 private val MinWindowHeight = 120.dp
 
+/** The ‹ and › buttons; the tuner on its side stands them beside the window, with no Hear pill under it. */
 @Composable
-private fun StepButton(
+internal fun StepButton(
     icon: ImageVector,
     description: String,
     enabled: Boolean,
@@ -109,4 +110,4 @@ private fun StepButton(
     }
 }
 
-private const val SPEAKER_EMOJI = "🔊" // speaker, loud
+internal const val SPEAKER_EMOJI = "🔊" // speaker, loud

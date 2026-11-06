@@ -27,17 +27,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
+import kotlin.math.roundToInt
 
 /**
  * One round button with the current language's flag; a tap opens a small list of every
@@ -45,20 +47,32 @@ import hr.bertlab.fluteassistant.ui.theme.Sun
  * words: they need no translation, so a child who cannot read the current language still finds
  * their own, and a screen reader hears each language's endonym. The other flag is not faded, as a
  * faded flag looks as if it cannot be pressed. Picking any flag closes the list. Stateless about the
- * language: the host applies the choice.
+ * language: the host applies the choice. [listOffset] moves the list across from the button, for
+ * the rail, where it opens beside the flag. Whether the list is open is kept here, unless the caller
+ * passes [isOpen] and [onOpenChange] together and keeps it, so that it stays open when the button
+ * moves between the top bar and the rail. The button's flag is [flagSize] dp where that is given
+ * (the rail's smaller buttons, where a flag sized in sp would outgrow them at a large text size)
+ * and 24 sp otherwise.
  */
 @Composable
 fun LanguageSwitch(
     current: AppLanguage,
     onSelect: (AppLanguage) -> Unit,
     modifier: Modifier = Modifier,
+    listOffset: Dp = 0.dp,
+    isOpen: Boolean? = null,
+    onOpenChange: ((Boolean) -> Unit)? = null,
+    flagSize: Dp? = null,
 ) {
-    var open by remember { mutableStateOf(false) }
+    var ownOpen by remember { mutableStateOf(false) }
+    val open = isOpen ?: ownOpen
+    val setOpen = onOpenChange ?: { ownOpen = it }
+    val flagFont = with(LocalDensity.current) { (flagSize ?: FlagSize).toSp().value.roundToInt() }
     val label = stringResource(R.string.language)
     val colors = FluteTheme.colors
     Box(modifier) {
         ChunkyButton(
-            onClick = { open = true },
+            onClick = { setOpen(true) },
             modifier = Modifier
                 .size(48.dp)
                 .semantics {
@@ -66,12 +80,12 @@ fun LanguageSwitch(
                     stateDescription = current.endonym
                 },
         ) {
-            Emoji(current.flag, fontSize = 24)
+            Emoji(current.flag, fontSize = flagFont)
         }
         DropdownMenu(
             expanded = open,
-            onDismissRequest = { open = false },
-            offset = DpOffset(0.dp, 12.dp),
+            onDismissRequest = { setOpen(false) },
+            offset = DpOffset(listOffset, 12.dp),
             shape = StageShape,
             containerColor = colors.card,
             tonalElevation = 0.dp,
@@ -89,7 +103,7 @@ fun LanguageSwitch(
                         language = language,
                         selected = language == current,
                         onClick = {
-                            open = false
+                            setOpen(false)
                             if (language != current) onSelect(language)
                         },
                     )
@@ -99,8 +113,14 @@ fun LanguageSwitch(
     }
 }
 
+/**
+ * The flag's size where the caller gives none, in dp and not sp: a flag is a picture, and at the
+ * largest text size one in sp would outgrow its circle.
+ */
+private val FlagSize = 24.dp
+
 @Composable
-private fun FlagChoice(language: AppLanguage, selected: Boolean, onClick: () -> Unit) {
+internal fun FlagChoice(language: AppLanguage, selected: Boolean, onClick: () -> Unit) {
     val colors = FluteTheme.colors
     Box(
         contentAlignment = Alignment.Center,
@@ -116,6 +136,6 @@ private fun FlagChoice(language: AppLanguage, selected: Boolean, onClick: () -> 
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .semantics { contentDescription = language.endonym },
     ) {
-        Text(language.flag, style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp))
+        Text(language.flag, style = MaterialTheme.typography.titleLarge.copy(fontSize = with(LocalDensity.current) { FlagSize.toSp() }))
     }
 }

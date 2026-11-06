@@ -194,12 +194,26 @@ class TunerViewModelTest {
     }
 
     @Test
-    fun `engine failures surface as an error message`() = runTest(dispatcher) {
+    fun `an engine failure tells the screen and keeps its cause in the log`() = runTest(dispatcher) {
         engine.flowOverride = flow { throw IllegalStateException("Microphone busy") }
         val vm = listeningViewModel()
         advanceUntilIdle()
         assertFalse(vm.state.value.isListening)
-        assertEquals("Microphone busy", vm.state.value.errorMessage)
+        assertTrue(vm.state.value.micFailed)
+        assertEquals("Microphone busy", logger.events("tuner.error").single()["message"])
+    }
+
+    @Test
+    fun `listening again clears the failure`() = runTest(dispatcher) {
+        engine.flowOverride = flow { throw IllegalStateException("Microphone busy") }
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        engine.flowOverride = null
+        vm.startListening()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.isListening)
+        assertFalse(vm.state.value.micFailed)
+        vm.stopListening()
     }
 
     @Test
@@ -332,7 +346,7 @@ class TunerViewModelTest {
             throw IllegalStateException("Microphone busy")
         }
         val vm = listeningViewModel(); advanceUntilIdle()
-        assertEquals("Microphone busy", vm.state.value.errorMessage)
+        assertTrue(vm.state.value.micFailed)
         assertEquals(Hearing.CLEAR, vm.state.value.hearing)
         assertEquals(TunerAdvice.NONE, vm.state.value.advice)
     }

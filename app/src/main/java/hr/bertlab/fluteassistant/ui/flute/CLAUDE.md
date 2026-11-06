@@ -76,13 +76,17 @@ silence while nothing is held and every block written in full (`writeFully`, ret
 a route rebuild so a sustained tone never skips samples); on `close()` the thread
 (`ToneRenderLoop`, the loop body kept pure Kotlin so the close path is unit-tested) lets a
 sounding note release and plays the track buffer out before it gives the track back, never
-touches the command queue once retired (after a rotation the successor thread is already
-serving the keys), and a new `open()` meanwhile starts its own track at once, so two tracks
-overlap for the fade rather than the first press after a rotation waiting for it. `FluteViewModel` (Activity-scoped; specs:
+touches the command queue once retired (when the child leaves the tab and comes straight back the
+successor thread is already serving the keys), and a new `open()` meanwhile starts its own track at
+once, so two tracks overlap for the fade rather than the first press after coming back waiting for it.
+Turning the phone no longer closes the player: the Activity is not re-created (`configChanges`, see
+"Sideways" below), so only leaving the tab, Home and what still re-creates the Activity do (the language change, and
+a dark mode, text size or display size change in the phone's settings). `FluteViewModel` (Activity-scoped; specs:
 `docs/superpowers/specs/2026-10-23-digital-flute-design.md`, rests and breaths
 `docs/superpowers/specs/2026-11-02-flute-rest-and-breath-design.md`) opens the player in `enterTab()`
 and closes it in `leaveTab()` (`FluteScreen`'s `LifecycleStartEffect`, so the first press is
-never late and nothing plays off screen); `onKeyPressed(midi)` sounds the key at once, shows
+never late and nothing plays off screen; a turn of the phone does neither, and Home or another tab
+still logs `flute.stop reason=leave` for a tune that was running); `onKeyPressed(midi)` sounds the key at once, shows
 it (`FluteUiState.shown`, a `Shown.Note`, `Rest` or `Breath`) and appends it as an eighth (not at the cap, where it only sounds), then grows
 it while the key stays down at `Tune.growAtMs` (`heldLength`, and the step's length in `tune`,
 which the staff shows); `onKeyReleased(midi)` silences it and records the length the hold made from
@@ -275,8 +279,8 @@ main thread is busiest right after a judged note, when the staff scrolls and the
 is just when the next note's gap frames arrive.
 
 While the tune runs, in Play as in Your turn (`FluteUiState.isRunning`), the keys and the sponge
-go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3: lines 24 dp apart, the canvas's
-original size, for a phone on a music stand at arm's length; the geometry stays one table in dp
+go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3 upright: lines 24 dp apart, the canvas's
+original size, for a phone on a music stand at arm's length; sideways see "Sideways" below; the geometry stays one table in dp
 and a private `LocalStaffScale` multiplies every size and every `scale(density * s)`), with the
 advice line in the keys' room and the wide Stop at the bottom; the knob stays in the
 corner, its drum faded and inert and its badge gone (`SpeedKnob(running = true)`), because its animal is on the staff, walking
@@ -366,6 +370,59 @@ build adds `session.open` (path: where this run's session folder is) and `sessio
 and inside the session log alone `session.reopened` (frame, rate, source: the microphone opened
 again inside one run, which nothing in the app does today; the audio keeps the first opening's
 rate so the rows still line up with it).
+
+## Sideways
+
+Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "Flute" and "Turning the
+phone"; what every tab shares sideways, and why the tab has one call site in `MainScreen`, is in
+`../CLAUDE.md`). `FluteContent` builds the same pieces upright shows (the tune, the keys, the Play row)
+as local lambdas and `FluteSideways.kt` only says where they stand. `choosingSpeed`, `choosingBook` and the
+speed panel's `TempoWheelState` live above the branch, so an open panel or shelf survives a turn.
+
+- **Writing** (`FluteWritingSideways`; mockup `fit-v2.html`, the user's pick: the same keys as upright):
+  the rail, the staff's card, then the keys with Play and Listen to me under them. There is no right
+  column, so no `SidewaysPage`: beside the keys it left the staff about three beats. The three key rows
+  keep their upright order and contents (the rest, breath and sponge keys on top). Keys are 48 wide and
+  `SidewaysGeometry.keyHeight` tall (85 at 411, 68 at 360, never under upright's 58) with gaps of 6 and
+  12 (`FluteKeys(keyHeight, keyGap)`); under 630 dp of content they are 40 wide with 4 dp gaps, which is
+  what upright gives on a phone that narrow. Play (left) and Listen to me share the keys' width, 84
+  tall, in upright's order. The card takes the width left: 427 dp at 915, 11 beats at rest scale
+  (upright shows 9), 8 beats at 800, 5 at 640, with the staff centred in its height; the knob and the book
+  keep their corners. Under `WRITING_MIN_HEIGHT` (329 dp, shorter than any phone it was drawn for) the keys'
+  column scrolls like upright's tab instead of overflowing onto Play. The empty staff's hint (`EmptyHint`)
+  may take two lines sideways: at 640 it is about 92 dp wide and one line was cut.
+- **Running, Play or Your turn** (`FluteRunningSideways`; the worst case, `frame.html` option A): the keys
+  and the two buttons go as upright, the rail stays, and the card widens to leave the right column (683 dp
+  at 915: 15 beats, 14 at 800, 9 at 640). The staff is drawn at `SidewaysGeometry.runningStaffScale`: 4/3 where
+  the height allows it (343 dp plus the card's 38), below that the largest that fits (about 1.19 at 360 tall,
+  lines 21 dp apart, still bigger than upright at rest). The advice line is at the top of the column, wrapping
+  (`AdviceLine(wrap = true)`, 19 sp, up to four lines, shrinking before it would cut or split a word), and Stop
+  is low in it, in Listen to me's corner, under the thumb that started Your turn. The walking animal, the faded
+  knob and book and the heard-note bubble stay as they are.
+- **Speed panel** (`FluteSpeedSideways`): the metronome's `MetronomeStageSideways` with OK in Play's place.
+- **The shelf**: one row of six books, `SONGBOOK.md`.
+- **The microphone card** is the shared one (`ui/tuner/CLAUDE.md`); Your turn adds "Not now" to its column.
+- **Nothing stops when the phone turns.** Before this, a turn re-created the Activity and `FluteScreen`'s
+  `LifecycleStartEffect` called `leaveTab()`: pressing Play and then setting the phone on the stand logged
+  `flute.stop reason=leave`, which would lose the run of a child on a music stand. `MainActivity` now handles
+  orientation and size changes itself, so a tune and Your turn (the microphone keeps listening, the marks stay) run on
+  across a turn while the layout changes under them. The language change still
+  re-creates the Activity, and Home still stops the flute.
+- **A key held through a turn must stop its note.** When the layout changes (upright to sideways and
+  back) the keys move, so the finger's gesture is cancelled with a `CancellationException` and nothing else
+  would end the note. `FluteKey` and `RestKey` therefore call the release in a `finally` (logged once as
+  `flute.note`, at the turn, with the finger still down; nothing more when it lifts). A half turn between
+  the two sideways directions keeps the keys composed, so by the code only a move off the key or the lift should end
+  the note there. On the emulator the injected press stays on the same key (the two layouts are identical), so what a real
+  finger does, after the glass has turned under it, has not been seen. No automated test can drive this exactly:
+  the Compose test dispatcher handles a cancel at once, so the release runs by the ordinary road with or
+  without the `finally`. `FluteSidewaysTest` cancels the gesture by a density change instead (that fails without
+  the `finally`), and the real rotation with a finger down is checked by hand (`adb shell input swipe X Y X Y
+  4000` in the background, then turn).
+- **The staff keeps its place.** `staffPlace`, the `LazyListState` of the staff's marks, is created in
+  `FluteContent`'s writing and running branch and passed to `TuneStaff`, so a turn, Play and Stop do not
+  restart the scroll from the start of the line. It is not created higher, so opening the speed panel or the
+  shelf still gives a new book's tune a fresh state.
 
 ## Sessions (debug builds only)
 

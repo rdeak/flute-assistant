@@ -4,9 +4,14 @@
 package hr.bertlab.fluteassistant.ui.notes
 
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -62,6 +67,28 @@ class NotesScreenTest {
     private fun asking(midi: Int = 60) = NotesUiState(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = midi)
 
     private val staffDescription = "Staff, press where the note goes and let go"
+
+    /**
+     * Flames are pictures and not words: a larger text size would run five of them out of their pill,
+     * which is only 92 dp wide inside, so they keep their size.
+     */
+    @Test
+    fun the_flames_do_not_grow_with_the_text_size() {
+        var fontScale by mutableFloatStateOf(1f)
+        compose.setContent {
+            DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
+                LocaleProvider(Locale.ENGLISH) { StreakFlames(3) }
+            }
+        }
+        val pill = compose.onNodeWithContentDescription("Streak of 3")
+        val normal = pill.getBoundsInRoot().width
+        listOf(1.5f, 2f).forEach { scale ->
+            compose.runOnIdle { fontScale = scale }
+            compose.waitForIdle()
+            val grown = pill.getBoundsInRoot().width
+            assertTrue("at $scale x the pill is $grown wide, at normal text $normal", (grown - normal).value <= 1f)
+        }
+    }
 
     @Test
     fun shows_the_note_name_as_the_whole_question() {

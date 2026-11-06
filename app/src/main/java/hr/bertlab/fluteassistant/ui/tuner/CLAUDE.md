@@ -117,3 +117,45 @@ grey with "…". In "Tune" the window sits between ‹ › with a "Hear" pill un
 `docs/superpowers/specs/2026-10-22-tuner-target-note-design.md`); then the fingering for the ring's
 note, one status line and, under it, one quieter advice line that says what to change (roll the
 flute, air, fingers, come closer, a clear note), never a number.
+
+## Sideways
+
+Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "Tuner"; what every tab
+shares sideways is in `../CLAUDE.md`). `TunerContent` branches on `LocalSideways` before its padded column:
+the microphone card first (it branches itself, below), then `TunerSideways` (`TunerSideways.kt`). One layout,
+as the height leaves little choice. The numbers come from `SidewaysGeometry`, which the unit tests pin.
+
+- **The pitch window** stays vertical, because up means higher, and grows to fill the card's height:
+  `pitchWindowScale` is the inside height over 300, so 1.19 at 411 tall (the home ring 157 dp across against
+  132) and about 1.02 at 360. `PitchWindow` takes `maxScale` for this, where upright keeps its cap of 1. In Tune
+  mode it stands between the ‹ › (52 dp); in Which? mode their room stays empty, so the ring does not move
+  when the mode changes.
+- **The 20 dp gap.** The arrows stand 20 dp from the window, upright's `ButtonGap`, and the window block is 20
+  dp from the words (`SidewaysGeometry.ARROW_GAP`, `FINGERING_GAP`; `PITCH_WINDOW_SIDES` is derived from
+  them, so the decision below and the layout use the same numbers). The first build had 14, from the mockup,
+  and the sound bubble's arrow, which reaches 24 x scale dp past the window's edge (about 29 dp at 1.19), ran
+  into the › button in the 2 to 4 cent band just outside "Perfect!", which is when the child is closest. Under
+  the 750 dp edge the arrows are 44 dp with a 12 dp gap, as `fit-v2.html` draws.
+- **The fingering's rule.** It stands beside the window, under the status and advice lines, in what the card
+  leaves: `fingeringRoom` is the card's inside less the window with its arrows and the 20 dp gap, so 324 dp
+  wide at 915 x 411 and 255 at 800 x 360. When that is under 205 (`fingeringBeside`) it moves under the window
+  across the card, and the window shrinks by its height plus 12 dp to make room (237 dp tall; `fit-v2.html`).
+  At 360 tall that is a window under 750 dp wide: the 640 wide phone, and a wider phone whose camera hole
+  leaves it less, as a hole takes width from the tab (the emulator's takes 45 dp at 800 x 360). An 800 wide phone
+  keeps the full-size ring with a hole up to 50 dp, a 780 wide one with a hole up to 30. The number was 240 first,
+  which put the edge at 785 and sent a 780 wide phone, or an 800 wide one with a hole over 15 dp, to the
+  small layout (the final review, 2026-11-06). 205 keeps it down to 750 with the fingering 205 wide and about 30 tall; `TunerSidewaysTest` covers 780 and 750. The status line (40 sp in a 48 dp box; 28 sp in 64 under the
+  750 dp edge) and the advice line (22 sp in a fixed 58 dp box, two lines, 19 sp under that edge)
+  have fixed room, so the fingering never moves when advice comes and goes. A failed microphone says one translated
+  line (`micFailed`, `mic_failed`) in the advice's box, as nothing is heard then, so it moves nothing either
+  (upright it stands under the advice). The cause goes to the log (`tuner.error`) and never to the screen: a child can do nothing with it. Both shrink before they cut a
+  word (`StatusLine` and `AdviceLine` have floors and `autoSize` for large text).
+- **The right column** holds the buttons, 116 wide with the emoji over the word: Hear at the top in Tune mode only
+  (84 tall, faded while the note plays), and Which? over Tune as one child low (92 tall, 80 when the window is short), the
+  chosen one yellow; one child, so the pair stays low whether or not Hear is above it. They are a
+  `selectableGroup` with the `tuner_mode` description.
+- **Asking for the microphone** (tuner and flute): `MicrophonePermissionCard` branches itself, so the flute
+  gets it free. The disc on the left of the card (up to 0.38 of its width), "Can I listen?" and its line beside
+  it; Yes low on the right, Settings at the top of the column, and the flute's Your turn adds its quiet Not
+  now under Settings (it has no emoji).
+

@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.ui.metronome
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -13,6 +14,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -161,6 +163,25 @@ class MetronomeScreenTest {
         assertEquals(TimeSignature.FIVE_FOUR, chosenSignature)
         compose.onNodeWithContentDescription("Fewer beats").performClick()
         assertEquals(TimeSignature.THREE_FOUR, chosenSignature)
+    }
+
+    /**
+     * 6/8's fourth bubble is a medium accent, a little bigger than a plain one, so a row that counts
+     * only the first as bigger comes out too wide and squeezes the last bubble into an oval. The
+     * bubbles have no nodes of their own, so the last one is measured from what is drawn.
+     */
+    @Test
+    fun six_beats_stay_round() {
+        show(MetronomeUiState(config = MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT)))
+        val image = compose.onNodeWithContentDescription("Beats in a bar: 6").captureToImage().toPixelMap()
+        val background = image[0, 0]
+        fun drawn(x: Int) = (0 until image.height).any { y -> image[x, y] != background }
+        val right = (image.width - 1 downTo 0).first { drawn(it) }
+        val left = (right downTo 0).first { !drawn(it) } + 1
+        val rows = (0 until image.height).filter { y -> (left..right).any { x -> image[x, y] != background } }
+        val width = right - left + 1
+        val height = rows.last() - rows.first() + 1
+        assertTrue("the last bubble is $width px wide and $height px tall", kotlin.math.abs(width - height) <= 2)
     }
 
     @Test

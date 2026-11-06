@@ -18,6 +18,8 @@ import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
  * An [AppCompatActivity] only so that the in-app language switch
  * ([androidx.appcompat.app.AppCompatDelegate.setApplicationLocales]) works below Android 13;
  * the activity is re-created when the language changes and the ViewModels survive that.
+ *
+ * A turn does not re-create it (`configChanges` in the manifest), so a playing tune keeps going.
  */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {

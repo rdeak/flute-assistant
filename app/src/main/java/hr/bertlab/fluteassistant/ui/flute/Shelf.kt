@@ -44,8 +44,10 @@ import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.DISABLED_ALPHA
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.fadedUnless
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
@@ -99,7 +101,7 @@ fun BookButton(
 }
 
 /** The sweet on the book button: the round button's 26, which fits the room between the spine and the cover's edge. */
-private val CornerSweetSize = 26.dp
+internal val CornerSweetSize = 26.dp
 
 /** The least a row of books may take; on a taller screen the three rows share the height. */
 private val BookMinHeight = 116.dp
@@ -114,6 +116,12 @@ private val ShelfGap = 16.dp
  */
 val ShelfMinHeight: Dp = BookMinHeight * 3 + ShelfGap * 2 + 20.dp
 
+/** Between the books of the sideways shelf, the margin the other sideways screens leave around their cards. */
+private val SidewaysShelfGap = SidewaysGeometry.MARGIN.dp
+
+/** The tallest a sideways book grows (the mockup's 128 x 300): a taller window centres the row and leaves air over and under it. */
+private val SidewaysBookMaxHeight = 300.dp
+
 /**
  * The child's shelf of tunes, which takes the flute tab's stage, keys and Play row in place while
  * it is open: the [Songbook.SIZE] [books] as little books in two columns and three rows, always in
@@ -121,6 +129,11 @@ val ShelfMinHeight: Dp = BookMinHeight * 3 + ShelfGap * 2 + 20.dp
  * notes, the [openBook]'s cover yellow. One tap on a book is [onChoose] with its index, the open
  * book's too (which only closes the shelf). There is no number and no word on it; a screen
  * reader hears each book as "Cookie, 3 notes", "Cupcake, empty" or "Lollipop, open now".
+ *
+ * On a phone on its side ([LocalSideways]) the six stand in one row, like a real shelf, 8 dp apart
+ * and equally wide, as tall as the room allows up to [SidewaysBookMaxHeight] and centred in it. The
+ * caller gives the shelf the whole room and no more than the margins around it: nothing scrolls and
+ * no column stands beside it, since choosing a book is the only thing to do.
  */
 @Composable
 fun TuneShelf(
@@ -129,6 +142,33 @@ fun TuneShelf(
     onChoose: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val cover: @Composable (Sweet, Modifier) -> Unit = { sweet, coverModifier ->
+        val index = sweet.ordinal
+        BookCover(
+            sweet = sweet,
+            book = books.getOrElse(index) { Book() },
+            open = index == openBook,
+            onClick = { onChoose(index) },
+            modifier = coverModifier,
+        )
+    }
+    if (LocalSideways.current) {
+        Box(modifier.selectableGroup(), contentAlignment = Alignment.Center) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(SidewaysShelfGap),
+                // The cap goes first, so the row is as tall as the room up to the cap, not past it.
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = SidewaysBookMaxHeight)
+                    .fillMaxHeight(),
+            ) {
+                Sweet.entries.forEach { sweet ->
+                    cover(sweet, Modifier.weight(1f).fillMaxHeight())
+                }
+            }
+        }
+        return
+    }
     Column(
         verticalArrangement = Arrangement.spacedBy(ShelfGap),
         modifier = modifier.selectableGroup(),
@@ -142,16 +182,7 @@ fun TuneShelf(
                     .heightIn(min = BookMinHeight),
             ) {
                 row.forEach { sweet ->
-                    val index = sweet.ordinal
-                    BookCover(
-                        sweet = sweet,
-                        book = books.getOrElse(index) { Book() },
-                        open = index == openBook,
-                        onClick = { onChoose(index) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                    )
+                    cover(sweet, Modifier.weight(1f).fillMaxHeight())
                 }
             }
         }
@@ -287,6 +318,36 @@ private const val SWEET_WIDTH_SHARE = 0.5f
 internal fun sweetSize(width: Dp, height: Dp): Dp =
     minOf(maxOf(height * SWEET_SHARE, SweetMinSize), width * SWEET_WIDTH_SHARE)
 
+/**
+ * The sideways shelf's share of the label room the sweet may take: its books are narrow and 300 dp
+ * tall, so half the width left the sweet at 46 dp on the 915 dp phone where the mockup draws 58
+ * ([width] 92.8 dp times this is 58) and the sweet is the only cue a child who cannot read has
+ * for a tune.
+ */
+private const val SIDEWAYS_SWEET_WIDTH_SHARE = 0.625f
+
+/**
+ * The most of the room the sweet may take where the cover is too narrow to reach [SweetMinSize]
+ * by [SIDEWAYS_SWEET_WIDTH_SHARE]: the emoji is about 1.05 times as wide as its size, so 0.85
+ * leaves it a little air in the room, which already stands 6 dp clear of the spine and the edge.
+ */
+private const val SIDEWAYS_SWEET_FITS_SHARE = 0.85f
+
+/**
+ * [sweetSize] for the sideways shelf: the same third of the cover's [height], but across a
+ * larger share of the [width] ([SIDEWAYS_SWEET_WIDTH_SHARE]: 58 dp at 915 x 411, 47 at 800 x 360),
+ * and where the books are narrowest (640 x 360, 48 dp of room, a label of one bubble) not less
+ * than [SweetMinSize], or as near it as [SIDEWAYS_SWEET_FITS_SHARE] of the room lets it. That
+ * keeps it over the book button's [CornerSweetSize] for every sideways window: it holds for any
+ * [width] of 31 dp or more (0.85 of it is 26), and the narrowest sideways window, 600 dp wide,
+ * still leaves 41.7.
+ */
+internal fun sidewaysSweetSize(width: Dp, height: Dp): Dp {
+    val tall = maxOf(height * SWEET_SHARE, SweetMinSize)
+    val wide = maxOf(width * SIDEWAYS_SWEET_WIDTH_SHARE, minOf(SweetMinSize, width * SIDEWAYS_SWEET_FITS_SHARE))
+    return minOf(tall, wide)
+}
+
 /** The least room left between the label and the spine, and between the label and the cover's other edge. */
 private val LabelMargin = 6.dp
 
@@ -299,6 +360,20 @@ private const val COVER_NOTE_FONT = 0.5f
 private val LabelPadding = 3.dp
 private val LabelOutline = 2.dp
 private val LabelShape = RoundedCornerShape(7.dp)
+
+/** What the label's padding and outline take from its width, both sides. */
+private val LabelInset = (LabelPadding + LabelOutline) * 2
+
+/**
+ * How many [CoverNoteSize] bubbles, [CoverNoteGap] apart, fit on a label whose room is
+ * [labelWidth] wide after its padding and outline: the sideways shelf's books are narrower than
+ * upright's and show that many of the tune's first notes instead of shrinking five. At least one,
+ * so a book is never without a label, and at most [Songbook.COVER_NOTES], all a [Book] has to show.
+ */
+internal fun coverNotesThatFit(labelWidth: Dp): Int =
+    ((labelWidth - LabelInset + CoverNoteGap) / (CoverNoteSize + CoverNoteGap))
+        .toInt()
+        .coerceIn(1, Songbook.COVER_NOTES)
 
 /**
  * One book of the shelf, drawn as a little book (`sweets-shelf-v2.html`): a cover with a dark
@@ -316,6 +391,7 @@ private fun BookCover(
     modifier: Modifier = Modifier,
 ) {
     val colors = FluteTheme.colors
+    val sideways = LocalSideways.current
     val name = stringResource(sweet.nameRes)
     val description = when {
         open -> stringResource(R.string.flute_book_open, name)
@@ -338,7 +414,9 @@ private fun BookCover(
                 .clearAndSetSemantics { },
         ) {
             // In dp, not sp: the sweet grows with its cover, and a large font scale cannot push it out.
-            val sweetFont = with(LocalDensity.current) { sweetSize(maxWidth, maxHeight).toSp().value.roundToInt() }
+            val sweetFont = with(LocalDensity.current) {
+                (if (sideways) sidewaysSweetSize(maxWidth, maxHeight) else sweetSize(maxWidth, maxHeight)).toSp().value.roundToInt()
+            }
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
@@ -352,30 +430,34 @@ private fun BookCover(
 }
 
 /**
- * The cover's white label: the [notes] as small bubbles, blank for an empty book. It is as wide as
- * [Songbook.COVER_NOTES] bubbles, so every book's label is the same size, an empty one too; where
- * the cover is too narrow for five [CoverNoteSize] bubbles (a 360 dp phone) the bubbles shrink to fit.
+ * The cover's white label: the [notes] as small bubbles, blank for an empty book. Upright it is as
+ * wide as [Songbook.COVER_NOTES] bubbles, so every book's label is the same size, an empty one
+ * too; where the cover is too narrow for five [CoverNoteSize] bubbles (a 360 dp phone) the bubbles
+ * shrink to fit. On a phone on its side ([LocalSideways]) the books are narrower, and the label is
+ * as wide as the [coverNotesThatFit] full-size bubbles the cover has room for, and shows that many
+ * of the notes, every book's label again the same size.
  */
 @Composable
 private fun CoverLabel(notes: List<Int>) {
     val colors = FluteTheme.colors
+    val sideways = LocalSideways.current
     BoxWithConstraints {
-        val inset = (LabelPadding + LabelOutline) * 2
-        val gaps = CoverNoteGap * (Songbook.COVER_NOTES - 1)
-        val bubble = minOf(CoverNoteSize, (maxWidth - inset - gaps) / Songbook.COVER_NOTES)
+        val slots = if (sideways) coverNotesThatFit(maxWidth) else Songbook.COVER_NOTES
+        val gaps = CoverNoteGap * (slots - 1)
+        val bubble = minOf(CoverNoteSize, (maxWidth - LabelInset - gaps) / slots)
         // In dp, not sp: a name must stay inside its little bubble whatever the font scale.
         val fontSize = with(LocalDensity.current) { (bubble * COVER_NOTE_FONT).toSp() }
         Row(
             horizontalArrangement = Arrangement.spacedBy(CoverNoteGap, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .size(bubble * Songbook.COVER_NOTES + gaps + inset, bubble + inset)
+                .size(bubble * slots + gaps + LabelInset, bubble + LabelInset)
                 .clip(LabelShape)
                 .background(colors.card)
                 .border(LabelOutline, colors.outline, LabelShape)
                 .padding(LabelPadding + LabelOutline),
         ) {
-            notes.forEach { midi -> NoteBubble(midi = midi, size = bubble, fontSize = fontSize, depth = 0.dp) }
+            notes.take(slots).forEach { midi -> NoteBubble(midi = midi, size = bubble, fontSize = fontSize, depth = 0.dp) }
         }
     }
 }

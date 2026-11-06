@@ -72,7 +72,7 @@ Room enum `Converters` fall back to defaults on unknown names.
 
 Each feature's design, thresholds and the reasons behind them live in a CLAUDE.md next to its
 code, which loads when you work in that folder; read the one for the feature you are changing:
-`ui/` (the look, top bar, tab bar and screen structure every tab shares), `audio/metronome/`
+`ui/` (the look, top bar, tab bar, the sideways rail and the screen structure every tab shares), `audio/metronome/`
 (metronome audio path, player contract), `ui/metronome/` (that tab), `playback/` (background
 playback), `ui/tuner/` (tuner path), `ui/notes/` (note reading game), `ui/flute/` (digital flute:
 tune, rests and breaths, bars and ties; the songbook of six tunes is `SONGBOOK.md` beside it). The
@@ -99,7 +99,10 @@ tab's CLAUDE.md; these rules hold on all of them:
   for on a main screen. The notes game's summary and Your turn show no number, and Your turn has no
   summary.
 - The user rejected a wider layout (−/+ beside the ring, a ten-button signature scroller, flags in
-  the content area) as too packed: keep the screens this sparse.
+  the content area) as too packed: keep the screens this sparse. The one agreed exception is the
+  sideways layout (a phone on its side, 2026-11-05; spec
+  `docs/superpowers/specs/2026-11-05-landscape-design.md`, `ui/CLAUDE.md`): its width goes to size and
+  air, not to more things, and the turned-down list below holds there too.
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than

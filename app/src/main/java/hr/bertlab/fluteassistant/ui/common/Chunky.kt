@@ -156,7 +156,8 @@ fun ChunkyButton(
  * side on a phone with the word beside the icon; [stacked] puts the icon over the word, as the
  * tab bar's buttons stack an emoji over a word, at the same height, the word shrinking a step
  * or two at a narrow width or large text rather than being cut short (the flute's Play and
- * Your turn).
+ * Your turn). Sideways the button is taller than [BigActionHeight] ([height]), and the icon and word
+ * grow with it, to read from a music stand.
  */
 @Composable
 fun BigActionButton(
@@ -167,26 +168,30 @@ fun BigActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     stacked: Boolean = false,
+    height: Dp = BigActionHeight,
+    shape: Shape = CircleShape,
 ) {
+    val tall = height > BigActionHeight
     ChunkyButton(
         onClick = onClick,
         color = color,
-        shape = CircleShape,
+        shape = shape,
         depth = 8.dp,
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .height(84.dp),
+            .height(height),
     ) {
         if (stacked) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(28.dp))
+                Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(if (tall) 34.dp else 28.dp))
+                val wordStyle = MaterialTheme.typography.titleMedium
                 Text(
                     text,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = if (tall) wordStyle.copy(lineHeight = 30.sp) else wordStyle,
                     color = OnAction,
                     maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 18.sp),
+                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = if (tall) 26.sp else 18.sp),
                     modifier = Modifier.padding(horizontal = 8.dp),
                 )
             }
@@ -205,6 +210,9 @@ fun BigActionButton(
     }
 }
 
+/** The height of a [BigActionButton] upright. */
+private val BigActionHeight = 84.dp
+
 /**
  * The rounded white (navy in dark mode) card each tab draws its main content on, with a
  * thin border: it is not pressable, so it has no ink outline or shadow.
@@ -213,6 +221,7 @@ fun BigActionButton(
 fun Stage(
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.SpaceBetween,
+    padding: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = FluteTheme.colors
@@ -223,7 +232,7 @@ fun Stage(
             .clip(StageShape)
             .background(colors.card)
             .border(OutlineWidth, colors.border, StageShape)
-            .padding(16.dp),
+            .padding(padding),
         content = content,
     )
 }

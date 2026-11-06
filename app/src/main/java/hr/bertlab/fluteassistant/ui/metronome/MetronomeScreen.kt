@@ -31,6 +31,7 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
+import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.ActionStop
@@ -66,7 +67,8 @@ fun MetronomeScreen(
 /**
  * The whole metronome: the [MetronomeStage] (beat bubbles and tempo ring), then the big play
  * button. Nothing else: a child should never have to read. Loudness is left to the phone's
- * volume buttons. The column closes the tempo wheel on a touch anywhere, Play included.
+ * volume buttons. The column closes the tempo wheel on a touch anywhere, Play included. On a phone
+ * on its side it is [MetronomeSideways] instead, with the same wheel and the same callbacks.
  */
 @Composable
 fun MetronomeContent(
@@ -77,6 +79,18 @@ fun MetronomeContent(
     modifier: Modifier = Modifier,
 ) {
     val wheel = rememberTempoWheelState()
+
+    if (LocalSideways.current) {
+        MetronomeSideways(
+            state = state,
+            wheel = wheel,
+            onTogglePlayback = onTogglePlayback,
+            onBpmChange = onBpmChange,
+            onTimeSignatureChange = onTimeSignatureChange,
+            modifier = modifier.closesTempoWheel(wheel),
+        )
+        return
+    }
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         Column(

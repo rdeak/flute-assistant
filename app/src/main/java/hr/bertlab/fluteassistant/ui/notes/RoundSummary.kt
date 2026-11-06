@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.common.AppIcons
@@ -53,47 +54,14 @@ const val MAX_FLAMES = 5
  */
 @Composable
 fun RoundSummary(state: NotesUiState, onPlayAgain: () -> Unit, modifier: Modifier = Modifier) {
-    val hop by rememberInfiniteTransition(label = "trophy").animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
-        label = "trophy",
-    )
-    val starsDescription = stringResource(R.string.summary_stars, state.score, NotesUiState.ROUND_LENGTH)
-    val speed = state.speed()
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly,
     ) {
-        Emoji(TROPHY_EMOJI, fontSize = 100, modifier = Modifier.graphicsLayer { translationY = -10.dp.toPx() * hop })
-        Row(Modifier.clearAndSetSemantics { contentDescription = starsDescription }) {
-            repeat(NotesUiState.ROUND_LENGTH) { index ->
-                Emoji(STAR_EMOJI, fontSize = 26, modifier = Modifier.alpha(if (index < state.score) 1f else 0.25f))
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            StatTile(
-                picture = FLAME_EMOJI.repeat(state.bestStreak.coerceIn(1, MAX_FLAMES)),
-                faint = state.bestStreak == 0,
-                label = stringResource(R.string.summary_streak),
-                description = stringResource(R.string.streak_description, state.bestStreak),
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                picture = AIM_EMOJI + STAR_EMOJI.repeat(state.aimStars()),
-                label = stringResource(R.string.summary_aim),
-                description = stringResource(R.string.aim_description, state.aimStars()),
-                modifier = Modifier.weight(1f),
-            )
-            StatTile(
-                picture = speed?.emoji.orEmpty(),
-                animal = true,
-                label = stringResource(R.string.summary_speed),
-                description = speed?.let { stringResource(R.string.speed_description, stringResource(it.labelRes)) }.orEmpty(),
-                modifier = Modifier.weight(1f),
-            )
-        }
+        Emoji(TROPHY_EMOJI, fontSize = 100, modifier = Modifier.trophyHop())
+        SummaryStars(state)
+        SummaryTiles(state)
         BigActionButton(
             icon = AppIcons.Again,
             text = stringResource(R.string.play_again),
@@ -104,10 +72,72 @@ fun RoundSummary(state: NotesUiState, onPlayAgain: () -> Unit, modifier: Modifie
     }
 }
 
+/** The trophy's hop: up 10 dp and back, once a second. */
+@Composable
+internal fun Modifier.trophyHop(): Modifier {
+    val hop by rememberInfiniteTransition(label = "trophy").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
+        label = "trophy",
+    )
+    return graphicsLayer { translationY = -10.dp.toPx() * hop }
+}
+
+/**
+ * A star for every note found on the first try, ten in a row and the rest faint, of [fontSize] sp
+ * (a sideways card sizes them from its width). One accessible node, read as the count.
+ */
+@Composable
+internal fun SummaryStars(state: NotesUiState, modifier: Modifier = Modifier, fontSize: Int = 26) {
+    val description = stringResource(R.string.summary_stars, state.score, NotesUiState.ROUND_LENGTH)
+    Row(modifier.clearAndSetSemantics { contentDescription = description }) {
+        repeat(NotesUiState.ROUND_LENGTH) { index ->
+            Emoji(STAR_EMOJI, fontSize = fontSize, modifier = Modifier.alpha(if (index < state.score) 1f else 0.25f))
+        }
+    }
+}
+
+/**
+ * The three tiles: the best streak in flames, the aim in stars and the speed as one of the
+ * metronome's animals. [compact] is the sideways size, lower and with the room between them and
+ * the words shrinking to the tile.
+ */
+@Composable
+internal fun SummaryTiles(state: NotesUiState, modifier: Modifier = Modifier, compact: Boolean = false) {
+    val speed = state.speed()
+    Row(horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 10.dp), modifier = modifier.fillMaxWidth()) {
+        StatTile(
+            picture = FLAME_EMOJI.repeat(state.bestStreak.coerceIn(1, MAX_FLAMES)),
+            faint = state.bestStreak == 0,
+            label = stringResource(R.string.summary_streak),
+            description = stringResource(R.string.streak_description, state.bestStreak),
+            compact = compact,
+            modifier = Modifier.weight(1f),
+        )
+        StatTile(
+            picture = AIM_EMOJI + STAR_EMOJI.repeat(state.aimStars()),
+            label = stringResource(R.string.summary_aim),
+            description = stringResource(R.string.aim_description, state.aimStars()),
+            compact = compact,
+            modifier = Modifier.weight(1f),
+        )
+        StatTile(
+            picture = speed?.emoji.orEmpty(),
+            animal = true,
+            label = stringResource(R.string.summary_speed),
+            description = speed?.let { stringResource(R.string.speed_description, stringResource(it.labelRes)) }.orEmpty(),
+            compact = compact,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
 /**
  * A quiet tile: a picture made of emoji over one word; an [animal] faces right, as on the
  * metronome. The picture shrinks to fit the tile rather than lose an emoji off the edge: five
- * flames are wider than a third of a phone at full size.
+ * flames are wider than a third of a phone at full size. A [compact] tile (sideways) is lower, and
+ * its word shrinks too, as a third of a short phone's card is narrow for a word at large text.
  */
 @Composable
 private fun StatTile(
@@ -117,14 +147,16 @@ private fun StatTile(
     modifier: Modifier = Modifier,
     faint: Boolean = false,
     animal: Boolean = false,
+    compact: Boolean = false,
 ) {
     val colors = FluteTheme.colors
     val shape = RoundedCornerShape(24.dp)
+    val pictureStyle = MaterialTheme.typography.titleLarge.copy(letterSpacing = (-2).sp)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
         modifier = modifier
-            .height(104.dp)
+            .height(if (compact) 92.dp else 104.dp)
             .clip(shape)
             .background(colors.track)
             .border(OutlineWidth, colors.border, shape)
@@ -132,15 +164,26 @@ private fun StatTile(
     ) {
         Text(
             text = picture,
-            style = MaterialTheme.typography.titleLarge.copy(letterSpacing = (-2).sp),
+            // Compact lines are relative: a fixed line of the theme (30 sp) would stay as tall when the size shrinks to fit, and at the largest text the two lines would not fit the 92 dp.
+            style = if (compact) pictureStyle.copy(lineHeight = 1.2.em) else pictureStyle,
             maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 22.sp),
+            autoSize = TextAutoSize.StepBased(minFontSize = if (compact) 8.sp else 10.sp, maxFontSize = if (compact) 24.sp else 22.sp),
             modifier = Modifier
                 .padding(horizontal = 8.dp)
                 .alpha(if (faint) 0.3f else 1f)
                 .then(if (animal) Modifier.facingRight(picture) else Modifier),
         )
-        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        if (compact) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(fontSize = 17.sp, lineHeight = 1.25.em),
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = 17.sp),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+        } else {
+            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        }
     }
 }
 
@@ -154,5 +197,5 @@ fun headlineFor(score: Int): Int = when {
 }
 
 const val FLAME_EMOJI = "🔥" // fire
-private const val TROPHY_EMOJI = "🏆" // trophy
+internal const val TROPHY_EMOJI = "🏆" // trophy
 private const val AIM_EMOJI = "🎯" // direct hit

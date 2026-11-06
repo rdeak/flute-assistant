@@ -92,6 +92,7 @@
     <string name="advice_play_again">🔁 Stani, pa odsviraj opet</string>
     <string name="mic_permission_title">Smijem li slušati?</string>
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
+    <string name="mic_failed">Sada ne mogu slušati.</string>
     <string name="allow_microphone">Da</string>
     <string name="open_settings">Postavke</string>
     <string name="mic_not_now">Ne sad</string>

@@ -101,14 +101,15 @@ key as `openSpeed()` does and leaves the tone player open, and then `FluteConten
 The shelf (`TuneShelf`, `Shelf.kt`): `FluteContent` keeps `choosingBook` in `rememberSaveable`, as it
 keeps `choosingSpeed`, so rotation and the language switch keep it open, and while it is true the
 shelf takes the place of the stage, the keys and the Play row (leaving the tab drops it, and logs no
-closing line, as for the speed panel). Six `BookCover`s stand in two columns and three rows, always
+closing line, as for the speed panel). Six `BookCover`s stand in two columns and three rows (sideways in one row, see below), always
 in the sweets' order (🍭 🍪 / 🧁 🍩 / 🍦 🍬), each a little book (`LittleBook` at the `ShelfBook` sizes,
 the drawing the book button shares): a cover square at the spine and round
 at the edge that opens (`BookLook.shape`), a dark spine down its left edge, page edges (thin lines on
 paper) showing past its right edge, the sweet large in the middle and under it a white label with
 the tune's first five notes (`Book.coverNotes`, rests and breaths skipped) as small `NoteBubble`s in
 their letters' colours, the label always five bubbles wide so every label is the same size (the
-bubbles shrink on a 360 dp phone, where five of 22 dp do not fit). The open book's cover is `Sun`,
+bubbles shrink on a 360 dp phone, where five of 22 dp do not fit; sideways the label is as many bubbles as
+fit). The open book's cover is `Sun`,
 the others `colors.raised`, and dark mode follows `FluteColors` as every other card. An empty book
 has its sweet faded and a blank label; there is no number and no word anywhere on the shelf. One tap
 on a book is `onChoose(index)`, which closes the shelf and, in `FluteScreen`, calls `openBook` and
@@ -124,3 +125,24 @@ gaps and the column's 20 dp), so it fits a 360 x 640 dp phone with large text an
 that. A screen reader hears each cover as one node, "Cookie, 3 notes" (`flute_book_notes`, the
 note-count plural), "Cupcake, empty" or "Lollipop, open now", and the bubbles on it stay silent
 (the wording was chosen in the same brainstorm and approved by the user).
+
+Sideways (2026-11-05, spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "The shelf of tunes"):
+the six books stand side by side in one row, like a real shelf, with no right column, as tapping a book is
+the only action (and `FluteContent` keeps `choosingBook`, so a turn leaves the shelf open). Each
+`BookCover` is `weight(1f)` and as tall as the room up to 300 dp, centred, 8 dp apart with 8 dp margins: about
+128 x 300 on the 915 x 411 phone, 83 wide at 640. There is no `fitOrScroll` and no `ShelfMinHeight` here (that
+is the upright column's); the six covers are in the room on the three phones, which `FluteSidewaysTest` checks
+with their bounds. The little strip under the sweet shows as many of the tune's first notes as fit
+(`coverNotesThatFit`, bubbles 22 dp with `CoverNoteGap` between and a 10 dp `LabelInset`): three at 915, two at
+800, one at 640, where upright always shows five.
+
+The sweet is bigger sideways (`sidewaysSweetSize`, used by `BookCover` when `LocalSideways`): the third of the
+cover's height with the 40 dp floor as upright, but capped at 0.625 of the room between the spine and the cover's
+other edge instead of a half, and where that falls under 40 dp (the 640 phone: a room of about 48 dp) the sweet
+keeps 40 dp, or 0.85 of the room on a window narrower than that. That is 58 dp at 915 (the mockup's), about 47 at
+800 and 40 at 640. Upright's half-of-the-room cap gave 46, 38 and 24 dp, and 24 is under the book button's 26;
+the sweet is the only cue a child who cannot read yet has for "my school tune", so it is not left small. The
+sweet's glyph is about 1.05 times its size wide, which the 6 dp `LabelMargin` on each side of a 40 dp sweet in
+the 640 phone's room still clears. `SweetTest` pins the sizes and that the sweet is never under
+`CornerSweetSize` from 31 dp of room up (below 30 dp the bound does not hold, and no sideways window is that
+narrow).

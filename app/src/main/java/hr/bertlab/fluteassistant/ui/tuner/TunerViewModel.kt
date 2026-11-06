@@ -88,7 +88,7 @@ class TunerViewModel @Inject constructor(
     fun startListening() {
         if (!_state.value.permissionGranted || listenJob?.isActive == true) return
         listenJob = viewModelScope.launch {
-            _state.update { it.copy(isListening = true, errorMessage = null) }
+            _state.update { it.copy(isListening = true, micFailed = false) }
             try {
                 engine.pitchFrames().collect(::onFrame)
                 _state.update { it.copy(isListening = false) }
@@ -97,9 +97,7 @@ class TunerViewModel @Inject constructor(
             } catch (e: Exception) {
                 logger.w(LogTags.TUNER, "tuner.error", "message" to e.message, error = e)
                 clearHearing()
-                _state.update {
-                    it.copy(isListening = false, reading = null, errorMessage = e.message ?: "Microphone unavailable")
-                }
+                _state.update { it.copy(isListening = false, reading = null, micFailed = true) }
             }
         }
     }

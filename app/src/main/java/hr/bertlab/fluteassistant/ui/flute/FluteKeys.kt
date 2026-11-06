@@ -65,9 +65,9 @@ import kotlinx.coroutines.launch
  * A key's height: a sure target for a small finger, and the canvas's 58 at every screen height
  * (the user, 2026-11-02: keys as on the canvas; they used to stretch to 72 dp to fill the space).
  */
-private val KeyHeight = 58.dp
+internal val KeyHeight = 58.dp
 private val KeyRowGap = 12.dp
-private val KeyGap = 6.dp
+internal val KeyGap = 6.dp
 private val KeyShape = RoundedCornerShape(21.dp)
 private val KeyDepth = 5.dp
 
@@ -92,8 +92,9 @@ private const val EraseRepeatMs = 120L
  * its name; the key of [litMidi] sinks onto its shadow inside a yellow ring. A finger down
  * calls [onPress] at once and the finger lifting, or sliding off, calls [onRelease]; sliding
  * onto another key does not press it, so every note in the tune is a deliberate tap. A
- * screen reader activates a key through [onActivate]. Every row is [KeyHeight] tall, as on the
- * canvas, and the three rows sit centred in the height they are given.
+ * screen reader activates a key through [onActivate]. Every row is [keyHeight] tall, [KeyHeight] as
+ * on the canvas unless the phone is on its side, and the three rows sit centred in the height they
+ * are given. A key's width comes from the width given, less [keyGap] between each two keys.
  *
  * At the end of the top row, apart from c3 with the rest of the row empty between, stand three
  * plain keys, each one note key wide and over a note key of the row below (g2, a2, h2), so a tool is
@@ -120,6 +121,8 @@ fun FluteKeys(
     eraseEnabled: Boolean,
     onErase: () -> Unit,
     modifier: Modifier = Modifier,
+    keyHeight: Dp = KeyHeight,
+    keyGap: Dp = KeyGap,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
     val rows = remember { StaffNotes.ALL.groupBy { Math.floorDiv(it, 12) }.toSortedMap().values.reversed() }
@@ -130,7 +133,7 @@ fun FluteKeys(
         // tools stand exactly over the columns below (the rows end up to 6 px short, split between
         // the sides).
         val keyWidth = with(LocalDensity.current) {
-            ((constraints.maxWidth - KeyGap.roundToPx() * (keysPerRow - 1)) / keysPerRow).toDp()
+            ((constraints.maxWidth - keyGap.roundToPx() * (keysPerRow - 1)) / keysPerRow).toDp()
         }
         Column(
             modifier = Modifier
@@ -142,9 +145,9 @@ fun FluteKeys(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(KeyHeight + KeyDepth)
+                        .height(keyHeight + KeyDepth)
                         .padding(bottom = KeyDepth),
-                    horizontalArrangement = Arrangement.spacedBy(KeyGap, Alignment.CenterHorizontally),
+                    horizontalArrangement = Arrangement.spacedBy(keyGap, Alignment.CenterHorizontally),
                 ) {
                     row.forEach { midi ->
                         FluteKey(
@@ -165,7 +168,7 @@ fun FluteKeys(
                         // the last three keys of the row below, the sponge ending where h2 does.
                         val emptyColumns = keysPerRow - row.size - SignKeyCount
                         if (emptyColumns > 0) {
-                            Spacer(Modifier.width(keyWidth * emptyColumns + KeyGap * (emptyColumns - 1)))
+                            Spacer(Modifier.width(keyWidth * emptyColumns + keyGap * (emptyColumns - 1)))
                         }
                         RestKey(
                             lit = restLit,
@@ -217,8 +220,11 @@ private fun RestKey(
             detectTapGestures(
                 onPress = {
                     currentOnPress()
-                    tryAwaitRelease() // up, or the finger slid off: both let go of the key
-                    currentOnRelease()
+                    try {
+                        tryAwaitRelease() // up, or the finger slid off: both let go of the key
+                    } finally {
+                        currentOnRelease() // as does the key leaving the screen (see FluteKey)
+                    }
                 },
             )
         },
@@ -376,8 +382,14 @@ private fun FluteKey(
                 detectTapGestures(
                     onPress = {
                         currentOnPress(midi)
-                        tryAwaitRelease() // up, or the finger slid off: both let go of the key
-                        currentOnRelease(midi)
+                        try {
+                            tryAwaitRelease() // up, or the finger slid off: both let go of the key
+                        } finally {
+                            // Turning the phone takes the key off the screen and cancels the gesture
+                            // here, with no up to come; the Activity lives on, so nothing else would
+                            // end the note. The ViewModel ignores a key that is no longer the one held.
+                            currentOnRelease(midi)
+                        }
                     },
                 )
             },

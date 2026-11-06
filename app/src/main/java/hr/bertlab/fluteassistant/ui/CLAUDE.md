@@ -5,16 +5,18 @@ when needed. Each tab's own screen is in its folder's CLAUDE.md; the rules every
 the root CLAUDE.md, "Kid-friendly UI constraint". User-visible strings: the root CLAUDE.md too.
 
 The top bar shows the app icon and names the open tab; the tab bar is four emoji-and-word buttons.
+That is the upright frame. On a phone on its side a rail stands in for both ("Sideways", at the end).
 
 - One Activity, which sets `volumeControlStream` to the media stream so the volume keys adjust
   the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus the `LanguageSwitch`: since 2026-11-05 one
-  flag button that opens a list of the flags, with no words, over `ui/common/AppLanguage`; selecting one calls
+  flag button that opens a list of the flags, with no words and sized in dp so they keep to their circles at any text size, over `ui/common/AppLanguage`; selecting one calls
   `AppCompatDelegate.setApplicationLocales`, which re-creates the Activity) and a bottom bar
   switching between the four tabs (`AppTab`: flute, metronome, tuner, notes; since 2026-11-04 the
   flute is first and the app opens on it, the first entry always being the start tab, and the drum
   sits beside it as the tab the speed knob opens; before that the order was just the build order,
   never a decision; Play screenshots follow the same order). All ViewModels are
-  Activity-scoped so state and playback survive tab switches, rotation and that re-creation;
+  Activity-scoped so state and playback survive tab switches and that re-creation; a turn of the
+  phone re-creates nothing (`configChanges` in the manifest, "Sideways" below);
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
   when the notes tab is left, so the child always comes back to a zero score. `MainScreen` also
   keeps the screen on (`ui/common/KeepScreenOn`) while the metronome plays, the tuner listens or
@@ -55,8 +57,8 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   notes tab scrolls a little on such phones rather than shrink the staff's places, and the flute
   scrolls below its own `FitsHeight` as before (its speed panel, like the metronome tab, only
   below `MetronomeMinHeight`).
-- The credits (`ui/common/Credits.kt`, the user's call on 2026-11-05): a long press on the top bar's
-  icon (`CreditsLogo`) opens a `Dialog` with the version, the privacy policy's address, the copyright,
+- The credits (`ui/common/Credits.kt`, the user's call on 2026-11-05): a long press on the app icon
+  (`CreditsLogo`, in the top bar or at the top of the rail) opens a `Dialog` with the version, the privacy policy's address, the copyright,
   the licence and where to read it, and no repository address (the user's call: users do not need
   it). A visible entry was drawn and turned down the same day as more load than it is worth. Nothing on
   screen shows it can, and a tap does nothing, so the main screens stay as sparse as ever; a screen
@@ -64,7 +66,103 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   credit, and it is the only place the app shows the credit or the policy, which Play asks to find
   inside the app. The addresses stay plain text, never links, so a child cannot leave the app. It is
   not a main screen, so its numbers are fine.
-  Its strings are read before the `Dialog`, whose own window `LocaleProvider` does not reach.
+  Its strings are read before the `Dialog`, whose own window `LocaleProvider` does not reach. It stays
+  open across a turn (the open state lives in `MainScreen`, see below), and it scrolls on a short window.
 - `ui/common/ValueWheel` is the snapping three-row drum behind the metronome's `TempoWheel`. Its
   content description stays on the `LazyColumn` node: the UI tests scroll it with
   `performScrollToIndex`.
+
+## Sideways (a phone on its side)
+
+Since 2026-11-05; the design, the mockups and who decided what are in
+`docs/superpowers/specs/2026-11-05-landscape-design.md`. Each tab's sideways screen is described in
+its own folder's CLAUDE.md; this is what they share. Before it the app rotated but had no sideways
+layout: the bars left about 209 of 411 dp, so every tab was cut off. The moment it is for is a
+child who props the phone on a music stand and plays with both hands on the flute, so the metronome,
+the tuner and the flute's Your turn must read from arm's length and need no tap until Stop.
+
+- **When.** `SidewaysGeometry.isSideways(width, height)`: the window is wider than tall and at least
+  600 dp wide, in both sideways directions. It follows the window, not the device, so a narrow pane of
+  a split screen keeps the upright layouts (which already scroll there). `MainScreen` reads the window in a
+  `BoxWithConstraints` and provides `LocalSideways` (static: it changes only with the window, and then the
+  whole screen is laid out again anyway). Screens read `LocalSideways` and branch inside their `*Content`: the
+  metronome, tuner and notes with an early `return` into a `*Sideways` composable (the upright body is untouched),
+  the flute inside `FluteContent` over the same lambdas for the tune, the keys and the Play row, and the
+  microphone card by itself, which gives the tuner and the flute theirs; never
+  `LocalConfiguration`, which the tests' `SidewaysHost` does not move. The one thing that reads a
+  configuration is the flag (`AppLanguageSwitch`): it reads `LocalResources.current.configuration`, the
+  resources the words come from, so the flag cannot disagree with them after a turn. The orientation is
+  never locked.
+- **`SidewaysGeometry`** (`ui/common/Sideways.kt`): the sideways sizes as plain dp floats, like
+  `StaffGeometry`, so `SidewaysGeometryTest` pins what the three phones it was drawn for get (915 x 411,
+  800 x 360, 640 x 360). The screens read these: the rail (92 wide, 84 under 400 dp tall,
+  `isShort`), the right column (116, 100), the card, the keys, the running staff's scale, the ring, the
+  big beats' gaps and cap, the tuner's window and where its fingering stands. Some sizes stay local
+  to the screen that draws them (the metronome's panel and well, the picker's keys), and `bigBeatUnit`
+  is what the tests hold `BeatBubbles` to: no screen calls it. `CARD_CHROME` is 38 (the card's padding
+  and border) although the border takes no layout room, so the real inset is 32: upright's `FitsHeight`
+  counts the same 38, and the spare 6 dp gives c3's stem its room.
+- **The frame.** `SideRail` replaces `TitleBar` and `TabBar`: from the top the logo (`CreditsLogo`, its
+  long press opens the credits), the four tabs as emoji over word in `AppTab` order with the open one a
+  yellow pill (`TabItem`, shared with the tab bar), and the flag (`AppLanguageSwitch`). It never
+  rearranges, not even when a tune starts. The drum hops on every beat as in the tab bar, and a screen
+  reader still hears "Playing". There is no title: the yellow tab says which is open, and a screen reader
+  hears it as the selected tab. The rail's words may shrink to 7 dp (the bar's floor is 10 sp) because
+  "Metronome" was cut short at large text and a cut word is worse than a small one. The rail's sizes are
+  in dp where the text size would break the 60 dp cell of a short rail: the floor and the emoji over the word
+  do not grow with the text (a floor of 7 sp is 14 dp at twice the text, wider than "Metronome" has room for), and
+  the word grows to 1.3 times at most (`RailWordGrowth`; at twice the emoji and the word took the whole cell and
+  the open tab's outline cut the word). The language list
+  opens beside the rail (`LanguageSwitch.listOffset`): above the flag it would cover the tabs. A camera
+  cutout: the rail's background runs under the one on its side and its contents stand clear, and the tab's
+  box clears the one on the other (`EndCutout`); sideways `Scaffold` gets `WindowInsets.systemBars` rather
+  than its default, which also takes the cutout and would double it. The emulator has no cutout of its
+  own: `adb shell cmd overlay enable --user 0 com.android.internal.display.cutout.emulation.hole` (also
+  `.tall`, `.corner`, `.double`; `disable` afterwards) shows the rail and the right column clearing it in both
+  sideways directions, but only a real phone's camera settles it.
+- **`SidewaysPage`** (`ui/common/SidewaysPage.kt`): the shape every tab has, where am I on the left (the
+  rail), the thing itself in the middle (the white card, `Stage`, 8 dp margins), what to do on the right
+  (a column, `column = null` for none). Its first child sits at the top, its last low, the same spot on every
+  tab (near the stand's ledge, under the right hand), and a lone child goes low too
+  (`Arrangement.SpaceBetween` alone would send it to the top). `SidewaysActionButton` is the stacked
+  `BigActionButton` (116 x 104), `SidewaysPlainButton` the quieter emoji-over-word one (84 tall, or 92 and
+  80 for the tuner's modes; no emoji means the word alone, for "Not now"). The flute's writing screen has no
+  column, so it does not use the page. Words shrink with `autoSize` and use relative line heights: before
+  Android 14 font scaling is linear, and a fixed line would not fit.
+- **`HideSystemBars`** (`ui/common/SystemBars.kt`): while sideways the status and navigation bars hide, which
+  gives the running staff its full size (with them 48 dp of the height goes); a swipe from the edge brings them
+  back for a moment (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`). They return upright and stay in split screen, where
+  they are not the app's to take. The activity handles the change into and out of split screen itself, so
+  the effect also listens to it: `enabled` does not change when a wide pane is dragged to full screen.
+  **Android shows its own one-time "Viewing full screen / To exit, swipe down from the top" prompt with a
+  "Got it" button the first time the bars hide.** It covers the middle of the screen until it is tapped, shows
+  once, and an app cannot turn it off; a child on the stand meets it once. Kept on purpose (the staff needs the
+  height); the user decides whether it is worth it. Another system overlay: when the microphone opens (the
+  tuner, Your turn) Android draws its green microphone chip, with the clock, over the top of the rail and of
+  the right column for a few seconds, bars hidden or not; there is nothing to do about it.
+- **A turn re-creates nothing.** `MainActivity` declares `orientation|screenSize|smallestScreenSize|screenLayout`
+  in `configChanges`, and not the locale: the language switch relies on re-creation. So a tune, Your turn, the
+  tuner and the metronome run on through a turn, and an open panel (speed, shelf, picker) stays open. Going
+  to the background (Home) still stops the flute (`flute.stop reason=leave`). `TurningThePhoneTest` reads the
+  manifest's flags.
+- **One call site for the tab.** `MainScreen` writes the `when (selectedTab)` once and hands it to the stateless
+  `MainFrame` as its `tab` slot; `MainFrame` calls it in one place, a `Box` in a `Row` that holds the rail only
+  when sideways, so a turn only recomposes it. Were the tab composed in an `if (sideways) ... else ...`, it would
+  leave the composition on a turn and `FluteScreen`'s lifecycle effect would call `leaveTab()` and stop the tune:
+  the same loss the manifest flag prevents, by another road. `MainFrameTest` guards it: a tab with a
+  `DisposableEffect` and a `remember`ed object is flipped upright to sideways and back, and must be entered once,
+  never disposed and made once (checked by putting `tab()` in two branches, which fails it). The real run is still
+  worth a look after a change to the frame: a turn during Play with no `flute.stop reason=leave` in
+  `adb logcat -s FA.Flute`. For the same reason the credits' and the language list's open state is held in
+  `MainScreen` (`creditsOpen`, `languageOpen`) and passed to whichever bar shows: the logo and the flag move
+  between the top bar and the rail, and state kept inside them would be lost.
+- **Tests.** `SidewaysHost(width, height, fontScale, sideways)` (androidTest) forces a window size and
+  `LocalSideways`; it takes the rail off the width, so a test with `SideRail` beside a tab forces its own full
+  size. Its density is floored, so it is about 0.5 % larger than asked. **`assertIsDisplayed` does not prove a
+  fit**: what spills past a window is still displayed, and a word cut short still has its node. Compare
+  `getUnclippedBoundsInRoot()` with the room, and ask `GetTextLayoutResult` about words (`hasVisualOverflow`, line
+  breaks only at whitespace). Text also measures a little differently at the phone's real density, so a tight fit
+  is worth one run with the emulator itself sideways (the rail's "Metronome" failed only there). A flip of
+  `LocalSideways` alone cannot show that a key held through a turn is released: the Compose test dispatcher
+  handles the gesture's cancel at once, where a phone throws it; `FluteSidewaysTest` cancels the gesture by a
+  density change instead, and the real rotation is checked by hand (`ui/flute/CLAUDE.md`).

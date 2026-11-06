@@ -20,6 +20,9 @@ adb shell pm grant hr.bertlab.fluteassistant android.permission.RECORD_AUDIO
 adb shell cmd locale set-app-locales hr.bertlab.fluteassistant --user 0 --locales hr   # switch the app to Croatian (the in-app flags do the same)
 adb shell cmd uimode night yes                                                         # dark mode
 adb exec-out screencap -p > shot.png
+adb shell settings put system accelerometer_rotation 0                                # then turn it by hand:
+adb shell settings put system user_rotation 1                                         # sideways (3 the other way, 0 upright)
+adb shell wm size 945x2100                                                            # the 800 x 360 dp phone; 945x1680 is 640 x 360; `wm size reset` after
 ```
 
 The notification-permission dialog appears on the first metronome start (API 33+);

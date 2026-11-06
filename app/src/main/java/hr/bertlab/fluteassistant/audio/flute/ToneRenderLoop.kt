@@ -41,7 +41,8 @@ internal sealed interface ToneCommand {
  * not, it lets a sounding note release (bounded), then writes one track buffer's worth of
  * silence so the end of the fade is played out rather than flushed with the track, and then
  * says it is done. A retired loop never touches the queue: that belongs to whichever loop is
- * running now (after a rotation the successor is already serving the keys).
+ * running now (when the child leaves the tab and comes straight back, the successor is already
+ * serving the keys; a turn of the phone does not close the player).
  */
 internal class ToneRenderLoop(
     private val synth: SustainedToneSynth,

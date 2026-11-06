@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +38,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -50,6 +54,7 @@ import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.chunky
@@ -135,6 +140,26 @@ fun TunerContent(
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // A phone on its side has its own layout ([TunerSideways]), and its own place for the microphone
+    // card, which brings its own page there.
+    if (LocalSideways.current) {
+        if (state.permissionGranted) {
+            TunerSideways(
+                state = state,
+                onTargetNoteChange = onTargetNoteChange,
+                onModeChange = onModeChange,
+                onPlayNote = onPlayNote,
+                modifier = modifier,
+            )
+        } else {
+            MicrophonePermissionCard(
+                onRequestPermission = onRequestPermission,
+                onOpenSettings = onOpenSettings,
+                modifier = modifier.fillMaxSize(),
+            )
+        }
+        return
+    }
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -191,27 +216,13 @@ fun TunerContent(
                 }
 
                 // Which keys to press: for the ring's note, chosen or heard.
-                val fingeredMidi = state.homeMidi
-                FingeringDiagram(
-                    keys = fingeredMidi?.let(FluteFingerings::keysFor),
-                    noteLabel = fingeredMidi?.let { noteLabel(it) },
-                    color = fingeredMidi?.let(::noteColor) ?: FluteTheme.colors.raised,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(FINGERING_ASPECT_RATIO),
-                )
+                TunerFingering(state)
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    StatusLine(
-                        status = state.status,
-                        targetNote = noteLabel(state.targetMidi).takeIf { state.mode == TunerMode.TARGET },
-                        mismatch = state.mismatch,
-                        heardNote = state.reading?.let { noteLabel(it.midi) },
-                        playing = state.isPlayingReference,
-                    )
+                    StatusLine(state)
                     AdviceLine(state.advice)
-                    state.errorMessage?.let { message ->
-                        Text(message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                    if (state.micFailed) {
+                        Text(stringResource(R.string.mic_failed), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
                     }
                 }
             }
@@ -225,7 +236,7 @@ fun TunerContent(
  */
 private val TunerMinHeight = 440.dp
 
-private val TunerMode.emoji: String
+internal val TunerMode.emoji: String
     get() = when (this) {
         TunerMode.IDENTIFY -> "\uD83D\uDD0D" // magnifying glass
         TunerMode.TARGET -> "\uD83C\uDFAF" // direct hit
@@ -272,21 +283,33 @@ private fun TunerModeChoice(mode: TunerMode, onSelect: (TunerMode) -> Unit) {
 }
 
 /**
- * One line of feedback; while nothing is heard it names [targetNote] when there is one, or
- * asks for any note, and while the reference note is [playing] it says to listen. When the
- * child plays a different note from the chosen one ([mismatch]) the line says which note it
- * was ([heardNote]), or that it is the octave above or below. What to change about it is
- * the advice line's business ([AdviceLine]). It bounces in when the note comes into tune,
- * and shrinks rather than wraps when the words are long.
+ * One line of feedback for [state], written once for both layouts; while nothing is heard it names
+ * the chosen note (in Tune mode) or asks for any note, and while the reference note is playing it
+ * says to listen. When the child plays a different note from the chosen one (the state's mismatch)
+ * the line says which note it was, or that it is the octave above or below. What to change about it
+ * is the advice line's business ([AdviceLine]). It bounces in when the note comes into tune, and
+ * shrinks rather than wraps when the words are long.
+ *
+ * Upright is the default. A phone on its side draws it bigger ([maxFont], in a box [height] tall)
+ * and may let the longest words shrink further ([minFont]) or break once between words ([maxLines])
+ * where the room beside the window is narrow. Such a caller gives a [style] with a relative line
+ * height, so that the lines scale with the font and the largest that fits is found by the box.
  */
 @Composable
-private fun StatusLine(
-    status: TuningStatus,
-    targetNote: String?,
-    mismatch: TargetMismatch,
-    heardNote: String?,
-    playing: Boolean,
+internal fun StatusLine(
+    state: TunerUiState,
+    modifier: Modifier = Modifier,
+    maxFont: TextUnit = 32.sp,
+    height: Dp = 40.dp,
+    minFont: TextUnit = 18.sp,
+    maxLines: Int = 1,
+    style: TextStyle = MaterialTheme.typography.headlineMedium,
 ) {
+    val status = state.status
+    val targetNote = noteLabel(state.targetMidi).takeIf { state.mode == TunerMode.TARGET }
+    val mismatch = state.mismatch
+    val heardNote = state.reading?.let { noteLabel(it.midi) }
+    val playing = state.isPlayingReference
     val scale = remember { Animatable(1f) }
     LaunchedEffect(status == TuningStatus.IN_TUNE) {
         if (status == TuningStatus.IN_TUNE) {
@@ -313,13 +336,15 @@ private fun StatusLine(
                 else -> stringResource(R.string.too_high)
             }
         },
-        style = MaterialTheme.typography.headlineMedium,
+        style = style,
         textAlign = TextAlign.Center,
-        maxLines = 1,
-        autoSize = TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = 32.sp),
-        modifier = Modifier
+        maxLines = maxLines,
+        autoSize = TextAutoSize.StepBased(minFontSize = minFont, maxFontSize = maxFont),
+        modifier = modifier
             .fillMaxWidth()
-            .height(40.dp)
+            .height(height)
+            // Two lines sit in the middle of their box, as one line would at the top of it.
+            .then(if (maxLines > 1) Modifier.wrapContentHeight(Alignment.CenterVertically) else Modifier)
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
@@ -328,11 +353,28 @@ private fun StatusLine(
 }
 
 /**
+ * Which keys to press for the ring's note, chosen or heard, across the room it is given: written
+ * once for both layouts, which pass their own [modifier] (the sideways one tags it for the tests).
+ */
+@Composable
+internal fun TunerFingering(state: TunerUiState, modifier: Modifier = Modifier) {
+    val midi = state.homeMidi
+    FingeringDiagram(
+        keys = midi?.let(FluteFingerings::keysFor),
+        noteLabel = midi?.let { noteLabel(it) },
+        color = midi?.let(::noteColor) ?: FluteTheme.colors.raised,
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(FINGERING_ASPECT_RATIO),
+    )
+}
+
+/**
  * What a screen reader says for the pitch window: the home note and nothing heard yet, or
  * where the child's sound is against it and which way to go.
  */
 @Composable
-private fun pitchWindowDescription(state: TunerUiState): String {
+internal fun pitchWindowDescription(state: TunerUiState): String {
     val home = state.homeMidi ?: return stringResource(R.string.pitch_listening)
     val homeName = noteLabel(home)
     val heard = state.heardMidi

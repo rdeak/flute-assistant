@@ -65,9 +65,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import hr.bertlab.fluteassistant.R
@@ -84,6 +86,7 @@ import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
+import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.facingRight
@@ -188,7 +191,10 @@ private class StaffInk(
  * resting size (the geometry is one table in dp, so the running staff is one multiplication).
  * The staff follows the newest step and the lit one, keeping the last note before the lit one in
  * view ([Bars.anchor]: the note just played stays on the staff with what it earned, and the lit
- * step is the second thing in view), and the child can drag it back to look.
+ * step is the second thing in view), and the child can drag it back to look. The row's place is
+ * [listState], which a caller that draws the staff in more than one place (a phone on its side
+ * lays Play and a run out differently) keeps above them, so the staff does not scroll in again
+ * from its start each time it moves.
  * While [tune] is empty a dashed hint sits on the lines instead.
  */
 @Composable
@@ -203,6 +209,7 @@ fun TuneStaff(
     wrong: WrongNote? = null,
     heardNow: Int? = null,
     scale: Float = 1f,
+    listState: LazyListState = rememberLazyListState(),
 ) {
     val colors = FluteTheme.colors
     val ink = StaffInk(line = colors.text, outline = colors.outline, card = colors.card, rest = colors.mutedText)
@@ -232,7 +239,7 @@ fun TuneStaff(
             if (tune.isEmpty()) {
                 EmptyHint()
             } else {
-                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, ink, measurer)
+                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, ink, measurer, listState)
             }
         }
     }
@@ -292,11 +299,20 @@ private fun TimeSignatureMark(signature: TimeSignature, ink: StaffInk, measurer:
     )
 }
 
-/** The dashed hint on the empty staff, after the time signature. */
+/**
+ * The dashed hint on the empty staff, after the time signature. A phone on its side can leave it
+ * half of upright's room (about 116 dp at 640 dp wide), where one line would lose its last words at
+ * any size, so there it may take a second line, its line height following its size, as the style's
+ * fixed one leaves the pill no room for two. It stops shrinking at a size in dp, as a floor in sp
+ * would grow with the text size and push it out of the pill.
+ */
 @Composable
 private fun EmptyHint() {
     val s = LocalStaffScale.current
     val colors = FluteTheme.colors
+    val sideways = LocalSideways.current
+    val style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
+    val smallest = if (sideways) with(LocalDensity.current) { HintFloor.toSp() } else 14.sp
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -319,14 +335,18 @@ private fun EmptyHint() {
     ) {
         Text(
             text = stringResource(R.string.flute_hint),
-            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+            style = if (sideways) style.copy(lineHeight = 1.15.em) else style,
             color = colors.mutedText,
-            maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = 20.sp),
+            textAlign = if (sideways) TextAlign.Center else TextAlign.Unspecified,
+            maxLines = if (sideways) 2 else 1,
+            autoSize = TextAutoSize.StepBased(minFontSize = smallest, maxFontSize = 20.sp),
             modifier = Modifier.padding(horizontal = 12.dp),
         )
     }
 }
+
+/** The smallest the hint gets on a phone on its side. */
+private val HintFloor = 14.dp
 
 /** The scrolling row of what [Bars.write] makes of [tune], after the clef and the time signature. */
 @Composable
@@ -341,6 +361,7 @@ private fun TuneMarks(
     heardNow: Int?,
     ink: StaffInk,
     measurer: TextMeasurer,
+    listState: LazyListState,
 ) {
     val s = LocalStaffScale.current
     val notes = tune.count { it is TuneNote }
@@ -349,7 +370,6 @@ private fun TuneMarks(
     // The last note before the lit step (so the note just played stays in view with its mark and
     // the lit step comes second), else the lit step, else the staff's end (a bar line, once a bar is full).
     val target = Bars.anchor(lineMarks, tune, litIndex)
-    val listState = rememberLazyListState()
     // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
     LaunchedEffect(target, lineMarks) {
         listState.animateScrollToItem(target)

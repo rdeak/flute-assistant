@@ -103,6 +103,8 @@
     <string name="advice_play_again">🔁 Stop, then play it again</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
+    <!-- The tuner when the microphone will not open or stops. The cause goes to the log, as a child can do nothing with it -->
+    <string name="mic_failed">I can\'t listen right now.</string>
     <string name="allow_microphone">Yes</string>
     <string name="open_settings">Settings</string>
     <!-- The quiet way back from the microphone card on the flute tab, which works without the microphone -->

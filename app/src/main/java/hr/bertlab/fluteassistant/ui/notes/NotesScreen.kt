@@ -37,17 +37,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.Stage
@@ -95,7 +102,24 @@ fun NotesContent(
     onToggleSound: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Kept above the branch, so the picker stays open when the phone turns.
     var choosingNotes by rememberSaveable { mutableStateOf(false) }
+
+    // A phone on its side has its own layout ([NotesSideways]): the same screens, arranged for the width.
+    if (LocalSideways.current) {
+        NotesSideways(
+            state = state,
+            choosingNotes = choosingNotes,
+            onChoose = { choosingNotes = true },
+            onChosen = { choosingNotes = false },
+            onNoteTapped = onNoteTapped,
+            onPlayAgain = onPlayAgain,
+            onTogglePracticeNote = onTogglePracticeNote,
+            onToggleSound = onToggleSound,
+            modifier = modifier,
+        )
+        return
+    }
 
     // The staff takes whatever height is left, so the tab fits an ordinary phone without
     // scrolling; only a short screen (or large text) scrolls, keeping the places big enough.
@@ -199,14 +223,19 @@ private fun HeroRow(state: NotesUiState, choosingNotes: Boolean, onChoose: () ->
 }
 
 @Composable
-private fun StreakFlames(streak: Int) {
+internal fun StreakFlames(streak: Int, modifier: Modifier = Modifier) {
     val colors = FluteTheme.colors
     val description = stringResource(R.string.streak_description, streak)
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.width(HeroSideWidth)) {
+    val density = LocalDensity.current
+    Box(contentAlignment = Alignment.Center, modifier = modifier.width(HeroSideWidth)) {
         if (streak > 0) {
             Text(
                 text = FLAME_EMOJI.repeat(streak.coerceAtMost(MAX_FLAMES)),
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 17.sp, letterSpacing = (-2).sp),
+                // In dp: they are pictures, and five at a larger text size would not fit the pill.
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = with(density) { 17.dp.toSp() },
+                    letterSpacing = with(density) { (-2).dp.toSp() },
+                ),
                 maxLines = 1,
                 modifier = Modifier
                     .height(52.dp)
@@ -225,7 +254,6 @@ private fun StreakFlames(streak: Int) {
 @Composable
 private fun PickButton(practiceNotes: Set<Int>, onChoose: () -> Unit) {
     val description = stringResource(R.string.choose_notes)
-    val letterColors = practiceNotes.sorted().map { noteColor(it) }.distinct()
     ChunkyButton(
         onClick = onChoose,
         shape = CircleShape,
@@ -239,17 +267,35 @@ private fun PickButton(practiceNotes: Set<Int>, onChoose: () -> Unit) {
                 Emoji(BACKPACK_EMOJI, fontSize = 20)
                 Text(stringResource(R.string.pick_notes), style = MaterialTheme.typography.titleMedium)
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                letterColors.forEach { color ->
-                    Box(
-                        Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(color)
-                            .border(1.5.dp, FluteTheme.colors.outline, CircleShape),
-                    )
-                }
-            }
+            LetterDots(practiceNotes)
+        }
+    }
+}
+
+/** The colour of each letter among [practiceNotes], lowest first: one dot of the Pick button each. */
+internal fun letterColorsOf(practiceNotes: Set<Int>): List<Color> =
+    practiceNotes.sorted().map { noteColor(it) }.distinct()
+
+/**
+ * A dot of [size] in the colour of each letter among [practiceNotes], [gap] apart, lowest first: what the Pick
+ * button says about the chosen notes without a word. Tagged so a test can find it, as the button's
+ * own semantics swallow it.
+ */
+@Composable
+internal fun LetterDots(practiceNotes: Set<Int>, modifier: Modifier = Modifier, size: Dp = 10.dp, gap: Dp = 3.dp) {
+    val letterColors = letterColorsOf(practiceNotes)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(gap),
+        modifier = modifier.testTag("pick_dots"),
+    ) {
+        letterColors.forEach { color ->
+            Box(
+                Modifier
+                    .size(size)
+                    .clip(CircleShape)
+                    .background(color)
+                    .border(1.5.dp, FluteTheme.colors.outline, CircleShape),
+            )
         }
     }
 }
@@ -274,9 +320,27 @@ private fun ColumnScope.Question(state: NotesUiState, onNoteTapped: (Int) -> Uni
         modifier = Modifier.weight(1f),
     )
     Spacer(Modifier.height(12.dp))
+    FeedbackLine(state = state, placing = placing)
+}
 
-    // The feedback line: "That's it!" bounces in, as "Perfect!" does on the tuner. While
-    // waiting the line is empty but keeps its height, so nothing jumps.
+/**
+ * The line under the staff (in the panel beside it, sideways): "That's it!" bounces in, as
+ * "Perfect!" does on the tuner, "Slide, let go" while a finger is down, "Try again" after a
+ * miss. While waiting the line is empty but keeps its [height], so nothing jumps. A caller short
+ * of room has it shrink further ([minFont]) and break between words ([maxLines]), with a [style]
+ * of relative line height so that the lines follow the font.
+ */
+@Composable
+internal fun FeedbackLine(
+    state: NotesUiState,
+    placing: Int?,
+    modifier: Modifier = Modifier,
+    maxFont: TextUnit = 32.sp,
+    minFont: TextUnit = 18.sp,
+    maxLines: Int = 1,
+    height: Dp = FeedbackLineHeight,
+    style: TextStyle = MaterialTheme.typography.headlineMedium,
+) {
     val scale = remember { Animatable(1f) }
     LaunchedEffect(state.solved) {
         if (state.solved) {
@@ -292,13 +356,15 @@ private fun ColumnScope.Question(state: NotesUiState, onNoteTapped: (Int) -> Uni
     }
     Text(
         text = feedback,
-        style = MaterialTheme.typography.headlineMedium,
+        style = style,
         textAlign = TextAlign.Center,
-        maxLines = 1,
-        autoSize = TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = 32.sp),
-        modifier = Modifier
+        maxLines = maxLines,
+        autoSize = TextAutoSize.StepBased(minFontSize = minFont, maxFontSize = maxFont),
+        modifier = modifier
             .fillMaxWidth()
-            .height(FeedbackLineHeight)
+            .height(height)
+            // Two lines sit in the middle of their box, as one line would at the top of it.
+            .then(if (maxLines > 1) Modifier.wrapContentHeight(Alignment.CenterVertically) else Modifier)
             .graphicsLayer {
                 scaleX = scale.value
                 scaleY = scale.value
@@ -309,4 +375,4 @@ private fun ColumnScope.Question(state: NotesUiState, onNoteTapped: (Int) -> Uni
 /** The feedback line's reserved height: one line of the 32 sp headline. */
 private val FeedbackLineHeight = 40.dp
 
-private const val BACKPACK_EMOJI = "\uD83C\uDF92" // school backpack
+internal const val BACKPACK_EMOJI = "\uD83C\uDF92" // school backpack

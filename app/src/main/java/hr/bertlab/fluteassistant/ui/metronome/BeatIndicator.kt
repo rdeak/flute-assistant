@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
@@ -38,9 +41,29 @@ import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
-/** Height of one bubble's column: room for the hopping animal above the largest bubble. */
-private val ColumnHeight = 112.dp
+/** The room above a bubble for the hopping animal, and the biggest plain bubble upright draws. */
 private val AnimalHeight = 40.dp
+private val UprightUnit = 52.dp
+
+/** The first bubble is a little bigger than the rest, and so is a compound bar's secondary accent. */
+private const val FIRST_BEAT = 1.16f
+private const val MEDIUM_BEAT = 1.08f
+
+/** How many plain bubbles' width this bubble takes. */
+private fun BeatStrength.sizeFactor(): Float = when (this) {
+    BeatStrength.STRONG -> FIRST_BEAT
+    BeatStrength.MEDIUM -> MEDIUM_BEAT
+    else -> 1f
+}
+
+/** The gap between a bubble and the animal above it. */
+private val AnimalGap = 6.dp
+
+/**
+ * What a bubble's column has to spare under the animal, the gap and the biggest bubble upright
+ * draws: upright's column is 112 dp tall ([AnimalHeight] + [AnimalGap] + 52 * 1.16 + this).
+ */
+private val ColumnSpare = 5.68.dp
 
 /** How much a beat bubble pops (scale) and the animal above it hops (dp) at the flash's peak. */
 private const val POP = 0.18f
@@ -85,35 +108,64 @@ fun BeatIndicator(
     }
 }
 
+/** A round − or + that steps the bar by a beat; [size] is 52 dp upright, 56 dp under the bubbles sideways. */
 @Composable
-private fun BeatStepButton(text: String, description: String, enabled: Boolean, onClick: () -> Unit) {
+internal fun BeatStepButton(
+    text: String,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    size: Dp = 52.dp,
+) {
     ChunkyButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
             .padding(bottom = 4.dp)
-            .size(52.dp)
+            .size(size)
             .semantics { contentDescription = description },
     ) {
         Text(text, style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp, lineHeight = 30.sp))
     }
 }
 
+/**
+ * The bubbles alone, one per beat, as wide as [modifier] leaves them: a plain beat up to [maxUnit]
+ * (52 dp upright; sideways 68 dp at rest and 150 dp while it plays), the first a little bigger.
+ * [gapFew] is the room between them up to four beats and [gapMany] with more. The animal above the
+ * sounding one is [animalFont] sp in a box [animalHeight] tall. The column is as tall as its first
+ * bubble needs, but never less than upright's 112 dp, which narrow phones keep.
+ *
+ * The bubbles are counted by their real sizes: counting only the first as bigger leaves 6/8's fourth
+ * (a medium accent, 1.08) too wide for the row, which squeezes the last one into an oval.
+ *
+ * With [stableRow] the animal's box is no wider than its bubble, so an animal wider than a small
+ * bubble overflows into the gap instead of widening the sounding column and reflowing the row on
+ * every beat. Only the sideways layouts ask for it, as upright's animal fits its bubble.
+ */
 @Composable
-private fun BeatBubbles(
+internal fun BeatBubbles(
     timeSignature: TimeSignature,
     currentBeat: Int,
     animal: String,
     flash: () -> Float,
     modifier: Modifier = Modifier,
+    maxUnit: Dp = UprightUnit,
+    gapFew: Dp = 12.dp,
+    gapMany: Dp = 6.dp,
+    animalFont: Int = 32,
+    animalHeight: Dp = AnimalHeight,
+    stableRow: Boolean = false,
 ) {
     val colors = FluteTheme.colors
     val beats = timeSignature.accents
     val description = stringResource(R.string.beats_in_bar, beats.size)
     BoxWithConstraints(modifier.clearAndSetSemantics { contentDescription = description }) {
-        // Fit every bubble: up to 52 dp for a plain beat, the first a little bigger.
-        val gap = if (beats.size <= 4) 12.dp else 6.dp
-        val unit = ((maxWidth - gap * (beats.size - 1)) / (beats.size + 0.16f)).coerceAtMost(52.dp)
+        // Fit every bubble: up to maxUnit for a plain beat, the first a little bigger.
+        val gap = if (beats.size <= 4) gapFew else gapMany
+        val widths = beats.sumOf { it.sizeFactor().toDouble() }.toFloat()
+        val unit = ((maxWidth - gap * (beats.size - 1)) / widths).coerceAtMost(maxUnit)
+        val columnHeight = animalHeight + AnimalGap + maxOf(unit, UprightUnit) * FIRST_BEAT + ColumnSpare
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
@@ -121,22 +173,24 @@ private fun BeatBubbles(
         ) {
             beats.forEachIndexed { index, strength ->
                 val active = index == currentBeat
-                val diameter = when (strength) {
-                    BeatStrength.STRONG -> unit * 1.16f
-                    BeatStrength.MEDIUM -> unit * 1.08f
-                    else -> unit
-                }
+                val diameter = unit * strength.sizeFactor()
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom),
-                    modifier = Modifier.height(ColumnHeight),
+                    verticalArrangement = Arrangement.spacedBy(AnimalGap, Alignment.Bottom),
+                    modifier = Modifier.height(columnHeight),
                 ) {
-                    Box(Modifier.height(AnimalHeight), contentAlignment = Alignment.BottomCenter) {
+                    Box(
+                        modifier = Modifier
+                            .height(animalHeight)
+                            .then(if (stableRow) Modifier.width(diameter) else Modifier),
+                        contentAlignment = Alignment.BottomCenter,
+                    ) {
                         if (active) {
                             Emoji(
                                 emoji = animal,
-                                fontSize = 32,
+                                fontSize = animalFont,
                                 modifier = Modifier
+                                    .then(if (stableRow) Modifier.wrapContentWidth(unbounded = true) else Modifier)
                                     .facingRight(animal)
                                     .graphicsLayer { translationY = -HOP_DP * density * flash() },
                             )
