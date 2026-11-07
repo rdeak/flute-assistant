@@ -42,8 +42,10 @@ import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
+import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
@@ -212,6 +214,8 @@ fun FluteContent(
     var choosingSpeed by rememberSaveable { mutableStateOf(false) }
     var choosingBook by rememberSaveable { mutableStateOf(false) }
     val sideways = LocalSideways.current
+    val zoom = LocalTabZoom.current
+    val zoomed = zoom > 1f
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         if (state.micDenied) {
@@ -315,12 +319,13 @@ fun FluteContent(
             }
         } else {
             val fits = maxHeight >= FitsHeight
+            val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
             val running = state.isRunning
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
             // out in places of their own, and a staff made anew at each swap would scroll in from its start.
             val staffPlace = rememberLazyListState()
             val staffScale = when {
-                !running -> 1f
+                !running -> if (sideways && zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f
                 sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value)
                 else -> RunningStaffScale
             }
@@ -457,7 +462,7 @@ fun FluteContent(
                             Modifier
                                 .fillMaxWidth()
                                 .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
-                            KeyHeight,
+                            uprightKeyHeight,
                             KeyGap,
                         )
                         playRow(Modifier)

@@ -424,6 +424,17 @@ speed panel's `TempoWheelState` live above the branch, so an open panel or shelf
   restart the scroll from the start of the line. It is not created higher, so opening the speed panel or the
   shelf still gives a new book's tune a fresh state.
 
+## Tablets
+
+The one tab that adjusts anything on top of a tablet's zoom (`ui/CLAUDE.md`, "Tablets"; spec
+`2026-11-06-tablet-design.md`), and only while `LocalTabZoom` is over 1. Upright the keys take a third of
+what the height spares over `FitsHeight`, from 58 up to 72 (`TabletGeometry.uprightKeyHeight`), about 104 dp
+on a 10-inch tablet: the phone's 58 left a band of nothing either side of them. Sideways, writing, the keys'
+column is 336 rather than 372 and the resting staff 0.91 rather than 1 (`TabletGeometry.sidewaysKeys`,
+`sidewaysStaffScale`), so that about 13 quarter notes show with their bar lines, against about 10; the staff
+is still 1.3 times a phone's at 10 inches and 1.02 at 8, and a barely zoomed window keeps a phone's real sizes. The running staff keeps `runningStaffScale`. A tune
+longer than that scrolls as it does on a phone. `FluteTabletTest` holds these.
+
 ## Sessions (debug builds only)
 
 A debug build records every "Your turn" run on the phone: the audio, a per-frame table and the run's

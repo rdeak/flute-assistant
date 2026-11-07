@@ -25,6 +25,17 @@ adb shell settings put system user_rotation 1                                   
 adb shell wm size 945x2100                                                            # the 800 x 360 dp phone; 945x1680 is 640 x 360; `wm size reset` after
 ```
 
+There is no tablet AVD and `avdmanager` is not installed, so the phone AVD fakes one by its size and
+density. `wm density` is what makes it a tablet: `wm size` alone only stretches the phone's dp.
+
+```sh
+adb shell pm grant hr.bertlab.fluteassistant android.permission.POST_NOTIFICATIONS   # else the first Play's dialog blocks a scripted run
+adb shell wm size 1600x2560; adb shell wm density 320                                # 800 x 1280 dp, 10 inches; 1280x2048 is 640 x 1024, 8 inches
+adb shell settings put system accelerometer_rotation 0
+adb shell settings put system user_rotation 1                                        # sideways: 1280 x 800 dp
+adb shell wm size reset; adb shell wm density reset; adb shell settings put system user_rotation 0   # after
+```
+
 The notification-permission dialog appears on the first metronome start (API 33+);
 `adb shell input keyevent 4` dismisses it.
 

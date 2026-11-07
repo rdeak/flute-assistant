@@ -1,6 +1,6 @@
 ---
 name: release
-description: Use when cutting or checking a Flute Assistant release, bumping fluteAssistant.versionName, changing the release or listing GitHub workflows, signing secrets, the Play upload, store graphics or Play screenshots.
+description: Use when cutting or checking a Flute Assistant release, bumping fluteAssistant.versionName, changing the release GitHub workflow, signing secrets, the Play upload, store graphics or Play screenshots.
 ---
 
 # Release
@@ -14,12 +14,9 @@ jobs" repeats only what failed. `tools/release.sh` derives the versionCode from 
 minor * 100 + patch), checks both outputs carry the upload certificate (a build without the
 secrets comes out unsigned on purpose, so the check is what stops it being published), writes
 the notes from the git log, and `tools/release.sh secrets` sets the four signing secrets from
-`keystore.properties` without showing them. A push that changes `docs/release/play-listing/` (the
-listing text in `text/<lang>/`, icon, feature graphic, screenshots) runs the separate
-`.github/workflows/listing.yml`, whose `tools/play-listing.sh` replaces the Play store listing in
-English and Croatian and saves it unsent: "Send for review" in Play Console makes it public (the
-service account needs "Manage store presence"; the workflow shares the release workflow's
-concurrency group because two open Play edits of one account invalidate each other). A release also uploads the bundle to the Play
+`keystore.properties` without showing them. The Play store listing is changed by hand in Play Console,
+in English and Croatian, from `docs/release/play-listing/` (the text in `text/<lang>/`, icon, feature
+graphic, screenshots), and "Send for review" makes it public; no workflow does this. A release also uploads the bundle to the Play
 internal testing track through Workload Identity Federation (no key file; repository variables
 `PLAY_WORKLOAD_IDENTITY_PROVIDER` and `PLAY_SERVICE_ACCOUNT`, both required); closed test and
 production stay manual. Release signing reads the
@@ -29,4 +26,5 @@ read or print the keystore password. Release builds use whole-app R8 (a package-
 optimisation crashed at startup inside androidx.startup). Process, Play Console answers and the
 Secrets Manager backup recipe are in `docs/release/`. Launcher PNGs and store graphics come from
 `java -Djava.awt.headless=true tools/IconGen.java /tmp/icons`. Store screenshots (one per tab, en and hr,
-padded to 9:16) come from `tools/play-screenshots.sh` with the emulator up and a debug APK built.
+padded to 9:16) come from `tools/play-screenshots.sh` with the emulator up and a debug APK built;
+`tools/play-screenshots.sh tablet` writes the shots for the tablet slots into `screenshots-tablet/`.

@@ -52,6 +52,12 @@ octave rows, highest on top, the "Sound" switch row and a big OK, the only way b
 end-of-round summary has no numbers on screen either: a trophy, ten stars, and tiles for the best
 streak (flames), the aim (one to three stars) and the speed (an animal).
 
+At large text the upright Pick button holds together like the sideways one (2026-11-07, the user's call, on
+phones and tablets alike): the backpack is in dp, the word keeps 6 dp from the outline, and it shrinks to fit
+the width and `PickWordHeight` (`autoSize`, floor 8 dp). Before, "Odaberi" broke inside the word from 1.5 x text
+and the dots were cut. At normal text nothing moved. A test of the word's size must go by its width:
+`layoutInput.style.fontSize` keeps the size the text was given, whatever `autoSize` chose.
+
 ## Sideways
 
 Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "Notes game"; what every tab
@@ -94,3 +100,6 @@ stays open when the phone turns, and then, when `LocalSideways`, hands over to `
   next place, and at 360 dp tall the e1 place sat on the line between two nodes and was never hit. Tap the
   drawn bands instead: the nodes' union, cut into the visible places plus two (the margins), one tap per band.
 
+## Tablets
+
+Simply the phone layouts, zoomed (`../CLAUDE.md`, "Tablets"), with nothing of their own.

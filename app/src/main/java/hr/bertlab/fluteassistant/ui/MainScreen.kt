@@ -8,7 +8,6 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,6 +52,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -76,10 +76,13 @@ import hr.bertlab.fluteassistant.ui.common.HideSystemBars
 import hr.bertlab.fluteassistant.ui.common.KeepScreenOn
 import hr.bertlab.fluteassistant.ui.common.LanguageSwitch
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
+import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
+import hr.bertlab.fluteassistant.ui.common.zoomedBy
 import hr.bertlab.fluteassistant.ui.flute.FluteScreen
 import hr.bertlab.fluteassistant.ui.flute.FluteViewModel
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeMessage
@@ -117,6 +120,8 @@ enum class AppTab(@StringRes val labelRes: Int, val emoji: String) {
  * tab's `when` is written once here and handed to [MainFrame] as one slot, which calls it in one
  * place in both layouts, so a turn only recomposes it: were it in a branch of its own, the tab would
  * leave the composition and `FluteScreen` would stop the tune. `MainFrameTest` guards that.
+ *
+ * On a tablet the bars and the rail stay phone-sized, and [MainFrame] zooms the tab between them.
  */
 @Composable
 fun MainScreen(
@@ -164,7 +169,8 @@ fun MainScreen(
 
     BoxWithConstraints {
         val sideways = SidewaysGeometry.isSideways(maxWidth.value, maxHeight.value)
-        HideSystemBars(sideways)
+        val tablet = TabletGeometry.isTablet(maxWidth.value, maxHeight.value)
+        HideSystemBars(TabletGeometry.hidesSystemBars(sideways, tablet))
         CompositionLocalProvider(LocalSideways provides sideways) {
             MainFrame(
                 sideways = sideways,
@@ -198,6 +204,7 @@ fun MainScreen(
                         onLanguageOpenChange = { languageOpen = it },
                     )
                 },
+                tablet = tablet,
             ) {
                 // The one call site of the tab: `MainFrame` puts this in the same place upright and sideways.
                 when (selectedTab) {
@@ -219,10 +226,15 @@ fun MainScreen(
 /**
  * The frame round the open tab, stateless so that a test can turn it: a [Scaffold] with the
  * [titleBar] over and the [tabBar] under the tab when upright, and a [rail] beside it when
- * [sideways]. The [tab] is called in one place, a `Box` in a `Row` that holds the rail only when
- * sideways, so a turn recomposes it where it stands: written in a branch of its own, it would
- * leave the composition and `FluteScreen` would stop the tune. `MainFrameTest` flips [sideways] and
+ * [sideways]. The [tab] is called in one place, a `BoxWithConstraints` in a `Row` that holds the rail
+ * only when sideways, so a turn recomposes it where it stands: written in a branch of its own, it
+ * would leave the composition and `FluteScreen` would stop the tune. `MainFrameTest` flips [sideways] and
  * asks that a `DisposableEffect` in the tab is not disposed and a `remember`ed object is the same one.
+ *
+ * On a [tablet] the tab is drawn at a higher density, by [TabletGeometry.tabZoom] of the room the bars
+ * leave it: the phone layouts are laid out in a smaller logical area and come out bigger, and everything
+ * outside this box keeps its phone size. The provider stands on a phone too, at 1, so that there is one
+ * call site.
  */
 @Composable
 internal fun MainFrame(
@@ -231,6 +243,7 @@ internal fun MainFrame(
     titleBar: @Composable () -> Unit,
     tabBar: @Composable () -> Unit,
     rail: @Composable () -> Unit,
+    tablet: Boolean = false,
     tab: @Composable () -> Unit,
 ) {
     Scaffold(
@@ -252,13 +265,19 @@ internal fun MainFrame(
                 .padding(innerPadding),
         ) {
             if (sideways) rail()
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
                     .then(if (sideways) Modifier.windowInsetsPadding(EndCutout) else Modifier),
             ) {
-                tab()
+                val zoom = TabletGeometry.tabZoom(maxWidth.value, maxHeight.value, sideways, tablet)
+                val real = LocalDensity.current
+                CompositionLocalProvider(
+                    LocalDensity provides remember(real, zoom) { real.zoomedBy(zoom) },
+                    LocalTabZoom provides zoom,
+                    content = tab,
+                )
             }
         }
     }

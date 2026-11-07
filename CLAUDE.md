@@ -56,7 +56,7 @@ In short: a phone is often attached, so pin `ANDROID_SERIAL=emulator-5554`; star
 
 ### Release
 
-The release process (version bump in `gradle.properties`, the release and listing workflows,
+The release process (version bump in `gradle.properties`, the release workflow,
 signing, Play upload, store graphics and screenshots) is in the `release` skill
 (`.claude/skills/release/SKILL.md`) and `docs/release/`. Never read or print the keystore password.
 
@@ -102,7 +102,8 @@ tab's CLAUDE.md; these rules hold on all of them:
   the content area) as too packed: keep the screens this sparse. The one agreed exception is the
   sideways layout (a phone on its side, 2026-11-05; spec
   `docs/superpowers/specs/2026-11-05-landscape-design.md`, `ui/CLAUDE.md`): its width goes to size and
-  air, not to more things, and the turned-down list below holds there too.
+  air, not to more things, and the turned-down list below holds there too. A tablet's room goes the
+  same way (2026-11-06, `ui/CLAUDE.md`, "Tablets"): the tab grows, and nothing is added.
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than

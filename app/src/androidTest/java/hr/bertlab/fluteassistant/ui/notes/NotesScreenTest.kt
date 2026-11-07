@@ -3,6 +3,9 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -10,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.FontScale
 import androidx.compose.ui.test.assertIsDisplayed
@@ -18,10 +22,14 @@ import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
@@ -29,6 +37,7 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -88,6 +97,90 @@ class NotesScreenTest {
             val grown = pill.getBoundsInRoot().width
             assertTrue("at $scale x the pill is $grown wide, at normal text $normal", (grown - normal).value <= 1f)
         }
+    }
+
+    /** The question at this [fontScale], as `show` has it but for the text size. */
+    private fun showAtTextSize(fontScale: Float, locale: Locale) {
+        compose.setContent {
+            DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
+                LocaleProvider(locale) {
+                    NotesContent(
+                        state = asking(),
+                        onNoteTapped = {},
+                        onPlayAgain = {},
+                        onTogglePracticeNote = {},
+                        onToggleSound = {},
+                    )
+                }
+            }
+        }
+    }
+
+    private fun layoutOf(word: String): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(word, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+
+    private fun tagged(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getBoundsInRoot()
+
+    /**
+     * Everything stays on the button at this [fontScale], as on the sideways one: the word one whole line
+     * 6 dp from the outline, less a pixel for rounding, and the backpack and dots inside it. "Odaberi" used
+     * to break inside the word, then, only shrunk, lost its last letter under the outline, and the backpack
+     * grew over the edge and pushed the dots out.
+     */
+    private fun assertThePickButtonHolds(fontScale: Float, locale: Locale, word: String, name: String) {
+        showAtTextSize(fontScale, locale)
+        val layout = layoutOf(word)
+        val says = "at $fontScale x: \"$word\" is ${layout.lineCount} lines"
+        assertEquals("$says, it broke", 1, layout.lineCount)
+        assertTrue("$says, wider than its ${layout.size.width} px", layout.multiParagraph.maxIntrinsicWidth <= layout.size.width + 1)
+        val pick = compose.onNodeWithContentDescription(name).getBoundsInRoot()
+        val box = compose.onNodeWithText(word, useUnmergedTree = true).getBoundsInRoot()
+        val backpack = tagged("pick_backpack")
+        val dots = tagged("pick_dots")
+        val least = 6f - 1f / compose.density.density
+        assertTrue("$says, it ends ${pick.right - box.right} inside Pick", (pick.right - box.right).value >= least)
+        assertTrue("$says, the backpack starts ${backpack.left - pick.left} inside Pick", (backpack.left - pick.left).value >= least)
+        assertTrue("$says, the dots end ${pick.bottom - dots.bottom} inside Pick", pick.bottom - dots.bottom >= OutlineWidth)
+    }
+
+    @Test
+    fun the_pick_button_holds_at_normal_text() = assertThePickButtonHolds(1f, Locale("hr"), "Odaberi", "Odaberi note")
+
+    @Test
+    fun the_pick_button_holds_at_a_larger_text() = assertThePickButtonHolds(1.5f, Locale("hr"), "Odaberi", "Odaberi note")
+
+    @Test
+    fun the_pick_button_holds_at_the_largest_text() = assertThePickButtonHolds(2f, Locale("hr"), "Odaberi", "Odaberi note")
+
+    @Test
+    fun the_pick_button_holds_at_the_largest_text_in_english() = assertThePickButtonHolds(2f, Locale.ENGLISH, "Pick", "Choose notes")
+
+    /**
+     * The fit is for large text only: at the phone's normal text the word is as wide as the plain word in
+     * the same style. By width, as `layoutInput.style` keeps the size it was given whatever `autoSize` chose.
+     */
+    @Test
+    fun the_pick_word_keeps_its_size_at_normal_text() {
+        compose.setContent {
+            LocaleProvider(Locale("hr")) {
+                Column {
+                    Text("Odaberi", style = MaterialTheme.typography.titleMedium)
+                    NotesContent(
+                        state = asking(),
+                        onNoteTapped = {},
+                        onPlayAgain = {},
+                        onTogglePracticeNote = {},
+                        onToggleSound = {},
+                    )
+                }
+            }
+        }
+        val (plain, onPick) = compose.onAllNodesWithText("Odaberi", useUnmergedTree = true).fetchSemanticsNodes().map { it.size.width }
+        assertEquals(plain, onPick)
     }
 
     @Test

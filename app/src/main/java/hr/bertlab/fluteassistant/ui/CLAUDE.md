@@ -6,6 +6,7 @@ the root CLAUDE.md, "Kid-friendly UI constraint". User-visible strings: the root
 
 The top bar shows the app icon and names the open tab; the tab bar is four emoji-and-word buttons.
 That is the upright frame. On a phone on its side a rail stands in for both ("Sideways", at the end).
+On a tablet the same frames stay phone-sized and the tab between them grows ("Tablets", after it).
 
 - One Activity, which sets `volumeControlStream` to the media stream so the volume keys adjust
   the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus the `LanguageSwitch`: since 2026-11-05 one
@@ -129,8 +130,9 @@ the tuner and the flute's Your turn must read from arm's length and need no tap 
   80 for the tuner's modes; no emoji means the word alone, for "Not now"). The flute's writing screen has no
   column, so it does not use the page. Words shrink with `autoSize` and use relative line heights: before
   Android 14 font scaling is linear, and a fixed line would not fit.
-- **`HideSystemBars`** (`ui/common/SystemBars.kt`): while sideways the status and navigation bars hide, which
-  gives the running staff its full size (with them 48 dp of the height goes); a swipe from the edge brings them
+- **`HideSystemBars`** (`ui/common/SystemBars.kt`): while a phone is sideways the status and navigation bars
+  hide, which gives the running staff its full size (with them 48 dp of the height goes); a tablet keeps them
+  ("Tablets"). A swipe from the edge brings them
   back for a moment (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`). They return upright and stay in split screen, where
   they are not the app's to take. The activity handles the change into and out of split screen itself, so
   the effect also listens to it: `enabled` does not change when a wide pane is dragged to full screen.
@@ -141,12 +143,15 @@ the tuner and the flute's Your turn must read from arm's length and need no tap 
   tuner, Your turn) Android draws its green microphone chip, with the clock, over the top of the rail and of
   the right column for a few seconds, bars hidden or not; there is nothing to do about it.
 - **A turn re-creates nothing.** `MainActivity` declares `orientation|screenSize|smallestScreenSize|screenLayout`
-  in `configChanges`, and not the locale: the language switch relies on re-creation. So a tune, Your turn, the
+  and, since 2026-11-06, `keyboard|keyboardHidden|navigation` in `configChanges`, and not the locale: the language
+  switch relies on re-creation. The keyboard flags are for a tablet's keyboard case attached during a tune; Android
+  17 does that by itself for an app targeting 37 (Google's Android 17 beta post, and seen on the emulator, where
+  a manifest without them still reported them), older Android does not. So a tune, Your turn, the
   tuner and the metronome run on through a turn, and an open panel (speed, shelf, picker) stays open. Going
   to the background (Home) still stops the flute (`flute.stop reason=leave`). `TurningThePhoneTest` reads the
-  manifest's flags.
+  flags the activity reports and `ManifestFlagsTest` the manifest's own, as on API 37 the two differ.
 - **One call site for the tab.** `MainScreen` writes the `when (selectedTab)` once and hands it to the stateless
-  `MainFrame` as its `tab` slot; `MainFrame` calls it in one place, a `Box` in a `Row` that holds the rail only
+  `MainFrame` as its `tab` slot; `MainFrame` calls it in one place, a `BoxWithConstraints` in a `Row` that holds the rail only
   when sideways, so a turn only recomposes it. Were the tab composed in an `if (sideways) ... else ...`, it would
   leave the composition on a turn and `FluteScreen`'s lifecycle effect would call `leaveTab()` and stop the tune:
   the same loss the manifest flag prevents, by another road. `MainFrameTest` guards it: a tab with a
@@ -161,8 +166,41 @@ the tuner and the flute's Your turn must read from arm's length and need no tap 
   size. Its density is floored, so it is about 0.5 % larger than asked. **`assertIsDisplayed` does not prove a
   fit**: what spills past a window is still displayed, and a word cut short still has its node. Compare
   `getUnclippedBoundsInRoot()` with the room, and ask `GetTextLayoutResult` about words (`hasVisualOverflow`, line
-  breaks only at whitespace). Text also measures a little differently at the phone's real density, so a tight fit
+  breaks only at whitespace; for a plain `Text` this action hands back a paragraph as wide as the room and a box as
+  wide as the word, so `hasVisualOverflow` is always true there: see `TabletFitTest.assertWhole`). Text also measures a little differently at the phone's real density, so a tight fit
   is worth one run with the emulator itself sideways (the rail's "Metronome" failed only there). A flip of
   `LocalSideways` alone cannot show that a key held through a turn is released: the Compose test dispatcher
   handles the gesture's cancel at once, where a phone throws it; `FluteSidewaysTest` cancels the gesture by a
   density change instead, and the real rotation is checked by hand (`ui/flute/CLAUDE.md`).
+
+## Tablets
+
+Since 2026-11-06; the design, the numbers and who decided what are in
+`docs/superpowers/specs/2026-11-06-tablet-design.md`. The reason is the Play Store, not a child: the user
+has no tablet and wants the app to look right to someone choosing it on one, so a tablet screen is judged
+as a screenshot. Before it nothing was broken, but every control stayed phone-sized in a big empty card.
+The user picked this over one uniform scale of the whole app.
+
+- **When.** `TabletGeometry.isTablet(width, height)` (`ui/common/Tablet.kt`): the window's shortest side is at
+  least 600 dp. It follows the window, not the device, and `MainScreen` reads it where it reads `isSideways`.
+  Upright or sideways is decided exactly as on a phone.
+- **The tab zooms, the frame does not.** `MainFrame` draws the tab at a higher `LocalDensity`, by
+  `TabletGeometry.tabZoom` of the room the bars leave, so the phone layouts are laid out in a smaller logical
+  area and come out bigger: about 560 x 745 upright and 830 x 526 sideways on a 10-inch tablet, a zoom of 1.43.
+  One provider covers every tab, panel, picker and summary, words and touch included, and `SidewaysGeometry`
+  needs no change, as it is handed logical sizes like any other layout. `TitleBar`, `TabBar`, `SideRail`, the
+  language list, the credits and the snackbar are outside it and keep their phone sizes. The provider stands on
+  a phone too, at 1, for the one call site ("One call site for the tab"). A window too short to grow, a foldable
+  or a split pane, stays at 1 with its phone sizes; the zoom stops at 2.
+- **What a tab adjusts on top of it** reads `LocalTabZoom`, which is 1 on a phone: the flute's keys and staff
+  (`ui/flute/CLAUDE.md`). The rest is simply the phone layout, zoomed; keep it that way unless a screen shows
+  why.
+- **The density.** `Density.zoomedBy`: at 1 it is the frame's own density object, so a phone is untouched by
+  construction. When zoomed it is a plain `Density`, which keeps Android's curve for large text (at twice the
+  text 24 sp is 36 dp, not 48): measured equal to Android's own at every font scale on 2026-11-06, and
+  `TabletDensityTest` holds it there, as a Compose update could change that.
+- **Bars.** `TabletGeometry.hidesSystemBars`: a tablet keeps them sideways, as hiding them only ever bought
+  height on 360 to 411 dp phones, and so it never meets Android's "Viewing full screen" prompt.
+- **Tests.** `TabletHost(size, fontScale)` (androidTest) forces a `TabletSize`'s logical area, with the limits of
+  `SidewaysHost`. The sizes are the tab areas of Google's test sizes, after the bars. A real tablet has not seen
+  this app: the emulator fakes one (the `emulator` skill), so the look and the audio on real hardware are unchecked.

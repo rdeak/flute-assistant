@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -175,6 +176,12 @@ private val NotesMinHeight = 560.dp
 private val HeroRowHeight = 96.dp
 private val HeroSideWidth = 116.dp
 
+/** The floor of the Pick word, in dp as a floor in sp doubles at the largest text size. */
+private val PickWordFloor = 8.dp
+
+/** The most the Pick word is tall: past it a short word, which has the width to grow, pushes the dots into the outline. */
+private val PickWordHeight = 36.dp
+
 /**
  * The row above the stage. While asking: the streak's flames at the start (one per note
  * found first time in a row, up to [MAX_FLAMES], nothing at zero), "Find" over the note in
@@ -250,10 +257,17 @@ internal fun StreakFlames(streak: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** "🎒 Pick" over a dot in the colour of each letter among the chosen notes. */
+/**
+ * "🎒 Pick" over a dot in the colour of each letter among the chosen notes. As on the sideways button,
+ * the backpack is in dp, as a picture, and the word keeps 6 dp from the outline and shrinks to fit the
+ * rest, so large text neither splits "Odaberi" nor pushes the row off the button.
+ */
 @Composable
 private fun PickButton(practiceNotes: Set<Int>, onChoose: () -> Unit) {
     val description = stringResource(R.string.choose_notes)
+    val wordStyle = MaterialTheme.typography.titleMedium
+    val backpack = with(LocalDensity.current) { 20.dp.toSp().value.toInt() }
+    val wordFloor = with(LocalDensity.current) { PickWordFloor.toSp() }
     ChunkyButton(
         onClick = onChoose,
         shape = CircleShape,
@@ -262,10 +276,20 @@ private fun PickButton(practiceNotes: Set<Int>, onChoose: () -> Unit) {
             .size(width = HeroSideWidth, height = 60.dp)
             .semantics { contentDescription = description },
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 6.dp),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Emoji(BACKPACK_EMOJI, fontSize = 20)
-                Text(stringResource(R.string.pick_notes), style = MaterialTheme.typography.titleMedium)
+                Emoji(BACKPACK_EMOJI, fontSize = backpack, modifier = Modifier.testTag("pick_backpack"))
+                Text(
+                    stringResource(R.string.pick_notes),
+                    style = wordStyle,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = wordFloor, maxFontSize = wordStyle.fontSize),
+                    modifier = Modifier.weight(1f, fill = false).heightIn(max = PickWordHeight),
+                )
             }
             LetterDots(practiceNotes)
         }

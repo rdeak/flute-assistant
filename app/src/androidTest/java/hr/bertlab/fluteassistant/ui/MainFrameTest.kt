@@ -16,11 +16,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
@@ -46,6 +51,15 @@ class MainFrameTest {
     val compose = createComposeRule()
 
     private var sideways by mutableStateOf(false)
+    private var tablet by mutableStateOf(false)
+
+    /** The density the tab and the rail were drawn at, the rail standing for the frame. */
+    private var tabDensity = 0f
+    private var frameDensity = 0f
+
+    /** The densities themselves, as a phone must hand the tab the very one the frame has. */
+    private var tabDensityItself: Density? = null
+    private var frameDensityItself: Density? = null
 
     /** Times the tab's effect was entered and disposed, and its remembered object made. */
     private var entered = 0
@@ -64,7 +78,12 @@ class MainFrameTest {
             entered++
             onDispose { disposed++ }
         }
-        SideEffect { seen += remembered }
+        val density = LocalDensity.current
+        SideEffect {
+            seen += remembered
+            tabDensity = density.density
+            tabDensityItself = density
+        }
         Text("the tab, sideways: $sideways", Modifier.testTag(TAB))
     }
 
@@ -82,6 +101,40 @@ class MainFrameTest {
                 }
             }
         }
+    }
+
+    /**
+     * The frame sideways in a window 1280 wide, where the rail leaves the tab 1188 of it. The window
+     * is 1000 tall, not a tablet's 800, so that the width sets the zoom: this runs on an upright
+     * emulator, whose real bars take about 150 dp at the density `ForcedSize` needs for that width.
+     */
+    private fun showOnATablet(isTablet: Boolean) {
+        sideways = true
+        tablet = isTablet
+        compose.setContent {
+            DeviceConfigurationOverride(DeviceConfigurationOverride.ForcedSize(DpSize(1280.dp, 1000.dp))) {
+                FluteAssistantTheme {
+                    MainFrame(
+                        sideways = sideways,
+                        snackbarHostState = remember { SnackbarHostState() },
+                        titleBar = { Text("title", Modifier.testTag(TITLE_BAR)) },
+                        tabBar = { Text("tabs", Modifier.testTag(TAB_BAR)) },
+                        rail = {
+                            val density = LocalDensity.current
+                            SideEffect {
+                                frameDensity = density.density
+                                frameDensityItself = density
+                            }
+                            Box(Modifier.width(92.dp).fillMaxHeight().testTag(RAIL))
+                        },
+                        tablet = tablet,
+                    ) {
+                        CountingTab(sideways)
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
     }
 
     private fun turn() {
@@ -132,6 +185,42 @@ class MainFrameTest {
         // Composed again on every turn (it was handed the new value), and the same object each time.
         assertTrue("the tab was not composed again on a turn: ${seen.size} passes", seen.size > 1)
         seen.forEach { assertSame("a different object was remembered", seen.first(), it) }
+    }
+
+    @Test
+    fun a_tablet_zooms_the_tab_and_not_the_frame() {
+        showOnATablet(isTablet = true)
+        assertEquals(1.43f, tabDensity / frameDensity, 0.01f)
+    }
+
+    @Test
+    fun a_phone_does_not_zoom_the_tab() {
+        showOnATablet(isTablet = false)
+        assertEquals(frameDensity, tabDensity)
+    }
+
+    @Test
+    fun a_phone_hands_the_tab_the_frames_own_density() {
+        showOnATablet(isTablet = false)
+        assertSame(frameDensityItself, tabDensityItself)
+    }
+
+    @Test
+    fun the_tab_is_not_disposed_or_made_again_when_the_zoom_changes() {
+        showOnATablet(isTablet = true)
+        repeat(3) {
+            compose.runOnIdle { tablet = false }
+            compose.waitForIdle()
+            assertEquals("not zoomed", frameDensity, tabDensity)
+            compose.runOnIdle { tablet = true }
+            compose.waitForIdle()
+            assertTrue("zoomed again", tabDensity > frameDensity)
+            turn()
+            turn()
+        }
+        assertEquals("the effect was entered again: the tab left the composition", 1, entered)
+        assertEquals("the effect was disposed: the tab left the composition", 0, disposed)
+        assertEquals("the remembered object was made again", 1, made)
     }
 
     private companion object {

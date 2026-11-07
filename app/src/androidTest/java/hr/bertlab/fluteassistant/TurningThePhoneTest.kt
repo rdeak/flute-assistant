@@ -18,7 +18,8 @@ class TurningThePhoneTest {
     /**
      * A turn must not re-create the activity: a re-creation stops it, `FluteScreen` calls
      * `leaveTab()` when that happens, and that stops a tune that is playing back. The locale stays
-     * out of the list because the language switch relies on re-creation.
+     * out of the list because the language switch relies on re-creation. A keyboard counts too: a
+     * tablet's keyboard case attached during a tune must not stop it.
      */
     @Test
     fun the_activity_handles_a_turn_itself() {
@@ -32,6 +33,9 @@ class TurningThePhoneTest {
             "screenSize" to ActivityInfo.CONFIG_SCREEN_SIZE,
             "smallestScreenSize" to ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE,
             "screenLayout" to ActivityInfo.CONFIG_SCREEN_LAYOUT,
+            "keyboard" to ActivityInfo.CONFIG_KEYBOARD,
+            "keyboardHidden" to ActivityInfo.CONFIG_KEYBOARD_HIDDEN,
+            "navigation" to ActivityInfo.CONFIG_NAVIGATION,
         )) {
             assertTrue("$name is handled by the activity", (handled and flag) == flag)
         }

@@ -21,10 +21,12 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
+import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeStageSideways
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
@@ -66,6 +68,9 @@ internal fun FluteWritingSideways(
         val contentWidth = maxWidth.value
         val keyHeight = SidewaysGeometry.keyHeight(maxHeight.value).dp
         val keysFit = maxHeight.value >= SidewaysGeometry.WRITING_MIN_HEIGHT
+        // A tablet gives the staff more of the room: a zoomed tab has height to spare, and a tune wants the width.
+        val zoom = LocalTabZoom.current
+        val keysWidth = if (zoom > 1f) TabletGeometry.sidewaysKeys(zoom) else SidewaysGeometry.keysWidth(contentWidth)
         Row(
             horizontalArrangement = Arrangement.spacedBy(margin),
             modifier = Modifier
@@ -83,7 +88,7 @@ internal fun FluteWritingSideways(
             Column(
                 verticalArrangement = Arrangement.spacedBy(KeysToButtons),
                 modifier = Modifier
-                    .width(SidewaysGeometry.keysWidth(contentWidth).dp)
+                    .width(keysWidth.dp)
                     .fitOrScroll(fits = keysFit, minHeight = KeysColumnMinHeight),
             ) {
                 keys(

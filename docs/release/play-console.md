@@ -18,6 +18,7 @@ Settings and the child's tunes are stored locally on the device.
 | App icon | `play-listing/icon-512.png` (512x512) |
 | Feature graphic | `play-listing/feature-graphic-1024x500.png` (subtitle "Flute, metronome, tuner and notes", text in `tools/IconGen.java`) |
 | Screenshots | `play-listing/screenshots/en/` and `hr/`: one per tab, 1080x1920 JPEG (9:16, the ratio Play asks for), made by `tools/play-screenshots.sh` on the emulator |
+| Tablet screenshots | `play-listing/screenshots-tablet/7-inch/<lang>/` (1296x2304) for the 7-inch tablet slot and `10-inch/<lang>/` (2880x1620) for the 10-inch slot: one per tab, made by `tools/play-screenshots.sh tablet`, uploaded by hand |
 | Category | Music & Audio |
 | Languages | English (default) and Croatian; the UI follows the system language and Android 13+ per-app language settings. Add a Croatian listing translation (draft below) with the `hr/` screenshots so Croatian users see the listing in their language. |
 | Contact email | Required; shown publicly |

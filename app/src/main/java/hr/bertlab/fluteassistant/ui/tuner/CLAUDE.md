@@ -159,3 +159,12 @@ as the height leaves little choice. The numbers come from `SidewaysGeometry`, wh
   it; Yes low on the right, Settings at the top of the column, and the flute's Your turn adds its quiet Not
   now under Settings (it has no emoji).
 
+## The microphone in split screen
+
+Since 2026-11-06 (spec `2026-11-06-tablet-design.md`, "Google's basics"), accepted as it is. On Android 10 and
+later, when two apps record, the one on top gets the audio and the other silence, with no error: the tuner goes
+quiet and hears again when its pane is back on top. `AudioRecordTunerEngine` does not look at `isClientSilenced`, so
+`micFailed` stays false and the flute's Your turn just waits. Showing the failure line would need plumbing through
+both ViewModels and new words on the flute; giving the microphone up on losing focus would stop Your turn when the
+child touches the other pane. Android 7 to 9 stays first come, first served. None of this has been run on a device:
+the emulator needs `-no-audio`, and there is no tablet.
