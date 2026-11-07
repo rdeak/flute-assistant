@@ -12,6 +12,7 @@ import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import hr.bertlab.fluteassistant.domain.model.Subdivision
+import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.repository.SettingsStore
@@ -100,6 +101,10 @@ class SharedPreferencesSettingsStore @Inject constructor(
 
     override fun saveOpenBook(index: Int) = prefs.edit { putInt(KEY_OPEN_BOOK, index) }
 
+    override fun loadTheme(): ThemeChoice = enumOrDefault(prefs.getString(KEY_THEME, null), ThemeChoice.SYSTEM)
+
+    override fun saveTheme(choice: ThemeChoice) = prefs.edit { putString(KEY_THEME, choice.name) }
+
     private fun bookKey(index: Int) = "book_$index"
 
     private inline fun <reified T : Enum<T>> enumOrDefault(name: String?, default: T): T =
@@ -118,6 +123,7 @@ class SharedPreferencesSettingsStore @Inject constructor(
         const val KEY_PRACTICE_NOTES = "practice_notes"
         const val KEY_NOTE_SOUND = "note_sound"
         const val KEY_OPEN_BOOK = "open_book"
+        const val KEY_THEME = "theme"
 
         /** The single tune of builds before the shelf; read once to migrate it into book 0, then removed. */
         const val KEY_TUNE = "tune"

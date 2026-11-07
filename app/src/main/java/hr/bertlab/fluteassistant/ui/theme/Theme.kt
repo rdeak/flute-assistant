@@ -61,7 +61,8 @@ private val DarkColorScheme = DarkFluteColors.toColorScheme(dark = true)
 
 /**
  * Material 3 theme with a fixed playful palette (see [Color.kt]), extra-round shapes and
- * big, bold rounded type. Dark mode follows the system setting.
+ * big, bold rounded type. Dark mode follows the system setting unless the caller says otherwise
+ * (`MainScreen` passes the child's choice, [ThemeViewModel]).
  */
 @Composable
 fun FluteAssistantTheme(

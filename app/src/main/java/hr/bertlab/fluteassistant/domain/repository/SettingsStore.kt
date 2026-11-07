@@ -6,12 +6,13 @@ package hr.bertlab.fluteassistant.domain.repository
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 
 /**
  * Small key-value persistence for "where the user left off": the last metronome settings,
  * the volume, the tuner's reference pitch and the note it tunes to, the notes the reading
- * game asks, the flute tab's shelf of tunes. Synchronous by design
+ * game asks, the flute tab's shelf of tunes, the day or night choice. Synchronous by design
  * (tiny values, read once at ViewModel creation).
  */
 interface SettingsStore {
@@ -42,4 +43,7 @@ interface SettingsStore {
     fun saveBook(index: Int, book: Book)
     /** Stores which book is open, 0 until Songbook.SIZE. */
     fun saveOpenBook(index: Int)
+    /** The child's day or night choice; [ThemeChoice.SYSTEM] until one is made. */
+    fun loadTheme(): ThemeChoice
+    fun saveTheme(choice: ThemeChoice)
 }

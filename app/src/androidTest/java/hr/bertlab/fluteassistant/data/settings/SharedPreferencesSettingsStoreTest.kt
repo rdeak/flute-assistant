@@ -17,6 +17,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -151,5 +152,24 @@ class SharedPreferencesSettingsStoreTest {
         assertEquals(cookie, shelf.books[1])
         assertEquals(donut, shelf.books[3])
         assertTrue(listOf(0, 2, 4, 5).all { shelf.books[it].isEmpty })
+    }
+
+    // ---- The theme ----
+
+    @Test
+    fun a_fresh_install_follows_the_phone_s_theme() {
+        assertEquals(ThemeChoice.SYSTEM, store().loadTheme())
+    }
+
+    @Test
+    fun the_chosen_theme_comes_back_after_a_restart() {
+        store().saveTheme(ThemeChoice.DARK)
+        assertEquals(ThemeChoice.DARK, store().loadTheme())
+    }
+
+    @Test
+    fun an_unknown_theme_name_falls_back_to_the_phone_s() {
+        assertTrue(raw.edit().putString("theme", "SEPIA").commit())
+        assertEquals(ThemeChoice.SYSTEM, store().loadTheme())
     }
 }

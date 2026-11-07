@@ -19,6 +19,8 @@
 
     <string name="language">Jezik</string>
 
+    <string name="theme_dark">Tamna tema</string>
+
     <!-- Credits: a long press on the app icon opens them. The addresses stay plain text, never links. -->
     <string name="credits_open">Prikaži zasluge</string>
     <string name="credits_version">Verzija %1$s</string>

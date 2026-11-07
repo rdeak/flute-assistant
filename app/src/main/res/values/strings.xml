@@ -21,6 +21,9 @@
     <!-- In-app language switch (the language names themselves are endonyms in ui/common/AppLanguage.kt) -->
     <string name="language">Language</string>
 
+    <!-- The day/night switch beside the flag: a moon or a sun, so this name is for a screen reader. -->
+    <string name="theme_dark">Dark theme</string>
+
     <!-- Credits: a long press on the app icon opens them. The addresses stay plain text, never links. -->
     <string name="credits_open">Show credits</string>
     <string name="credits_version">Version %1$s</string>

@@ -285,6 +285,8 @@ class SideRailTest {
                     } else {
                         TitleBar(
                             tab = selected,
+                            dark = false,
+                            onDarkChange = {},
                             creditsOpen = creditsOpen,
                             onCreditsOpenChange = { creditsOpen = it },
                             languageOpen = languageOpen,

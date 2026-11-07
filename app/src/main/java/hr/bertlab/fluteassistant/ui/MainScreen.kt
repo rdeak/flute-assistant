@@ -7,6 +7,7 @@ import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -79,7 +80,9 @@ import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.SystemBarsFollowTheme
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
+import hr.bertlab.fluteassistant.ui.common.ThemeSwitch
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.common.zoomedBy
@@ -90,9 +93,11 @@ import hr.bertlab.fluteassistant.ui.metronome.MetronomeScreen
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeViewModel
 import hr.bertlab.fluteassistant.ui.notes.NotesScreen
 import hr.bertlab.fluteassistant.ui.notes.NotesViewModel
+import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import hr.bertlab.fluteassistant.ui.theme.Sun
+import hr.bertlab.fluteassistant.ui.theme.ThemeViewModel
 import hr.bertlab.fluteassistant.ui.tuner.TunerScreen
 import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
 
@@ -109,12 +114,16 @@ enum class AppTab(@StringRes val labelRes: Int, val emoji: String) {
 }
 
 /**
- * Root of the UI: a [Scaffold] with the tab's title and the language switch on top and a bottom
- * tab bar that switches between the digital flute, the metronome, the tuner and the note reading
- * game. All four ViewModels are scoped to the Activity, so settings, playback and
- * the flute's tune survive switching tabs, rotation and the re-creation that a language change
+ * Root of the UI: a [Scaffold] with the tab's title, the day/night switch and the language switch
+ * on top and a bottom tab bar that switches between the digital flute, the metronome, the tuner
+ * and the note reading game. All the ViewModels are scoped to the Activity, so settings, playback
+ * and the flute's tune survive switching tabs, rotation and the re-creation that a language change
  * triggers. The game's round is the exception: leaving its tab resets the score, so the child
  * always comes back to a fresh start.
+ *
+ * The theme is applied here, from the child's stored choice ([ThemeViewModel]) or, before one is
+ * made, the phone's night setting: as Compose state, so a tap on the moon changes the colours in
+ * place and re-creates nothing. The phone's bar icons are told the same.
  *
  * On a phone on its side a [SideRail] stands in for both bars and the phone's own bars hide. The
  * tab's `when` is written once here and handed to [MainFrame] as one slot, which calls it in one
@@ -129,6 +138,7 @@ fun MainScreen(
     tunerViewModel: TunerViewModel = hiltViewModel(),
     notesViewModel: NotesViewModel = hiltViewModel(),
     fluteViewModel: FluteViewModel = hiltViewModel(),
+    themeViewModel: ThemeViewModel = hiltViewModel(),
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.entries.first()) }
     // What the bars open, kept here: the title bar and the rail stand in different places, so a turn
@@ -139,6 +149,9 @@ fun MainScreen(
     val tunerState by tunerViewModel.state.collectAsStateWithLifecycle()
     val notesState by notesViewModel.state.collectAsStateWithLifecycle()
     val fluteState by fluteViewModel.state.collectAsStateWithLifecycle()
+    val themeChoice by themeViewModel.choice.collectAsStateWithLifecycle()
+    val dark = themeChoice.isDark(systemDark = isSystemInDarkTheme())
+    SystemBarsFollowTheme(dark)
 
     // A tune plays back untouched for up to a minute or two, and a child plays it back to the phone with both hands on the flute: the screen must not time out under either.
     KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.isRunning)
@@ -167,56 +180,60 @@ fun MainScreen(
         selectedTab = tab
     }
 
-    BoxWithConstraints {
-        val sideways = SidewaysGeometry.isSideways(maxWidth.value, maxHeight.value)
-        val tablet = TabletGeometry.isTablet(maxWidth.value, maxHeight.value)
-        HideSystemBars(TabletGeometry.hidesSystemBars(sideways, tablet))
-        CompositionLocalProvider(LocalSideways provides sideways) {
-            MainFrame(
-                sideways = sideways,
-                snackbarHostState = snackbarHostState,
-                titleBar = {
-                    TitleBar(
-                        tab = selectedTab,
-                        creditsOpen = creditsOpen,
-                        onCreditsOpenChange = { creditsOpen = it },
-                        languageOpen = languageOpen,
-                        onLanguageOpenChange = { languageOpen = it },
-                    )
-                },
-                tabBar = {
-                    TabBar(
-                        selected = selectedTab,
-                        onSelect = onSelectTab,
-                        drumBeating = metronomeState.isPlaying,
-                        beatPulse = metronomeState.beatPulse,
-                    )
-                },
-                rail = {
-                    SideRail(
-                        selected = selectedTab,
-                        onSelect = onSelectTab,
-                        drumBeating = metronomeState.isPlaying,
-                        beatPulse = metronomeState.beatPulse,
-                        creditsOpen = creditsOpen,
-                        onCreditsOpenChange = { creditsOpen = it },
-                        languageOpen = languageOpen,
-                        onLanguageOpenChange = { languageOpen = it },
-                    )
-                },
-                tablet = tablet,
-            ) {
-                // The one call site of the tab: `MainFrame` puts this in the same place upright and sideways.
-                when (selectedTab) {
-                    AppTab.METRONOME -> MetronomeScreen(state = metronomeState, viewModel = metronomeViewModel)
-                    AppTab.TUNER -> TunerScreen(state = tunerState, viewModel = tunerViewModel)
-                    AppTab.NOTES -> NotesScreen(state = notesState, viewModel = notesViewModel)
-                    AppTab.FLUTE -> FluteScreen(
-                        state = fluteState,
-                        viewModel = fluteViewModel,
-                        metronome = metronomeState,
-                        metronomeViewModel = metronomeViewModel,
-                    )
+    FluteAssistantTheme(darkTheme = dark) {
+        BoxWithConstraints {
+            val sideways = SidewaysGeometry.isSideways(maxWidth.value, maxHeight.value)
+            val tablet = TabletGeometry.isTablet(maxWidth.value, maxHeight.value)
+            HideSystemBars(TabletGeometry.hidesSystemBars(sideways, tablet))
+            CompositionLocalProvider(LocalSideways provides sideways) {
+                MainFrame(
+                    sideways = sideways,
+                    snackbarHostState = snackbarHostState,
+                    titleBar = {
+                        TitleBar(
+                            tab = selectedTab,
+                            dark = dark,
+                            onDarkChange = themeViewModel::setDark,
+                            creditsOpen = creditsOpen,
+                            onCreditsOpenChange = { creditsOpen = it },
+                            languageOpen = languageOpen,
+                            onLanguageOpenChange = { languageOpen = it },
+                        )
+                    },
+                    tabBar = {
+                        TabBar(
+                            selected = selectedTab,
+                            onSelect = onSelectTab,
+                            drumBeating = metronomeState.isPlaying,
+                            beatPulse = metronomeState.beatPulse,
+                        )
+                    },
+                    rail = {
+                        SideRail(
+                            selected = selectedTab,
+                            onSelect = onSelectTab,
+                            drumBeating = metronomeState.isPlaying,
+                            beatPulse = metronomeState.beatPulse,
+                            creditsOpen = creditsOpen,
+                            onCreditsOpenChange = { creditsOpen = it },
+                            languageOpen = languageOpen,
+                            onLanguageOpenChange = { languageOpen = it },
+                        )
+                    },
+                    tablet = tablet,
+                ) {
+                    // The one call site of the tab: `MainFrame` puts this in the same place upright and sideways.
+                    when (selectedTab) {
+                        AppTab.METRONOME -> MetronomeScreen(state = metronomeState, viewModel = metronomeViewModel)
+                        AppTab.TUNER -> TunerScreen(state = tunerState, viewModel = tunerViewModel)
+                        AppTab.NOTES -> NotesScreen(state = notesState, viewModel = notesViewModel)
+                        AppTab.FLUTE -> FluteScreen(
+                            state = fluteState,
+                            viewModel = fluteViewModel,
+                            metronome = metronomeState,
+                            metronomeViewModel = metronomeViewModel,
+                        )
+                    }
                 }
             }
         }
@@ -322,13 +339,16 @@ internal fun AppLanguageSwitch(
 }
 
 /**
- * The top bar: the app icon, the open tab's name and, at the end, the in-app language switch. The
+ * The top bar: the app icon, the open tab's name and, at the end, the day/night switch (a moon
+ * by day, a sun by night, [dark] and [onDarkChange]) and then the in-app language switch. The
  * credits and the language list are open or shut as [creditsOpen] and [languageOpen] say when the
  * caller passes them with their change callbacks, so a turn to the rail leaves them as they were.
  */
 @Composable
 internal fun TitleBar(
     tab: AppTab,
+    dark: Boolean,
+    onDarkChange: (Boolean) -> Unit,
     creditsOpen: Boolean? = null,
     onCreditsOpenChange: ((Boolean) -> Unit)? = null,
     languageOpen: Boolean? = null,
@@ -355,6 +375,8 @@ internal fun TitleBar(
                 .padding(end = 12.dp)
                 .semantics { heading() },
         )
+        ThemeSwitch(dark = dark, onDarkChange = onDarkChange)
+        Spacer(Modifier.width(8.dp))
         AppLanguageSwitch(isOpen = languageOpen, onOpenChange = onLanguageOpenChange)
     }
 }

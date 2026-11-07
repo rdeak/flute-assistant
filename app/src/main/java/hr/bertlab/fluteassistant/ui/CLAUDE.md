@@ -9,7 +9,7 @@ That is the upright frame. On a phone on its side a rail stands in for both ("Si
 On a tablet the same frames stay phone-sized and the tab between them grows ("Tablets", after it).
 
 - One Activity, which sets `volumeControlStream` to the media stream so the volume keys adjust
-  the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus the `LanguageSwitch`: since 2026-11-05 one
+  the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus, at the end, the `ThemeSwitch` and the `LanguageSwitch`: since 2026-11-05 one
   flag button that opens a list of the flags, with no words and sized in dp so they keep to their circles at any text size, over `ui/common/AppLanguage`; selecting one calls
   `AppCompatDelegate.setApplicationLocales`, which re-creates the Activity) and a bottom bar
   switching between the four tabs (`AppTab`: flute, metronome, tuner, notes; since 2026-11-04 the
@@ -26,6 +26,20 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   `ui/common/BeatFlash.kt`, the same hop as the ring's animal), so a running drum is visible
   everywhere and one tap on it reaches Stop; a screen reader hears that tab as "Playing"
   (`tab_metronome_playing`).
+- The day/night switch (`ui/common/ThemeSwitch`, the user's call on 2026-11-07, "add theme change button
+  near flags"): a round button just before the flag, a moon by day (tap it for night) and a sun by night, the
+  picture saying what the tap does as Play shows while stopped, no words, and sized in dp like the flag. A
+  screen reader hears a "Dark theme" switch (`theme_dark`). The choice is `ThemeChoice` in `SettingsStore`:
+  `SYSTEM` (the phone's night setting) until the first tap, then `LIGHT` or `DARK` for good, a two-way switch
+  with no way back to the phone's setting, as a child needs none. `ThemeViewModel` holds it and `MainScreen`
+  applies it: it computes `dark` and wraps the frame in `FluteAssistantTheme(darkTheme = dark)` itself
+  (`MainActivity` only calls `MainScreen()`), so a tap changes the colours in place; it never goes through
+  AppCompat's night mode, which would re-create the Activity and stop a playing tune. `SystemBarsFollowTheme`
+  (`ui/common/SystemBars.kt`) calls `enableEdgeToEdge` again with the app's answer, so the phone's bar icons
+  match the app and not the phone. The rail has no theme switch: the short rail (360 dp) has no spare height
+  (another 38 dp button would take the tabs from about 60 to 49 dp, and at large text the words would stand on
+  the open tab's outline), and sideways is for playing, not settings; a child turns the phone upright to
+  change it. `ThemeSwitchTest` covers the button and its place before the flag.
 - Each screen is split into a stateful `MetronomeScreen` / `TunerScreen` / `NotesScreen` /
   `FluteScreen` (ViewModel, permissions, lifecycle) and a stateless `MetronomeContent` /
   `TunerContent` / `NotesContent` / `FluteContent` taking state plus callbacks (`FluteScreen` is also handed the metronome's state and

@@ -104,6 +104,8 @@ tab's CLAUDE.md; these rules hold on all of them:
   `docs/superpowers/specs/2026-11-05-landscape-design.md`, `ui/CLAUDE.md`): its width goes to size and
   air, not to more things, and the turned-down list below holds there too. A tablet's room goes the
   same way (2026-11-06, `ui/CLAUDE.md`, "Tablets"): the tab grows, and nothing is added.
+- Added at the user's request (2026-11-07): a day/night switch in the top bar before the flag, a moon or a
+  sun with no words (`ui/CLAUDE.md`). It is part of the frame like the flag, not a control on a tab.
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than

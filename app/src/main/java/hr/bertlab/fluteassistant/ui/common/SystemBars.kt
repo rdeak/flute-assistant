@@ -3,7 +3,11 @@
 
 package hr.bertlab.fluteassistant.ui.common
 
+import android.graphics.Color
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.core.app.MultiWindowModeChangedInfo
@@ -43,3 +47,26 @@ fun HideSystemBars(enabled: Boolean) {
         }
     }
 }
+
+/**
+ * Draws the status and navigation bars' icons for the app's own theme: light icons while [dark],
+ * dark ones otherwise. `enableEdgeToEdge` in `onCreate` reads the phone's night setting, which
+ * the child's moon or sun can overrule, so this applies it again with the app's answer whenever
+ * that changes. The scrims are the library's own defaults, which only a three-button bar below
+ * Android 10 ever shows.
+ */
+@Composable
+fun SystemBarsFollowTheme(dark: Boolean) {
+    val activity = LocalActivity.current as? ComponentActivity
+    DisposableEffect(dark, activity) {
+        activity?.enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { dark },
+            navigationBarStyle = SystemBarStyle.auto(LightScrim, DarkScrim) { dark },
+        )
+        onDispose { }
+    }
+}
+
+/** `enableEdgeToEdge`'s own navigation bar scrims, which it does not export. */
+private val LightScrim = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+private val DarkScrim = Color.argb(0x80, 0x1b, 0x1b, 0x1b)

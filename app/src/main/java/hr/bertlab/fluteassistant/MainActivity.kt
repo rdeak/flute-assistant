@@ -10,7 +10,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import dagger.hilt.android.AndroidEntryPoint
 import hr.bertlab.fluteassistant.ui.MainScreen
-import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
 
 /**
  * Single-activity host. All navigation and state live in Compose and the ViewModels.
@@ -29,11 +28,10 @@ class MainActivity : AppCompatActivity() {
         // the volume keys must adjust the media stream even while nothing is sounding; without
         // this they adjust the ringer and seem to do nothing to the app.
         volumeControlStream = AudioManager.STREAM_MUSIC
+        // The bars' icons are set again from the app's own theme once it is known (`SystemBarsFollowTheme`).
         enableEdgeToEdge()
         setContent {
-            FluteAssistantTheme {
-                MainScreen()
-            }
+            MainScreen()
         }
     }
 }

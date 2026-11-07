@@ -20,6 +20,7 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.Preset
+import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.repository.PresetRepository
 import hr.bertlab.fluteassistant.domain.repository.SettingsStore
@@ -180,6 +181,7 @@ class FakeSettingsStore(
     var noteSound: Boolean = true,
     val books: MutableList<Book> = MutableList(Songbook.SIZE) { Book() },
     var openBook: Int = 0,
+    var theme: ThemeChoice = ThemeChoice.SYSTEM,
 ) : SettingsStore {
     /** The tune of the open book, so a test can set or read it without going through the shelf. */
     var tune: List<TuneItem>
@@ -203,6 +205,8 @@ class FakeSettingsStore(
     override fun loadShelf() = Shelf(openBook, books.toList())
     override fun saveBook(index: Int, book: Book) { books[index] = book }
     override fun saveOpenBook(index: Int) { openBook = index }
+    override fun loadTheme() = theme
+    override fun saveTheme(choice: ThemeChoice) { theme = choice }
 }
 
 class FakeClock(var now: Long = 0L) : MonotonicClock {
