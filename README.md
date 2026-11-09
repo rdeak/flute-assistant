@@ -22,9 +22,7 @@ metronome, a chromatic tuner and a note reading game, in English and Croatian.
 The screens show no jargon and almost no numbers: no BPM, hertz or cents (the only figures are the
 tempo in the middle of the ring and the small octave on note names). Tempo is an animal on the ring,
 tuning is a bubble floating up or down to its ring, and the game's score is stars, flames and an
-animal, even in the round summary. The
-metronome engine already supports tap tempo, subdivisions, click sounds and presets, and the tuner
-supports other A4 references. None of that is exposed, and it is kept for a later advanced mode.
+animal, even in the round summary.
 
 The app asks for no account and has no network permission, analytics or ads. The microphone is open
 only while the tuner tab is on screen or the flute listens after "Listen to me" is pressed, and the
@@ -37,7 +35,7 @@ audio is analysed in memory and discarded. Settings and the child's tunes stay o
 |-----------------|--------------------------------------------------------------------------------------------------------------------|
 | Platform        | Android, minSdk 24, targetSdk 37                                                                                   |
 | Language and UI | Kotlin, Jetpack Compose, Material 3                                                                                |
-| Architecture    | MVVM with `StateFlow`, Hilt, Room, coroutines and Flow                                                             |
+| Architecture    | MVVM with `StateFlow`, Hilt, coroutines and Flow                                                                   |
 | Audio           | Own DSP on `AudioTrack` and `AudioRecord`: click synthesis, YIN pitch detection, a sustained-tone synth            |
 | Dependencies    | AndroidX, plus Hilt and kotlinx.coroutines. No audio, networking or image libraries                                |
 | Size            | About 7,400 lines of app code and 4,300 lines of tests (about 220 JVM unit tests, about 70 instrumented)           |
@@ -49,8 +47,8 @@ audio is analysed in memory and discarded. Settings and the child's tunes stay o
 The code is layered by package under `app/src/main/java/hr/bertlab/fluteassistant/`:
 
 ```
-domain/    pure Kotlin: models, note math, tap tempo, the note pool, repository interfaces, use cases
-data/      Room and SharedPreferences implementations of those interfaces
+domain/    pure Kotlin: models, note math, the note pool, the tune and its songbook, the settings interface
+data/      the SharedPreferences settings store
 audio/     metronome, tuner and flute-tone engines
 playback/  foreground service that keeps the metronome alive off screen
 ui/        Compose screens and ViewModels (StateFlow state, intent methods)
@@ -198,10 +196,6 @@ description of the internals, kept in step with the code.
   Console.
 - Sound quality and the -60 dBFS silence gate can only be confirmed on a phone, and the tuner's
   confidence gate is waiting for such a capture.
-- Room is at schema version 1 with a destructive fallback migration. Presets are not exposed, so no
-  user data is stored there today, but a migration has to be written before they ship.
-- Tap tempo, subdivisions, click sounds, presets and the A4 reference are built but have no screen.
-  The advanced mode that would hold them is not started.
 
 ## Licence
 

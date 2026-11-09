@@ -19,8 +19,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
@@ -31,22 +29,6 @@ import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
  * Display names live in string resources so the app can be localised (English by default,
  * Croatian in values-hr); the domain enums stay language-free.
  */
-
-@StringRes
-fun Subdivision.labelRes(): Int = when (this) {
-    Subdivision.NONE -> R.string.subdivision_quarter
-    Subdivision.EIGHTH -> R.string.subdivision_eighth
-    Subdivision.SIXTEENTH -> R.string.subdivision_sixteenth
-    Subdivision.TRIPLET -> R.string.subdivision_triplet
-    Subdivision.SHUFFLE -> R.string.subdivision_shuffle
-}
-
-@StringRes
-fun SoundProfile.labelRes(): Int = when (this) {
-    SoundProfile.WOODBLOCK -> R.string.sound_woodblock
-    SoundProfile.BEEP -> R.string.sound_beep
-    SoundProfile.BELL -> R.string.sound_bell
-}
 
 @StringRes
 fun TunerMode.labelRes(): Int = when (this) {
@@ -75,18 +57,9 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.PLAY_AGAIN -> R.string.advice_play_again
 }
 
-/** One line for preset lists and the playback notification, e.g. "120 BPM · 4/4 · Quarter · Woodblock". */
-fun MetronomeConfig.summary(resources: Resources): String = resources.getString(
-    R.string.config_summary,
-    bpm,
-    timeSignature.label,
-    resources.getString(subdivision.labelRes()),
-    resources.getString(sound.labelRes()),
-)
-
-@Composable
-@ReadOnlyComposable
-fun MetronomeConfig.summary(): String = summary(LocalResources.current)
+/** One line for the playback notification, e.g. "120 BPM · 4/4". */
+fun MetronomeConfig.summary(resources: Resources): String =
+    resources.getString(R.string.config_summary, bpm, timeSignature.label)
 
 /**
  * Note name with octave for a MIDI number in the user's language. English uses scientific

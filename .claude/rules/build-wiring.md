@@ -3,14 +3,12 @@ paths:
   - "**/*.gradle.kts"
   - "gradle.properties"
   - "gradle/**"
-  - "app/schemas/**"
   - "app/src/debug/**"
   - "app/src/release/**"
   - "app/src/testDebug/**"
   - "app/src/main/AndroidManifest.xml"
   - "app/src/main/res/values/themes.xml"
   - "app/src/main/java/hr/bertlab/fluteassistant/MainActivity.kt"
-  - "app/src/main/java/hr/bertlab/fluteassistant/data/local/**"
   - "app/src/main/java/hr/bertlab/fluteassistant/ui/common/AppLanguage.kt"
   - "app/src/main/java/hr/bertlab/fluteassistant/ui/common/LanguageSwitch.kt"
 ---
@@ -20,9 +18,9 @@ paths:
 AGP 9.4.1 uses built-in Kotlin: there is no `kotlin-android` plugin and no kapt. The root
 `build.gradle.kts` puts the Kotlin Gradle plugin on the buildscript classpath to raise AGP's
 bundled Kotlin to the catalog's `kotlin` version, and the Compose compiler plugin shares that
-same version ref; keep the two equal. KSP is the standalone 2.3.x line; Hilt must stay >= 2.59.
-Room exports schemas to `app/schemas` (database version 1, destructive fallback migration for
-now). `localeFilters` strips every library locale except en and hr.
+same version ref; keep the two equal. KSP is the standalone 2.3.x line and runs for Hilt alone
+(Room went with the presets on 2026-11-09); Hilt must stay >= 2.59. `localeFilters` strips every
+library locale except en and hr.
 
 The build types differ in source: `app/src/debug` holds the "Your turn" session recorder
 (`debug/session`, the `RecordingLogger` and the `di/SessionModule` that binds them, plus backup

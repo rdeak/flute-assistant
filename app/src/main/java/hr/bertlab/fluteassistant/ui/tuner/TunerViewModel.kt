@@ -54,10 +54,6 @@ class TunerViewModel @Inject constructor(
     private val logger: Logger,
 ) : ViewModel() {
 
-    // The simplified UI cannot show or change the A4 reference, so a stale stored value must
-    // not silently relabel every note: start from the standard 440 Hz (the stored value is
-    // left for a future advanced mode, which would call setReferenceA4 explicitly). The
-    // target note and the mode, by contrast, are on screen, so the stored ones are honoured.
     private val _state = MutableStateFlow(
         TunerUiState(targetMidi = FluteRange.clamp(settings.loadTargetNote()), mode = settings.loadTunerMode()),
     )
@@ -109,20 +105,9 @@ class TunerViewModel @Inject constructor(
         recentFrequencies.clear()
         silentFrames = 0
         clearHearing()
-        _state.update { it.copy(isListening = false, reading = null, level = 0f) }
+        _state.update { it.copy(isListening = false, reading = null) }
         if (summary.frames > 0) logSummary() // the last partial second, before the child left
         logReadingIfChanged()
-    }
-
-    fun setReferenceA4(hz: Double) {
-        val clamped = hz.coerceIn(MIN_A4, MAX_A4)
-        settings.saveReferenceA4(clamped)
-        _state.update { s ->
-            s.copy(
-                referenceA4 = clamped,
-                reading = s.reading?.let { NoteMath.frequencyToNote(it.frequency, clamped) },
-            )
-        }
     }
 
     /** Chooses the note the gauge measures against; clamped to the flute's range and remembered. */
@@ -142,7 +127,7 @@ class TunerViewModel @Inject constructor(
         val current = _state.value
         logger.d(LogTags.TUNER, "tuner.reference", "midi" to current.targetMidi, "ms" to REFERENCE_TONE_MS, "volume" to REFERENCE_TONE_VOLUME)
         tonePlayer.play(
-            NoteMath.midiToFrequency(current.targetMidi, current.referenceA4),
+            NoteMath.midiToFrequency(current.targetMidi),
             REFERENCE_TONE_MS,
             REFERENCE_TONE_VOLUME,
         )
@@ -191,29 +176,24 @@ class TunerViewModel @Inject constructor(
 
     /** Folds one frame into the state and says what became of it. */
     private fun process(frame: PitchFrame): FrameDecision {
-        if (_state.value.isPlayingReference) {
-            _state.update { it.copy(level = frame.level) }
-            return FrameDecision.IGNORED
-        }
-        val frequency = frame.frequency ?: return onUnpitchedFrame(frame, FrameDecision.SILENT)
-        if (frame.probability < MIN_PROBABILITY) return onUnpitchedFrame(frame, FrameDecision.LOW_PROBABILITY)
+        if (_state.value.isPlayingReference) return FrameDecision.IGNORED
+        val frequency = frame.frequency ?: return onUnpitchedFrame(FrameDecision.SILENT)
+        if (frame.probability < MIN_PROBABILITY) return onUnpitchedFrame(FrameDecision.LOW_PROBABILITY)
 
         recentFrequencies.addLast(frequency)
         while (recentFrequencies.size > SMOOTHING_WINDOW) recentFrequencies.removeFirst()
         if (!isSteady()) {
             // Counts towards the hold like silence: a wandering pitch must not keep the last reading up for as long as it lasts.
             silentFrames++
-            _state.update {
-                it.copy(reading = if (silentFrames >= HOLD_FRAMES) null else it.reading, level = frame.level)
-            }
+            if (silentFrames >= HOLD_FRAMES) _state.update { it.copy(reading = null) }
             return FrameDecision.UNSTEADY
         }
         silentFrames = 0
         val median = recentFrequencies.sorted()[recentFrequencies.size / 2]
         val previous = _state.value
-        val reading = NoteMath.frequencyToNote(median, previous.referenceA4)
+        val reading = NoteMath.frequencyToNote(median)
         val identified = identify(previous, reading)
-        _state.update { it.copy(reading = reading, identifiedMidi = identified, level = frame.level) }
+        _state.update { it.copy(reading = reading, identifiedMidi = identified) }
         return FrameDecision.SHOWN
     }
 
@@ -230,7 +210,7 @@ class TunerViewModel @Inject constructor(
             driftFrames = 0
             return reading.midi
         }
-        val reach = abs(NoteMath.centsBetween(reading.frequency, current, previous.referenceA4))
+        val reach = abs(NoteMath.centsBetween(reading.frequency, current))
         if (reach > TunerUiState.NEAR_TARGET_CENTS || ++driftFrames >= SWITCH_FRAMES) {
             driftFrames = 0
             return reading.midi
@@ -239,13 +219,11 @@ class TunerViewModel @Inject constructor(
     }
 
     /** Silence or a frame too uncertain to trust: hold the reading for a while, then clear it. */
-    private fun onUnpitchedFrame(frame: PitchFrame, decision: FrameDecision): FrameDecision {
+    private fun onUnpitchedFrame(decision: FrameDecision): FrameDecision {
         silentFrames++
         if (silentFrames >= HOLD_FRAMES) {
             recentFrequencies.clear()
-            _state.update { it.copy(reading = null, level = frame.level) }
-        } else {
-            _state.update { it.copy(level = frame.level) }
+            _state.update { it.copy(reading = null) }
         }
         return decision
     }
@@ -335,8 +313,6 @@ class TunerViewModel @Inject constructor(
         const val HOLD_FRAMES = 20
         /** ~0.5 s: how long a drift past the halfway point must last before the identified note switches. */
         const val SWITCH_FRAMES = 12
-        const val MIN_A4 = 415.0
-        const val MAX_A4 = 466.0
         /** How long the reference note sounds. */
         const val REFERENCE_TONE_MS = 2000
         /** How loud, in 0..1. Fixed: the app has no volume control, the phone's buttons do that. */

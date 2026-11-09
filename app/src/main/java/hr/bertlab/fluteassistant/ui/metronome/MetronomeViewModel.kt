@@ -7,20 +7,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import hr.bertlab.fluteassistant.audio.metronome.MetronomePlayer
-import hr.bertlab.fluteassistant.core.MonotonicClock
-import hr.bertlab.fluteassistant.domain.metronome.TapTempoCalculator
-import hr.bertlab.fluteassistant.domain.model.BeatStrength
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.Preset
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.domain.repository.SettingsStore
-import hr.bertlab.fluteassistant.domain.usecase.DeletePresetUseCase
-import hr.bertlab.fluteassistant.domain.usecase.ObservePresetsUseCase
-import hr.bertlab.fluteassistant.domain.usecase.SavePresetUseCase
 import hr.bertlab.fluteassistant.playback.BackgroundPlayback
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,8 +22,8 @@ import javax.inject.Inject
 
 /**
  * Unidirectional data flow: the screen renders [state] and calls the intent methods below.
- * Engine calls are forwarded synchronously; persistence goes through the use cases and
- * [SettingsStore] (last-used settings survive process death).
+ * Engine calls are forwarded synchronously; the last-used settings go to [SettingsStore], so
+ * they survive process death.
  *
  * The ViewModel is a controller, not the owner, of playback: the engine is an app-wide
  * singleton kept alive by [BackgroundPlayback], so the metronome keeps running when the
@@ -42,16 +32,9 @@ import javax.inject.Inject
 @HiltViewModel
 class MetronomeViewModel @Inject constructor(
     private val player: MetronomePlayer,
-    observePresets: ObservePresetsUseCase,
-    private val savePreset: SavePresetUseCase,
-    private val deletePreset: DeletePresetUseCase,
     private val settings: SettingsStore,
-    private val clock: MonotonicClock,
     private val backgroundPlayback: BackgroundPlayback,
 ) : ViewModel() {
-
-    private val tapTempo = TapTempoCalculator()
-    private var tapHintJob: Job? = null
 
     /** Session id of the playback run we started; events from any other run are ignored. */
     private var activeSession = MetronomePlayer.NO_SESSION
@@ -64,25 +47,14 @@ class MetronomeViewModel @Inject constructor(
         val running = player.playback.value
         if (running != null) {
             activeSession = running.sessionId
-            return MetronomeUiState(config = running.config, volume = running.volume, isPlaying = true)
+            return MetronomeUiState(config = running.config, isPlaying = true)
         }
-        // The simplified UI offers no subdivision, sound or volume choice, so a value stored
-        // before that change (or by a future advanced mode) must not keep clicking with no way
-        // off, or stay silent with no way back up: the volume is the default, not the stored one.
-        // The same goes for a tempo outside the ring's range, from an older, wider ring.
+        // A tempo stored by an older, wider ring is brought onto this one.
         val stored = settings.loadMetronomeConfig()
-        val config = stored.copy(
-            bpm = stored.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM),
-            subdivision = Subdivision.NONE,
-            sound = SoundProfile.WOODBLOCK,
-        )
-        return MetronomeUiState(config = config)
+        return MetronomeUiState(config = stored.copy(bpm = stored.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM)))
     }
 
     init {
-        viewModelScope.launch {
-            observePresets().collect { presets -> _state.update { it.copy(presets = presets) } }
-        }
         // The engine can stop on its own (audio focus lost, headphones unplugged, output failure).
         viewModelScope.launch {
             player.sessionEnded.collect { session ->
@@ -101,14 +73,12 @@ class MetronomeViewModel @Inject constructor(
                 if (waitMillis > 0) delay(waitMillis)
                 // Playback may have stopped while we waited: never light an LED on a stopped metronome.
                 if (event.sessionId != activeSession || !_state.value.isPlaying) return@collect
-                if (event.click.strength != BeatStrength.SUBDIVISION) {
-                    _state.update {
-                        it.copy(
-                            currentBeat = event.click.beatIndex,
-                            currentStrength = event.click.strength,
-                            beatPulse = it.beatPulse + 1,
-                        )
-                    }
+                _state.update {
+                    it.copy(
+                        currentBeat = event.click.beatIndex,
+                        currentStrength = event.click.strength,
+                        beatPulse = it.beatPulse + 1,
+                    )
                 }
             }
         }
@@ -121,16 +91,14 @@ class MetronomeViewModel @Inject constructor(
     }
 
     private fun start() {
-        val current = _state.value
-        val session = player.start(current.config, current.volume)
+        val session = player.start(_state.value.config)
         if (session == MetronomePlayer.NO_SESSION) {
             _state.update { it.copy(userMessage = MetronomeMessage.AUDIO_UNAVAILABLE) }
             return
         }
         activeSession = session
         backgroundPlayback.start()
-        tapHintJob?.cancel()
-        _state.update { it.copy(isPlaying = true, currentBeat = -1, currentStrength = null, tapCount = 0) }
+        _state.update { it.copy(isPlaying = true, currentBeat = -1, currentStrength = null) }
     }
 
     private fun stop() {
@@ -143,57 +111,12 @@ class MetronomeViewModel @Inject constructor(
 
     fun setBpm(bpm: Int) = updateConfig { it.withBpm(bpm) }
 
-    fun adjustBpm(delta: Int) = updateConfig { it.withBpm(it.bpm + delta) }
-
     fun setTimeSignature(timeSignature: TimeSignature) = updateConfig { it.copy(timeSignature = timeSignature) }
-
-    fun setSubdivision(subdivision: Subdivision) = updateConfig { it.copy(subdivision = subdivision) }
-
-    fun setSound(sound: SoundProfile) = updateConfig { it.copy(sound = sound) }
-
-    fun setVolume(volume: Float) {
-        val clamped = volume.coerceIn(0f, 1f)
-        _state.update { it.copy(volume = clamped) }
-        settings.saveVolume(clamped)
-        player.setVolume(clamped)
-    }
-
-    /** Call on every tap of the Tap Tempo button. */
-    fun tapTempo() {
-        val bpm = tapTempo.tap(clock.nowMillis())
-        _state.update { it.copy(tapCount = tapTempo.tapCount) }
-        if (bpm != null) setBpm(bpm)
-        tapHintJob?.cancel()
-        tapHintJob = viewModelScope.launch {
-            delay(TAP_HINT_MS)
-            _state.update { it.copy(tapCount = 0) }
-        }
-    }
 
     private fun updateConfig(transform: (MetronomeConfig) -> MetronomeConfig) {
         val newState = _state.updateAndGet { it.copy(config = transform(it.config)) }
         settings.saveMetronomeConfig(newState.config)
         if (newState.isPlaying) player.update(newState.config)
-    }
-
-    // ---- Presets ---------------------------------------------------------------------------
-
-    fun savePreset(name: String) {
-        if (name.isBlank()) return
-        val config = _state.value.config
-        viewModelScope.launch {
-            runCatching { savePreset(name, config) }
-                .onFailure { _state.update { it.copy(userMessage = MetronomeMessage.SAVE_FAILED) } }
-        }
-    }
-
-    fun loadPreset(preset: Preset) = updateConfig { preset.config }
-
-    fun deletePreset(id: Long) {
-        viewModelScope.launch {
-            runCatching { deletePreset.invoke(id) }
-                .onFailure { _state.update { it.copy(userMessage = MetronomeMessage.DELETE_FAILED) } }
-        }
     }
 
     fun dismissMessage() = _state.update { it.copy(userMessage = null) }
@@ -204,7 +127,5 @@ class MetronomeViewModel @Inject constructor(
     companion object {
         /** Guards against a bogus audio timestamp freezing the indicator. */
         const val MAX_VISUAL_WAIT_MS = 1_000L
-        /** How long the "N taps" hint stays after the last tap. */
-        const val TAP_HINT_MS = 2_500L
     }
 }

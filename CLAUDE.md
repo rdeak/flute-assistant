@@ -64,11 +64,9 @@ signing, Play upload, store graphics and screenshots) is in the `release` skill
 
 AGP 9 with built-in Kotlin, the version constraints, the debug and release source sets and the
 AppCompat language switch: `.claude/rules/build-wiring.md`, which loads with the gradle, manifest,
-theme, Room and debug/release files.
+theme and debug/release files.
 
 ## Architecture
-
-Room enum `Converters` fall back to defaults on unknown names.
 
 Each feature's design, thresholds and the reasons behind them live in a CLAUDE.md next to its
 code, which loads when you work in that folder; read the one for the feature you are changing:
@@ -111,11 +109,12 @@ tab's CLAUDE.md; these rules hold on all of them:
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than
   the speed knob and the metronome stage it opens in place, and note lengths as a control (lengths
   come only from how long a key is held; the user drew this on 2026-10-24).
-- Tap tempo, subdivisions, click sounds, volume, presets and the A4 reference still exist in the
-  engine, data layer and ViewModels but are not exposed: `MetronomeViewModel.initialState()` resets
-  subdivision, sound and volume to their defaults (and brings a stored tempo onto the ring's 40 to
-  200) and `TunerViewModel` starts from 440 Hz and plays the reference tone at a fixed
-  `REFERENCE_TONE_VOLUME`, so a stale stored value cannot silently affect playback.
+- Tap tempo, subdivisions, the beep and bell click sounds, the volume setting, presets (with their
+  Room database) and the A4 reference are gone from the code since 2026-11-09, at the user's
+  decision: no screen could reach them. The metronome clicks one woodblock on every beat at a fixed
+  gain (`MetronomeRenderer.OUTPUT_GAIN`), `NoteMath` measures against 440 Hz and the reference tone
+  plays at a fixed `REFERENCE_TONE_VOLUME`. `MetronomeViewModel.initialState()` still brings a stored
+  tempo onto the ring's 40 to 200. Git keeps the old code (the preset sheet is in commit `6a20374`).
 
 ## Logging and observability
 
@@ -148,5 +147,5 @@ with `advanceTimeBy` / `advanceUntilIdle`. Instrumented tests cover the `*Conten
 settings store (over a throwaway preferences file so the app's own settings are never touched), the
 microphone engine's tap and locale-dependent resources. Unit tests that touch the debug-only session
 recorder live in `app/src/testDebug` (shared `app/src/test` is also compiled for the release
-variant's unit tests). The `config_summary`, `subdivision_*` and `sound_*` strings must stay even
-though the screens no longer show them: the playback notification and `LabelsTest` use them.
+variant's unit tests). The `config_summary` string is on no screen: the playback notification shows
+it and `LabelsTest` checks it.

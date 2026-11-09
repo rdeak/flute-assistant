@@ -37,20 +37,10 @@
     <string name="band_rabbit">Zec</string>
     <string name="band_cheetah">Gepard</string>
 
-    <string name="subdivision_quarter">Četvrtinke</string>
-    <string name="subdivision_eighth">Osminke</string>
-    <string name="subdivision_sixteenth">Šesnaestinke</string>
-    <string name="subdivision_triplet">Triole</string>
-    <string name="subdivision_shuffle">Shuffle</string>
-    <string name="sound_woodblock">Drveni blok</string>
-    <string name="sound_beep">Digitalni bip</string>
-    <string name="sound_bell">Zvono</string>
-    <string name="config_summary">%1$d BPM · %2$s · %3$s · %4$s</string>
+    <string name="config_summary">%1$d BPM · %2$s</string>
 
     <!-- One-shot messages -->
     <string name="msg_audio_unavailable">Ups, zvuk je trenutno zauzet. Pokušaj opet za trenutak.</string>
-    <string name="msg_save_failed">Ups, to se nije moglo spremiti.</string>
-    <string name="msg_delete_failed">Ups, to se nije moglo izbrisati.</string>
 
     <!-- Playback notification -->
     <string name="notification_channel_playback">Reprodukcija metronoma</string>

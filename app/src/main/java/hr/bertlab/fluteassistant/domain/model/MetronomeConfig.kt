@@ -6,12 +6,11 @@ package hr.bertlab.fluteassistant.domain.model
 /**
  * How loud / which sample a single click should use.
  *
- * STRONG      - first beat of the bar (accent sound, highest pitch)
- * MEDIUM      - secondary accent in compound meters (e.g. beat 4 of 6/8)
- * WEAK        - any other main beat
- * SUBDIVISION - an in-between tick (8th / 16th / triplet / shuffle)
+ * STRONG - first beat of the bar (accent sound, highest pitch)
+ * MEDIUM - secondary accent in compound meters (e.g. beat 4 of 6/8)
+ * WEAK   - any other beat
  */
-enum class BeatStrength { STRONG, MEDIUM, WEAK, SUBDIVISION }
+enum class BeatStrength { STRONG, MEDIUM, WEAK }
 
 private fun simpleMeter(beats: Int): List<BeatStrength> =
     List(beats) { index -> if (index == 0) BeatStrength.STRONG else BeatStrength.WEAK }
@@ -29,7 +28,7 @@ private fun compoundMeter(beats: Int): List<BeatStrength> =
 /**
  * Supported time signatures, in the order the UI offers them: the three a beginner meets
  * first, then the rest. [accents] has exactly [beatsPerBar] entries and describes the
- * strength of every main beat in the bar. Persisted by name, so the order is free to change.
+ * strength of every beat in the bar. Persisted by name, so the order is free to change.
  */
 enum class TimeSignature(
     val beatsPerBar: Int,
@@ -58,29 +57,10 @@ enum class TimeSignature(
     val label: String get() = "$beatsPerBar/$noteValue"
 }
 
-/**
- * Rhythmic subdivision of one beat. [offsets] are the positions inside the beat
- * (0.0 = on the beat, 0.5 = halfway) at which a click is played. The first offset is
- * always 0.0 so the main beat itself is part of every pattern.
- */
-enum class Subdivision(val offsets: List<Double>) {
-    NONE(listOf(0.0)),
-    EIGHTH(listOf(0.0, 0.5)),
-    SIXTEENTH(listOf(0.0, 0.25, 0.5, 0.75)),
-    TRIPLET(listOf(0.0, 1.0 / 3.0, 2.0 / 3.0)),
-    /** Swing feel: the off-beat 8th is delayed to the last triplet position. */
-    SHUFFLE(listOf(0.0, 2.0 / 3.0)),
-}
-
-/** Click sound family. Each profile has an accent, beat and subdivision variant. */
-enum class SoundProfile { WOODBLOCK, BEEP, BELL }
-
-/** Everything the metronome engine needs to produce a click pattern. */
+/** Everything the metronome engine needs to produce a click pattern: one click on every beat. */
 data class MetronomeConfig(
     val bpm: Int = DEFAULT_BPM,
     val timeSignature: TimeSignature = TimeSignature.FOUR_FOUR,
-    val subdivision: Subdivision = Subdivision.NONE,
-    val sound: SoundProfile = SoundProfile.WOODBLOCK,
 ) {
     /** Returns a copy with [bpm] clamped to the supported range. */
     fun withBpm(newBpm: Int): MetronomeConfig = copy(bpm = newBpm.coerceIn(MIN_BPM, MAX_BPM))

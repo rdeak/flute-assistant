@@ -156,15 +156,13 @@ fun MainScreen(
     // A tune plays back untouched for up to a minute or two, and a child plays it back to the phone with both hands on the flute: the screen must not time out under either.
     KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.isRunning)
 
-    // One-shot messages (audio unavailable, persistence failures) as a snackbar.
+    // One-shot messages (audio unavailable) as a snackbar.
     val snackbarHostState = remember { SnackbarHostState() }
     val message = metronomeState.userMessage
     val messageText = message?.let {
         stringResource(
             when (it) {
                 MetronomeMessage.AUDIO_UNAVAILABLE -> R.string.msg_audio_unavailable
-                MetronomeMessage.SAVE_FAILED -> R.string.msg_save_failed
-                MetronomeMessage.DELETE_FAILED -> R.string.msg_delete_failed
             },
         )
     }

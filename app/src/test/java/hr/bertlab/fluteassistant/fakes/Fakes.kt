@@ -19,15 +19,12 @@ import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.Preset
 import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.domain.repository.PresetRepository
 import hr.bertlab.fluteassistant.domain.repository.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
-import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.playback.BackgroundPlayback
 import hr.bertlab.fluteassistant.ui.flute.ListenFrame
@@ -50,30 +47,22 @@ class FakeMetronomePlayer : MetronomePlayer {
     var playing = false
 
     var started: MetronomeConfig? = null
-    var startVolume: Float? = null
     val updates = mutableListOf<MetronomeConfig>()
-    var volume: Float? = null
     var stopCount = 0
     var refuseStart = false
     var lastSession = 0L
 
-    override fun start(config: MetronomeConfig, volume: Float): Long {
+    override fun start(config: MetronomeConfig): Long {
         if (refuseStart) return MetronomePlayer.NO_SESSION
         started = config
-        startVolume = volume
         playing = true
-        _playback.value = PlaybackState(++lastSession, config, volume)
+        _playback.value = PlaybackState(++lastSession, config)
         return lastSession
     }
 
     override fun update(config: MetronomeConfig) {
         updates += config
         _playback.update { it?.copy(config = config) }
-    }
-
-    override fun setVolume(volume: Float) {
-        this.volume = volume
-        _playback.update { it?.copy(volume = volume) }
     }
 
     override fun stop() {
@@ -94,26 +83,6 @@ class FakeMetronomePlayer : MetronomePlayer {
 class FakeBackgroundPlayback : BackgroundPlayback {
     var startCount = 0
     override fun start() { startCount++ }
-}
-
-class FakePresetRepository : PresetRepository {
-    val presets = MutableStateFlow<List<Preset>>(emptyList())
-    var failWrites = false
-    private var nextId = 1L
-
-    override fun observePresets(): Flow<List<Preset>> = presets
-
-    override suspend fun save(name: String, config: MetronomeConfig): Long {
-        if (failWrites) throw IllegalStateException("disk full")
-        val id = nextId++
-        presets.update { listOf(Preset(id, name, config, createdAt = id)) + it }
-        return id
-    }
-
-    override suspend fun delete(id: Long) {
-        if (failWrites) throw IllegalStateException("disk full")
-        presets.update { list -> list.filterNot { it.id == id } }
-    }
 }
 
 class FakeTunerEngine : TunerEngine {
@@ -175,8 +144,6 @@ class FakeFluteTonePlayer : FluteTonePlayer {
 
 class FakeSettingsStore(
     var config: MetronomeConfig = MetronomeConfig(),
-    var volume: Float = 0.8f,
-    var referenceA4: Double = NoteMath.DEFAULT_A4,
     var targetNote: Int = FluteRange.DEFAULT_TARGET,
     var tunerMode: TunerMode = TunerMode.IDENTIFY,
     var practiceNotes: Set<Int> = StaffNotes.DEFAULT_PRACTICE,
@@ -194,10 +161,6 @@ class FakeSettingsStore(
 
     override fun loadMetronomeConfig() = config
     override fun saveMetronomeConfig(config: MetronomeConfig) { this.config = config }
-    override fun loadVolume() = volume
-    override fun saveVolume(volume: Float) { this.volume = volume }
-    override fun loadReferenceA4() = referenceA4
-    override fun saveReferenceA4(hz: Double) { referenceA4 = hz }
     override fun loadTargetNote() = targetNote
     override fun saveTargetNote(midi: Int) { targetNote = midi }
     override fun loadTunerMode() = tunerMode

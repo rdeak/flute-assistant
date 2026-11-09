@@ -17,10 +17,6 @@ data class TunerUiState(
     val isListening: Boolean = false,
     /** Smoothed reading of the note being played, or null during silence. */
     val reading: NoteReading? = null,
-    /** Microphone input level in [0, 1]. */
-    val level: Float = 0f,
-    /** Reference pitch for A4 in Hz (440 standard; many orchestras use 442). */
-    val referenceA4: Double = NoteMath.DEFAULT_A4,
     /** The note the child chose to tune, as a MIDI number inside [FluteRange]; used in [TunerMode.TARGET]. */
     val targetMidi: Int = FluteRange.DEFAULT_TARGET,
     val mode: TunerMode = TunerMode.IDENTIFY,
@@ -41,7 +37,7 @@ data class TunerUiState(
 ) {
     /** Distance in cents from [targetMidi] to the played note (positive = sharp), or null in silence. */
     val centsOffTarget: Double?
-        get() = reading?.let { NoteMath.centsBetween(it.frequency, targetMidi, referenceA4) }
+        get() = reading?.let { NoteMath.centsBetween(it.frequency, targetMidi) }
 
     /**
      * The note the pitch window's home ring stands for: the chosen note when tuning to one; when
@@ -58,7 +54,7 @@ data class TunerUiState(
         get() {
             val heard = reading ?: return null
             val home = homeMidi ?: return null
-            return NoteMath.centsBetween(heard.frequency, home, referenceA4)
+            return NoteMath.centsBetween(heard.frequency, home)
         }
 
     /**

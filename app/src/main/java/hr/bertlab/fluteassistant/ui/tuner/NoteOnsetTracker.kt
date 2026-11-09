@@ -39,7 +39,6 @@ import kotlin.math.log2
  * frames do not count towards the gap: a wobble inside a held note must not make it two.
  */
 class NoteOnsetTracker(
-    private val referenceA4: Double = NoteMath.DEFAULT_A4,
     val rules: Rules = Rules(),
     floor: Float? = null,
 ) {
@@ -166,7 +165,7 @@ class NoteOnsetTracker(
         if (!isSteady()) return Result(FrameDecision.UNSTEADY, onset = null).also { ageStop() }
         val median = recent.sorted()[recent.size / 2]
         val before = sounding
-        val identified = identify(NoteMath.frequencyToNote(median, referenceA4).midi, median)
+        val identified = identify(NoteMath.frequencyToNote(median).midi, median)
         // The tone is back after a stop: the note started again, whatever pitch locked.
         val restarted = stopAge in 1..rules.restartFrames && frame.minLevel >= stopFloor + rules.restartRise
         val onset = when {
@@ -262,7 +261,7 @@ class NoteOnsetTracker(
             driftFrames = 0
             return heard
         }
-        val reach = abs(NoteMath.centsBetween(median, current, referenceA4))
+        val reach = abs(NoteMath.centsBetween(median, current))
         if (reach > rules.nearCents) {
             driftFrames = 0
             return heard

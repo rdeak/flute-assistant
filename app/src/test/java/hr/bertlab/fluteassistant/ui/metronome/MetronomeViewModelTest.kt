@@ -8,16 +8,9 @@ import hr.bertlab.fluteassistant.audio.metronome.BeatEvent
 import hr.bertlab.fluteassistant.audio.metronome.ClickEvent
 import hr.bertlab.fluteassistant.domain.model.BeatStrength
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
-import hr.bertlab.fluteassistant.domain.usecase.DeletePresetUseCase
-import hr.bertlab.fluteassistant.domain.usecase.ObservePresetsUseCase
-import hr.bertlab.fluteassistant.domain.usecase.SavePresetUseCase
 import hr.bertlab.fluteassistant.fakes.FakeBackgroundPlayback
-import hr.bertlab.fluteassistant.fakes.FakeClock
 import hr.bertlab.fluteassistant.fakes.FakeMetronomePlayer
-import hr.bertlab.fluteassistant.fakes.FakePresetRepository
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,9 +33,7 @@ class MetronomeViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private val player = FakeMetronomePlayer()
-    private val repository = FakePresetRepository()
     private val settings = FakeSettingsStore()
-    private val clock = FakeClock()
     private val backgroundPlayback = FakeBackgroundPlayback()
 
     @Before
@@ -53,11 +44,7 @@ class MetronomeViewModelTest {
 
     private fun createViewModel() = MetronomeViewModel(
         player = player,
-        observePresets = ObservePresetsUseCase(repository),
-        savePreset = SavePresetUseCase(repository),
-        deletePreset = DeletePresetUseCase(repository),
         settings = settings,
-        clock = clock,
         backgroundPlayback = backgroundPlayback,
     )
 
@@ -67,7 +54,7 @@ class MetronomeViewModelTest {
         session: Long = player.lastSession,
         audibleAtNanos: Long = System.nanoTime(),
     ) = BeatEvent(
-        click = ClickEvent(frame = 0, strength = strength, beatIndex = index, subdivisionIndex = 0, barIndex = 0),
+        click = ClickEvent(frame = 0, strength = strength, beatIndex = index, barIndex = 0),
         audibleAtNanos = audibleAtNanos,
         sessionId = session,
     )
@@ -76,12 +63,10 @@ class MetronomeViewModelTest {
     fun `toggle starts and stops the player with the current config`() = runTest(dispatcher) {
         val vm = createViewModel()
         vm.setBpm(100)
-        vm.setVolume(0.6f)
 
         vm.togglePlayback()
         assertTrue(vm.state.value.isPlaying)
         assertEquals(100, player.started?.bpm)
-        assertEquals(0.6f, player.startVolume)
 
         vm.togglePlayback()
         assertFalse(vm.state.value.isPlaying)
@@ -96,16 +81,13 @@ class MetronomeViewModelTest {
         assertTrue(player.updates.isEmpty())
 
         vm.togglePlayback()
-        vm.adjustBpm(+5)
-        vm.setSubdivision(Subdivision.TRIPLET)
-        vm.setSound(SoundProfile.BELL)
+        vm.setBpm(125)
+        vm.setTimeSignature(TimeSignature.SIX_EIGHT)
 
-        assertEquals(3, player.updates.size)
-        val last = player.updates.last()
-        assertEquals(125, last.bpm)
-        assertEquals(TimeSignature.THREE_FOUR, last.timeSignature)
-        assertEquals(Subdivision.TRIPLET, last.subdivision)
-        assertEquals(SoundProfile.BELL, last.sound)
+        assertEquals(2, player.updates.size)
+        assertEquals(125, player.updates.first().bpm)
+        assertEquals(TimeSignature.THREE_FOUR, player.updates.first().timeSignature)
+        assertEquals(MetronomeConfig(bpm = 125, timeSignature = TimeSignature.SIX_EIGHT), player.updates.last())
     }
 
     @Test
@@ -113,68 +95,8 @@ class MetronomeViewModelTest {
         val vm = createViewModel()
         vm.setBpm(5)
         assertEquals(MetronomeConfig.MIN_BPM, vm.state.value.config.bpm)
-        vm.adjustBpm(+10_000)
+        vm.setBpm(10_000)
         assertEquals(MetronomeConfig.MAX_BPM, vm.state.value.config.bpm)
-    }
-
-    @Test
-    fun `tap tempo sets the bpm after two taps`() = runTest(dispatcher) {
-        val vm = createViewModel()
-        clock.now = 1_000
-        vm.tapTempo()
-        assertEquals(1, vm.state.value.tapCount)
-        assertEquals(MetronomeConfig.DEFAULT_BPM, vm.state.value.config.bpm)
-
-        clock.now = 1_500
-        vm.tapTempo()
-        assertEquals(2, vm.state.value.tapCount)
-        assertEquals(120, vm.state.value.config.bpm)
-
-        clock.now = 1_900
-        vm.tapTempo()
-        assertEquals(133, vm.state.value.config.bpm) // 60000 / 450
-    }
-
-    @Test
-    fun `volume is forwarded to the player`() = runTest(dispatcher) {
-        val vm = createViewModel()
-        vm.setVolume(1.7f)
-        assertEquals(1f, vm.state.value.volume)
-        assertEquals(1f, player.volume)
-    }
-
-    @Test
-    fun `presets can be saved, loaded and deleted`() = runTest(dispatcher) {
-        val vm = createViewModel()
-        advanceUntilIdle()
-        vm.setBpm(84)
-        vm.setTimeSignature(TimeSignature.SIX_EIGHT)
-        vm.savePreset("  Slow jig ")
-        advanceUntilIdle()
-
-        val presets = vm.state.value.presets
-        assertEquals(1, presets.size)
-        assertEquals("Slow jig", presets[0].name)
-        assertEquals(84, presets[0].config.bpm)
-        assertEquals(TimeSignature.SIX_EIGHT, presets[0].config.timeSignature)
-
-        vm.setBpm(200)
-        vm.setTimeSignature(TimeSignature.FOUR_FOUR)
-        vm.loadPreset(presets[0])
-        assertEquals(84, vm.state.value.config.bpm)
-        assertEquals(TimeSignature.SIX_EIGHT, vm.state.value.config.timeSignature)
-
-        vm.deletePreset(presets[0].id)
-        advanceUntilIdle()
-        assertTrue(vm.state.value.presets.isEmpty())
-    }
-
-    @Test
-    fun `saving with a blank name is ignored`() = runTest(dispatcher) {
-        val vm = createViewModel()
-        vm.savePreset("   ")
-        advanceUntilIdle()
-        assertTrue(vm.state.value.presets.isEmpty())
     }
 
     @Test
@@ -193,27 +115,6 @@ class MetronomeViewModelTest {
         advanceUntilIdle()
         assertEquals(1, vm.state.value.currentBeat)
         assertEquals(pulseAfterFirst + 1, vm.state.value.beatPulse)
-    }
-
-    @Test
-    fun `subdivision ticks do not move the beat indicator`() = runTest(dispatcher) {
-        val vm = createViewModel()
-        advanceUntilIdle()
-        vm.togglePlayback()
-        player.events.tryEmit(beat(2, BeatStrength.WEAK))
-        advanceUntilIdle()
-        val pulse = vm.state.value.beatPulse
-
-        player.events.tryEmit(
-            BeatEvent(
-                ClickEvent(0, BeatStrength.SUBDIVISION, beatIndex = 2, subdivisionIndex = 1, barIndex = 0),
-                audibleAtNanos = System.nanoTime(),
-                sessionId = player.lastSession,
-            ),
-        )
-        advanceUntilIdle()
-        assertEquals(2, vm.state.value.currentBeat)
-        assertEquals(pulse, vm.state.value.beatPulse)
     }
 
     @Test
@@ -288,43 +189,14 @@ class MetronomeViewModelTest {
 
     @Test
     fun `last used settings are restored and persisted`() = runTest(dispatcher) {
-        settings.config = MetronomeConfig(bpm = 96, timeSignature = TimeSignature.THREE_FOUR, sound = SoundProfile.BELL)
-        settings.volume = 0.3f
+        settings.config = MetronomeConfig(bpm = 96, timeSignature = TimeSignature.THREE_FOUR)
         val vm = createViewModel()
         assertEquals(96, vm.state.value.config.bpm)
         assertEquals(TimeSignature.THREE_FOUR, vm.state.value.config.timeSignature)
-        // No volume control on screen: a stored value (maybe 0) must not stick with no way back.
-        assertEquals(MetronomeUiState().volume, vm.state.value.volume)
 
         vm.setBpm(140)
-        vm.setSubdivision(Subdivision.SHUFFLE)
-        vm.setVolume(0.9f)
-        assertEquals(140, settings.config.bpm)
-        assertEquals(Subdivision.SHUFFLE, settings.config.subdivision)
-        assertEquals(0.9f, settings.volume)
-    }
-
-    @Test
-    fun `tap hint clears after a pause`() = runTest(dispatcher) {
-        val vm = createViewModel()
-        clock.now = 1_000
-        vm.tapTempo()
-        assertEquals(1, vm.state.value.tapCount)
-        advanceTimeBy(MetronomeViewModel.TAP_HINT_MS + 1)
-        assertEquals(0, vm.state.value.tapCount)
-    }
-
-    @Test
-    fun `persistence failures surface as messages`() = runTest(dispatcher) {
-        repository.failWrites = true
-        val vm = createViewModel()
-        vm.savePreset("x")
-        advanceUntilIdle()
-        assertEquals(MetronomeMessage.SAVE_FAILED, vm.state.value.userMessage)
-        vm.dismissMessage()
-        vm.deletePreset(1)
-        advanceUntilIdle()
-        assertEquals(MetronomeMessage.DELETE_FAILED, vm.state.value.userMessage)
+        vm.setTimeSignature(TimeSignature.TWO_FOUR)
+        assertEquals(MetronomeConfig(bpm = 140, timeSignature = TimeSignature.TWO_FOUR), settings.config)
     }
 
     @Test
@@ -347,13 +219,12 @@ class MetronomeViewModelTest {
         // The screen was closed with Back while the metronome kept running in the background,
         // then the app was opened again from the notification.
         val running = MetronomeConfig(bpm = 72, timeSignature = TimeSignature.THREE_FOUR)
-        player.start(running, 0.5f)
+        player.start(running)
         val vm = createViewModel()
         advanceUntilIdle()
 
         assertTrue(vm.state.value.isPlaying)
         assertEquals(running, vm.state.value.config)
-        assertEquals(0.5f, vm.state.value.volume)
 
         player.events.tryEmit(beat(1, BeatStrength.WEAK))
         advanceUntilIdle()
@@ -373,15 +244,6 @@ class MetronomeViewModelTest {
 
         assertTrue(player.playing)
         assertEquals(0, player.stopCount)
-    }
-
-    @Test
-    fun `hidden options are reset on load`() = runTest(dispatcher) {
-        settings.config = MetronomeConfig(bpm = 96, subdivision = Subdivision.TRIPLET, sound = SoundProfile.BELL)
-        val vm = createViewModel()
-        assertEquals(96, vm.state.value.config.bpm)
-        assertEquals(Subdivision.NONE, vm.state.value.config.subdivision)
-        assertEquals(SoundProfile.WOODBLOCK, vm.state.value.config.sound)
     }
 
     @Test

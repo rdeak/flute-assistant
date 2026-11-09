@@ -5,7 +5,6 @@ package hr.bertlab.fluteassistant.audio.metronome
 
 import hr.bertlab.fluteassistant.domain.model.BeatStrength
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.Subdivision
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -15,13 +14,13 @@ import kotlin.math.abs
 class ClickSchedulerTest {
 
     private val sampleRate = 48_000
-    private val base = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.FOUR_FOUR, subdivision = Subdivision.NONE)
+    private val base = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.FOUR_FOUR)
 
     private fun events(config: MetronomeConfig, count: Int, scheduler: ClickScheduler = ClickScheduler(sampleRate)) =
         List(count) { scheduler.next(config) }
 
     @Test
-    fun `quarter notes in four four`() {
+    fun `a click on every beat in four four`() {
         val e = events(base, 5)
         assertEquals(listOf(0L, 24_000L, 48_000L, 72_000L, 96_000L), e.map { it.frame })
         assertEquals(
@@ -30,34 +29,6 @@ class ClickSchedulerTest {
         )
         assertEquals(listOf(0, 1, 2, 3, 0), e.map { it.beatIndex })
         assertEquals(listOf(0L, 0L, 0L, 0L, 1L), e.map { it.barIndex })
-        assertTrue(e.all { it.subdivisionIndex == 0 })
-    }
-
-    @Test
-    fun `eighth notes`() {
-        val e = events(base.copy(subdivision = Subdivision.EIGHTH), 3)
-        assertEquals(listOf(0L, 12_000L, 24_000L), e.map { it.frame })
-        assertEquals(listOf(BeatStrength.STRONG, BeatStrength.SUBDIVISION, BeatStrength.WEAK), e.map { it.strength })
-        assertEquals(listOf(0, 1, 0), e.map { it.subdivisionIndex })
-        assertEquals(listOf(0, 0, 1), e.map { it.beatIndex })
-    }
-
-    @Test
-    fun `sixteenth notes`() {
-        val e = events(base.copy(subdivision = Subdivision.SIXTEENTH), 5)
-        assertEquals(listOf(0L, 6_000L, 12_000L, 18_000L, 24_000L), e.map { it.frame })
-    }
-
-    @Test
-    fun `triplets`() {
-        val e = events(base.copy(subdivision = Subdivision.TRIPLET), 4)
-        assertEquals(listOf(0L, 8_000L, 16_000L, 24_000L), e.map { it.frame })
-    }
-
-    @Test
-    fun `shuffle delays the off beat to the last triplet`() {
-        val e = events(base.copy(subdivision = Subdivision.SHUFFLE), 3)
-        assertEquals(listOf(0L, 16_000L, 24_000L), e.map { it.frame })
     }
 
     @Test
@@ -93,17 +64,6 @@ class ClickSchedulerTest {
         val e = scheduler.next(base.copy(timeSignature = TimeSignature.TWO_FOUR))
         assertEquals(0, e.beatIndex)
         assertEquals(BeatStrength.STRONG, e.strength)
-    }
-
-    @Test
-    fun `switching to a coarser subdivision mid beat moves on to the next beat`() {
-        val scheduler = ClickScheduler(sampleRate)
-        val sixteenths = base.copy(subdivision = Subdivision.SIXTEENTH)
-        repeat(3) { scheduler.next(sixteenths) }             // emitted slots 0,1,2 -> internal index 3
-        val e = scheduler.next(base)                           // quarter notes: index 3 is out of range
-        assertEquals(0, e.subdivisionIndex)
-        assertEquals(1, e.beatIndex)
-        assertEquals(BeatStrength.WEAK, e.strength)
     }
 
     @Test

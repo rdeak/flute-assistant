@@ -9,8 +9,6 @@ import android.os.LocaleList
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
@@ -29,10 +27,10 @@ class LabelsTest {
     }
 
     @Test
-    fun summary_is_localised() {
-        val config = MetronomeConfig(bpm = 120, subdivision = Subdivision.NONE, sound = SoundProfile.WOODBLOCK)
-        assertEquals("120 BPM · 4/4 · Quarter · Woodblock", config.summary(resources(Locale.ENGLISH)))
-        assertEquals("120 BPM · 4/4 · Četvrtinke · Drveni blok", config.summary(resources(Locale("hr"))))
+    fun the_summary_is_the_tempo_and_the_bar() {
+        val config = MetronomeConfig(bpm = 120)
+        assertEquals("120 BPM · 4/4", config.summary(resources(Locale.ENGLISH)))
+        assertEquals("120 BPM · 4/4", config.summary(resources(Locale("hr"))))
     }
 
     @Test
@@ -97,7 +95,7 @@ class LabelsTest {
 
     @Test
     fun other_system_languages_fall_back_to_english() {
-        assertEquals("Triplets", resources(Locale.GERMAN).getString(Subdivision.TRIPLET.labelRes()))
-        assertEquals("Bell", resources(Locale.FRENCH).getString(SoundProfile.BELL.labelRes()))
+        assertEquals("🔎 Find", resources(Locale.GERMAN).getString(NotesGame.FIND.labelRes()))
+        assertEquals("👂 Hear", resources(Locale.FRENCH).getString(NotesGame.HEAR.labelRes()))
     }
 }

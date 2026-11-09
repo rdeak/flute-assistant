@@ -5,15 +5,14 @@ package hr.bertlab.fluteassistant.audio.metronome
 
 import hr.bertlab.fluteassistant.domain.model.BeatStrength
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import kotlin.math.abs
 
 /**
  * Turns a [MetronomeConfig] into a continuous stream of PCM blocks.
  *
- * Owns the [ClickScheduler] (timeline), a cache of synthesised click samples, and the set of
+ * Owns the [ClickScheduler] (timeline), the two synthesised click samples, and the set of
  * clicks currently sounding ("voices"), which it mixes into each block. Clicks that overlap
- * block boundaries carry across calls. The output is scaled by [volume] and passed through
+ * block boundaries carry across calls. The output is scaled by [OUTPUT_GAIN] and passed through
  * [SoftLimiter] so overlapping clicks can never hard-clip.
  *
  * Pure Kotlin: the Android-specific [AudioTrackMetronomePlayer] only moves blocks into an
@@ -27,23 +26,13 @@ class MetronomeRenderer(val sampleRate: Int) {
     }
 
     private val scheduler = ClickScheduler(sampleRate)
-    private val sampleCache = HashMap<Pair<SoundProfile, ClickVariant>, FloatArray>()
+
+    // Synthesised here, when the renderer is built, so the first beat finds them ready.
+    private val accent = ClickSynth.render(ClickVariant.ACCENT, sampleRate)
+    private val beat = ClickSynth.render(ClickVariant.BEAT, sampleRate)
     private val voices = ArrayList<Voice>(8)
     private var framePosition = 0L
     private var lastConfig: MetronomeConfig? = null
-
-    /** Master gain in [0, 1]. Safe to set from any thread. */
-    @Volatile
-    var volume: Float = 1f
-
-    /** Synthesises every sound/variant combination up front (call off the hot path). */
-    fun preload() {
-        for (sound in SoundProfile.entries) {
-            for (variant in ClickVariant.entries) {
-                sampleCache.getOrPut(sound to variant) { ClickSynth.render(sound, variant, sampleRate) }
-            }
-        }
-    }
 
     /** Rewinds to the start of bar 1 and silences anything still sounding. */
     fun reset() {
@@ -65,19 +54,17 @@ class MetronomeRenderer(val sampleRate: Int) {
 
         // A pure tempo change moves the upcoming click instead of waiting the old interval out.
         val previous = lastConfig
-        if (previous != null && config.bpm != previous.bpm &&
-            config.subdivision == previous.subdivision && config.timeSignature == previous.timeSignature
-        ) {
+        if (previous != null && config.bpm != previous.bpm && config.timeSignature == previous.timeSignature) {
             scheduler.retime(config, notBefore = blockStart)
         }
         lastConfig = config
 
         // Queue every click that begins inside this block. Clicks are only materialised when
-        // their block is rendered, so meter/sound changes apply to the very next click too.
+        // their block is rendered, so a meter change applies to the very next click too.
         while (scheduler.nextFrame < blockEnd) {
             val click = scheduler.next(config)
             if (click.frame >= blockStart) {
-                voices += Voice(samplesFor(config.sound, click.strength), gainFor(click.strength), click.frame)
+                voices += Voice(samplesFor(click.strength), gainFor(click.strength), click.frame)
                 started += click
             }
         }
@@ -93,27 +80,26 @@ class MetronomeRenderer(val sampleRate: Int) {
             if (voice.finished) iterator.remove()
         }
 
-        val gain = volume
-        for (i in out.indices) out[i] = SoftLimiter.limit(out[i] * gain)
+        for (i in out.indices) out[i] = SoftLimiter.limit(out[i] * OUTPUT_GAIN)
 
         framePosition = blockEnd
         return started
     }
 
-    private fun samplesFor(sound: SoundProfile, strength: BeatStrength): FloatArray {
-        val variant = when (strength) {
-            BeatStrength.STRONG -> ClickVariant.ACCENT
-            BeatStrength.MEDIUM, BeatStrength.WEAK -> ClickVariant.BEAT
-            BeatStrength.SUBDIVISION -> ClickVariant.SUBDIVISION
-        }
-        return sampleCache.getOrPut(sound to variant) { ClickSynth.render(sound, variant, sampleRate) }
+    private fun samplesFor(strength: BeatStrength): FloatArray = when (strength) {
+        BeatStrength.STRONG -> accent
+        BeatStrength.MEDIUM, BeatStrength.WEAK -> beat
     }
 
     private fun gainFor(strength: BeatStrength): Float = when (strength) {
         BeatStrength.STRONG -> 1.0f
         BeatStrength.MEDIUM -> 0.85f
         BeatStrength.WEAK -> 0.7f
-        BeatStrength.SUBDIVISION -> 0.45f
+    }
+
+    private companion object {
+        /** How loud the clicks are, in 0..1. Fixed: the app has no volume control, the phone's buttons do that. */
+        const val OUTPUT_GAIN = 0.8f
     }
 }
 

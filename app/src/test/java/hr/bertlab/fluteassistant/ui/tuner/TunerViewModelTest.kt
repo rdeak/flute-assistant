@@ -8,7 +8,6 @@ import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeReferenceTonePlayer
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
-import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.fakes.FakeTunerEngine
 import kotlinx.coroutines.Dispatchers
@@ -77,9 +76,8 @@ class TunerViewModelTest {
 
         val reading = vm.state.value.reading
         assertNotNull(reading)
-        assertEquals("A4", reading!!.label)
+        assertEquals(69, reading!!.midi)
         assertEquals(0.0, reading.cents, 0.01)
-        assertEquals(0.4f, vm.state.value.level)
     }
 
     @Test
@@ -89,7 +87,7 @@ class TunerViewModelTest {
         steady(440.0)
         listOf(880.0, 439.8, 440.2, 440.1).forEach { engine.frames.tryEmit(pitched(it)) }
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
         assertEquals(0.0, vm.state.value.reading!!.cents, 1.0)
     }
 
@@ -108,11 +106,11 @@ class TunerViewModelTest {
         advanceUntilIdle()
         steady(440.0)
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
 
         listOf(300.0, 330.0, 360.0).forEach { engine.frames.tryEmit(pitched(it)) } // a voice gliding past
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
         assertEquals(0.0, vm.state.value.reading!!.cents, 0.01)
     }
 
@@ -123,7 +121,7 @@ class TunerViewModelTest {
         steady(440.0)
         steady(392.0)
         advanceUntilIdle()
-        assertEquals("G4", vm.state.value.reading!!.label)
+        assertEquals(67, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -132,11 +130,11 @@ class TunerViewModelTest {
         advanceUntilIdle()
         steady(440.0)
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
 
         engine.frames.tryEmit(pitched(1000.0, probability = 0.3))
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -153,31 +151,6 @@ class TunerViewModelTest {
         engine.frames.tryEmit(silence)
         advanceUntilIdle()
         assertNull(vm.state.value.reading)
-    }
-
-    @Test
-    fun `changing the reference pitch recalculates the reading`() = runTest(dispatcher) {
-        val vm = listeningViewModel()
-        advanceUntilIdle()
-        steady(440.0)
-        advanceUntilIdle()
-
-        vm.setReferenceA4(442.0)
-        assertEquals(442.0, vm.state.value.referenceA4, 0.0)
-        assertEquals(-7.85, vm.state.value.reading!!.cents, 0.05)
-
-        vm.setReferenceA4(9999.0)
-        assertEquals(TunerViewModel.MAX_A4, vm.state.value.referenceA4, 0.0)
-        assertEquals(TunerViewModel.MAX_A4, settings.referenceA4, 0.0)
-    }
-
-    @Test
-    fun `stored reference pitch is reset to standard on load`() {
-        // The simplified UI cannot show or change A4, so a stale 442 or 466 must not silently
-        // relabel every note; only an explicit setReferenceA4 (future advanced mode) changes it.
-        settings.referenceA4 = 442.0
-        val vm = TunerViewModel(engine, settings, tonePlayer, logger)
-        assertEquals(NoteMath.DEFAULT_A4, vm.state.value.referenceA4, 0.0)
     }
 
     @Test
@@ -262,19 +235,7 @@ class TunerViewModelTest {
 
         vm.setTargetNote(67)
         assertEquals(200.0, vm.state.value.centsOffTarget!!, 0.05)
-        assertEquals("A4", vm.state.value.reading!!.label)
-    }
-
-    @Test
-    fun `reference pitch moves the deviation from the target`() = runTest(dispatcher) {
-        val vm = listeningViewModel()
-        advanceUntilIdle()
-        steady(440.0)
-        advanceUntilIdle()
-
-        vm.setTargetNote(69)
-        vm.setReferenceA4(442.0)
-        assertEquals(-7.85, vm.state.value.centsOffTarget!!, 0.05)
+        assertEquals(69, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -294,7 +255,6 @@ class TunerViewModelTest {
 
     @Test
     fun `playing the target note sounds it and pauses the readings`() = runTest(dispatcher) {
-        settings.volume = 0.7f // left over from an old build; nothing can change it now, so it is ignored
         val vm = listeningViewModel()
         advanceUntilIdle()
         vm.setTargetNote(69)
@@ -315,7 +275,7 @@ class TunerViewModelTest {
         assertEquals(1, tonePlayer.stopCount) // the finished track is released, not left registered as playing
         steady(440.0)
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
     }
 
     @Test

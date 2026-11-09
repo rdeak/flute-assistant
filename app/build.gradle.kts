@@ -8,7 +8,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.room)
 }
 
 // Release signing. Credentials never live in the repo: they come from the environment
@@ -91,11 +90,6 @@ android {
     }
 }
 
-// Room exports each schema version to app/schemas so future migrations can be written and tested.
-room {
-    schemaDirectory("$projectDir/schemas")
-}
-
 // With AGP's built-in Kotlin, jvmTarget defaults to compileOptions.targetCompatibility.
 kotlin {
     compilerOptions {
@@ -133,10 +127,6 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
-
-    // Room
-    implementation(libs.androidx.room.runtime)
-    ksp(libs.androidx.room.compiler)
 
     // Unit tests
     testImplementation(libs.junit)

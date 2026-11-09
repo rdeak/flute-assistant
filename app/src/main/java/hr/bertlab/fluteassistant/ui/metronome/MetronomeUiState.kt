@@ -7,27 +7,21 @@ import androidx.annotation.StringRes
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.model.BeatStrength
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.Preset
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import kotlin.math.roundToInt
 
 /** One-shot messages the screen shows in a snackbar (mapped to string resources in the UI). */
-enum class MetronomeMessage { AUDIO_UNAVAILABLE, SAVE_FAILED, DELETE_FAILED }
+enum class MetronomeMessage { AUDIO_UNAVAILABLE }
 
 /** Immutable snapshot of everything the metronome screen renders. */
 data class MetronomeUiState(
     val config: MetronomeConfig = MetronomeConfig(),
     val isPlaying: Boolean = false,
-    /** Master volume in [0, 1]. Not part of presets and not on screen (the phone's buttons set loudness). */
-    val volume: Float = 0.8f,
     /** Index of the beat currently sounding, or -1 while stopped. */
     val currentBeat: Int = -1,
     val currentStrength: BeatStrength? = null,
-    /** Increments on every main beat; the UI keys its flash animation on it. */
+    /** Increments on every beat; the UI keys its flash animation on it. */
     val beatPulse: Long = 0L,
-    val presets: List<Preset> = emptyList(),
-    /** Taps in the current tap-tempo sequence (not shown by the simplified UI; kept for an advanced mode). */
-    val tapCount: Int = 0,
     val userMessage: MetronomeMessage? = null,
 )
 
@@ -78,8 +72,8 @@ fun bpmAtDialFraction(fraction: Float): Int {
 /*
  * The − / + beat buttons step through one bar per beat count, two to six: a child counts
  * bubbles, not fractions, so 3/8 and 2/2 are not offered (they click like 3/4 and 2/4) and
- * six beats are the lilting 6/8. The longer bars stay in the engine for an advanced mode; a
- * stored one still shows, and the buttons step from it onto this ladder.
+ * six beats are the lilting 6/8. The other bars stay in [TimeSignature]; a stored one still
+ * shows, and the buttons step from it onto this ladder.
  */
 private val BEAT_LADDER = listOf(
     TimeSignature.TWO_FOUR,

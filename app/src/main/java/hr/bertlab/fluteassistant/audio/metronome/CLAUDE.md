@@ -4,11 +4,14 @@ Loaded when working in this folder; moved here from the root CLAUDE.md on 2026-1
 
 `MetronomeConfig` -> `ClickScheduler` (sample-accurate click timeline; positions accumulate as
 doubles so there is no drift, and `retime` moves the already-scheduled click when only the tempo
-changes) -> `MetronomeRenderer` (mixes active click "voices" into PCM blocks, caches samples
-synthesised by `ClickSynth`, passes everything through `SoftLimiter`) ->
+changes) -> `MetronomeRenderer` (mixes active click "voices" into PCM blocks from the two samples
+`ClickSynth` makes, a woodblock and its accent for the bar's first beat, at the fixed `OUTPUT_GAIN`,
+and passes everything through `SoftLimiter`) ->
 `AudioTrackMetronomePlayer` (a dedicated URGENT_AUDIO thread doing blocking float-PCM writes to a
 low-latency streaming `AudioTrack`; stops on audio-focus loss and ACTION_AUDIO_BECOMING_NOISY).
 Scheduler, renderer and synth have no Android dependencies and are unit-tested on the JVM.
+There is one click on every beat and one sound: subdivisions, the beep and bell sounds and the
+volume setting went on 2026-11-09 (root CLAUDE.md), and `metronome.start` lost their three fields.
 
 The player is an app-wide singleton that outlives any screen. Its contract (`MetronomePlayer`):
 `start()` returns a session id (or `NO_SESSION` when focus is refused); every `BeatEvent` carries

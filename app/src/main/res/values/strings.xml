@@ -43,22 +43,11 @@
     <string name="band_rabbit">Rabbit</string>
     <string name="band_cheetah">Cheetah</string>
 
-    <!-- Subdivisions and click sounds (the domain enums map to these in ui/common/Labels.kt) -->
-    <string name="subdivision_quarter">Quarter</string>
-    <string name="subdivision_eighth">8ths</string>
-    <string name="subdivision_sixteenth">16ths</string>
-    <string name="subdivision_triplet">Triplets</string>
-    <string name="subdivision_shuffle">Shuffle</string>
-    <string name="sound_woodblock">Woodblock</string>
-    <string name="sound_beep">Digital Beep</string>
-    <string name="sound_bell">Bell</string>
-    <!-- BPM, meter, subdivision, sound -->
-    <string name="config_summary">%1$d BPM · %2$s · %3$s · %4$s</string>
+    <!-- The playback notification's line: BPM, meter -->
+    <string name="config_summary">%1$d BPM · %2$s</string>
 
     <!-- One-shot messages -->
     <string name="msg_audio_unavailable">Oops, the sound is busy right now. Try again in a moment.</string>
-    <string name="msg_save_failed">Oops, that could not be saved.</string>
-    <string name="msg_delete_failed">Oops, that could not be deleted.</string>
 
     <!-- Playback notification -->
     <string name="notification_channel_playback">Metronome playback</string>
