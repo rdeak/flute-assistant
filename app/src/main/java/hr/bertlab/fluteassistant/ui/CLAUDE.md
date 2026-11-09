@@ -50,7 +50,9 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   change with the theme are `FluteColors` (read through `FluteTheme.colors`), the bright fills that
   never change are `Sun` (yellow = chosen), `Go` (the Sound switch), `Stop` and `NoteLetterColors`, one per letter,
   which `noteColor(midi)` applies wherever a note appears (a sharp takes the letter below). Text on a
-  bright fill is always `InkOnFill`. Everything pressable is a `ChunkyButton` / `Modifier.chunky`
+  bright fill is always `InkOnFill`, with one exception (2026-11-07): the notes tab's keys (picker and summary) sit on `noteTint`
+  (`ui/common/Labels.kt`, the letter colour at 0.3 over the card colour), which in dark mode is a dark surface and
+  not a bright fill, so a key's label takes `colors.text` there (`NoteKey`, `ui/notes/CLAUDE.md`). Everything pressable is a `ChunkyButton` / `Modifier.chunky`
   (thick ink outline, solid shadow, sinks 3 dp when pressed; a faded one goes through `fadedUnless`, as `Modifier.alpha` cuts the shadow off flat); big actions are `BigActionButton`,
   the one place with white on colour: a drawn icon and the word in `OnAction` on `ActionGo` (deep
   green: Play, OK, Again, Yes), `ActionStop` (deep red: Stop) or `ActionListen` (deep blue: the
@@ -59,10 +61,11 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   The font is Nunito (three static weights in `res/font`, licence in `docs/licenses/`); the canvas
   used Fredoka, which has no č, ć or đ. Icons are emoji (`Emoji`, hidden from accessibility), plus
   the chevrons, arrows and tick of the tuner and the big buttons' play, stop, done, again and
-  microphone icons in `AppIcons`. The app icon's picture is one vector, `@drawable/ic_app_art` (a robot
-  over a flute, from the canvas's "App icon" board): the launcher insets it into the adaptive icon's
-  safe zone, `AppLogo` puts it on the golden rounded square in the top bar, and `tools/IconGen.java`
-  draws the same shapes for the PNGs and the Play listing. Note names are shown with the octave raised as every canvas board draws it, a `sup` at 0.48 of the
+  microphone icons in `AppIcons`. The app icon's picture is one vector, `@drawable/ic_app_art` (the Android
+  robot playing a flute, since 2026-11-07; Google's robot, modified under
+  CC BY 3.0, so the credits show the attribution line `credits_android_robot`): the launcher insets it
+  into the adaptive icon's safe zone, `AppLogo` puts it on the golden rounded square in the top bar,
+  and `tools/IconGen.java` draws the same shapes for the PNGs and the Play listing. Note names are shown with the octave raised as every canvas board draws it, a `sup` at 0.48 of the
 letter, its top level with the letter's top, 1 sp after it (`noteText`, matched on 2026-11-02, built from
   `noteLabelParts`) in a round `NoteBubble`; English keeps scientific octaves (C⁴), Croatian the
   school ones (c¹), and accessibility and tests still read the plain `noteLabel`.
@@ -86,6 +89,9 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
 - `ui/common/ValueWheel` is the snapping three-row drum behind the metronome's `TempoWheel`. Its
   content description stays on the `LazyColumn` node: the UI tests scroll it with
   `performScrollToIndex`.
+- `ui/common/ModeChoice` is the pair of chunky pills on top of a tab (64 dp, 12 apart, the chosen one yellow, a
+  selectable group for a screen reader), lifted from the tuner's `TunerModeChoice` on 2026-11-07 and shared by the
+  tuner's two modes and the notes tab's two games. Change it for both.
 
 ## Sideways (a phone on its side)
 

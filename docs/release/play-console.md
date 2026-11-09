@@ -48,6 +48,9 @@ Full description, English:
 > notes to practise.
 >
 > In English and Croatian. No account, no ads, no data leaves your device.
+>
+> The Android robot is reproduced or modified from work created and shared by Google and used
+> according to terms described in the Creative Commons 3.0 Attribution License.
 
 Full description, Croatian (short description: "Digitalna flauta, metronom, štimer i igra
 čitanja nota za male flautiste."):
@@ -74,6 +77,9 @@ Full description, Croatian (short description: "Digitalna flauta, metronom, šti
 > note vježbaš.
 >
 > Na hrvatskom i engleskom. Bez računa, bez oglasa, nikakvi podaci ne napuštaju uređaj.
+>
+> Android robot preuzet je ili izmijenjen iz djela koje je stvorio i podijelio Google te se
+> koristi u skladu s uvjetima licencije Creative Commons 3.0 Attribution.
 
 ## App content
 

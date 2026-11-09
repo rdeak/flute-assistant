@@ -9,6 +9,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -16,9 +18,15 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -30,10 +38,12 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
+import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -63,6 +73,9 @@ class NotesSidewaysTest {
     private val toggled = mutableListOf<Int>()
     private var playAgainRequests = 0
     private var soundToggles = 0
+    private val games = mutableListOf<NotesGame>()
+    private var hearAgainRequests = 0
+    private var phraseShownRequests = 0
 
     /** The density `SidewaysHost` forces on the content now: what a dp comes to in pixels, and so how a dp length is rounded. */
     private var density = 1f
@@ -93,6 +106,9 @@ class NotesSidewaysTest {
                         onPlayAgain = { playAgainRequests++ },
                         onTogglePracticeNote = { toggled += it },
                         onToggleSound = { soundToggles++ },
+                        onSetGame = { games += it },
+                        onHearAgain = { hearAgainRequests++ },
+                        onPhraseShown = { phraseShownRequests++ },
                     )
                 }
             }
@@ -116,12 +132,20 @@ class NotesSidewaysTest {
         compose.waitForIdle()
     }
 
+    /** A Hear round whose phrase is C4 then D4, with the first on the staff and the second asked. */
+    private fun hearing() = asking(62).copy(game = NotesGame.HEAR, phrase = listOf(60, 62), placed = 1)
+
     private val staffDescription = "Staff, press where the note goes and let go"
+    private val hearStaffDescription = "Staff, press where the next note goes and let go"
 
     private fun staff() = compose.onNodeWithContentDescription(staffDescription)
+    private fun hearStaff() = compose.onNodeWithContentDescription(hearStaffDescription)
     private fun places() = compose.onNodeWithContentDescription("Round progress, 0 of 10 notes")
     private fun pick() = compose.onNodeWithContentDescription("Choose notes")
     private fun word(text: String) = compose.onNodeWithText(text)
+    private fun findPill() = word("🔎 Find")
+    private fun hearPill() = word("👂 Hear")
+    private fun yourNotes() = compose.onNode(hasContentDescription("Your notes", substring = true))
 
     /** The dots under Pick's word, which Pick's own node swallows from the merged tree. */
     private fun dotsOfPick() = compose.onNodeWithTag("pick_dots", useUnmergedTree = true)
@@ -186,21 +210,219 @@ class NotesSidewaysTest {
     @Test
     fun the_question_shows_find_the_note_and_pick() {
         show(asking(65)) // F4
-        word("🔎 Find").assertIsDisplayed()
+        findPill().assertIsDisplayed()
         word("F4").assertIsDisplayed()
         word("Pick").assertIsDisplayed()
         pick().assertIsDisplayed()
         staff().assertIsDisplayed()
-        // Find and the note stand left of the staff, where a right hand will not cover them, and the
-        // note is the big round bubble of the mockup, 108 dp across.
+        // The note stands left of the staff, where a right hand will not cover it, and is the big round
+        // bubble of the mockup, 108 dp across; Find is a pill in the column now, right of the staff.
         assertTrue("the panel is left of the staff", bounds(word("F4")).right <= bounds(staff()).left)
-        assertTrue("Find is left of the staff", bounds(word("🔎 Find")).right <= bounds(staff()).left)
+        assertTrue("Find is right of the staff", bounds(findPill()).left >= bounds(staff()).right)
         // The bubble's own box has no node, but its word is 56 sp (a line 76 dp tall) where upright's is 36 sp (49).
         assertTrue("the note's word is ${height(word("F4"))} tall", height(word("F4")) > 70.dp)
         val note = bounds(word("F4"))
-        val find = bounds(word("🔎 Find"))
-        assertNear("the note stands under Find, in the middle of the panel", (find.left + find.right) / 2, (note.left + note.right) / 2, tolerance = 3f)
-        assertTrue("Find is over the bubble", bounds(word("🔎 Find")).bottom <= bounds(word("F4")).top + SLACK)
+        assertNear("the note stands in the middle of the 124 dp panel", 8.dp + 62.dp, (note.left + note.right) / 2, tolerance = 3f)
+    }
+
+    /**
+     * The two games head the right column on all three screens, stacked as the tuner's modes are: Find
+     * over Hear at the column's top (the page's 8 and the column's 6), and Hear's 5 dp shadow clear of the
+     * first thing under them, the places, Sound or Pick.
+     */
+    @Test
+    fun the_pills_head_the_column_on_all_three_screens() {
+        show(asking(60))
+        fun assertThePillsHead(screen: String, first: SemanticsNodeInteraction, each: Phone) {
+            val columnLeft = (8f + each.cardWidth + 8f).dp
+            val find = bounds(findPill().assertIsDisplayed())
+            val hear = bounds(hearPill().assertIsDisplayed())
+            listOf("Find" to find, "Hear" to hear).forEach { (name, pill) ->
+                assertTrue("$each, $screen: $name starts at ${pill.left}, the column at $columnLeft", pill.left >= columnLeft - SLACK)
+                assertTrue("$each, $screen: $name ends at ${pill.right}", pill.right <= each.contentWidth.dp - 8.dp + SLACK)
+            }
+            assertNear("$each, $screen: Find's top", 14.dp, find.top)
+            assertTrue("$each, $screen: Find is over Hear", find.bottom <= hear.top)
+            val next = bounds(first)
+            assertTrue("$each, $screen: Hear's shadow ends at ${hear.bottom + 5.dp}, the next thing starts at ${next.top}", hear.bottom + 5.dp <= next.top + SLACK)
+        }
+        val phones = listOf(Phone(915, 411), Phone(800, 360), Phone(640, 360))
+        phones.forEach { each ->
+            on(each)
+            assertThePillsHead("the question", places(), each)
+        }
+        findPill().assertIsSelected()
+        hearPill().assertIsNotSelected()
+        openPicker()
+        phones.forEach { each ->
+            on(each)
+            assertThePillsHead("the picker", word("Sound"), each)
+        }
+        word("OK").performClick()
+        compose.runOnIdle { state.value = over(8) }
+        phones.forEach { each ->
+            on(each)
+            assertThePillsHead("the summary", pick(), each)
+        }
+        hearPill().performClick()
+        assertEquals(listOf(NotesGame.HEAR), games)
+        compose.runOnIdle { state.value = state.value.copy(game = NotesGame.HEAR) }
+        hearPill().assertIsSelected()
+        findPill().assertIsNotSelected()
+    }
+
+    /**
+     * At 360 tall the column holds the pills, the ten places and Pick at their full sizes. A column short of
+     * room squeezes its last child rather than spill past the window, so the sizes say whether it held: with
+     * pills 38 dp tall it was about 4 dp short and Pick came out about 78 tall. The pills are 30 tall here, 44 at 411.
+     */
+    @Test
+    fun the_column_holds_the_pills_the_places_and_pick_at_360_tall() {
+        show(asking(60), at = Phone(640, 360))
+        listOf(Phone(640, 360), Phone(800, 360)).forEach { each ->
+            on(each)
+            assertInside(each, "Find", findPill().assertIsDisplayed(), shadow = 5.dp)
+            assertInside(each, "Hear", hearPill().assertIsDisplayed(), shadow = 5.dp)
+            assertInside(each, "the places", places().assertIsDisplayed())
+            assertInside(each, "Pick", pick().assertIsDisplayed(), shadow = 5.dp)
+            assertNear("$each: Find's height", PILL_HEIGHT_SHORT, height(findPill()))
+            assertNear("$each: Hear's height", PILL_HEIGHT_SHORT, height(hearPill()))
+            assertNear("$each: the places' height", 168.dp, height(places()))
+            assertNear("$each: Pick's height", 84.dp, height(pick()))
+            assertTrue("$each: Hear's shadow runs into the places", bounds(hearPill()).bottom + 5.dp <= bounds(places()).top + SLACK)
+            assertTrue("$each: the places run into Pick", bounds(places()).bottom <= bounds(pick()).top)
+            assertTrue("$each: Pick's bottom is above the places'", bounds(pick()).bottom > bounds(places()).bottom)
+        }
+        on(Phone(915, 411))
+        assertNear("915 x 411: Find's height", PILL_HEIGHT, height(findPill()))
+        assertNear("915 x 411: Hear's height", PILL_HEIGHT, height(hearPill()))
+    }
+
+    /** Hear asks with the speaker bubble in the panel, where Find shows the note: the answer is not on screen. */
+    @Test
+    fun hear_puts_the_speaker_in_the_panel() {
+        show(hearing())
+        listOf(Phone(915, 411), Phone(640, 360)).forEach { each ->
+            on(each)
+            val speaker = compose.onNodeWithContentDescription("Hear it again").assertIsDisplayed()
+            val b = bounds(speaker)
+            assertTrue("$each: the speaker starts at ${b.left}, the panel at 8", b.left >= 8.dp - SLACK)
+            assertTrue("$each: the speaker ends at ${b.right}, the panel at 132", b.right <= 132.dp + SLACK)
+            assertTrue("$each: the speaker is left of the staff", b.right <= bounds(hearStaff()).left)
+            assertNear("$each: the speaker's width", 108.dp, width(speaker))
+            assertInside(each, "the speaker", speaker, shadow = 6.dp)
+            word("D4").assertDoesNotExist() // the note asked
+            word("C4").assertDoesNotExist() // nor the one on the staff
+        }
+        compose.onNodeWithContentDescription("Hear it again").performClick()
+        assertEquals(1, hearAgainRequests)
+        // A finger on the staff is answering, not asking to hear.
+        hearStaff().performTouchInput { down(center) }
+        compose.onNodeWithContentDescription("Hear it again").assertIsNotEnabled()
+        hearStaff().performTouchInput { up() }
+        compose.onNodeWithContentDescription("Hear it again").assertIsEnabled()
+    }
+
+    /**
+     * Hear's prompt in the panel, in each language on the phones that have the least room: its words whole (broken
+     * only between words), inside the panel's 8 to 132 dp and left of the staff, at [fontScale] times the text.
+     */
+    private fun assertTheHearPromptIsWhole(locale: Locale, prompt: String, staffName: String, fontScale: Float = 1f) {
+        show(hearing(), locale = locale, fontScale = fontScale)
+        listOf(Phone(915, 411), Phone(640, 360)).forEach { each ->
+            on(each)
+            val node = word(prompt).assertIsDisplayed()
+            assertWholeWords(each, prompt)
+            assertInside(each, "\"$prompt\"", node)
+            val b = bounds(node)
+            assertTrue("$each: \"$prompt\" starts at ${b.left}, the panel at 8", b.left >= 8.dp - SLACK)
+            assertTrue("$each: \"$prompt\" ends at ${b.right}, the panel at 132", b.right <= 132.dp + SLACK)
+            val staffLeft = bounds(compose.onNodeWithContentDescription(staffName)).left
+            assertTrue("$each: \"$prompt\" ends at ${b.right}, the staff starts at $staffLeft", b.right <= staffLeft)
+        }
+    }
+
+    @Test
+    fun the_hear_prompt_is_whole_in_the_panel() = assertTheHearPromptIsWhole(Locale.ENGLISH, "❓ Find the next note", hearStaffDescription)
+
+    @Test
+    fun the_hear_prompt_is_whole_in_the_panel_in_croatian() =
+        assertTheHearPromptIsWhole(Locale("hr"), "❓ Nađi sljedeću notu", "Crtovlje, pritisni gdje ide sljedeća nota i pusti")
+
+    @Test
+    fun the_hear_prompt_is_whole_in_the_panel_at_twice_the_text() =
+        assertTheHearPromptIsWhole(Locale.ENGLISH, "❓ Find the next note", hearStaffDescription, fontScale = 2f)
+
+    @Test
+    fun the_hear_prompt_is_whole_in_the_panel_in_croatian_at_twice_the_text() =
+        assertTheHearPromptIsWhole(Locale("hr"), "❓ Nađi sljedeću notu", "Crtovlje, pritisni gdje ide sljedeća nota i pusti", fontScale = 2f)
+
+    @Test
+    fun the_hear_prompt_is_whole_in_the_panel_at_large_text() =
+        assertTheHearPromptIsWhole(Locale.ENGLISH, "❓ Find the next note", hearStaffDescription, fontScale = 1.5f)
+
+    @Test
+    fun the_hear_prompt_is_whole_in_the_panel_in_croatian_at_large_text() =
+        assertTheHearPromptIsWhole(Locale("hr"), "❓ Nađi sljedeću notu", "Crtovlje, pritisni gdje ide sljedeća nota i pusti", fontScale = 1.5f)
+
+    /**
+     * The sideways staff is upright's `NoteStaff` with the phrase: E F G with two placed and the phrase
+     * sounding. It reads Hear's description, E sits in the first of the three columns in its letter's colour
+     * (the centre of a head is its fill, whatever line runs through it), and a slide answers nothing until
+     * the phrase stops.
+     */
+    @Test
+    fun hear_draws_the_phrase_and_locks_sideways_too() {
+        show(asking(67).copy(game = NotesGame.HEAR, phrase = listOf(64, 65, 67), placed = 2, phrasePlaying = true), at = Phone(915, 411))
+        val staff = hearStaff().assertIsDisplayed()
+        staff().assertDoesNotExist()
+        word("👂 Listen").assertIsDisplayed()
+        val image = staff.captureToImage().toPixelMap()
+        val visible = StaffNotes.visiblePositions(StaffNotes.DEFAULT_PRACTICE)
+        val pitch = image.height / (visible.count() + 2f)
+        val y = (visible.last - StaffNotes.positionOf(64) + 1.5f) * pitch
+        val x = image.width * phraseColumns(3).first()
+        assertEquals("E, the given note, at the first column", NoteLetterColors[2].toArgb(), image[x.toInt(), y.toInt()].toArgb())
+        fun slide() = staff.performTouchInput {
+            down(Offset(width * 0.3f, height * 0.5f))
+            moveBy(Offset(0f, 40f))
+            up()
+        }
+        slide()
+        assertTrue("the phrase is sounding, so nothing is answered: $tapped", tapped.isEmpty())
+        compose.runOnIdle { state.value = state.value.copy(phrasePlaying = false) }
+        slide()
+        assertEquals(1, tapped.size)
+    }
+
+    /**
+     * Ten notes asked are two rows of keys under the tiles, 36 x 40 sideways. The card is 312 dp inside at
+     * 360 tall, which with the column's 16 dp gaps was short: the keys came out 88 of their 96 dp at 640 wide.
+     * Two rows bring the gaps to 10 and the headline takes the height the rest leaves. A squeezed column cuts
+     * the second row, so its height says whether it held; the 10 dp over the first row is a learned key's star.
+     */
+    @Test
+    fun the_summary_keys_stay_in_the_card_with_ten_asked_at_360_tall() {
+        val ten = StaffNotes.ALL.take(10).toSet()
+        show(over(8).copy(askedThisRound = ten), at = Phone(640, 360))
+        listOf(8 to "🌟 Great job!", 2 to "💪 Keep practising!").forEach { (score, headline) ->
+            compose.runOnIdle { state.value = over(score).copy(askedThisRound = ten) }
+            listOf(Phone(640, 360), Phone(800, 360), Phone(915, 411)).forEach { each ->
+                on(each)
+                val keys = yourNotes().assertIsDisplayed()
+                assertInTheCard(each, "the keys", keys)
+                assertInTheCardsHeight(each, "the keys", keys)
+                assertNear("$each, \"$headline\": the keys' height", 96.dp, height(keys))
+                val tiles = bounds(compose.onNodeWithContentDescription("Streak of 5"))
+                assertNear("$each: a tile's height", 92.dp, tiles.bottom - tiles.top)
+                assertTrue("$each, \"$headline\": the keys start ${bounds(keys).top - tiles.bottom} under the tiles", bounds(keys).top - tiles.bottom >= 10.dp - SLACK)
+                val title = word(headline).assertIsDisplayed()
+                assertWholeWords(each, headline)
+                assertInTheCard(each, "\"$headline\"", title)
+                assertInTheCardsHeight(each, "\"$headline\"", title)
+                compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollBy)).assertCountEquals(0)
+            }
+        }
     }
 
     @Test
@@ -231,6 +453,22 @@ class NotesSidewaysTest {
             up()
         }
         assertEquals(1, tapped.size)
+    }
+
+    /** Sideways celebrates as upright: the fifth flame sets off the burst over the staff, and the slide still goes through it. */
+    @Test
+    fun five_flames_set_off_the_burst_over_the_staff_and_the_slide_goes_through() {
+        show(asking(60).copy(streak = 5))
+        val burst = compose.onNodeWithTag("streak_burst", useUnmergedTree = true).assertExists()
+        assertEquals("the burst covers the staff", bounds(staff()), bounds(burst))
+        staff().performTouchInput {
+            down(Offset(width * 0.3f, height * 0.5f))
+            moveBy(Offset(0f, 40f))
+            up()
+        }
+        assertEquals(1, tapped.size)
+        compose.runOnIdle { state.value = state.value.copy(streak = 4) }
+        compose.onNodeWithTag("streak_burst", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -321,14 +559,15 @@ class NotesSidewaysTest {
         assertTrue("C6 is over C5, C5 over C4", c6.bottom <= c5.top && c5.bottom <= c4.top)
         assertEquals("the rows line up on the left", c4.left, c5.left)
         assertTrue("the keys are in the card", b4.right <= (8f + Phone(915, 411).cardWidth).dp)
-        // Sound at the top of the right column, OK low, both as wide as the column.
+        // The pills at the top of the right column, Sound under them and OK low, all as wide as the column.
         val sound = bounds(word("Sound"))
         val ok = bounds(word("OK"))
         assertNear("Sound's width", 116.dp, sound.right - sound.left)
         assertNear("OK's width", 116.dp, ok.right - ok.left)
         assertTrue("Sound is right of the keys", sound.left >= b4.right)
         assertTrue("OK is under Sound", ok.top >= sound.bottom)
-        assertNear("Sound is at the top of the column", 14.dp, sound.top)
+        assertNear("the pills are at the top of the column", 14.dp, bounds(findPill()).top)
+        assertTrue("Sound is under the pills", sound.top >= bounds(hearPill()).bottom)
         assertNear("OK's bottom", 411.dp - 16.dp, ok.bottom)
         word("Sound").performClick()
         assertEquals(1, soundToggles)
@@ -370,6 +609,23 @@ class NotesSidewaysTest {
         word("Which notes?").assertIsDisplayed()
         assertNear("a key's width", 78.dp, width(word("C4")))
         staff().assertDoesNotExist()
+    }
+
+    /**
+     * The phrase is asked for as it comes on screen, sideways as upright, and a turn shows the same phrase:
+     * the ask sits above the sideways branch, so a turn does not ask again (the ViewModel would ignore it,
+     * but a turn is not a phrase coming on screen).
+     */
+    @Test
+    fun a_turn_does_not_ask_for_the_phrase_again() {
+        show(hearing())
+        compose.waitForIdle()
+        assertEquals("shown sideways", 1, phraseShownRequests)
+        compose.runOnIdle { sideways = false }
+        compose.waitForIdle()
+        compose.runOnIdle { sideways = true }
+        compose.waitForIdle()
+        assertEquals("turned upright and back", 1, phraseShownRequests)
     }
 
     @Test
@@ -454,7 +710,8 @@ class NotesSidewaysTest {
         listOf(Phone(915, 411), Phone(800, 360), Phone(640, 360)).forEach { each ->
             on(each)
             val question = "$each, the question"
-            assertInside(each, "$question: Find", word("🔎 Find").assertIsDisplayed())
+            assertInside(each, "$question: Find", findPill().assertIsDisplayed(), shadow = 5.dp)
+            assertInside(each, "$question: Hear", hearPill().assertIsDisplayed(), shadow = 5.dp)
             assertInside(each, "$question: the note", word("C4").assertIsDisplayed(), shadow = 6.dp)
             assertInside(each, "$question: the streak", compose.onNodeWithContentDescription("Streak of 3").assertIsDisplayed())
             assertInside(each, "$question: the staff", staff().assertIsDisplayed())
@@ -502,11 +759,9 @@ class NotesSidewaysTest {
             compose.runOnIdle { state.value = asking(60) }
             compose.waitForIdle()
             val bubble = bounds(word("C4"))
-            val find = bounds(word("🔎 Find"))
             compose.runOnIdle { state.value = asking(60).copy(streak = 3, results = listOf(true, true, true), taps = 3) }
             compose.waitForIdle()
             assertEquals("$each: the bubble moved with the streak", bubble, bounds(word("C4")))
-            assertEquals("$each: Find moved with the streak", find, bounds(word("🔎 Find")))
             compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 4) }
             compose.waitForIdle()
             word("🙈 Try again").assertIsDisplayed()
@@ -618,8 +873,8 @@ class NotesSidewaysTest {
     @Test
     fun odaberi_clears_the_outline_at_the_largest_text() = assertTheWordClearsTheOutline(2f)
 
-    /** The feedback line in each of its three states, whole and in the panel, on each phone. */
-    private fun assertTheFeedbackFits(locale: Locale, fontScale: Float, correct: String, wrong: String, placing: String, find: String) {
+    /** The feedback line in each of its three states, whole and in the panel, and the [pills]' words whole, on each phone. */
+    private fun assertTheFeedbackFits(locale: Locale, fontScale: Float, correct: String, wrong: String, placing: String, pills: List<String>) {
         show(asking(60), locale = locale, fontScale = fontScale)
         val staffName = if (locale.language == "hr") "Crtovlje, pritisni gdje ide nota i pusti" else staffDescription
         listOf(Phone(915, 411), Phone(800, 360), Phone(640, 360)).forEach { each ->
@@ -633,7 +888,7 @@ class NotesSidewaysTest {
                 assertTrue("$each: \"$line\" ends at ${bounds(node).right}, the staff starts at ${bounds(staffNode).left}", bounds(node).right <= bounds(staffNode).left)
                 assertTrue("$each: \"$line\" is under the bubble", bounds(node).top >= bounds(bubble).bottom)
             }
-            assertWholeWords(each, find)
+            pills.forEach { assertWholeWords(each, it) }
             // Wrong and right are states; the line that speaks while a finger is down is reached by one.
             compose.runOnIdle { state.value = asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1) }
             compose.waitForIdle()
@@ -651,21 +906,24 @@ class NotesSidewaysTest {
         }
     }
 
+    private val englishPills = listOf("🔎 Find", "👂 Hear")
+    private val croatianPills = listOf("🔎 Nađi", "👂 Slušaj")
+
     @Test
     fun the_feedback_lines_fit_the_panel_in_english() =
-        assertTheFeedbackFits(Locale.ENGLISH, 1f, "🎉 That's it!", "🙈 Try again", "👆 Slide, let go", "🔎 Find")
+        assertTheFeedbackFits(Locale.ENGLISH, 1f, "🎉 That's it!", "🙈 Try again", "👆 Slide, let go", englishPills)
 
     @Test
     fun the_feedback_lines_fit_the_panel_in_croatian() =
-        assertTheFeedbackFits(Locale("hr"), 1f, "🎉 Tako je!", "🙈 Probaj opet", "👆 Povuci i pusti", "🔎 Nađi")
+        assertTheFeedbackFits(Locale("hr"), 1f, "🎉 Tako je!", "🙈 Probaj opet", "👆 Povuci i pusti", croatianPills)
 
     @Test
     fun the_feedback_lines_fit_the_panel_in_croatian_at_large_text() =
-        assertTheFeedbackFits(Locale("hr"), 1.5f, "🎉 Tako je!", "🙈 Probaj opet", "👆 Povuci i pusti", "🔎 Nađi")
+        assertTheFeedbackFits(Locale("hr"), 1.5f, "🎉 Tako je!", "🙈 Probaj opet", "👆 Povuci i pusti", croatianPills)
 
     @Test
     fun the_feedback_lines_fit_the_panel_in_english_at_large_text() =
-        assertTheFeedbackFits(Locale.ENGLISH, 1.5f, "🎉 That's it!", "🙈 Try again", "👆 Slide, let go", "🔎 Find")
+        assertTheFeedbackFits(Locale.ENGLISH, 1.5f, "🎉 That's it!", "🙈 Try again", "👆 Slide, let go", englishPills)
 
     /** The four headlines, each by its score, whole and inside the card, on each phone. */
     private fun assertTheHeadlinesFit(locale: Locale, fontScale: Float, headlines: Map<Int, String>) {
@@ -823,5 +1081,9 @@ class NotesSidewaysTest {
     private companion object {
         const val TOLERANCE = 2f
         val SLACK = 1.dp
+
+        /** The game pills' height in the column: 44 dp, and 30 under 400 dp tall, where 38 left the column 4 dp short. */
+        val PILL_HEIGHT = 44.dp
+        val PILL_HEIGHT_SHORT = 30.dp
     }
 }

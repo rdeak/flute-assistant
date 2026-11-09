@@ -1,103 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The app icon's picture, from the Claude Design canvas (board "App icon"): a friendly robot
-     over a flute, drawn in a 512 x 512 box. It has no background of its own: the launcher icon
-     puts it on @drawable/ic_launcher_background (ic_launcher_foreground insets it into the safe
+<!-- The app icon's picture: the Android robot playing a flute, drawn in a 512 x 512 box. The robot
+     is reproduced and modified from work created and shared by Google under the Creative Commons 3.0
+     Attribution License (NOTICE, and the credits). It has no background of its own: the launcher
+     icon puts it on @drawable/ic_launcher_background (ic_launcher_foreground insets it into the safe
      zone) and the top bar on a rounded golden square (ui/common/AppLogo.kt). tools/IconGen.java
-     draws the same shapes for the PNG icons and the Play listing. -->
+     draws the same shapes for the PNG icons and the Play listing, so change both together.
+     Robot: a dome of radius 104 about (190,236), antennas 28 degrees off vertical, a body from 248
+     to 426 with 56 px bottom corners. Flute: a 300 x 40 pill at (340,222) tilted 3 degrees, with one
+     dot per note letter, C to B, and a round hand over the keys at each side (the hands cover two
+     dots, as fingers cover holes). One eighth note in the air, tilted 12 degrees. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="512"
     android:viewportHeight="512">
-    <!-- The robot: rotate(-9 about 256,216), then scale 1.1 about 256,196 and down 40, as on the canvas. -->
+    <!-- Body -->
+    <path
+        android:fillColor="#FF3DDC84"
+        android:strokeColor="#FF2E2A44"
+        android:strokeWidth="13"
+        android:strokeLineJoin="round"
+        android:pathData="M94,248 H286 V370 Q286,426 230,426 H150 Q94,426 94,370 Z" />
+    <!-- Antennas: an ink pill (22 wide plus the 13 outline) with a green core. -->
+    <path
+        android:strokeColor="#FF2E2A44"
+        android:strokeWidth="35"
+        android:strokeLineCap="round"
+        android:pathData="M144,149.5 L119.6,103.6 M236,149.5 L260.4,103.6" />
+    <path
+        android:strokeColor="#FF3DDC84"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:pathData="M144,149.5 L119.6,103.6 M236,149.5 L260.4,103.6" />
+    <!-- Head -->
+    <path
+        android:fillColor="#FF3DDC84"
+        android:strokeColor="#FF2E2A44"
+        android:strokeWidth="13"
+        android:strokeLineJoin="round"
+        android:pathData="M86,236 A104,104 0 0 1 294,236 Z" />
+    <!-- Eyes: white with a thinner outline, the pupils looking at the flute. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FF2E2A44"
+        android:strokeWidth="10"
+        android:pathData="M131,188 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0 M215,188 a17,17 0 1,0 34,0 a17,17 0 1,0 -34,0" />
+    <path
+        android:fillColor="#FF2E2A44"
+        android:pathData="M146.9,192 a7.1,7.1 0 1,0 14.2,0 a7.1,7.1 0 1,0 -14.2,0 M230.9,192 a7.1,7.1 0 1,0 14.2,0 a7.1,7.1 0 1,0 -14.2,0" />
+    <!-- The flute: a white pill from the face outward with one dot per note letter, C to B, and the hands. -->
     <group
-        android:pivotX="256"
-        android:pivotY="196"
-        android:scaleX="1.1"
-        android:scaleY="1.1"
-        android:translateY="40">
-        <group
-            android:pivotX="256"
-            android:pivotY="216"
-            android:rotation="-9">
-            <path
-                android:strokeColor="#FF2E2A44"
-                android:strokeWidth="13"
-                android:strokeLineJoin="round"
-                android:strokeLineCap="round"
-                android:pathData="M256,112 L256,84" />
-            <path
-                android:fillColor="#FFFF7A6B"
-                android:strokeColor="#FF2E2A44"
-                android:strokeWidth="13"
-                android:strokeLineJoin="round"
-                android:pathData="M236,68 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0" />
-            <path
-                android:fillColor="#FFFF9F68"
-                android:strokeColor="#FF2E2A44"
-                android:strokeWidth="13"
-                android:strokeLineJoin="round"
-                android:pathData="M80,216 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0" />
-            <path
-                android:fillColor="#FFFF9F68"
-                android:strokeColor="#FF2E2A44"
-                android:strokeWidth="13"
-                android:strokeLineJoin="round"
-                android:pathData="M360,216 a36,36 0 1,0 72,0 a36,36 0 1,0 -72,0" />
-            <path
-                android:fillColor="#FFE3EBF3"
-                android:strokeColor="#FF2E2A44"
-                android:strokeWidth="13"
-                android:strokeLineJoin="round"
-                android:pathData="M124,216 a132,104 0 1,0 264,0 a132,104 0 1,0 -264,0" />
-            <path
-                android:fillColor="#FF2E2A44"
-                android:pathData="M162,214 a94,64 0 1,0 188,0 a94,64 0 1,0 -188,0" />
-            <path
-                android:fillColor="#FF7BE8D8"
-                android:pathData="M198,200 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0" />
-            <path
-                android:fillColor="#FF7BE8D8"
-                android:pathData="M278,200 a18,18 0 1,0 36,0 a18,18 0 1,0 -36,0" />
-            <path
-                android:strokeColor="#FF7BE8D8"
-                android:strokeWidth="13"
-                android:strokeLineJoin="round"
-                android:strokeLineCap="round"
-                android:pathData="M224,238 Q256,268 288,238" />
-        </group>
-    </group>
-    <!-- The flute: a white pill with one dot per note letter, C to B, tilted -6 degrees. -->
-    <group
-        android:translateX="256"
-        android:translateY="428"
-        android:rotation="-6">
+        android:translateX="340"
+        android:translateY="222"
+        android:rotation="3">
         <path
             android:fillColor="#FFFFFFFF"
             android:strokeColor="#FF2E2A44"
             android:strokeWidth="13"
             android:strokeLineJoin="round"
-            android:pathData="M-168,-22 H168 A22,22 0 0 1 168,22 H-168 A22,22 0 0 1 -168,-22 Z" />
+            android:pathData="M-150,-20 H150 A20,20 0 0 1 150,20 H-150 A20,20 0 0 1 -150,-20 Z" />
         <path
             android:fillColor="#FFFF6B6B"
-            android:pathData="M-106,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M-87,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
         <path
             android:fillColor="#FFFFA047"
-            android:pathData="M-74,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M-61,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
         <path
             android:fillColor="#FFFFD93D"
-            android:pathData="M-42,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M-35,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
         <path
             android:fillColor="#FF7BD67B"
-            android:pathData="M-10,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
         <path
             android:fillColor="#FF5FD3C8"
-            android:pathData="M22,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M17,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
         <path
             android:fillColor="#FFB39DDB"
-            android:pathData="M54,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M43,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
         <path
             android:fillColor="#FFF7A1C4"
-            android:pathData="M86,0 a10,10 0 1,0 20,0 a10,10 0 1,0 -20,0" />
+            android:pathData="M69,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" />
+        <!-- Hands -->
+        <path
+            android:fillColor="#FF3DDC84"
+            android:strokeColor="#FF2E2A44"
+            android:strokeWidth="13"
+            android:pathData="M-78,6 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0 M36,6 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+    </group>
+    <!-- One eighth note -->
+    <group
+        android:pivotX="436"
+        android:pivotY="120"
+        android:rotation="12">
+        <path
+            android:strokeColor="#FF2E2A44"
+            android:strokeWidth="13"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M448,140 L448,70 Q478,84 478,118" />
+        <path
+            android:fillColor="#FF2E2A44"
+            android:pathData="M420,143 a20,15 0 1,0 40,0 a20,15 0 1,0 -40,0" />
     </group>
 </vector>

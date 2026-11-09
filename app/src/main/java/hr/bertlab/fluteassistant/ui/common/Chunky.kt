@@ -210,8 +210,8 @@ fun BigActionButton(
     }
 }
 
-/** The height of a [BigActionButton] upright. */
-private val BigActionHeight = 84.dp
+/** The height of a [BigActionButton] upright; the round summary counts it in the room it needs, and its tests check it. */
+internal val BigActionHeight = 84.dp
 
 /**
  * The rounded white (navy in dark mode) card each tab draws its main content on, with a

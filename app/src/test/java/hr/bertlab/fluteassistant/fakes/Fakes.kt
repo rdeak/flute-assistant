@@ -21,6 +21,8 @@ import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.Preset
 import hr.bertlab.fluteassistant.domain.model.ThemeChoice
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.repository.PresetRepository
 import hr.bertlab.fluteassistant.domain.repository.SettingsStore
@@ -182,6 +184,8 @@ class FakeSettingsStore(
     val books: MutableList<Book> = MutableList(Songbook.SIZE) { Book() },
     var openBook: Int = 0,
     var theme: ThemeChoice = ThemeChoice.SYSTEM,
+    var notesGame: NotesGame = NotesGame.FIND,
+    var noteProgress: NoteProgress = NoteProgress.EMPTY,
 ) : SettingsStore {
     /** The tune of the open book, so a test can set or read it without going through the shelf. */
     var tune: List<TuneItem>
@@ -202,6 +206,10 @@ class FakeSettingsStore(
     override fun savePracticeNotes(notes: Set<Int>) { practiceNotes = notes }
     override fun loadNoteSound() = noteSound
     override fun saveNoteSound(enabled: Boolean) { noteSound = enabled }
+    override fun loadNotesGame() = notesGame
+    override fun saveNotesGame(game: NotesGame) { notesGame = game }
+    override fun loadNoteProgress() = noteProgress
+    override fun saveNoteProgress(progress: NoteProgress) { noteProgress = progress }
     override fun loadShelf() = Shelf(openBook, books.toList())
     override fun saveBook(index: Int, book: Book) { books[index] = book }
     override fun saveOpenBook(index: Int) { openBook = index }

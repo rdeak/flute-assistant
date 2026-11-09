@@ -17,14 +17,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,11 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -52,10 +47,9 @@ import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
-import hr.bertlab.fluteassistant.ui.common.ChunkyButton
-import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
+import hr.bertlab.fluteassistant.ui.common.ModeChoice
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
@@ -63,7 +57,6 @@ import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteLabel
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
-import hr.bertlab.fluteassistant.ui.theme.Sun
 
 /**
  * Stateful entry point: handles the RECORD_AUDIO permission and starts / stops the microphone
@@ -248,38 +241,14 @@ internal val TunerMode.emoji: String
  */
 @Composable
 private fun TunerModeChoice(mode: TunerMode, onSelect: (TunerMode) -> Unit) {
-    val groupLabel = stringResource(R.string.tuner_mode)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 5.dp)
-            .selectableGroup()
-            .semantics { contentDescription = groupLabel },
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        TunerMode.entries.forEach { entry ->
-            val isSelected = entry == mode
-            ChunkyButton(
-                onClick = { onSelect(entry) },
-                selected = isSelected,
-                color = if (isSelected) Sun else FluteTheme.colors.raised,
-                depth = 5.dp,
-                modifier = Modifier
-                    .weight(1f)
-                    .height(64.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Emoji(entry.emoji, fontSize = 26)
-                    Text(
-                        text = stringResource(entry.labelRes()),
-                        style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
-    }
+    ModeChoice(
+        entries = TunerMode.entries,
+        selected = mode,
+        onSelect = onSelect,
+        groupLabel = stringResource(R.string.tuner_mode),
+        emojiOf = { it.emoji },
+        labelResOf = { it.labelRes() },
+    )
 }
 
 /**

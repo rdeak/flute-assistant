@@ -28,6 +28,7 @@
     <string name="credits_licence">Slobodan softver: smiješ ga dijeliti i mijenjati pod licencijom GNU General Public License, verzija 3 ili novija. Dolazi bez ikakvog jamstva.</string>
     <string name="credits_licence_text">Tekst licencije:</string>
     <string name="credits_privacy">Pravila privatnosti:</string>
+    <string name="credits_android_robot">Android robot preuzet je ili izmijenjen iz djela koje je stvorio i podijelio Google te se koristi u skladu s uvjetima licencije Creative Commons 3.0 Attribution.</string>
     <string name="credits_done">U redu</string>
 
     <string name="band_snail">Puž</string>
@@ -103,7 +104,15 @@
     <string name="notes_wrong">🙈 Probaj opet</string>
     <string name="notes_placing">👆 Povuci i pusti</string>
     <string name="find_note">🔎 Nađi</string>
+    <string name="hear_game">👂 Slušaj</string>
+    <string name="notes_game">Igra</string>
+    <string name="hear_again">Poslušaj opet</string>
+    <string name="notes_listening">👂 Slušaj</string>
+    <string name="hear_prompt">❓ Nađi sljedeću notu</string>
     <string name="staff_description">Crtovlje, pritisni gdje ide nota i pusti</string>
+    <string name="staff_description_hear">Crtovlje, pritisni gdje ide sljedeća nota i pusti</string>
+    <string name="note_known">%1$s, naučena</string>
+    <string name="your_notes">Tvoje note</string>
     <string name="staff_position">Mjesto %1$d u crtovlju</string>
     <plurals name="round_progress">
         <item quantity="one">Napredak, %1$d od %2$d note</item>

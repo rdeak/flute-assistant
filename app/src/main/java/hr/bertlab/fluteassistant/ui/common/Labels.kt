@@ -8,6 +8,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -20,7 +21,9 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import hr.bertlab.fluteassistant.domain.model.Subdivision
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
+import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 
@@ -49,6 +52,13 @@ fun SoundProfile.labelRes(): Int = when (this) {
 fun TunerMode.labelRes(): Int = when (this) {
     TunerMode.IDENTIFY -> R.string.mode_identify
     TunerMode.TARGET -> R.string.mode_target
+}
+
+/** The pill's word; the emoji is in the string itself, so the pill draws none of its own. */
+@StringRes
+fun NotesGame.labelRes(): Int = when (this) {
+    NotesGame.FIND -> R.string.find_note
+    NotesGame.HEAR -> R.string.hear_game
 }
 
 /** The advice line's words, or null when there is nothing to say. */
@@ -143,6 +153,20 @@ private const val OCTAVE_RISE = 0.36f
  * letter it raises, so C♯ is red like C.
  */
 fun noteColor(midi: Int): Color = NoteLetterColors[LETTER_OF_PITCH_CLASS[Math.floorMod(midi, 12)]]
+
+/**
+ * The pale tint of a note's colour: [noteColor] at [TINT_SHARE] over the card, so it stays a quiet
+ * ground in the light theme and in the dark one. A key of the sticker book is this until the note is
+ * learned, and the Pick button's dot of a letter that is not yet.
+ */
+@Composable
+fun noteTint(midi: Int): Color = tintOf(noteColor(midi))
+
+/** [color] at [TINT_SHARE] over the card: [noteTint] for a colour that is already in hand. */
+@Composable
+fun tintOf(color: Color): Color = lerp(FluteTheme.colors.card, color, TINT_SHARE)
+
+private const val TINT_SHARE = 0.3f
 
 /** Index of the letter (C = 0 to B = 6) each pitch class is written on, sharps on the letter below. */
 private val LETTER_OF_PITCH_CLASS = intArrayOf(0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6)

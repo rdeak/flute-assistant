@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.notes
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
@@ -44,22 +48,36 @@ import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
+import hr.bertlab.fluteassistant.ui.common.SidewaysPlainButton
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
-import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 
 /*
  * The notes game on a phone on its side (spec `2026-11-05-landscape-design.md`, "Notes game";
- * mockups `hand.html` and `more.html`). The phone is in the hand here, not on a stand. Three
- * screens, each in the shape every tab has: where am I on the left, the thing itself in the middle,
- * what to do in the right column. `NoteStaff` is the same one upright draws and takes the card's
- * full height; a place is the staff's height over the visible places plus two, which the spec's
- * table gives (26 dp at 411 tall with the usual notes, 23 at 360), and this tab never scrolls
- * at 360 tall or more, as scrolling would fight the slide.
+ * mockups `hand.html` and `more.html`; the two games and the keys, spec
+ * `2026-11-07-notes-hear-and-sticker-book-design.md`, "Sideways"). The phone is in the hand here,
+ * not on a stand. Three screens, each in the shape every tab has: where am I on the left, the thing
+ * itself in the middle, what to do in the right column, which the two game pills head on all three:
+ * the question (the bubble in a panel, the staff, the places over Pick), the picker (Sound, OK low)
+ * and the summary (the trophy, stars, tiles and keys; Pick, Again low). `NoteStaff` is the same one
+ * upright draws, phrase and all, and takes the card's full height; a place is the staff's height over
+ * the visible places plus two, which the spec's table gives (26 dp at 411 tall with the usual notes,
+ * 23 at 360), and this tab never scrolls at 360 tall or more, as scrolling would fight the slide.
  */
 
-/** The panel left of the staff: Find, the note's bubble, the streak and the feedback line (the mockup's 124). */
+/** The panel left of the staff: the bubble, the streak and the feedback line (the mockup's 124). */
 private val PanelWidth = 124.dp
+
+/**
+ * The game pills: 44 dp tall and 8 apart, or 30 and 6 on a short phone. At 360 tall the column is 330 dp
+ * inside, and the pills, the ten places (168) and Pick (84) left it 4 dp short at 38: Pick was squeezed and
+ * Hear's shadow lay on the places. At 30 there are 6 dp between them, and Hear's 5 dp shadow clears the places.
+ */
+private val PillHeight = 44.dp
+private val PillHeightShort = 30.dp
+private val PillGap = 8.dp
+private val PillGapShort = 6.dp
 
 /** The streak's slot, as tall as the pill, so the bubble does not move when the first flame comes. */
 private val StreakSlotHeight = 52.dp
@@ -67,12 +85,21 @@ private val StreakSlotHeight = 52.dp
 /** The feedback line's room in the panel: two lines of its 22 sp, so that nothing moves when it comes and goes. */
 private val FeedbackHeight = 64.dp
 
+/**
+ * How small the panel's feedback line may shrink in its two lines (it was 12 sp). At twice the text the 124 dp panel
+ * holds "❓ Find the next note" from about 11 sp down and "❓ Nađi sljedeću notu" from about 10, where the words
+ * broke inside themselves or ran past the second line; 9 is the least that is still a legible floor, and a floor only
+ * matters where the text would not fit.
+ */
+private val PanelFeedbackFloor = 9.sp
+
 /** The staff's card is padded 10 dp, less than the 16 of the others: the staff needs every dp of height. */
 private val StaffCardPadding = 10.dp
 
 /**
  * The whole game sideways: the picker while [choosingNotes] (`NotesContent` keeps that, so it stays
  * open when the phone turns), otherwise the summary once the round is over, otherwise the question.
+ * The window's height says whether the column is short, which sizes the game pills on all three.
  */
 @Composable
 internal fun NotesSideways(
@@ -84,74 +111,120 @@ internal fun NotesSideways(
     onPlayAgain: () -> Unit,
     onTogglePracticeNote: (Int) -> Unit,
     onToggleSound: () -> Unit,
+    onSetGame: (NotesGame) -> Unit,
+    onHearAgain: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    when {
-        choosingNotes -> PickerSideways(state, onTogglePracticeNote, onToggleSound, onChosen, modifier)
-        state.roundOver -> SummarySideways(state, onChoose, onPlayAgain, modifier)
-        else -> QuestionSideways(state, onChoose, onNoteTapped, modifier)
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val short = SidewaysGeometry.isShort(maxHeight.value)
+        val pills: @Composable () -> Unit = { GamePillsSideways(state.game, onSetGame, short) }
+        when {
+            choosingNotes -> PickerSideways(state, pills, onTogglePracticeNote, onToggleSound, onChosen)
+            state.roundOver -> SummarySideways(state, pills, onChoose, onPlayAgain)
+            else -> QuestionSideways(state, pills, onChoose, onNoteTapped, onHearAgain)
+        }
     }
 }
 
 /**
- * The panel, the staff's card and the column: Find and the note on the left, where a right hand will
- * not cover them, the staff in the middle with its note column in the centre and room on the right
- * for the sliding finger, and the ten places over Pick on the right.
+ * The two games stacked at the top of the column, as the tuner's modes are, the chosen one yellow. The
+ * emoji is in each word (`find_note`, `hear_game`), so the button draws the word alone. Lower on a
+ * [short] phone, where the column has no more room ([PillHeightShort]).
  */
 @Composable
-private fun QuestionSideways(state: NotesUiState, onChoose: () -> Unit, onNoteTapped: (Int) -> Unit, modifier: Modifier) {
-    // The place under the child's finger while they slide, before they let go.
+private fun GamePillsSideways(game: NotesGame, onSetGame: (NotesGame) -> Unit, short: Boolean) {
+    val groupLabel = stringResource(R.string.notes_game)
+    Column(
+        verticalArrangement = Arrangement.spacedBy(if (short) PillGapShort else PillGap),
+        modifier = Modifier
+            .selectableGroup()
+            .semantics { contentDescription = groupLabel },
+    ) {
+        NotesGame.entries.forEach { entry ->
+            SidewaysPlainButton(
+                emoji = null,
+                text = stringResource(entry.labelRes()),
+                onClick = { onSetGame(entry) },
+                selected = entry == game,
+                height = if (short) PillHeightShort else PillHeight,
+            )
+        }
+    }
+}
+
+/**
+ * The panel, the staff's card and the column: the bubble on the left, where a right hand will not
+ * cover it, the staff in the middle with its note column (or the phrase's columns) in the centre and
+ * room on the right for the sliding finger, and the pills over the ten places over Pick on the right.
+ */
+@Composable
+private fun QuestionSideways(
+    state: NotesUiState,
+    pills: @Composable () -> Unit,
+    onChoose: () -> Unit,
+    onNoteTapped: (Int) -> Unit,
+    onHearAgain: () -> Unit,
+) {
+    // The place under the child's finger while they slide, before they let go; the speaker waits for it.
     var placing by remember { mutableStateOf<Int?>(null) }
     SidewaysPage(
-        modifier = modifier,
         column = {
+            pills()
             RoundProgress(results = state.results, roundOver = state.roundOver, twoColumns = true)
-            SidewaysPickButton(state.practiceNotes, onChoose)
+            SidewaysPickButton(state.practiceNotes, state.progress, onChoose)
         },
     ) { page ->
         Row(modifier = page, horizontalArrangement = Arrangement.spacedBy(SidewaysGeometry.MARGIN.dp)) {
-            QuestionPanel(state, placing, Modifier.width(PanelWidth).fillMaxHeight())
+            QuestionPanel(state, placing, onHearAgain, Modifier.width(PanelWidth).fillMaxHeight())
             Stage(modifier = Modifier.weight(1f).fillMaxHeight(), padding = StaffCardPadding) {
-                NoteStaff(
-                    currentMidi = state.currentMidi,
-                    wrongTaps = state.wrongTaps,
-                    lastWrongTap = state.lastWrongTap,
-                    solved = state.solved,
-                    practiceNotes = state.practiceNotes,
-                    placing = placing,
-                    onPlacingChange = { placing = it },
-                    onNoteTapped = onNoteTapped,
-                    modifier = Modifier.weight(1f),
-                )
+                // As upright: the burst is drawn over the staff in the same box and takes no touch, so the slide goes through.
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    NoteStaff(
+                        currentMidi = state.currentMidi,
+                        wrongTaps = state.wrongTaps,
+                        lastWrongTap = state.lastWrongTap,
+                        solved = state.solved,
+                        practiceNotes = state.practiceNotes,
+                        placing = placing,
+                        onPlacingChange = { placing = it },
+                        onNoteTapped = onNoteTapped,
+                        modifier = Modifier.fillMaxSize(),
+                        phrase = state.phrase,
+                        placed = state.placed,
+                        locked = state.phrasePlaying,
+                        hearing = state.hearing,
+                        sounding = state.sounding,
+                    )
+                    StreakBurst(state.streak, Modifier.matchParentSize())
+                }
             }
         }
     }
 }
 
-/** On the page, not in a card: Find over the 108 dp bubble, the streak, and the feedback line. */
+/**
+ * On the page, not in a card: the 108 dp bubble, the streak and the feedback line. The bubble is the
+ * note in Find and, in Hear, the speaker that plays the phrase again, which waits while a finger is
+ * [placing] a note, as that is answering.
+ */
 @Composable
-private fun QuestionPanel(state: NotesUiState, placing: Int?, modifier: Modifier) {
+private fun QuestionPanel(state: NotesUiState, placing: Int?, onHearAgain: () -> Unit, modifier: Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
         modifier = modifier,
     ) {
-        Text(
-            text = stringResource(R.string.find_note),
-            style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp, lineHeight = 1.25.em),
-            color = FluteTheme.colors.mutedText,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = 22.sp),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        NoteBubble(midi = state.currentMidi, size = 108.dp, fontSize = 56.sp)
+        if (state.hearing) {
+            HearAgainBubble(size = 108.dp, fontSize = 52, enabled = placing == null, onClick = onHearAgain)
+        } else {
+            NoteBubble(midi = state.currentMidi, size = 108.dp, fontSize = 56.sp)
+        }
         StreakFlames(state.streak, Modifier.height(StreakSlotHeight))
         FeedbackLine(
             state = state,
             placing = placing,
             maxFont = 22.sp,
-            minFont = 12.sp,
+            minFont = PanelFeedbackFloor,
             maxLines = 2,
             height = FeedbackHeight,
             style = MaterialTheme.typography.headlineMedium.copy(lineHeight = 1.2.em),
@@ -168,7 +241,12 @@ private fun QuestionPanel(state: NotesUiState, placing: Int?, modifier: Modifier
  * outline and shrinks to fit the rest.
  */
 @Composable
-private fun SidewaysPickButton(practiceNotes: Set<Int>, onChoose: () -> Unit, modifier: Modifier = Modifier) {
+private fun SidewaysPickButton(
+    practiceNotes: Set<Int>,
+    progress: NoteProgress,
+    onChoose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val description = stringResource(R.string.choose_notes)
     val backpack = with(LocalDensity.current) { 24.dp.toSp().value.toInt() }
     // The word's floor is in dp, as a floor in sp doubles with the text and the 100 dp column then has no room for "Odaberi" at the largest size.
@@ -183,7 +261,7 @@ private fun SidewaysPickButton(practiceNotes: Set<Int>, onChoose: () -> Unit, mo
             .semantics { contentDescription = description },
     ) {
         BoxWithConstraints {
-            val dot = SidewaysGeometry.pickDotSize(maxWidth.value, letterColorsOf(practiceNotes).size)
+            val dot = SidewaysGeometry.pickDotSize(maxWidth.value, letterDotColors(practiceNotes, progress).size)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -199,7 +277,7 @@ private fun SidewaysPickButton(practiceNotes: Set<Int>, onChoose: () -> Unit, mo
                         modifier = Modifier.weight(1f, fill = false),
                     )
                 }
-                LetterDots(practiceNotes, size = dot.dp, gap = SidewaysGeometry.PICK_DOT_GAP.dp)
+                LetterDots(practiceNotes, progress, size = dot.dp, gap = SidewaysGeometry.PICK_DOT_GAP.dp)
             }
         }
     }
@@ -207,20 +285,20 @@ private fun SidewaysPickButton(practiceNotes: Set<Int>, onChoose: () -> Unit, mo
 
 /**
  * The title and the same rows as upright in the card, with bigger keys that narrow to fit the card
- * on the smaller phones; Sound at the top of the column and OK low. The ten places hide: there is
- * nothing to count while choosing.
+ * on the smaller phones; the pills at the top of the column, Sound under them and OK low. The ten
+ * places hide: there is nothing to count while choosing.
  */
 @Composable
 private fun PickerSideways(
     state: NotesUiState,
+    pills: @Composable () -> Unit,
     onTogglePracticeNote: (Int) -> Unit,
     onToggleSound: () -> Unit,
     onChosen: () -> Unit,
-    modifier: Modifier,
 ) {
     SidewaysPage(
-        modifier = modifier,
         column = {
+            pills()
             SoundTile(soundOn = state.soundOn, onToggleSound = onToggleSound)
             SidewaysActionButton(
                 icon = AppIcons.Done,
@@ -251,6 +329,7 @@ private fun PickerSideways(
                     NoteRows(
                         selected = state.practiceNotes,
                         onToggle = onTogglePracticeNote,
+                        progress = state.progress,
                         keyWidth = keyWidth,
                         keyHeight = PickerKeyHeight,
                         gap = PickerKeyGap,
@@ -266,17 +345,18 @@ private val PickerKeyHeight = 62.dp
 private val PickerKeyGap = 10.dp
 
 /**
- * The trophy beside the headline, the ten stars in one row and the three tiles, all in the card
- * and still no numbers; Pick over Again in the column. The trophy and the stars are sized from the
- * card's width, so the narrowest phone still holds them, and from dp, so large text does not grow
- * them out of the card.
+ * The trophy beside the headline, the ten stars in one row, the three tiles and the keys of the notes
+ * asked, all in the card and still no numbers; the pills over Pick over Again in the column. The trophy
+ * and the stars are sized from the card's width, so the narrowest phone still holds them, and from dp,
+ * so large text does not grow them out of the card. Nothing scrolls: the headline is measured last and
+ * shrinks to the height the rest leaves, so the keys keep theirs, and two rows of keys close the gaps.
  */
 @Composable
-private fun SummarySideways(state: NotesUiState, onChoose: () -> Unit, onPlayAgain: () -> Unit, modifier: Modifier) {
+private fun SummarySideways(state: NotesUiState, pills: @Composable () -> Unit, onChoose: () -> Unit, onPlayAgain: () -> Unit) {
     SidewaysPage(
-        modifier = modifier,
         column = {
-            SidewaysPickButton(state.practiceNotes, onChoose)
+            pills()
+            SidewaysPickButton(state.practiceNotes, state.progress, onChoose)
             SidewaysActionButton(
                 icon = AppIcons.Again,
                 text = stringResource(R.string.play_again),
@@ -298,23 +378,29 @@ private fun SummarySideways(state: NotesUiState, onChoose: () -> Unit, onPlayAga
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(gap),
                 ) {
-                    Emoji(TROPHY_EMOJI, fontSize = fontSizeOf(trophy), modifier = Modifier.trophyHop())
+                    // A perfect round hops higher, as upright (the sparkles beside it are upright's alone).
+                    Emoji(TROPHY_EMOJI, fontSize = fontSizeOf(trophy), modifier = Modifier.trophyHop(big = state.score == NotesUiState.ROUND_LENGTH))
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                        verticalArrangement = Arrangement.spacedBy(
+                            if (summaryRows(state.askedThisRound) > 1) SummaryGapTwoRows else SummaryGap,
+                            Alignment.CenterVertically,
+                        ),
                         modifier = Modifier.weight(1f),
                     ) {
+                        // Weighted, so it is measured after the rest and its autoSize fits the height they leave.
                         Text(
                             text = stringResource(headlineFor(state.score)),
                             style = MaterialTheme.typography.headlineMedium.copy(fontSize = 32.sp, lineHeight = 1.2.em),
                             textAlign = TextAlign.Center,
                             maxLines = 2,
                             autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 32.sp),
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
                         )
                         // Unbounded, so a row too wide for the card would show in its size rather than be squeezed.
                         SummaryStars(state, fontSize = fontSizeOf(star), modifier = Modifier.wrapContentWidth(unbounded = true))
                         SummaryTiles(state, compact = true)
+                        SummaryKeys(state, keyWidth = SummaryKeyWidth, keyHeight = SummaryKeyHeight, gap = SummaryKeyGap)
                     }
                 }
             }
@@ -325,6 +411,19 @@ private fun SummarySideways(state: NotesUiState, onChoose: () -> Unit, onPlayAga
 private val TrophyMin = 72.dp
 private val TrophyMax = 130.dp
 private val StarMax = 27.dp
+
+/** The keys of the summary sideways, smaller than upright's 44 x 50: a row of seven is 276 dp, and the narrowest card leaves the column 288. */
+private val SummaryKeyWidth = 36.dp
+private val SummaryKeyHeight = 40.dp
+private val SummaryKeyGap = 4.dp
+
+/**
+ * The room between the headline, the stars, the tiles and the keys. Two rows of keys (106 dp with the
+ * 10 over them for a star) did not fit the 312 dp a 360 tall card holds at 16 (the keys came out 88 of
+ * their 96 at 640 wide), so they bring it to 10.
+ */
+private val SummaryGap = 16.dp
+private val SummaryGapTwoRows = 10.dp
 
 /** The size an emoji is measured at to find how wide it is for its size; a width follows the size. */
 private val EmojiMeasureSize = 100.dp

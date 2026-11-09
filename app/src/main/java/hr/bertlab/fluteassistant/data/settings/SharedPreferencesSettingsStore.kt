@@ -14,6 +14,8 @@ import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import hr.bertlab.fluteassistant.domain.model.Subdivision
 import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.repository.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
@@ -74,6 +76,19 @@ class SharedPreferencesSettingsStore @Inject constructor(
 
     override fun saveNoteSound(enabled: Boolean) = prefs.edit { putBoolean(KEY_NOTE_SOUND, enabled) }
 
+    override fun loadNotesGame(): NotesGame =
+        enumOrDefault(prefs.getString(KEY_NOTES_GAME, null), NotesGame.FIND)
+
+    override fun saveNotesGame(game: NotesGame) = prefs.edit { putString(KEY_NOTES_GAME, game.name) }
+
+    // Decoded leniently; decode only reads the set SharedPreferences returns, which must not be
+    // touched.
+    override fun loadNoteProgress(): NoteProgress =
+        NoteProgress.decode(prefs.getStringSet(KEY_NOTE_PROGRESS, null))
+
+    override fun saveNoteProgress(progress: NoteProgress) =
+        prefs.edit { putStringSet(KEY_NOTE_PROGRESS, progress.encode()) }
+
     // The shelf is six strings and the open index. No open index yet means the shelf was never
     // stored: Songbook.restore moves the old single tune (key "tune") into book 0 at the
     // metronome's stored speed and beat, and that result is written at once, with the old key
@@ -122,6 +137,8 @@ class SharedPreferencesSettingsStore @Inject constructor(
         const val KEY_TUNER_MODE = "tuner_mode"
         const val KEY_PRACTICE_NOTES = "practice_notes"
         const val KEY_NOTE_SOUND = "note_sound"
+        const val KEY_NOTES_GAME = "notes_game"
+        const val KEY_NOTE_PROGRESS = "note_progress"
         const val KEY_OPEN_BOOK = "open_book"
         const val KEY_THEME = "theme"
 

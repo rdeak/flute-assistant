@@ -15,4 +15,7 @@ Additional terms under GPLv3 section 7:
 
 Third party: Nunito font (SIL OFL 1.1, docs/licenses/Nunito-OFL.txt);
 AndroidX, Hilt, Kotlin, kotlinx.coroutines and the Gradle wrapper
-(Apache-2.0).
+(Apache-2.0). The app icon: the Android robot is reproduced or modified
+from work created and shared by Google and used according to terms
+described in the Creative Commons 3.0 Attribution License
+(https://creativecommons.org/licenses/by/3.0/).

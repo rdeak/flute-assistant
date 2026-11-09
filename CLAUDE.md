@@ -74,7 +74,7 @@ Each feature's design, thresholds and the reasons behind them live in a CLAUDE.m
 code, which loads when you work in that folder; read the one for the feature you are changing:
 `ui/` (the look, top bar, tab bar, the sideways rail and the screen structure every tab shares), `audio/metronome/`
 (metronome audio path, player contract), `ui/metronome/` (that tab), `playback/` (background
-playback), `ui/tuner/` (tuner path), `ui/notes/` (note reading game), `ui/flute/` (digital flute:
+playback), `ui/tuner/` (tuner path), `ui/notes/` (note reading game: Find and Hear, and the sticker book of progress per note), `ui/flute/` (digital flute:
 tune, rests and breaths, bars and ties; the songbook of six tunes is `SONGBOOK.md` beside it). The
 matching `audio/` and `domain/` folders point there.
 
@@ -122,7 +122,7 @@ tab's CLAUDE.md; these rules hold on all of them:
 `core/log/Logger` (Hilt-provided, `AndroidLogger` in production, `FakeLogger` in tests) is the
 one way to log. Every line is a dotted event name plus `key=value` fields built by `LogLine`
 (two decimals for floating point, `none` for null, quoted text), under one tag per subsystem
-(`LogTags`: `FA.Tuner`, `FA.Metronome`, `FA.Playback`, `FA.Flute`), so lines are greppable and a script
+(`LogTags`: `FA.Tuner`, `FA.Metronome`, `FA.Playback`, `FA.Flute`, `FA.Notes`), so lines are greppable and a script
 can split them on spaces. Levels: `v` per-frame detail, off unless switched on per tag at
 runtime; `d` periodic summaries and state changes, on in debug builds; `i` lifecycle; `w`/`e`
 failures with the exception. Guard costly `v` calls with `logger.isVerbose(tag)`. Never log
@@ -130,12 +130,12 @@ through `android.util.Log` directly, never log user-identifying data, and keep e
 stable: they are the interface a logcat session is read with.
 
 Each subsystem's events are listed in its folder's CLAUDE.md: `ui/tuner/` (`FA.Tuner`),
-`audio/metronome/` (`FA.Metronome`, `FA.Playback`), `ui/flute/` (`FA.Flute`). A debug build also
+`audio/metronome/` (`FA.Metronome`, `FA.Playback`), `ui/flute/` (`FA.Flute`), `ui/notes/` (`FA.Notes`). A debug build also
 keeps every "Your turn" run on the phone (the audio, a per-frame table and the run's log lines
 aligned to it) for replay on the laptop: the `sessions` skill.
 
 ```sh
-adb logcat -s FA.Tuner FA.Metronome FA.Playback FA.Flute   # everything structured, debug build
+adb logcat -s FA.Tuner FA.Metronome FA.Playback FA.Flute FA.Notes   # everything structured, debug build
 adb shell setprop log.tag.FA.Tuner VERBOSE               # per-frame tuner lines (any build)
 adb logcat -v time -s FA.Tuner | grep tuner.summary     # one line a second: did frames pass the gate?
 ```

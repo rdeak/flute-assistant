@@ -68,7 +68,9 @@ fun CreditsLogo(
 
 /**
  * The version, where the privacy policy is (Play asks for it inside the app as well as on the
- * listing), who holds the copyright, the licence and where to read it. The addresses are plain text,
+ * listing), who holds the copyright, the licence and where to read it, and the Android robot's
+ * attribution line (the icon modifies Google's robot, which its brand guidelines allow with this
+ * line, CC BY 3.0). The addresses are plain text,
  * never links, so a child cannot leave the app from here. It scrolls for large text on a short
  * screen. The strings are read before the [Dialog]: its window has a context of its own, which the
  * UI tests' LocaleProvider does not reach.
@@ -87,6 +89,7 @@ private fun Credits(onClose: () -> Unit) {
     val licence = stringResource(R.string.credits_licence)
     val licenceText = stringResource(R.string.credits_licence_text)
     val licenceAddress = stringResource(R.string.credits_licence_url)
+    val robot = stringResource(R.string.credits_android_robot)
     val done = stringResource(R.string.credits_done)
     Dialog(onDismissRequest = onClose) {
         Stage(
@@ -102,6 +105,7 @@ private fun Credits(onClose: () -> Unit) {
             Line(copyright)
             Line(licence)
             Address(licenceText, licenceAddress)
+            Line(robot)
             BigActionButton(
                 icon = AppIcons.Done,
                 text = done,

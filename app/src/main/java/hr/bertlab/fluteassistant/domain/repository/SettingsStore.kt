@@ -7,13 +7,16 @@ import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.ThemeChoice
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 
 /**
  * Small key-value persistence for "where the user left off": the last metronome settings,
  * the volume, the tuner's reference pitch and the note it tunes to, the notes the reading
- * game asks, the flute tab's shelf of tunes, the day or night choice. Synchronous by design
- * (tiny values, read once at ViewModel creation).
+ * game asks, which of its two games is open and how well each note is known, the flute tab's
+ * shelf of tunes, the day or night choice. Synchronous by design (tiny values, read once at
+ * ViewModel creation).
  */
 interface SettingsStore {
     fun loadMetronomeConfig(): MetronomeConfig
@@ -33,6 +36,12 @@ interface SettingsStore {
     /** Whether the reading game sounds the note when it is found; true by default. */
     fun loadNoteSound(): Boolean
     fun saveNoteSound(enabled: Boolean)
+    /** Which game the notes tab shows; [NotesGame.FIND] until the other one is chosen. */
+    fun loadNotesGame(): NotesGame
+    fun saveNotesGame(game: NotesGame)
+    /** The sticker book: how well each note is known, decoded leniently (see NoteProgress). */
+    fun loadNoteProgress(): NoteProgress
+    fun saveNoteProgress(progress: NoteProgress)
     /**
      * The flute tab's shelf: its books, as stored (decoded leniently, see Songbook), and the open
      * one; the caller sanitises a tune. The first load after the update that added the shelf moves

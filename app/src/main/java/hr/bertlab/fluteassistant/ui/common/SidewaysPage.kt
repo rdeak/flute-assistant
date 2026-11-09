@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -108,7 +109,9 @@ fun SidewaysActionButton(
  * A column's quieter button: an emoji over a word on the plain raised colour, as wide as the column.
  * Pass [selected] for one option of a group, yellow when chosen. The 92 tall one has the bigger
  * emoji and word the mockup gives it. The microphone card's "Not now" has no emoji, and a button
- * without one is its word alone, centred.
+ * without one is its word alone, centred. The word shrinks to fit down to 12 dp, a floor in dp as
+ * the Pick buttons' are: one in sp doubles at the largest text, and 12 sp cut "👂 Slušaj" there,
+ * and a cut word is worse than a small one.
  */
 @Composable
 fun SidewaysPlainButton(
@@ -121,6 +124,7 @@ fun SidewaysPlainButton(
     height: Dp = 84.dp,
 ) {
     val big = height >= 92.dp
+    val wordFloor = with(LocalDensity.current) { 12.dp.toSp() }
     ChunkyButton(
         onClick = onClick,
         shape = RoundedCornerShape(30.dp),
@@ -139,7 +143,7 @@ fun SidewaysPlainButton(
                 // Relative, as before Android 14 large text would leave a short button no room for a full line.
                 style = MaterialTheme.typography.titleMedium.copy(lineHeight = 1.25.em),
                 maxLines = 1,
-                autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = if (big) 21.sp else 19.sp),
+                autoSize = TextAutoSize.StepBased(minFontSize = wordFloor, maxFontSize = if (big) 21.sp else 19.sp),
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
         }

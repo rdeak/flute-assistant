@@ -33,6 +33,7 @@
     <string name="credits_licence_url" translatable="false">gnu.org/licenses/gpl-3.0</string>
     <string name="credits_privacy">Privacy policy:</string>
     <string name="credits_privacy_url" translatable="false">rdeak.github.io/flute-assistant/release/privacy-policy.html</string>
+    <string name="credits_android_robot">The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</string>
     <string name="credits_done">OK</string>
 
     <!-- The tempo ring's five speeds, slowest first, each with an animal emoji (ui/metronome/MetronomeUiState.kt) -->
@@ -117,9 +118,22 @@
     <string name="notes_wrong">🙈 Try again</string>
     <!-- Feedback line while the child slides a finger over the staff, before letting go -->
     <string name="notes_placing">👆 Slide, let go</string>
-    <!-- Over the note to find, in the row above the staff -->
+    <!-- The two games, as the pills on top of the notes tab (the emoji is in the word) -->
     <string name="find_note">🔎 Find</string>
+    <string name="hear_game">👂 Hear</string>
+    <!-- Accessibility name of the pair of pills -->
+    <string name="notes_game">Game</string>
+    <!-- The speaker bubble that plays the phrase again; accessibility name only -->
+    <string name="hear_again">Hear it again</string>
+    <!-- Feedback line while the phrase sounds and the staff takes no answer -->
+    <string name="notes_listening">👂 Listen</string>
+    <!-- Feedback line in Hear while the phrase is not playing and no finger is down; the ❓ is the slot's own symbol -->
+    <string name="hear_prompt">❓ Find the next note</string>
     <string name="staff_description">Staff, press where the note goes and let go</string>
+    <string name="staff_description_hear">Staff, press where the next note goes and let go</string>
+    <!-- The argument is a note's name, e.g. "C4" -->
+    <string name="note_known">%1$s, learned</string>
+    <string name="your_notes">Your notes</string>
     <!-- Accessibility name of one tappable place, counted from the bottom; never the note's name -->
     <string name="staff_position">Staff position %1$d</string>
     <plurals name="round_progress">

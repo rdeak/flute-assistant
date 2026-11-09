@@ -19,6 +19,8 @@ import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.ThemeChoice
 import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -171,5 +173,25 @@ class SharedPreferencesSettingsStoreTest {
     fun an_unknown_theme_name_falls_back_to_the_phone_s() {
         assertTrue(raw.edit().putString("theme", "SEPIA").commit())
         assertEquals(ThemeChoice.SYSTEM, store().loadTheme())
+    }
+
+    // ---- The notes tab: the open game and the sticker book ----
+
+    @Test
+    fun notes_game_round_trips_and_an_unknown_name_is_find() {
+        store().saveNotesGame(NotesGame.HEAR)
+        assertEquals(NotesGame.HEAR, store().loadNotesGame())
+
+        assertTrue(raw.edit().putString("notes_game", "BANANA").commit())
+        assertEquals(NotesGame.FIND, store().loadNotesGame())
+    }
+
+    @Test
+    fun note_progress_round_trips_and_garbage_is_dropped() {
+        store().saveNoteProgress(NoteProgress(mapOf(60 to 3)))
+        assertEquals(NoteProgress(mapOf(60 to 3)), store().loadNoteProgress())
+
+        assertTrue(raw.edit().putStringSet("note_progress", setOf("abc", "62:2")).commit())
+        assertEquals(NoteProgress(mapOf(62 to 2)), store().loadNoteProgress())
     }
 }

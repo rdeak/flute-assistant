@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.model.SoundProfile
 import hr.bertlab.fluteassistant.domain.model.Subdivision
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -83,6 +84,15 @@ class LabelsTest {
         assertEquals("H", noteName(resources(Locale("hr")), 71))
         assertEquals("A♯", noteName(resources(Locale.ENGLISH), 70))
         assertEquals("B", noteName(resources(Locale("hr")), 70))
+    }
+
+    @Test
+    fun notes_games_are_named() {
+        // The emoji is part of the word, so the pill draws none of its own.
+        assertEquals("🔎 Find", resources(Locale.ENGLISH).getString(NotesGame.FIND.labelRes()))
+        assertEquals("👂 Hear", resources(Locale.ENGLISH).getString(NotesGame.HEAR.labelRes()))
+        assertEquals("🔎 Nađi", resources(Locale("hr")).getString(NotesGame.FIND.labelRes()))
+        assertEquals("👂 Slušaj", resources(Locale("hr")).getString(NotesGame.HEAR.labelRes()))
     }
 
     @Test

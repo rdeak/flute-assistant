@@ -212,9 +212,13 @@ answers, and `privacy-policy.md` for the policy text to host.
 
 ## 6. Launcher icon, store graphics and screenshots
 
-The icon is the canvas's robot over a flute on gold: one vector picture (`res/drawable/ic_app_art.xml`,
-also shown in the app's top bar) inset into a vector adaptive icon (`res/drawable/ic_launcher_*.xml`,
-with a one-colour version for themed icons) plus legacy PNGs for Android 7 (`res/mipmap-*/`).
+The icon is the Android robot playing a flute, with one note in the air, on gold (chosen on
+2026-11-07 from three robot drafts: the head over a flute, this one, and a big head with the flute
+held across it like a grin): one vector picture (`res/drawable/ic_app_art.xml`, also shown in the app's top
+bar) inset into a vector adaptive icon (`res/drawable/ic_launcher_*.xml`, with a one-colour version
+for themed icons) plus legacy PNGs for Android 7 (`res/mipmap-*/`). The robot is Google's, modified
+under CC BY 3.0: the attribution line in `NOTICE` is shown in the app's credits and must stay in
+the Play listing's full description (`play-console.md`).
 `tools/IconGen.java` renders the PNGs, the 512 px Play icon and the 1024x500 feature graphic from
 the same geometry (run it from the repository root: the feature graphic uses the app's Nunito):
 

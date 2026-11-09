@@ -135,6 +135,13 @@ class CreditsTest {
     }
 
     @Test
+    fun the_credits_attribute_the_android_robot() {
+        show()
+        logo().performTouchInput { longClick() }
+        compose.onNodeWithText("Creative Commons 3.0 Attribution", substring = true).assertIsDisplayed()
+    }
+
+    @Test
     fun ok_closes_the_credits() {
         show()
         logo().performTouchInput { longClick() }

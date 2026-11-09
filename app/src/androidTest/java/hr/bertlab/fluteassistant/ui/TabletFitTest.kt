@@ -207,7 +207,16 @@ class TabletFitTest {
 
     @Composable
     private fun Notes(state: NotesUiState) {
-        NotesContent(state = state, onNoteTapped = {}, onPlayAgain = {}, onTogglePracticeNote = {}, onToggleSound = {})
+        NotesContent(
+            state = state,
+            onNoteTapped = {},
+            onPlayAgain = {},
+            onTogglePracticeNote = {},
+            onToggleSound = {},
+            onSetGame = {},
+            onHearAgain = {},
+            onPhraseShown = {},
+        )
     }
 
     private val asking = NotesUiState(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = 60)

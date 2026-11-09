@@ -3,10 +3,17 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.notes.Phrases
 import hr.bertlab.fluteassistant.ui.metronome.TempoBand
 import kotlin.math.roundToInt
 
-/** Immutable snapshot of everything the note reading game renders: one round of [ROUND_LENGTH] notes. */
+/**
+ * Immutable snapshot of everything the notes tab renders: one round of [ROUND_LENGTH] notes of
+ * either game. In Hear the note asked is the next of [phrase] to place, so [currentMidi] is
+ * `phrase[placed]`; in Find the phrase fields keep their defaults.
+ */
 data class NotesUiState(
     /** The notes the child is practising, MIDI numbers from StaffNotes.ALL; never empty. */
     val practiceNotes: Set<Int>,
@@ -31,8 +38,37 @@ data class NotesUiState(
     val soundOn: Boolean = true,
     /** How long the round took, first tap to the tenth note found; null until then. */
     val roundMillis: Long? = null,
+    /** The game being played. */
+    val game: NotesGame = NotesGame.FIND,
+    /** Hear's notes, in the order they sound and sit on the staff; empty in Find. */
+    val phrase: List<Int> = emptyList(),
+    /** How many of [phrase] sit on the staff, the given first note included. */
+    val placed: Int = 0,
+    /** Changes with every phrase: the screen's key for playing it. Counts on across rounds and games. */
+    val phraseId: Int = 0,
+    /** True while the phrase sounds, the breath before it included; the staff takes no answer. */
+    val phrasePlaying: Boolean = false,
+    /**
+     * The index in [phrase] of the note sounding now during a phrase's playback; null in the breath
+     * before it, in the gaps between the notes and whenever no phrase plays. A placed note's own
+     * sound does not set it.
+     */
+    val sounding: Int? = null,
+    /** The staircase's length for the phrase on screen ([Phrases.MIN_LENGTH] to [Phrases.MAX_LENGTH]); the last phrase of a round may be shorter. */
+    val phraseLength: Int = Phrases.MIN_LENGTH,
+    /** True until a note of the phrase on screen is missed. */
+    val phraseClean: Boolean = true,
+    /** How well each note is known, over every round and both games. */
+    val progress: NoteProgress = NoteProgress.EMPTY,
+    /** Notes that moved up in [progress] this round. */
+    val grewThisRound: Set<Int> = emptySet(),
+    /** Notes answered this round, first try or not. */
+    val askedThisRound: Set<Int> = emptySet(),
 ) {
     val answered: Int get() = results.size
+
+    /** Whether the game is Hear. */
+    val hearing: Boolean get() = game == NotesGame.HEAR
 
     /** Notes found on the first tap. */
     val score: Int get() = results.count { it }
