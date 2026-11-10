@@ -87,11 +87,15 @@ fun TunerScreen(
 
     // Only hold the microphone while this screen is started (visible). Re-checking the
     // permission here picks up a grant made in system Settings while the app was stopped.
+    // Telling the view model of a grant it has not heard of (that one, or on the first opening
+    // after the app starts) changes this effect's key, so the effect ends and runs again, and
+    // that run opens the microphone. Hence the `else`: opening it in this run too opened it
+    // twice, the first time only for the key change to close it again (TunerScreenMicrophoneTest).
     LifecycleStartEffect(state.permissionGranted) {
         val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         if (granted != state.permissionGranted) viewModel.onPermissionResult(granted)
-        if (granted) viewModel.startListening()
+        else if (granted) viewModel.startListening()
         onStopOrDispose { viewModel.stopListening() }
     }
 

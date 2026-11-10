@@ -18,6 +18,8 @@ junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 # Runs the screen tests on the JVM; see the sourceSets block in app/build.gradle.kts.
 robolectric = "4.17"
+# Leak detection, in a debug build only when asked for: -PleakCanary (see app/build.gradle.kts).
+leakcanary = "2.14"
 
 [libraries]
 # Kotlin Gradle plugin, only used on the root build classpath to raise AGP's built-in Kotlin version.
@@ -54,6 +56,7 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

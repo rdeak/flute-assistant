@@ -44,6 +44,7 @@ configuration cache is on.
 ./gradlew :app:testDebugUnitTest --tests '*FluteScreenTest*'  # one screen's tests, on the JVM
 ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=hr.bertlab.fluteassistant.ui.tuner.TunerScreenTest  # the same class on the emulator
 ./gradlew testDebugUnitTest lintRelease bundleRelease     # pre-upload check (docs/release/README.md)
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:installDebug -PleakCanary   # debug build with LeakCanary, emulator only
 ```
 
 The screen tests (`app/src/androidTest`) run two ways since 2026-11-10. `testDebugUnitTest` compiles

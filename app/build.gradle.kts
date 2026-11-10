@@ -137,6 +137,13 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
+    // Leak detection, only in a debug build made with -PleakCanary (for the emulator): it freezes the
+    // app for each heap dump and adds a launcher icon, which the debug build on a child's phone and
+    // the Robolectric runs of testDebugUnitTest must not have.
+    if (providers.gradleProperty("leakCanary").isPresent) {
+        debugImplementation(libs.leakcanary.android)
+    }
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 

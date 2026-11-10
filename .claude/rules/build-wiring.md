@@ -41,6 +41,16 @@ the `--add-exports=java.base/jdk.internal.access=ALL-UNNAMED` JVM argument (Robo
 emulator. Android Studio lists a folder under one source set only, so it shows these files as
 instrumented tests; Gradle runs them both ways.
 
+LeakCanary (2.14) is in a debug build only when it is made with `-PleakCanary`, and that build goes
+to the emulator only: each heap dump freezes the app for seconds and it adds a "Leaks" icon, which the
+debug build on the child's phone and the Robolectric runs must not have. Both builds write the same
+`app-debug.apk`, so make a plain debug build before installing one on the phone. Its logcat tag is
+`LeakCanary`: `Watching instance of ...` per destroyed object, and a line only when one outlives its
+five seconds. It does not watch ViewModels with lifecycle 2.11, whose `ViewModelStore.clear()` empties
+its map before it clears them, so LeakCanary's watcher finds the map empty; to check them, hand each
+one to `AppWatcher.objectWatcher.expectWeaklyReachable` from an `addCloseable` for the run. The
+first run (2026-11-10, every tab, re-creations, the service, a finished activity) found no leak.
+
 `androidx.appcompat` is in the build only for the in-app language switch:
 `AppCompatDelegate.setApplicationLocales` is the per-app-language backport below Android 13, so
 `MainActivity` is an `AppCompatActivity`, the window theme must stay an AppCompat theme
