@@ -37,17 +37,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.metronome.bpmAtDialFraction
+import hr.bertlab.fluteassistant.domain.metronome.dialFraction
+import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
+import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 import kotlin.math.atan2
@@ -100,7 +105,7 @@ fun TempoDial(
     val colors = FluteTheme.colors
     val dialDescription = stringResource(R.string.tempo_dial)
     val band = tempoBand(bpm)
-    val bandName = stringResource(band.labelRes)
+    val bandName = stringResource(band.labelRes())
     val minBpm = TempoBand.MIN_BPM
     val maxBpm = TempoBand.MAX_BPM
 
@@ -148,7 +153,7 @@ fun TempoDial(
         // The animals on the bands; the current band's rides on the knob instead.
         TempoBand.entries.forEach { each ->
             val centre = pointOnRing(side, START_ANGLE + SWEEP_ANGLE * (each.ordinal + 0.5f) / TempoBand.entries.size)
-            val label = stringResource(each.labelRes)
+            val label = stringResource(each.labelRes())
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier

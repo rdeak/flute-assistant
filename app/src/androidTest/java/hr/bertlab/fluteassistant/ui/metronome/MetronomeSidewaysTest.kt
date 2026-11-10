@@ -35,8 +35,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.AppTab
 import hr.bertlab.fluteassistant.ui.SideRail
 import hr.bertlab.fluteassistant.ui.common.LocalSideways

@@ -24,9 +24,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -172,6 +174,7 @@ class MetronomeScreenTest {
      */
     @Test
     fun six_beats_stay_round() {
+        needsDevice()
         show(MetronomeUiState(config = MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT)))
         val image = compose.onNodeWithContentDescription("Beats in a bar: 6").captureToImage().toPixelMap()
         val background = image[0, 0]

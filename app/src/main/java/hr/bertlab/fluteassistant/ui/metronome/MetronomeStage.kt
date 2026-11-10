@@ -20,7 +20,8 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 

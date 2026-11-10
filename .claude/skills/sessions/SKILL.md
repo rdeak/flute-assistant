@@ -55,8 +55,9 @@ tools/pull-sessions.sh                                   # the phone's sessions 
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
 ```
 
-`ListenPath` (test source set) is the framing and judging both the synthetic `ListenPathTest`
-and the replay run on. A session can be pinned as a regression test: copy it into
+`ListenPath` (test source set) frames the audio as the engine does and feeds it to `ListenRun`
+(`domain/flute`), the same class the app's view model feeds the microphone to, so the synthetic
+`ListenPathTest`, the replay and the phone judge a run by one set of rules. A session can be pinned as a regression test: copy it into
 `app/src/testDebug/resources/sessions/<name>/` with a `pin marks=0:FIRST_TRY,...` line added to
 its log; `RecordedSessionsTest` replays every folder there and fails by the folder's name, for
 other marks, a missing pin line, or a folder that cannot be replayed (`frames.csv` may be left

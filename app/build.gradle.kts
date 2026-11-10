@@ -76,8 +76,25 @@ android {
         // stripped, and Play lists exactly these two.
         localeFilters += listOf("en", "hr")
     }
+    sourceSets {
+        // The screen tests (src/androidTest) are compiled a second time as JVM tests and run under
+        // Robolectric by testDebugUnitTest: all of them in seconds, where the emulator takes many
+        // minutes. The few a JVM cannot judge skip themselves there (needsDevice()). The emulator
+        // run (connectedDebugAndroidTest) stays the check before a release. Android Studio lists
+        // a folder under one source set only, so it shows these files as instrumented tests.
+        getByName("test") {
+            java.srcDir("src/androidTest/java")
+            kotlin.srcDir("src/androidTest/java")
+        }
+    }
     testOptions {
+        // Robolectric reads the app's real resources (strings in both languages, the font).
+        unitTests.isIncludeAndroidResources = true
         unitTests.all { test ->
+            // Robolectric reaches into the JDK for file descriptors, which Java 17+ refuses without this.
+            test.jvmArgs("--add-exports=java.base/jdk.internal.access=ALL-UNNAMED")
+            // captureToImage draws through the hardware renderer, which is what a device does.
+            test.systemProperty("robolectric.pixelCopyRenderMode", "hardware")
             // A recorded "Your turn" session to replay on the JVM (SessionReplayTest; see
             // ui/flute/CLAUDE.md, "Sessions"): -Psession=<folder>, relative to the repository
             // root, and -Psweep=<rule>:<v1>,<v2>,... The task is never up to date while one is
@@ -131,6 +148,13 @@ dependencies {
     // Unit tests
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // The screen tests on the JVM (the sourceSets block above): Robolectric and what the tests use.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.junit)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    // The Espresso the Compose rule brings by itself is too old for API 34 and later.
+    testImplementation(libs.androidx.espresso.core)
 
     // Instrumented tests
     androidTestImplementation(libs.androidx.junit)

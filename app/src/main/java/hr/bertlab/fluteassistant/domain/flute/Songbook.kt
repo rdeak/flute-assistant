@@ -3,8 +3,8 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 
 /**
  * One saved tune of the flute tab, a "book" on the child's shelf: the steps of the tune with

@@ -3,7 +3,7 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 
 /** What the tune line draws, left to right ([Bars.write]). */
 sealed interface LineMark {

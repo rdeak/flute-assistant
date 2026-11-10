@@ -3,7 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.common
 
-import hr.bertlab.fluteassistant.ui.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -16,11 +16,11 @@ import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.ThemeChoice
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.settings.ThemeChoice
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

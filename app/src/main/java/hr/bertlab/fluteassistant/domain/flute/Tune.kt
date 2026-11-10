@@ -3,7 +3,7 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import kotlin.math.ceil
 import kotlin.math.roundToLong
@@ -75,6 +75,24 @@ data class TuneRest(val length: NoteLength) : TuneItem
 data object TuneBreath : TuneItem
 
 /**
+ * One step of the tune as Play plays it: the step at [index] sounds [midi] (null: a rest, silent)
+ * for [durationMs]. The metronome's clicks that fall in it are timed from the step's own start,
+ * so a hop always lands with the note it belongs to: [clickAtStart] says one falls on its start,
+ * and [inside] lists, in order, the later ones and, for a note, its end a short gap
+ * ([Tune.gapMs]) before the next step.
+ */
+data class PlayStep(
+    val index: Int,
+    val midi: Int?,
+    val durationMs: Long,
+    val clickAtStart: Boolean,
+    val inside: List<Moment>,
+) {
+    /** Something inside a step, [atMs] after its start: a click [halfBeat] half beats into it, or (null) the note's end. */
+    data class Moment(val atMs: Long, val halfBeat: Int?)
+}
+
+/**
  * The tune the flute tab records: a line of [TuneItem]s, one per key press. A note or a rest
  * is as long as its key was held, snapped to the metronome's [Pulse] ([lengthOf]); a breath has
  * no length. It is played back at the metronome's pulse, so the rhythm stays when the tempo
@@ -114,6 +132,28 @@ object Tune {
      * rounded up, so the length shown while the key is held never runs ahead of [lengthOf].
      */
     fun growAtMs(pulse: Pulse): List<Long> = NoteLength.GROW_AT_BEATS.map { ceil(it * pulse.quarterMs).toLong() }
+
+    /**
+     * The tune as Play plays it at [pulse], a [PlayStep] per note and rest; a breath takes no
+     * time and gives none. A click falls on every [Pulse.halfBeatsPerClick]th half beat counted
+     * from the start of the tune (the first with the first step).
+     */
+    fun playSteps(items: List<TuneItem>, pulse: Pulse): List<PlayStep> {
+        var startsAt = 0 // half beats from the start of the tune to this step
+        return items.mapIndexedNotNull { index, item ->
+            val length = when (item) {
+                is TuneNote -> item.length
+                is TuneRest -> item.length
+                TuneBreath -> return@mapIndexedNotNull null
+            }
+            val duration = durationMs(length, pulse)
+            val clicks = (0 until length.halfBeats).filter { (startsAt + it) % pulse.halfBeatsPerClick == 0 }
+            val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.quarterMs / 2).roundToLong(), it) } +
+                listOfNotNull(if (item is TuneNote) PlayStep.Moment(duration - gapMs(duration), null) else null)
+            startsAt += length.halfBeats
+            PlayStep(index, (item as? TuneNote)?.midi, duration, clickAtStart = clicks.firstOrNull() == 0, inside.sortedBy { it.atMs })
+        }
+    }
 
     /**
      * Keeps only the notes the keys offer ([StaffNotes.ALL]), every rest, and a breath unless the

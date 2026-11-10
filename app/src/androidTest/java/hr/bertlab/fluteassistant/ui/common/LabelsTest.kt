@@ -8,8 +8,9 @@ import android.content.res.Resources
 import android.os.LocaleList
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.playback.summary
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
 import org.junit.Test

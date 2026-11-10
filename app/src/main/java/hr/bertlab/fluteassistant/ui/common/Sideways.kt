@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.runtime.staticCompositionLocalOf
-import hr.bertlab.fluteassistant.ui.flute.StaffGeometry
 import kotlin.math.floor
 
 /**
@@ -16,7 +15,7 @@ import kotlin.math.floor
 val LocalSideways = staticCompositionLocalOf { false }
 
 /**
- * The sideways layout's numbers, in dp as plain floats like [StaffGeometry], so a unit test can
+ * The sideways layout's numbers, in dp as plain floats like the flute's `StaffGeometry`, so a unit test can
  * check the sizes the three phones it was drawn for (915 x 411, 800 x 360, 640 x 360) get. The
  * frame, the card, the keys, the staff, the ring and the tuner's window are read from here; a few
  * sizes stay with the screen that draws them (the metronome's panel and well, the picker's keys),
@@ -172,10 +171,10 @@ internal object SidewaysGeometry {
 
     /**
      * The running staff's scale: the upright one's 4/3 where the card's height allows it, below that
-     * the largest that fits [StaffGeometry.TOTAL_HEIGHT] (about 1.19 at 360 dp tall).
+     * the largest at which a staff [staffHeight] tall at rest fits (about 1.19 at 360 dp tall).
      */
-    fun runningStaffScale(height: Float): Float =
-        minOf(4f / 3f, innerHeight(height) / StaffGeometry.TOTAL_HEIGHT)
+    fun runningStaffScale(height: Float, staffHeight: Float): Float =
+        minOf(4f / 3f, innerHeight(height) / staffHeight)
 
     /** The tempo ring, sideways: full size, or the card's height, or half its width where those are less. */
     fun ringSize(cardWidth: Float, height: Float): Float =

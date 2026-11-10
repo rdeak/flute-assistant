@@ -52,6 +52,7 @@ import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.dashedBorder
 import hr.bertlab.fluteassistant.ui.common.noteColor

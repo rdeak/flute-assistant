@@ -23,7 +23,7 @@ phone's buttons set loudness).
 ## Sideways
 
 Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "Metronome"; what every
-tab shares sideways is in `../CLAUDE.md`). `MetronomeContent` keeps `rememberTempoWheelState()` first and
+tab shares sideways is in `../DESIGN.md`). `MetronomeContent` keeps `rememberTempoWheelState()` first and
 then, when `LocalSideways`, hands over to `MetronomeSideways` (`MetronomeSideways.kt`) with the same
 `closesTempoWheel` modifier; the upright body below it is untouched. The user's pick of two (B): the beat
 takes over while it plays.

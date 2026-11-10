@@ -30,7 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.fewerBeats
+import hr.bertlab.fluteassistant.domain.metronome.moreBeats
+import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry

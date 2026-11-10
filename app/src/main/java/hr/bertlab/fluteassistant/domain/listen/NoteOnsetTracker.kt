@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 
-package hr.bertlab.fluteassistant.ui.tuner
+package hr.bertlab.fluteassistant.domain.listen
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlin.math.abs
 import kotlin.math.log2
@@ -12,12 +11,12 @@ import kotlin.math.log2
  * Turns microphone frames into notes the way the tuner's "Which?" mode does, and says when a
  * *new* note begins, which is what the flute's "Your turn" judges. Pure Kotlin, one frame at a
  * time, with the tuner's own thresholds: a frame counts only with a frequency and a probability
- * of at least [TunerViewModel.MIN_PROBABILITY]; a note is sounding once the last
- * [TunerViewModel.LOCK_FRAMES] counted frames agree within [TunerViewModel.LOCK_CENTS]; the median
- * of [TunerViewModel.SMOOTHING_WINDOW] frames names it; a sound that has only drifted past the
+ * of at least [ListenRules.MIN_PROBABILITY]; a note is sounding once the last
+ * [ListenRules.LOCK_FRAMES] counted frames agree within [ListenRules.LOCK_CENTS]; the median
+ * of [ListenRules.SMOOTHING_WINDOW] frames names it; a sound that has only drifted past the
  * halfway point to a neighbouring note keeps the old note until it has lasted
- * [TunerViewModel.SWITCH_FRAMES], while a clear step (further than
- * [TunerUiState.NEAR_TARGET_CENTS]) switches at once.
+ * [ListenRules.SWITCH_FRAMES], while a clear step (further than
+ * [ListenRules.NEAR_CENTS]) switches at once.
  *
  * A new note begins when a note sounds after a gap, when the sounding note changes to another
  * by a clear step without a gap (a slur, a fingered change), or when the same note starts again
@@ -26,7 +25,7 @@ import kotlin.math.log2
  * at the room's own level, [FLOOR_MARGIN] over the [floor] heard between notes): silence, a
  * breath. A frame that lost its pitch but kept its loudness is the probability gate blinking on a
  * breathy tone, not a gap; counting it would split one held note in two and count a written
- * repeat as played; but [TunerViewModel.HOLD_FRAMES] uncounted frames in a row are a pause at
+ * repeat as played; but [ListenRules.HOLD_FRAMES] uncounted frames in a row are a pause at
  * any level. After a gap the window is emptied, so the next note needs fresh agreeing frames. A
  * tongued stop between two notes of one pitch (40 to 80 ms) is too short for any of that, the
  * window's level barely moving and the pitch often kept, so it is heard in the frame's
@@ -51,13 +50,13 @@ class NoteOnsetTracker(
      * [with] sets one by its field name.
      */
     data class Rules(
-        val gate: Double = TunerViewModel.MIN_PROBABILITY,
-        val lockFrames: Int = TunerViewModel.LOCK_FRAMES,
-        val lockCents: Double = TunerViewModel.LOCK_CENTS,
-        val smoothing: Int = TunerViewModel.SMOOTHING_WINDOW,
-        val switchFrames: Int = TunerViewModel.SWITCH_FRAMES,
-        val holdFrames: Int = TunerViewModel.HOLD_FRAMES,
-        val nearCents: Double = TunerUiState.NEAR_TARGET_CENTS,
+        val gate: Double = ListenRules.MIN_PROBABILITY,
+        val lockFrames: Int = ListenRules.LOCK_FRAMES,
+        val lockCents: Double = ListenRules.LOCK_CENTS,
+        val smoothing: Int = ListenRules.SMOOTHING_WINDOW,
+        val switchFrames: Int = ListenRules.SWITCH_FRAMES,
+        val holdFrames: Int = ListenRules.HOLD_FRAMES,
+        val nearCents: Double = ListenRules.NEAR_CENTS,
         val onsetGapFrames: Int = ONSET_GAP_FRAMES,
         val gapLevelRatio: Float = GAP_LEVEL_RATIO,
         val floorMargin: Float = FLOOR_MARGIN,
@@ -121,7 +120,7 @@ class NoteOnsetTracker(
     private val recent = ArrayDeque<Double>()
     /** Frames in a row that did not count and were quiet enough; [ONSET_GAP_FRAMES] of them end the sounding note. */
     private var gap = 0
-    /** Frames in a row that did not count, at any level; [TunerViewModel.HOLD_FRAMES] of them end the sounding note too. */
+    /** Frames in a row that did not count, at any level; [ListenRules.HOLD_FRAMES] of them end the sounding note too. */
     private var unheard = 0
     /**
      * The room's own level: the lowest level of the frames that did not count while no note
@@ -225,7 +224,7 @@ class NoteOnsetTracker(
      * A frame that did not count. While a note sounds it counts towards the gap only when its
      * [level] fell well under the note's ([GAP_LEVEL_RATIO]) or back to the room's [floor]
      * (within [FLOOR_MARGIN]); between notes every such frame counts, and teaches the floor.
-     * [TunerViewModel.HOLD_FRAMES] such frames in a row end the note at any level: that long is
+     * [ListenRules.HOLD_FRAMES] such frames in a row end the note at any level: that long is
      * a pause, not a blink, however soft the note was over the room.
      */
     private fun uncounted(decision: FrameDecision, level: Float): Result {
@@ -241,7 +240,7 @@ class NoteOnsetTracker(
         return Result(decision, onset = null)
     }
 
-    /** True once the last [TunerViewModel.LOCK_FRAMES] frames agree within [TunerViewModel.LOCK_CENTS]. */
+    /** True once the last [ListenRules.LOCK_FRAMES] frames agree within [ListenRules.LOCK_CENTS]. */
     private fun isSteady(): Boolean {
         if (recent.size < rules.lockFrames) return false
         val last = recent.takeLast(rules.lockFrames)
@@ -251,7 +250,7 @@ class NoteOnsetTracker(
     /**
      * The note [heard] (the median's nearest note) becomes the sounding note at once when nothing
      * was sounding, when it is the sounding note, or when it is a clear step away; a drift that has
-     * only passed the halfway point to a neighbour waits for [TunerViewModel.SWITCH_FRAMES] shown
+     * only passed the halfway point to a neighbour waits for [ListenRules.SWITCH_FRAMES] shown
      * frames in a row, one frame back on the sounding note starting the count again.
      */
     private fun identify(heard: Int, median: Double): Int {

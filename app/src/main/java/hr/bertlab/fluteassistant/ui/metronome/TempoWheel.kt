@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.ValueWheel
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme

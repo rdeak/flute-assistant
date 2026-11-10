@@ -3,7 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.theme
 
-import hr.bertlab.fluteassistant.domain.model.ThemeChoice
+import hr.bertlab.fluteassistant.domain.settings.ThemeChoice
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
 import org.junit.Assert.assertEquals
 import org.junit.Test

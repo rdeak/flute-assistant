@@ -61,10 +61,12 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.BigActionHeight
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
@@ -84,7 +86,7 @@ class NotesScreenTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private lateinit var state: MutableState<NotesUiState>
+    private lateinit var state: MutableState<NotesRound>
     private lateinit var window: MutableState<DpSize>
     private val tapped = mutableListOf<Int>()
     private val toggled = mutableListOf<Int>()
@@ -94,20 +96,22 @@ class NotesScreenTest {
     private var phraseShownRequests = 0
     private var soundToggles = 0
 
-    private fun show(initial: NotesUiState, locale: Locale = Locale.ENGLISH, dark: Boolean = false) {
+    private fun show(initial: NotesRound, locale: Locale = Locale.ENGLISH, dark: Boolean = false) {
         state = mutableStateOf(initial)
         compose.setContent {
             LocaleProvider(locale) {
                 val content = @Composable {
                     NotesContent(
                         state = state.value,
-                        onNoteTapped = { tapped += it },
-                        onPlayAgain = { playAgainRequests++ },
-                        onTogglePracticeNote = { toggled += it },
-                        onToggleSound = { soundToggles++ },
-                        onSetGame = { games += it },
-                        onHearAgain = { hearAgainRequests++ },
-                        onPhraseShown = { phraseShownRequests++ },
+                        actions = NotesActions(
+                            onNoteTapped = { tapped += it },
+                            onPlayAgain = { playAgainRequests++ },
+                            onTogglePracticeNote = { toggled += it },
+                            onToggleSound = { soundToggles++ },
+                            onSetGame = { games += it },
+                            onHearAgain = { hearAgainRequests++ },
+                            onPhraseShown = { phraseShownRequests++ },
+                        ),
                     )
                 }
                 // The theme `LocaleProvider` gives follows the phone; a test of night pins it.
@@ -117,7 +121,7 @@ class NotesScreenTest {
     }
 
     /** A round in progress asking [midi], with the default notes chosen. */
-    private fun asking(midi: Int = 60) = NotesUiState(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = midi)
+    private fun asking(midi: Int = 60) = NotesRound(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = midi)
 
     /** A Hear round whose phrase is C4 then D4, with the first on the staff and the second asked. */
     private fun hearing() = asking(62).copy(game = NotesGame.HEAR, phrase = listOf(60, 62), placed = 1)
@@ -125,7 +129,7 @@ class NotesScreenTest {
     /** A finished round with [score] notes found first time. */
     private fun over(score: Int) = asking(60).copy(
         roundOver = true,
-        results = List(score) { true } + List(NotesUiState.ROUND_LENGTH - score) { false },
+        results = List(score) { true } + List(NotesRound.ROUND_LENGTH - score) { false },
         taps = 13,
         bestStreak = 5,
         roundMillis = 83_000L,
@@ -157,21 +161,12 @@ class NotesScreenTest {
     }
 
     /** The screen at this [fontScale], as `show` has it but for the text size; the question unless [initial] says otherwise. */
-    private fun showAtTextSize(fontScale: Float, locale: Locale, initial: NotesUiState = asking()) {
+    private fun showAtTextSize(fontScale: Float, locale: Locale, initial: NotesRound = asking()) {
         state = mutableStateOf(initial)
         compose.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
                 LocaleProvider(locale) {
-                    NotesContent(
-                        state = state.value,
-                        onNoteTapped = {},
-                        onPlayAgain = {},
-                        onTogglePracticeNote = {},
-                        onToggleSound = {},
-                        onSetGame = {},
-                        onHearAgain = {},
-                        onPhraseShown = {},
-                    )
+                    NotesContent(state = state.value, actions = NotesActions())
                 }
             }
         }
@@ -182,7 +177,7 @@ class NotesScreenTest {
      * room: the test's own window is the whole emulator, with none of the bars a phone's tab has to share its
      * height with. At [fontScale] and in [locale] when a test asks.
      */
-    private fun showInWindow(size: DpSize, initial: NotesUiState, fontScale: Float = 1f, locale: Locale = Locale.ENGLISH) {
+    private fun showInWindow(size: DpSize, initial: NotesRound, fontScale: Float = 1f, locale: Locale = Locale.ENGLISH) {
         state = mutableStateOf(initial)
         window = mutableStateOf(size)
         compose.setContent {
@@ -190,16 +185,7 @@ class NotesScreenTest {
                 DeviceConfigurationOverride.ForcedSize(window.value) then DeviceConfigurationOverride.FontScale(fontScale),
             ) {
                 LocaleProvider(locale) {
-                    NotesContent(
-                        state = state.value,
-                        onNoteTapped = {},
-                        onPlayAgain = {},
-                        onTogglePracticeNote = {},
-                        onToggleSound = {},
-                        onSetGame = {},
-                        onHearAgain = {},
-                        onPhraseShown = {},
-                    )
+                    NotesContent(state = state.value, actions = NotesActions())
                 }
             }
         }
@@ -258,16 +244,7 @@ class NotesScreenTest {
             LocaleProvider(Locale("hr")) {
                 Column {
                     Text("Odaberi", style = MaterialTheme.typography.titleMedium)
-                    NotesContent(
-                        state = asking(),
-                        onNoteTapped = {},
-                        onPlayAgain = {},
-                        onTogglePracticeNote = {},
-                        onToggleSound = {},
-                        onSetGame = {},
-                        onHearAgain = {},
-                        onPhraseShown = {},
-                    )
+                    NotesContent(state = asking(), actions = NotesActions())
                 }
             }
         }
@@ -424,6 +401,7 @@ class NotesScreenTest {
      */
     @Test
     fun hear_shows_the_given_and_placed_notes_on_the_staff() {
+        needsDevice()
         show(asking(67).copy(game = NotesGame.HEAR, phrase = listOf(64, 65, 67, 69), placed = 2))
         val image = compose.onNodeWithContentDescription(hearStaffDescription).captureToImage().toPixelMap()
         val visible = StaffNotes.visiblePositions(StaffNotes.DEFAULT_PRACTICE)
@@ -696,6 +674,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_note_to_find_has_a_slot_and_later_notes_fainter_ones() {
+        needsDevice()
         show(asking(65).copy(game = NotesGame.HEAR, phrase = listOf(64, 65, 67, 69), placed = 1))
         val staff = staffPixels()
         val bare = staff.at(0.9f, 8, 0.3f)
@@ -724,6 +703,7 @@ class NotesScreenTest {
      */
     @Test
     fun a_miss_takes_the_question_marks_off_the_slots_and_keeps_the_capsules() {
+        needsDevice()
         show(asking(65).copy(game = NotesGame.HEAR, phrase = listOf(64, 65, 67, 69), placed = 1))
         val rest = staffPixels()
         assertTrue("the slot of the note to find has its ❓ at rest", rest.any(0.42f, 6f, 8f, ::isRed))
@@ -746,6 +726,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_slot_of_the_note_to_find_has_a_bright_outline_at_night() {
+        needsDevice()
         show(hearing(), dark = true)
         val staff = staffPixels()
         val edge = staff.width * 0.58f - staff.slotHalf
@@ -767,6 +748,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_far_places_stub_stays_inside_the_slot() {
+        needsDevice()
         showInWindow(DpSize(640.dp, 760.dp), asking(62).copy(game = NotesGame.HEAR, phrase = listOf(64, 62), placed = 1))
         compose.waitForIdle()
         val staff = staffPixels()
@@ -830,6 +812,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_note_sounding_lights_up() {
+        needsDevice()
         show(asking(64).copy(game = NotesGame.HEAR, phrase = listOf(62, 64), placed = 1))
         val rest = staffPixels()
         assertFalse("no halo at rest: ${rest.at(0.42f, 1, dy = -0.6f)}", isYellowish(rest.at(0.42f, 1, dy = -0.6f)))
@@ -859,6 +842,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_halo_stops_at_the_next_capsule() {
+        needsDevice()
         showInWindow(
             DpSize(320.dp, 900.dp),
             asking(67).copy(game = NotesGame.HEAR, phrase = listOf(65, 67, 69, 71), placed = 1, sounding = 0, phrasePlaying = true),
@@ -889,6 +873,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_halo_is_a_whole_pitch_where_there_is_room() {
+        needsDevice()
         showInWindow(
             DpSize(411.dp, 640.dp),
             asking(64).copy(game = NotesGame.HEAR, phrase = listOf(62, 64), placed = 1, sounding = 0, phrasePlaying = true),
@@ -910,6 +895,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_playback_after_the_last_note_lights_the_found_note() {
+        needsDevice()
         val done = hearing().copy(solved = true, phrasePlaying = true) // C4 D4, the last index is 1
         show(done)
         val halo = { staffPixels().at(0.58f, 1, dy = -0.6f) }
@@ -931,6 +917,7 @@ class NotesScreenTest {
     /** Find has one note and no phrase: no slot (yellow), no ❓ and no halo, asking or solved. */
     @Test
     fun find_draws_no_slot_no_question_mark_and_no_halo() {
+        needsDevice()
         fun assertTheStaffIsBare(says: String) {
             val staff = staffPixels(staffDescription)
             val spot = staff.at(0.5f, 8, 0.3f) // the bare half of the D line's place, far from the G
@@ -948,6 +935,7 @@ class NotesScreenTest {
     /** A finger down is answering: the line says how, not what, and the ❓ gives way to the see-through note. */
     @Test
     fun the_question_mark_gives_way_to_the_finger() {
+        needsDevice()
         show(hearing())
         val prompt = "❓ Find the next note"
         compose.onNodeWithText(prompt).assertIsDisplayed()
@@ -1103,6 +1091,7 @@ class NotesScreenTest {
 
     @Test
     fun a_wrong_place_is_crossed_inside_its_own_place() {
+        needsDevice()
         // D4 answered by mistake right under the asked E4: the cross may not reach into E4's
         // place, or the child has nothing clear to aim at next. Whatever the miss changed in
         // the note column is the cross (the arrow beside it is drawn further right).
@@ -1394,6 +1383,7 @@ class NotesScreenTest {
      */
     @Test
     fun a_key_fills_from_the_bottom_as_far_as_it_is_learned() {
+        needsDevice()
         pickingWith(NoteProgress(mapOf(62 to 3)))
         val key = compose.onNodeWithContentDescription("D4").captureToImage().toPixelMap()
         val d = NoteLetterColors[1]
@@ -1441,6 +1431,7 @@ class NotesScreenTest {
      */
     @Test
     fun a_half_learned_key_keeps_its_whole_name_in_dark_mode() {
+        needsDevice()
         val (above, below) = halfLearnedLabel(dark = true)
         assertTrue("above the fill the name is light on the dark tint: the brightest is ${above.max()}", above.max() > 0.6f)
         assertTrue("on the fill the name is ink: the darkest is ${below.min()}", below.min() < 0.05f)
@@ -1449,6 +1440,7 @@ class NotesScreenTest {
     /** Day: the tint is bright as well, so the name is ink on both and looks as it always has. */
     @Test
     fun a_half_learned_key_is_ink_all_over_in_light_mode() {
+        needsDevice()
         val (above, below) = halfLearnedLabel(dark = false)
         assertTrue("above the fill the name is ink: the darkest is ${above.min()}", above.min() < 0.05f)
         assertTrue("on the fill the name is ink: the darkest is ${below.min()}", below.min() < 0.05f)
@@ -1460,6 +1452,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_pick_dots_are_solid_only_for_known_letters() {
+        needsDevice()
         show(asking(60).copy(progress = NoteProgress(mapOf(60 to 8))))
         val dots = compose.onNodeWithTag("pick_dots", useUnmergedTree = true).captureToImage().toPixelMap()
         val dot = dots.height // a dot is as tall as the row and as wide

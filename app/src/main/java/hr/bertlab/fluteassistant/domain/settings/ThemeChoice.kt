@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 
-package hr.bertlab.fluteassistant.domain.model
+package hr.bertlab.fluteassistant.domain.settings
 
 /**
  * Which colours the app wears: the phone's own day or night setting until the child taps the

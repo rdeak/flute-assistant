@@ -30,18 +30,21 @@ import androidx.test.platform.app.InstrumentationRegistry
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.TabletHost
 import hr.bertlab.fluteassistant.ui.common.TabletSize
+import hr.bertlab.fluteassistant.ui.flute.FluteActions
 import hr.bertlab.fluteassistant.ui.flute.FluteContent
 import hr.bertlab.fluteassistant.ui.flute.FluteUiState
+import hr.bertlab.fluteassistant.ui.flute.Playing
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeContent
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
+import hr.bertlab.fluteassistant.ui.notes.NotesActions
 import hr.bertlab.fluteassistant.ui.notes.NotesContent
-import hr.bertlab.fluteassistant.ui.notes.NotesUiState
 import hr.bertlab.fluteassistant.ui.tuner.TunerContent
 import hr.bertlab.fluteassistant.ui.tuner.TunerUiState
 import org.junit.Assert.assertFalse
@@ -165,26 +168,7 @@ class TabletFitTest {
         FluteContent(
             state = state,
             metronome = MetronomeUiState(config = MetronomeConfig(bpm = 120)),
-            onKeyPressed = {},
-            onKeyReleased = {},
-            onKeyActivated = {},
-            onRestPressed = {},
-            onRestReleased = {},
-            onRestActivated = {},
-            onBreath = {},
-            onTogglePlayback = {},
-            onEraseLast = {},
-            onBpmChange = {},
-            onTimeSignatureChange = {},
-            onSpeedOpen = {},
-            onSpeedDone = {},
-            onShelfOpen = {},
-            onBookChosen = {},
-            onYourTurn = {},
-            onStop = {},
-            onRequestMic = {},
-            onOpenSettings = {},
-            onMicDismiss = {},
+            actions = FluteActions(),
         )
     }
 
@@ -206,26 +190,17 @@ class TabletFitTest {
     }
 
     @Composable
-    private fun Notes(state: NotesUiState) {
-        NotesContent(
-            state = state,
-            onNoteTapped = {},
-            onPlayAgain = {},
-            onTogglePracticeNote = {},
-            onToggleSound = {},
-            onSetGame = {},
-            onHearAgain = {},
-            onPhraseShown = {},
-        )
+    private fun Notes(state: NotesRound) {
+        NotesContent(state = state, actions = NotesActions())
     }
 
-    private val asking = NotesUiState(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = 60)
+    private val asking = NotesRound(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = 60)
 
     @Test
     fun flute_writing_fits() = assertFitsEverywhere { Flute(FluteUiState(tune = tune)) }
 
     @Test
-    fun a_running_tune_fits() = assertFitsEverywhere { Flute(FluteUiState(tune = tune, playingIndex = 0)) }
+    fun a_running_tune_fits() = assertFitsEverywhere { Flute(FluteUiState(tune = tune, playing = Playing(0))) }
 
     @Test
     fun the_speed_panel_fits() = assertFitsEverywhere(
@@ -272,7 +247,7 @@ class TabletFitTest {
         Notes(
             asking.copy(
                 roundOver = true,
-                results = List(NotesUiState.ROUND_LENGTH) { true },
+                results = List(NotesRound.ROUND_LENGTH) { true },
                 taps = 13,
                 bestStreak = 5,
                 roundMillis = 83_000L,

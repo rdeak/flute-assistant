@@ -251,3 +251,9 @@ fun Emoji(emoji: String, fontSize: Int, modifier: Modifier = Modifier) {
         modifier = modifier.clearAndSetSemantics { },
     )
 }
+
+/** The star a note earns, in the notes game's round and under a step of the flute's "Your turn". */
+const val STAR_EMOJI = "⭐" // star
+
+/** A star for a note that took more than one try: still earned, but faint. */
+const val RETRY_STAR_ALPHA = 0.35f

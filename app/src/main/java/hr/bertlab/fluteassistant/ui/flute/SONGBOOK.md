@@ -1,5 +1,12 @@
 # The songbook
 
+Since 2026-11-10 the metronome's tempo and beat have one owner, `MetronomeSettings`
+(`domain/settings`), so the hand-over this file describes is done in one place: `openBook` reads the
+owner for the book being left and then updates the owner with the opened book's speed and beat, and
+`MetronomeViewModel` follows the owner (a running metronome jumps to the new tempo as before).
+`FluteScreen` no longer holds the metronome's ViewModel, `openBook` returns nothing, and there is no
+order for the screen to keep. Read "`FluteScreen` ... calls `MetronomeViewModel.setBpm`" below that way.
+
 Moved out of this folder's CLAUDE.md on 2026-11-05 to keep that file short; read it before changing
 books, the shelf, the book button or their storage.
 
@@ -112,8 +119,8 @@ bubbles shrink on a 360 dp phone, where five of 22 dp do not fit; sideways the l
 fit). The open book's cover is `Sun`,
 the others `colors.raised`, and dark mode follows `FluteColors` as every other card. An empty book
 has its sweet faded and a blank label; there is no number and no word anywhere on the shelf. One tap
-on a book is `onChoose(index)`, which closes the shelf and, in `FluteScreen`, calls `openBook` and
-then the metronome's setters; the open book's tap only closes it; there is no OK and the back button
+on a book is `onChoose(index)`, which closes the shelf and, in `FluteScreen`, calls `openBook`
+(which gives the metronome the book's speed and beat itself); the open book's tap only closes it; there is no OK and the back button
 is not handled, as in the speed panel and the notes picker, and a stray tap loses nothing, since
 every tune is kept as it is. The sweet is sized from its cover, not set: `sweetSize` is 0.32 of the
 cover's height (the mockup's 36 px sweet on a 112 px cover, a third of its height), at least 40 dp

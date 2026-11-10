@@ -10,6 +10,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -18,8 +29,6 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
-import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -32,15 +41,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PixelMap
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.ViewRootForTest
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -49,17 +49,21 @@ import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Held
+import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.flute.WrongNote
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
-import hr.bertlab.fluteassistant.ui.tuner.Hearing
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -119,29 +123,31 @@ class FluteScreenTest {
                     FluteContent(
                         state = state.value,
                         metronome = metronome.value,
-                        onKeyPressed = { pressed += it },
-                        onKeyReleased = { released += it },
-                        onKeyActivated = { activated += it },
-                        onRestPressed = { restEvents += "press" },
-                        onRestReleased = { restEvents += "release" },
-                        onRestActivated = { restEvents += "activate" },
-                        onBreath = { breaths++ },
-                        onTogglePlayback = { playToggles++ },
-                        onEraseLast = { erases++ },
-                        onBpmChange = { bpm ->
+                        actions = FluteActions(
+                            onKeyPressed = { pressed += it },
+                            onKeyReleased = { released += it },
+                            onKeyActivated = { activated += it },
+                            onRestPressed = { restEvents += "press" },
+                            onRestReleased = { restEvents += "release" },
+                            onRestActivated = { restEvents += "activate" },
+                            onBreath = { breaths++ },
+                            onTogglePlayback = { playToggles++ },
+                            onEraseLast = { erases++ },
+                            onBpmChange = { bpm ->
                             chosenBpm = bpm
                             metronome.value = metronome.value.copy(config = metronome.value.config.withBpm(bpm))
                         },
-                        onTimeSignatureChange = { chosenSignature = it },
-                        onSpeedOpen = { speedOpens++ },
-                        onSpeedDone = { speedDones++ },
-                        onShelfOpen = { shelfOpens++ },
-                        onBookChosen = { chosenBooks += it },
-                        onYourTurn = { yourTurns++ },
-                        onStop = { stops++ },
-                        onRequestMic = { micRequests++ },
-                        onOpenSettings = { settingsOpens++ },
-                        onMicDismiss = { micDismissals++ },
+                            onTimeSignatureChange = { chosenSignature = it },
+                            onSpeedOpen = { speedOpens++ },
+                            onSpeedDone = { speedDones++ },
+                            onShelfOpen = { shelfOpens++ },
+                            onBookChosen = { chosenBooks += it },
+                            onYourTurn = { yourTurns++ },
+                            onStop = { stops++ },
+                            onRequestMic = { micRequests++ },
+                            onOpenSettings = { settingsOpens++ },
+                            onMicDismiss = { micDismissals++ },
+                        ),
                     )
                 }
                 if (height == null) flute() else Box(Modifier.height(height)) { flute() }
@@ -202,8 +208,7 @@ class FluteScreenTest {
         show(
             FluteUiState(
                 tune = listOf(TuneNote(67, NoteLength.QUARTER)),
-                heldMidi = 67,
-                heldIndex = 0,
+                held = Held(67, index = 0),
             ),
         )
         compose.onAllNodesWithText("G4").assertCountEquals(1) // the key; the line's pill is read by its description, the staff is silent
@@ -231,6 +236,7 @@ class FluteScreenTest {
 
     @Test
     fun the_erase_button_sinks_while_pressed() {
+        needsDevice()
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
         val erase = compose.onNodeWithContentDescription("Erase the last note")
         // A pixel on the button's top edge: its ink outline at rest, empty once it sinks.
@@ -247,7 +253,7 @@ class FluteScreenTest {
 
     @Test
     fun the_pill_reads_stop_while_playing() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playingIndex = 1))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playing = Playing(1)))
         compose.onNodeWithText("Stop").assertIsDisplayed()
         compose.onNodeWithText("Play").assertDoesNotExist()
     }
@@ -255,7 +261,7 @@ class FluteScreenTest {
     @Test
     fun the_line_scrolls_to_the_newest_note() {
         val tune = List(29) { TuneNote(if (it % 2 == 0) 60 else 62, NoteLength.QUARTER) } + TuneNote(84, NoteLength.QUARTER)
-        show(FluteUiState(tune = tune, heldMidi = 84, heldIndex = 29))
+        show(FluteUiState(tune = tune, held = Held(84, index = 29)))
         compose.onNode(hasContentDescription("C6, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))).assertIsDisplayed()
     }
 
@@ -269,26 +275,7 @@ class FluteScreenTest {
                         FluteContent(
                             state = state.value,
                             metronome = MetronomeUiState(),
-                            onKeyPressed = {},
-                            onKeyReleased = {},
-                            onKeyActivated = {},
-                            onRestPressed = {},
-                            onRestReleased = {},
-                            onRestActivated = {},
-                            onBreath = {},
-                            onTogglePlayback = {},
-                            onEraseLast = {},
-                            onBpmChange = {},
-                            onTimeSignatureChange = {},
-                            onSpeedOpen = {},
-                            onSpeedDone = {},
-                            onShelfOpen = {},
-                            onBookChosen = {},
-                            onYourTurn = {},
-                            onStop = {},
-                            onRequestMic = {},
-                            onOpenSettings = {},
-                            onMicDismiss = {},
+                            actions = FluteActions(),
                         )
                     }
                 }
@@ -332,7 +319,7 @@ class FluteScreenTest {
     fun holding_a_key_does_not_move_the_keys() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
-        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0)
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.HALF)), held = Held(60, index = 0))
         compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
         state.value = FluteUiState()
@@ -397,7 +384,7 @@ class FluteScreenTest {
 
     @Test
     fun a_held_rest_is_written_on_the_staff_with_its_length() {
-        show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), restHeld = true, heldIndex = 0))
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), held = Held(midi = null, index = 0)))
         compose.onAllNodesWithContentDescription("Rest").assertCountEquals(1) // the key
         compose.onNodeWithContentDescription("Rest, 2 beats").assertExists()
     }
@@ -438,7 +425,7 @@ class FluteScreenTest {
 
     @Test
     fun a_new_time_signature_rewrites_the_staff_without_moving_the_keys() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), held = Held(60, index = 0)))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
         setTimeSignature(TimeSignature.SIX_EIGHT)
         compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
@@ -490,6 +477,7 @@ class FluteScreenTest {
 
     @Test
     fun the_speed_changes_only_the_knobs_badge_and_the_drum_stays_as_it_is() {
+        needsDevice()
         show(FluteUiState())
         val rabbit = knobPixels("Rabbit")
         setSpeed(60)
@@ -504,7 +492,8 @@ class FluteScreenTest {
 
     @Test
     fun the_knob_keeps_its_drum_and_loses_its_animal_while_the_tune_runs() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        needsDevice()
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
         val rabbit = knobPixels("Rabbit")
         setSpeed(60)
         val turtle = knobPixels("Turtle")
@@ -528,6 +517,7 @@ class FluteScreenTest {
 
     @Test
     fun the_knobs_badge_sinks_with_the_knob() {
+        needsDevice()
         show(FluteUiState())
         val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
         val top = knob.getBoundsInRoot().top
@@ -559,7 +549,7 @@ class FluteScreenTest {
 
     @Test
     fun the_book_button_is_inert_while_the_tune_runs() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), playingIndex = 0))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), playing = Playing(0)))
         compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").assertIsNotEnabled().performClick()
         assertEquals(0, shelfOpens)
         compose.onNodeWithContentDescription("Lollipop, open now").assertDoesNotExist()
@@ -572,7 +562,7 @@ class FluteScreenTest {
         val knob = "Speed: Rabbit, tap to change"
         assertTrue("the book at rest", accessibilityEnabled(book))
         assertTrue("the knob at rest", accessibilityEnabled(knob))
-        state.value = state.value.copy(playingIndex = 0)
+        state.value = state.value.copy(playing = Playing(0))
         compose.waitForIdle()
         compose.onNodeWithContentDescription(book).assertIsNotEnabled()
         compose.onNodeWithContentDescription(knob).assertIsNotEnabled()
@@ -773,7 +763,7 @@ class FluteScreenTest {
 
     @Test
     fun while_the_tune_runs_the_keys_and_the_sponge_are_gone_and_stop_is_wide() {
-        show(FluteUiState(tune = twoNotes, playingIndex = 0))
+        show(FluteUiState(tune = twoNotes, playing = Playing(0)))
         fun checkRunning() {
             compose.onNodeWithText("Stop").assertIsDisplayed()
             compose.onNodeWithText("Play").assertDoesNotExist()
@@ -787,7 +777,7 @@ class FluteScreenTest {
         checkRunning()
         compose.onNodeWithText("Stop").performClick()
         assertEquals(1, stops)
-        state.value = FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0)
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0))
         checkRunning()
         compose.onNodeWithText("Stop").performClick()
         assertEquals(2, stops)
@@ -799,7 +789,7 @@ class FluteScreenTest {
         show(FluteUiState(tune = twoNotes))
         val rest = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
         assertTrue("at rest the staff is ${rest.height}, expected $TuneStaffHeight", abs((rest.height - TuneStaffHeight).value) <= 1f)
-        state.value = state.value.copy(isListening = true, listenIndex = 0)
+        state.value = state.value.copy(listening = Listening(index = 0))
         val running = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
         val expected = tuneStaffHeight(RunningStaffScale)
         assertTrue("running the staff is ${running.height}, expected $expected", abs((running.height - expected).value) <= 1f)
@@ -807,12 +797,12 @@ class FluteScreenTest {
 
     @Test
     fun marks_and_the_waiting_animal_read_on_the_staff() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 1, marks = mapOf(0 to StepMark.FIRST_TRY)))
+        show(FluteUiState(tune = twoNotes, marks = mapOf(0 to StepMark.FIRST_TRY), listening = Listening(index = 1)))
         compose.onNodeWithContentDescription("C4, 1 beat, got it").assertExists()
         compose.onNodeWithContentDescription("G4, 1 beat, play this one").assertExists()
-        state.value = state.value.copy(wrong = WrongNote(index = 1, midi = 69))
+        state.value = state.value.copy(listening = Listening(index = 1, wrong = WrongNote(index = 1, midi = 69)))
         compose.onNodeWithContentDescription("G4, 1 beat, heard A4").assertExists()
-        state.value = state.value.copy(isListening = false, listenIndex = null, wrong = null, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY))
+        state.value = state.value.copy(listening = null, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY))
         compose.onNodeWithContentDescription("C4, 1 beat, got it").assertExists()
         compose.onNodeWithContentDescription("G4, 1 beat, got it after a retry").assertExists()
         compose.onNodeWithContentDescription("Flute keys").assertExists()
@@ -836,18 +826,19 @@ class FluteScreenTest {
 
     @Test
     fun the_note_heard_now_shows_live_under_the_waited_step_and_dots_while_nothing_is_heard() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 1, marks = mapOf(0 to StepMark.FIRST_TRY)))
+        needsDevice()
+        show(FluteUiState(tune = twoNotes, marks = mapOf(0 to StepMark.FIRST_TRY), listening = Listening(index = 1)))
         val waited = compose.onNodeWithContentDescription("G4, 1 beat, play this one")
         val a = noteColor(69)
         val silent = marksRow(waited.captureToImage().toPixelMap())
         val card = silent.first()
         assertTrue("in silence the row holds the listening dots, not an A bubble", silent.none { it.near(a) })
         assertTrue("in silence the row shows the listening dots' ring, not nothing", silent.count { !it.near(card) } > silent.size / 20)
-        state.value = state.value.copy(heardNow = 69)
+        state.value = state.value.copy(listening = Listening(index = 1, heardNow = 69))
         val hearing = marksRow(waited.captureToImage().toPixelMap())
         assertTrue("the A heard now should fill a bubble under the waited step", hearing.count { it.near(a) } > hearing.size / 3)
         compose.onNodeWithContentDescription("G4, 1 beat, play this one").assertExists() // a screen reader is not told of the passing note
-        state.value = state.value.copy(heardNow = null, isListening = false, listenIndex = null)
+        state.value = state.value.copy(listening = null)
         val rest = marksRow(compose.onNodeWithContentDescription("G4, 1 beat").captureToImage().toPixelMap())
         assertTrue("at rest the row under a step with no mark is empty", rest.all { it.near(rest.first()) })
     }
@@ -859,7 +850,7 @@ class FluteScreenTest {
         tune[18] = TuneNote(84, NoteLength.QUARTER) // C6: the note before the one just played
         tune[19] = TuneNote(83, NoteLength.QUARTER) // B5: just played, with its star
         tune[20] = TuneNote(81, NoteLength.QUARTER) // A5: waited on now
-        show(FluteUiState(tune = tune, isListening = true, listenIndex = 20, marks = mapOf(19 to StepMark.FIRST_TRY)))
+        show(FluteUiState(tune = tune, marks = mapOf(19 to StepMark.FIRST_TRY), listening = Listening(index = 20)))
         val line = hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))
         assertWhollyShown(hasContentDescription("B5, 1 beat, got it") and line)
         assertWhollyShown(hasContentDescription("A5, 1 beat, play this one") and line)
@@ -881,14 +872,14 @@ class FluteScreenTest {
 
     @Test
     fun the_advice_line_speaks_only_while_the_sound_is_unclear() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0, hearing = Hearing.LOUD_UNCLEAR))
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)))
         compose.onNodeWithText("🎵 Play one long, clear note").assertIsDisplayed()
-        state.value = state.value.copy(hearing = Hearing.QUIET_UNCLEAR)
+        state.value = state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR))
         compose.onNodeWithText("📱 Come closer to the phone").assertIsDisplayed()
-        state.value = state.value.copy(hearing = Hearing.CLEAR)
+        state.value = state.value.copy(listening = Listening(index = 0))
         compose.onNodeWithText("📱 Come closer to the phone").assertDoesNotExist()
         compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
-        state.value = FluteUiState(tune = twoNotes, playingIndex = 0)
+        state.value = FluteUiState(tune = twoNotes, playing = Playing(0))
         compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
     }
 
@@ -908,13 +899,15 @@ class FluteScreenTest {
 
     @Test
     fun the_faded_knob_and_book_keep_their_whole_shadow_while_the_tune_runs() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        needsDevice()
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
         assertWholeShadowUnder(compose.onNodeWithContentDescription("Speed: Rabbit, tap to change"), 5.dp)
         assertWholeShadowUnder(compose.onNodeWithContentDescription("Tune: Lollipop, tap to change"), 5.dp)
     }
 
     @Test
     fun the_faded_keys_and_buttons_of_an_empty_tune_keep_their_whole_shadow() {
+        needsDevice()
         show(FluteUiState())
         assertWholeShadowUnder(compose.onNodeWithContentDescription("Erase the last note"), 5.dp)
         assertWholeShadowUnder(compose.onNodeWithText("Play"), 8.dp)
@@ -923,7 +916,7 @@ class FluteScreenTest {
 
     @Test
     fun the_knob_is_inert_while_the_tune_runs() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
         val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
         knob.assertIsDisplayed()
         knob.assertIsNotEnabled()

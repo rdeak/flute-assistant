@@ -62,6 +62,7 @@ class ThemeSwitchTest {
      */
     @Test
     fun the_picture_changes_between_day_and_night() {
+        needsDevice()
         var dark by mutableStateOf(false)
         compose.setContent {
             LocaleProvider(Locale.ENGLISH) {
@@ -110,6 +111,7 @@ class ThemeSwitchTest {
     /** Like the flag: a picture in a round button, sized in dp so large text cannot push it out of its circle. */
     @Test
     fun the_moon_does_not_grow_with_the_text_size() {
+        needsDevice()
         var fontScale by mutableFloatStateOf(1f)
         compose.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {

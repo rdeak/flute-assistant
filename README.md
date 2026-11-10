@@ -38,7 +38,7 @@ audio is analysed in memory and discarded. Settings and the child's tunes stay o
 | Architecture    | MVVM with `StateFlow`, Hilt, coroutines and Flow                                                                   |
 | Audio           | Own DSP on `AudioTrack` and `AudioRecord`: click synthesis, YIN pitch detection, a sustained-tone synth            |
 | Dependencies    | AndroidX, plus Hilt and kotlinx.coroutines. No audio, networking or image libraries                                |
-| Size            | About 7,400 lines of app code and 4,300 lines of tests (about 220 JVM unit tests, about 70 instrumented)           |
+| Size            | About 17,000 lines of app code and 17,500 lines of tests (about 580 rule and view-model tests, about 430 screen tests) |
 | Languages       | English and Croatian, switchable in the app                                                                        |
 | Status          | 1.0.1 is on the Play internal testing track and a GitHub Release. Store listing in both languages is ready         |
 
@@ -47,12 +47,15 @@ audio is analysed in memory and discarded. Settings and the child's tunes stay o
 The code is layered by package under `app/src/main/java/hr/bertlab/fluteassistant/`:
 
 ```
-domain/    pure Kotlin: models, note math, the note pool, the tune and its songbook, the settings interface
+domain/    the rules, pure Kotlin with no Android import, a package per feature: how a held key writes
+           the tune, how "Your turn" judges playing, the notes game's round, the listening thresholds,
+           note math, the settings interface
 data/      the SharedPreferences settings store
 audio/     metronome, tuner and flute-tone engines
 playback/  foreground service that keeps the metronome alive off screen
-ui/        Compose screens and ViewModels (StateFlow state, intent methods)
-di/        Hilt modules binding each interface to its Android implementation
+ui/        Compose screens, and one ViewModel per tab that gives the rules the clock, the sound,
+           the storage and the log (StateFlow state, intent methods)
+di/        the Hilt module binding each interface to its Android implementation
 core/      fake-able monotonic clock, logger
 ```
 
@@ -124,9 +127,12 @@ not wait for the old one. The render loop is plain Kotlin so this close path is 
 
 - Unit tests use hand-written fakes (`FakeMetronomePlayer`, `FakeTunerEngine`, `FakeSettingsStore`,
   `FakeClock`, `FakeFluteTonePlayer` and others) and no mocking library.
+- The rules are tested where they live, in `domain`, as plain JVM tests with no dispatcher.
 - ViewModel tests run under `StandardTestDispatcher` and drive time with `advanceTimeBy`.
-- Instrumented tests render each `Content` composable with the locale pinned, and a resource test
-  checks that labels and note names follow the locale.
+- Screen tests render each `Content` composable with the locale pinned, and a resource test
+  checks that labels and note names follow the locale. They run two ways: on the JVM under
+  Robolectric with the unit tests (seconds), and on the emulator as instrumented tests, which is
+  where the few that read the screen's pixels run.
 - Audio output cannot be judged in CI. The emulator runs with `-no-audio` because with host audio on
   it crashed about 30 s after the metronome started, so sound is checked on a phone.
 

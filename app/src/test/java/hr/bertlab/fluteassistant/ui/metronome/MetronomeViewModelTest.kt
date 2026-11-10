@@ -6,9 +6,11 @@ package hr.bertlab.fluteassistant.ui.metronome
 import androidx.lifecycle.ViewModelStore
 import hr.bertlab.fluteassistant.audio.metronome.BeatEvent
 import hr.bertlab.fluteassistant.audio.metronome.ClickEvent
-import hr.bertlab.fluteassistant.domain.model.BeatStrength
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.settings.MetronomeSettings
 import hr.bertlab.fluteassistant.fakes.FakeBackgroundPlayback
 import hr.bertlab.fluteassistant.fakes.FakeMetronomePlayer
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
@@ -18,6 +20,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -42,9 +45,12 @@ class MetronomeViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
+    /** The one owner of the tempo and the beat, as the app has it: made over the store when first asked for. */
+    private val metronome by lazy { MetronomeSettings(settings) }
+
     private fun createViewModel() = MetronomeViewModel(
         player = player,
-        settings = settings,
+        metronome = metronome,
         backgroundPlayback = backgroundPlayback,
     )
 
@@ -250,7 +256,25 @@ class MetronomeViewModelTest {
     fun `a stored tempo outside the ring is brought onto it`() = runTest(dispatcher) {
         settings.config = MetronomeConfig(bpm = 250)
         assertEquals(TempoBand.MAX_BPM, createViewModel().state.value.config.bpm)
-        settings.config = MetronomeConfig(bpm = 30)
-        assertEquals(TempoBand.MIN_BPM, createViewModel().state.value.config.bpm)
+    }
+
+    @Test
+    fun `a tempo and beat changed elsewhere reach the screen and a playing metronome`() = runTest(dispatcher) {
+        val vm = createViewModel()
+        vm.togglePlayback()
+        // A book opened on the flute brings its own speed and beat.
+        metronome.update { MetronomeConfig(bpm = 70, timeSignature = TimeSignature.THREE_FOUR) }
+        runCurrent()
+        assertEquals(MetronomeConfig(bpm = 70, timeSignature = TimeSignature.THREE_FOUR), vm.state.value.config)
+        assertEquals(listOf(MetronomeConfig(bpm = 70, timeSignature = TimeSignature.THREE_FOUR)), player.updates)
+    }
+
+    @Test
+    fun `a change made on the ring is passed to the player once`() = runTest(dispatcher) {
+        val vm = createViewModel()
+        vm.togglePlayback()
+        vm.setBpm(90)
+        advanceUntilIdle() // the settings' own notice of the same change arrives: nothing more to do
+        assertEquals(listOf(90), player.updates.map { it.bpm })
     }
 }

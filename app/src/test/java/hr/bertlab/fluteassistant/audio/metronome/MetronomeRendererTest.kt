@@ -3,8 +3,8 @@
 
 package hr.bertlab.fluteassistant.audio.metronome
 
-import hr.bertlab.fluteassistant.domain.model.BeatStrength
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

@@ -9,6 +9,9 @@ import hr.bertlab.fluteassistant.core.log.LogLine
 import hr.bertlab.fluteassistant.core.log.LogSink
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
+import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -16,11 +19,8 @@ import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
-import hr.bertlab.fluteassistant.ui.flute.FluteViewModel
-import hr.bertlab.fluteassistant.ui.flute.ListenFrame
-import hr.bertlab.fluteassistant.ui.flute.ListenRecorder
-import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import java.io.BufferedWriter
 import java.io.File
 import java.io.IOException
@@ -78,7 +78,7 @@ class FileSessionRecorder(
             "sdk" to facts.sdk, "floor" to floor?.let { level(it) },
         )
         val rules = NoteOnsetTracker.Rules().fields() +
-            listOf("repeatAdviceFrames" to FluteViewModel.REPEAT_ADVICE_FRAMES.toString(), "finishFrames" to FluteViewModel.FINISH_FRAMES.toString())
+            listOf("repeatAdviceFrames" to ListenRun.REPEAT_ADVICE_FRAMES.toString(), "finishFrames" to ListenRun.FINISH_FRAMES.toString())
         line(s, "session.rules", *rules.toTypedArray())
         line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
         tune.forEachIndexed { index, item ->

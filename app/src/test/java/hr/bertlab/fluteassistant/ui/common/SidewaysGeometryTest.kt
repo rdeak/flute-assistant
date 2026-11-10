@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.common
 
 import hr.bertlab.fluteassistant.ui.flute.FluteKeysMinHeight
+import hr.bertlab.fluteassistant.ui.flute.StaffGeometry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -95,8 +96,8 @@ class SidewaysGeometryTest {
 
     @Test
     fun `the running staff is 4 over 3 where it fits and the largest that fits below`() {
-        assertScale(4f / 3f, SidewaysGeometry.runningStaffScale(411f))
-        assertScale(1.19f, SidewaysGeometry.runningStaffScale(360f))
+        assertScale(4f / 3f, SidewaysGeometry.runningStaffScale(411f, StaffGeometry.TOTAL_HEIGHT))
+        assertScale(1.19f, SidewaysGeometry.runningStaffScale(360f, StaffGeometry.TOTAL_HEIGHT))
     }
 
     @Test

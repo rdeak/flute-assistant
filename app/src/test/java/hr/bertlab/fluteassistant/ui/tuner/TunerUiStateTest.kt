@@ -3,6 +3,8 @@
 
 package hr.bertlab.fluteassistant.ui.tuner
 
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.NoteReading
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode

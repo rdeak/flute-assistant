@@ -42,13 +42,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
+import hr.bertlab.fluteassistant.domain.notes.aimStars
+import hr.bertlab.fluteassistant.domain.notes.speed
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.BigActionHeight
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
+import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.noteLabel
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
@@ -64,8 +69,8 @@ const val MAX_FLAMES = 5
  * again. The numbers are in the descriptions, for screen readers.
  */
 @Composable
-fun RoundSummary(state: NotesUiState, onPlayAgain: () -> Unit, modifier: Modifier = Modifier) {
-    val perfect = state.score == NotesUiState.ROUND_LENGTH
+fun RoundSummary(state: NotesRound, onPlayAgain: () -> Unit, modifier: Modifier = Modifier) {
+    val perfect = state.score == NotesRound.ROUND_LENGTH
     val rows = summaryRows(state.askedThisRound)
     // Pictures, in dp, as the trophy's room is worked out without them: the trophy is always the taller.
     val sparkles = with(LocalDensity.current) { TrophySparkles.toSp().value.toInt() }
@@ -203,7 +208,7 @@ internal fun summaryRows(asked: Set<Int>): Int = (asked.size + SUMMARY_KEYS_PER_
  */
 @Composable
 internal fun SummaryKeys(
-    state: NotesUiState,
+    state: NotesRound,
     modifier: Modifier = Modifier,
     keyWidth: Dp = 44.dp,
     keyHeight: Dp = KEY_HEIGHT,
@@ -242,10 +247,10 @@ internal fun SummaryKeys(
  * (a sideways card sizes them from its width). One accessible node, read as the count.
  */
 @Composable
-internal fun SummaryStars(state: NotesUiState, modifier: Modifier = Modifier, fontSize: Int = SUMMARY_STAR_SIZE) {
-    val description = stringResource(R.string.summary_stars, state.score, NotesUiState.ROUND_LENGTH)
+internal fun SummaryStars(state: NotesRound, modifier: Modifier = Modifier, fontSize: Int = SUMMARY_STAR_SIZE) {
+    val description = stringResource(R.string.summary_stars, state.score, NotesRound.ROUND_LENGTH)
     Row(modifier.clearAndSetSemantics { contentDescription = description }) {
-        repeat(NotesUiState.ROUND_LENGTH) { index ->
+        repeat(NotesRound.ROUND_LENGTH) { index ->
             Emoji(STAR_EMOJI, fontSize = fontSize, modifier = Modifier.alpha(if (index < state.score) 1f else 0.25f))
         }
     }
@@ -259,7 +264,7 @@ internal fun SummaryStars(state: NotesUiState, modifier: Modifier = Modifier, fo
  */
 @Composable
 internal fun SummaryTiles(
-    state: NotesUiState,
+    state: NotesRound,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     tileHeight: Dp = if (compact) COMPACT_TILE_HEIGHT else TILE_HEIGHT,
@@ -287,7 +292,7 @@ internal fun SummaryTiles(
             picture = speed?.emoji.orEmpty(),
             animal = true,
             label = stringResource(R.string.summary_speed),
-            description = speed?.let { stringResource(R.string.speed_description, stringResource(it.labelRes)) }.orEmpty(),
+            description = speed?.let { stringResource(R.string.speed_description, stringResource(it.labelRes())) }.orEmpty(),
             compact = compact,
             height = tileHeight,
             modifier = Modifier.weight(1f),

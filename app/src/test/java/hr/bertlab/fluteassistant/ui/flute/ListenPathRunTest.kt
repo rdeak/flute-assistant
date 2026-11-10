@@ -9,8 +9,8 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
-import hr.bertlab.fluteassistant.ui.tuner.FrameDecision
-import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue

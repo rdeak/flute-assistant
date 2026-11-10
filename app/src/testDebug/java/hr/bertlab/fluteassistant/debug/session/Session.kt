@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.debug.session
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.core.log.LogLine
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepMark
@@ -12,9 +11,10 @@ import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
-import hr.bertlab.fluteassistant.ui.tuner.FrameDecision
-import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
 import java.io.File
 import java.util.Locale
 

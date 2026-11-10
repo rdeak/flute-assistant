@@ -5,6 +5,11 @@ description: Use when running Flute Assistant on the Android emulator, for instr
 
 # Emulator and instrumented tests
 
+First: most screen tests no longer need the emulator. `./gradlew testDebugUnitTest` runs every one
+of them on the JVM under Robolectric in seconds (root CLAUDE.md, "Commands"). Come here for the
+check before a release, for a change to drawing, sizes or a gesture (the tests that start with
+`needsDevice()` run only here), and for adb-driven checks and screenshots.
+
 Instrumented-test notes: pass one class at a time (a comma-separated list only ran the first
 class here); the task uninstalls the app when it finishes, so `adb install -r` again before any
 adb-driven checks; uninstall a release-signed build first or the debug install fails.

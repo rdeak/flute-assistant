@@ -3,8 +3,8 @@
 
 package hr.bertlab.fluteassistant.audio.metronome
 
-import hr.bertlab.fluteassistant.domain.model.BeatStrength
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import kotlin.math.max
 import kotlin.math.roundToLong
 

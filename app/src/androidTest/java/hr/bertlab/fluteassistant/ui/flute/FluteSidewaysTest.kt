@@ -27,15 +27,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
-import hr.bertlab.fluteassistant.ui.tuner.Hearing
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -94,26 +96,21 @@ class FluteSidewaysTest {
                     FluteContent(
                         state = state.value,
                         metronome = metronome.value,
-                        onKeyPressed = { pressed += it },
-                        onKeyReleased = { released += it },
-                        onKeyActivated = {},
-                        onRestPressed = { restEvents += "press" },
-                        onRestReleased = { restEvents += "release" },
-                        onRestActivated = {},
-                        onBreath = {},
-                        onTogglePlayback = { playToggles++ },
-                        onEraseLast = {},
-                        onBpmChange = { bpm -> metronome.value = metronome.value.copy(config = metronome.value.config.withBpm(bpm)) },
-                        onTimeSignatureChange = { chosenSignature = it },
-                        onSpeedOpen = { speedOpens++ },
-                        onSpeedDone = { speedDones++ },
-                        onShelfOpen = {},
-                        onBookChosen = { chosenBooks += it },
-                        onYourTurn = { yourTurns++ },
-                        onStop = { stops++ },
-                        onRequestMic = {},
-                        onOpenSettings = {},
-                        onMicDismiss = { micDismissals++ },
+                        actions = FluteActions(
+                            onKeyPressed = { pressed += it },
+                            onKeyReleased = { released += it },
+                            onRestPressed = { restEvents += "press" },
+                            onRestReleased = { restEvents += "release" },
+                            onTogglePlayback = { playToggles++ },
+                            onBpmChange = { bpm -> metronome.value = metronome.value.copy(config = metronome.value.config.withBpm(bpm)) },
+                            onTimeSignatureChange = { chosenSignature = it },
+                            onSpeedOpen = { speedOpens++ },
+                            onSpeedDone = { speedDones++ },
+                            onBookChosen = { chosenBooks += it },
+                            onYourTurn = { yourTurns++ },
+                            onStop = { stops++ },
+                            onMicDismiss = { micDismissals++ },
+                        ),
                     )
                 }
             }
@@ -275,7 +272,7 @@ class FluteSidewaysTest {
 
     @Test
     fun running_swaps_the_keys_for_stop() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
         fun assertRunning() {
             key("C4").assertDoesNotExist()
             key("Erase the last note").assertDoesNotExist()
@@ -289,7 +286,7 @@ class FluteSidewaysTest {
             assertTrue("the card ends at ${bounds(staff()).right}, Stop starts at ${stop.left}", bounds(staff()).right < stop.left)
         }
         assertRunning()
-        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes, playingIndex = 0) }
+        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes, playing = Playing(0)) }
         compose.waitForIdle()
         assertRunning()
         word("Stop").performClick()
@@ -306,7 +303,7 @@ class FluteSidewaysTest {
     fun stop_comes_up_in_listen_to_mes_corner() {
         show(FluteUiState(tune = twoNotes))
         val listen = bounds(word("Listen to me"))
-        compose.runOnIdle { state.value = state.value.copy(isListening = true, listenIndex = 0) }
+        compose.runOnIdle { state.value = state.value.copy(listening = Listening(index = 0)) }
         compose.waitForIdle()
         val stop = bounds(word("Stop"))
         assertNear("the right edge", listen.right, stop.right)
@@ -315,10 +312,10 @@ class FluteSidewaysTest {
 
     @Test
     fun the_running_staff_is_as_big_as_the_height_lets_it() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0))
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
         PHONES.forEach { each ->
             on(each)
-            val scale = SidewaysGeometry.runningStaffScale(each.height.toFloat())
+            val scale = SidewaysGeometry.runningStaffScale(each.height.toFloat(), StaffGeometry.TOTAL_HEIGHT)
             assertNear("$each: the staff's height", tuneStaffHeight(scale), height(staff()), tolerance = 4f)
             val staff = bounds(staff())
             assertInside("the staff", staff())
@@ -333,7 +330,7 @@ class FluteSidewaysTest {
     @Test
     fun advice_wraps_in_the_column() {
         phone = Phone(640, 360)
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0, hearing = Hearing.LOUD_UNCLEAR))
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)))
         val advice = word(CLEAR_NOTE).assertIsDisplayed()
         assertWholeWords(CLEAR_NOTE)
         assertTrue("the advice is one line, it should wrap in the column", layoutOf(CLEAR_NOTE).lineCount > 1)
@@ -348,11 +345,11 @@ class FluteSidewaysTest {
     /** The Croatian advice's long words in the 100 dp column at large text: smaller, never cut. */
     private fun assertCroatianAdviceFits(fontScale: Float) {
         phone = Phone(640, 360)
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0), Locale("hr"), fontScale = fontScale)
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"), fontScale = fontScale)
         listOf(
-            state.value.copy(hearing = Hearing.LOUD_UNCLEAR) to "🎵 Odsviraj jedan dug, čist ton",
-            state.value.copy(hearing = Hearing.QUIET_UNCLEAR) to "📱 Dođi bliže mobitelu",
-            state.value.copy(repeatHeld = true) to "🔁 Stani, pa odsviraj opet",
+            state.value.copy(listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)) to "🎵 Odsviraj jedan dug, čist ton",
+            state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)) to "📱 Dođi bliže mobitelu",
+            state.value.copy(listening = Listening(index = 0, repeatHeld = true)) to "🔁 Stani, pa odsviraj opet",
         ).forEach { (next, advice) ->
             compose.runOnIdle { state.value = next }
             compose.waitForIdle()
@@ -372,7 +369,7 @@ class FluteSidewaysTest {
 
     @Test
     fun stop_stays_on_screen_on_every_phone() {
-        show(FluteUiState(tune = twoNotes, isListening = true, listenIndex = 0, hearing = Hearing.LOUD_UNCLEAR))
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)))
         PHONES.forEach { each ->
             on(each)
             assertInside("Stop", word("Stop").assertIsDisplayed(), shadow = 8.dp)
@@ -519,6 +516,7 @@ class FluteSidewaysTest {
 
     @Test
     fun a_key_whose_gesture_is_cancelled_is_released() {
+        needsDevice()
         show(FluteUiState(tune = twoNotes))
         key("G4").performTouchInput { down(center) }
         assertEquals(listOf(67), pressed)
@@ -529,6 +527,7 @@ class FluteSidewaysTest {
 
     @Test
     fun a_rest_whose_gesture_is_cancelled_is_released() {
+        needsDevice()
         show(FluteUiState(tune = twoNotes))
         key("Rest").performTouchInput { down(center) }
         assertEquals(listOf("press"), restEvents)
@@ -593,7 +592,7 @@ class FluteSidewaysTest {
         assertInside("OK", word("U redu").assertIsDisplayed(), shadow = 8.dp)
         assertWhole("U redu")
         word("U redu").performClick()
-        compose.runOnIdle { state.value = state.value.copy(isListening = true, listenIndex = 0) }
+        compose.runOnIdle { state.value = state.value.copy(listening = Listening(index = 0)) }
         compose.waitForIdle()
         assertInside("Stop", word("Stani").assertIsDisplayed(), shadow = 8.dp)
         assertWhole("Stani")
@@ -663,7 +662,7 @@ class FluteSidewaysTest {
 
     @Test
     fun the_staff_keeps_its_place_when_a_run_ends() {
-        show(FluteUiState(tune = longTune, isListening = true, listenIndex = 38))
+        show(FluteUiState(tune = longTune, listening = Listening(index = 38)))
         compose.waitForIdle()
         assertTheStaffNeverGoesBackToItsStart { state.value = FluteUiState(tune = longTune) }
     }
@@ -672,7 +671,7 @@ class FluteSidewaysTest {
     fun the_staff_keeps_its_place_when_a_run_starts() {
         show(FluteUiState(tune = longTune))
         compose.waitForIdle()
-        assertTheStaffNeverGoesBackToItsStart { state.value = FluteUiState(tune = longTune, playingIndex = 38) }
+        assertTheStaffNeverGoesBackToItsStart { state.value = FluteUiState(tune = longTune, playing = Playing(38)) }
     }
 
     // ---- The microphone card ----

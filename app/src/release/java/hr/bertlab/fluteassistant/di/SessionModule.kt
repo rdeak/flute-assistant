@@ -13,7 +13,7 @@ import dagger.hilt.components.SingletonComponent
 import hr.bertlab.fluteassistant.audio.tuner.AudioTap
 import hr.bertlab.fluteassistant.core.log.AndroidLogger
 import hr.bertlab.fluteassistant.core.log.Logger
-import hr.bertlab.fluteassistant.ui.flute.ListenRecorder
+import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
 import javax.inject.Singleton
 
 /**

@@ -4,13 +4,15 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Held
+import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.ui.tuner.Hearing
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -22,10 +24,10 @@ class FluteUiStateTest {
     @Test
     fun `lit note and index follow playback first, then the held key`() {
         val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
-        val playing = FluteUiState(tune = tune, heldMidi = 72, heldIndex = 1, playingIndex = 0)
+        val playing = FluteUiState(tune = tune, held = Held(72, index = 1), playing = Playing(0))
         assertEquals(60, playing.litMidi)
         assertEquals(0, playing.litIndex)
-        val held = FluteUiState(tune = tune, heldMidi = 72, heldIndex = 1)
+        val held = FluteUiState(tune = tune, held = Held(72, index = 1))
         assertEquals(72, held.litMidi)
         assertEquals(1, held.litIndex)
         assertNull(FluteUiState().litMidi)
@@ -33,48 +35,44 @@ class FluteUiStateTest {
     }
 
     @Test
-    fun `empty, playing and cap flags`() {
+    fun `empty and playing flags`() {
         assertTrue(FluteUiState().isEmpty)
         assertFalse(FluteUiState().isPlaying)
-        assertFalse(FluteUiState().atCap)
-        assertTrue(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), playingIndex = 0).isPlaying)
-        assertTrue(FluteUiState(tune = List(200) { TuneNote(60, NoteLength.QUARTER) }).atCap)
+        assertTrue(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), playing = Playing(0)).isPlaying)
     }
 
     @Test
     fun `the rest key is lit while held or while its rest plays`() {
         val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.HALF), TuneBreath)
         assertFalse(FluteUiState(tune = tune).restLit)
-        assertTrue(FluteUiState(tune = tune, restHeld = true, heldIndex = 1).restLit)
-        assertTrue(FluteUiState(tune = tune, restHeld = true).isHolding)
-        assertTrue(FluteUiState(tune = tune, playingIndex = 1).restLit)
-        assertNull(FluteUiState(tune = tune, playingIndex = 1).litMidi)
-        assertEquals(1, FluteUiState(tune = tune, playingIndex = 1).litIndex)
-        assertFalse(FluteUiState(tune = tune, playingIndex = 0).restLit)
-        assertEquals(60, FluteUiState(tune = tune, playingIndex = 0).litMidi)
-        assertFalse(FluteUiState(tune = tune).isHolding)
+        assertTrue(FluteUiState(tune = tune, held = Held(midi = null, index = 1)).restLit)
+        assertTrue(FluteUiState(tune = tune, playing = Playing(1)).restLit)
+        assertNull(FluteUiState(tune = tune, playing = Playing(1)).litMidi)
+        assertEquals(1, FluteUiState(tune = tune, playing = Playing(1)).litIndex)
+        assertFalse(FluteUiState(tune = tune, playing = Playing(0)).restLit)
+        assertEquals(60, FluteUiState(tune = tune, playing = Playing(0)).litMidi)
     }
 
     @Test
     fun `running covers playback and listening, and the lit step follows the listened one`() {
         val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
-        assertTrue(FluteUiState(tune = tune, playingIndex = 0).isRunning)
-        val listening = FluteUiState(tune = tune, isListening = true, listenIndex = 1)
+        assertTrue(FluteUiState(tune = tune, playing = Playing(0)).isRunning)
+        val listening = FluteUiState(tune = tune, listening = Listening(index = 1))
         assertTrue(listening.isRunning)
         assertEquals(1, listening.litIndex)
         assertEquals(1, listening.animalIndex)
-        assertEquals(0, FluteUiState(tune = tune, playingIndex = 0, listenIndex = 1).animalIndex)
-        assertNull(FluteUiState(tune = tune, heldIndex = 1).animalIndex)
-        assertEquals(1, FluteUiState(tune = tune, heldIndex = 1).litIndex)
+        assertEquals(0, FluteUiState(tune = tune, playing = Playing(0), listening = Listening(index = 1)).animalIndex)
+        assertNull(FluteUiState(tune = tune, held = Held(midi = null, index = 1)).animalIndex)
+        assertEquals(1, FluteUiState(tune = tune, held = Held(midi = null, index = 1)).litIndex)
         assertFalse(FluteUiState().isRunning)
     }
 
     @Test
     fun `the animal stands on the last click's beat only while the tune plays`() {
         val tune = listOf(TuneNote(60, NoteLength.HALF), TuneNote(67, NoteLength.QUARTER))
-        assertEquals(2, FluteUiState(tune = tune, playingIndex = 0, playingHalfBeat = 2).animalHalfBeat)
-        // A playback stopped mid-note leaves its count behind; Your turn waits over the head.
-        assertEquals(0, FluteUiState(tune = tune, isListening = true, listenIndex = 0, playingHalfBeat = 2).animalHalfBeat)
+        assertEquals(2, FluteUiState(tune = tune, playing = Playing(0, halfBeat = 2)).animalHalfBeat)
+        // Your turn waits over the head of the step.
+        assertEquals(0, FluteUiState(tune = tune, listening = Listening(index = 0)).animalHalfBeat)
     }
 
     @Test
@@ -86,22 +84,22 @@ class FluteUiStateTest {
 
     @Test
     fun `advice follows the hearing, and a repeat held on instead of started again comes first`() {
-        assertEquals(TunerAdvice.NONE, FluteUiState(hearing = Hearing.CLEAR).advice)
-        assertEquals(TunerAdvice.COME_CLOSER, FluteUiState(hearing = Hearing.QUIET_UNCLEAR).advice)
-        assertEquals(TunerAdvice.CLEAR_NOTE, FluteUiState(hearing = Hearing.LOUD_UNCLEAR).advice)
-        assertEquals(TunerAdvice.PLAY_AGAIN, FluteUiState(repeatHeld = true).advice)
-        assertEquals(TunerAdvice.PLAY_AGAIN, FluteUiState(repeatHeld = true, hearing = Hearing.LOUD_UNCLEAR).advice)
+        assertEquals(TunerAdvice.NONE, FluteUiState(listening = Listening(index = null, hearing = Hearing.CLEAR)).advice)
+        assertEquals(TunerAdvice.COME_CLOSER, FluteUiState(listening = Listening(index = null, hearing = Hearing.QUIET_UNCLEAR)).advice)
+        assertEquals(TunerAdvice.CLEAR_NOTE, FluteUiState(listening = Listening(index = null, hearing = Hearing.LOUD_UNCLEAR)).advice)
+        assertEquals(TunerAdvice.PLAY_AGAIN, FluteUiState(listening = Listening(index = null, repeatHeld = true)).advice)
+        assertEquals(TunerAdvice.PLAY_AGAIN, FluteUiState(listening = Listening(index = null, hearing = Hearing.LOUD_UNCLEAR, repeatHeld = true)).advice)
     }
 
     @Test
     fun `while the last note sounds the animal stays over it but nothing is lit or waited on`() {
         val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
-        val finishing = FluteUiState(tune = tune, isListening = true, listenIndex = 1, finishing = true)
+        val finishing = FluteUiState(tune = tune, listening = Listening(index = 1, finishing = true))
         assertTrue(finishing.isRunning)
         assertEquals(1, finishing.animalIndex)
         assertNull(finishing.litIndex)
         assertFalse(finishing.waiting)
-        assertTrue(FluteUiState(tune = tune, isListening = true, listenIndex = 1).waiting)
+        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 1)).waiting)
     }
 
     @Test

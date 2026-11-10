@@ -3,7 +3,7 @@
 
 package hr.bertlab.fluteassistant.audio.metronome
 
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 

@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.audio.tuner
 
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min

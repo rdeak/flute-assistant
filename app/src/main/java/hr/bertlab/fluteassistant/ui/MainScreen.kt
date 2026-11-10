@@ -229,7 +229,6 @@ fun MainScreen(
                             state = fluteState,
                             viewModel = fluteViewModel,
                             metronome = metronomeState,
-                            metronomeViewModel = metronomeViewModel,
                         )
                     }
                 }

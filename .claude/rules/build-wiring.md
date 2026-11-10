@@ -30,6 +30,17 @@ tests that touch the recorder live in `app/src/testDebug` (shared `app/src/test`
 for the release variant's unit tests). The recorder logs through the plain `AndroidLogger`, never
 the recording one. Details: the `sessions` skill.
 
+The screen tests in `app/src/androidTest` are also a source folder of the `test` source set
+(`sourceSets` in `app/build.gradle.kts`, since 2026-11-10), so `testDebugUnitTest` runs them on the
+JVM under Robolectric (4.17, with `robolectric.properties` in `app/src/test/resources`: native
+graphics and the emulator's 411 x 914 dp window). That needs `unitTests.isIncludeAndroidResources`,
+the `--add-exports=java.base/jdk.internal.access=ALL-UNNAMED` JVM argument (Robolectric on Java
+17+) and Espresso 3.7 on the test classpath (the one the Compose rule brings calls
+`InputManager.getInstance()`, gone since API 34). A test class there needs
+`@RunWith(AndroidJUnit4::class)`, which picks Robolectric on the JVM and the device runner on the
+emulator. Android Studio lists a folder under one source set only, so it shows these files as
+instrumented tests; Gradle runs them both ways.
+
 `androidx.appcompat` is in the build only for the in-app language switch:
 `AppCompatDelegate.setApplicationLocales` is the per-app-language backport below Android 13, so
 `MainActivity` is an `AppCompatActivity`, the window theme must stay an AppCompat theme

@@ -4,18 +4,18 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
+import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.ui.flute.FluteSound
-import hr.bertlab.fluteassistant.ui.flute.ListenFrame
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
-import hr.bertlab.fluteassistant.ui.tuner.Hearing
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

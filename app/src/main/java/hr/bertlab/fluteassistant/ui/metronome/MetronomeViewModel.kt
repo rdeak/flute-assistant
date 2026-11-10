@@ -7,16 +7,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import hr.bertlab.fluteassistant.audio.metronome.MetronomePlayer
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
-import hr.bertlab.fluteassistant.domain.repository.SettingsStore
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.settings.MetronomeSettings
 import hr.bertlab.fluteassistant.playback.BackgroundPlayback
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -32,7 +31,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MetronomeViewModel @Inject constructor(
     private val player: MetronomePlayer,
-    private val settings: SettingsStore,
+    private val metronome: MetronomeSettings,
     private val backgroundPlayback: BackgroundPlayback,
 ) : ViewModel() {
 
@@ -44,17 +43,20 @@ class MetronomeViewModel @Inject constructor(
 
     /** Last-used settings, unless the engine is already running: then its settings win. */
     private fun initialState(): MetronomeUiState {
+        // A player already running (the service kept it going after the screen closed) knows what
+        // it plays, so the settings take that, which they hold anyway unless the app was restarted.
         val running = player.playback.value
         if (running != null) {
             activeSession = running.sessionId
-            return MetronomeUiState(config = running.config, isPlaying = true)
+            metronome.update { running.config }
         }
-        // A tempo stored by an older, wider ring is brought onto this one.
-        val stored = settings.loadMetronomeConfig()
-        return MetronomeUiState(config = stored.copy(bpm = stored.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM)))
+        return MetronomeUiState(config = metronome.config.value, isPlaying = running != null)
     }
 
     init {
+        // The tempo and the beat have one owner ([MetronomeSettings]). Whoever changes them, the
+        // ring here or a book opened on the flute, the screen and a running player follow.
+        viewModelScope.launch { metronome.config.collect(::follow) }
         // The engine can stop on its own (audio focus lost, headphones unplugged, output failure).
         viewModelScope.launch {
             player.sessionEnded.collect { session ->
@@ -109,14 +111,20 @@ class MetronomeViewModel @Inject constructor(
 
     // ---- Settings --------------------------------------------------------------------------
 
-    fun setBpm(bpm: Int) = updateConfig { it.withBpm(bpm) }
+    fun setBpm(bpm: Int) = change { it.withBpm(bpm) }
 
-    fun setTimeSignature(timeSignature: TimeSignature) = updateConfig { it.copy(timeSignature = timeSignature) }
+    fun setTimeSignature(timeSignature: TimeSignature) = change { it.copy(timeSignature = timeSignature) }
 
-    private fun updateConfig(transform: (MetronomeConfig) -> MetronomeConfig) {
-        val newState = _state.updateAndGet { it.copy(config = transform(it.config)) }
-        settings.saveMetronomeConfig(newState.config)
-        if (newState.isPlaying) player.update(newState.config)
+    private fun change(transform: (MetronomeConfig) -> MetronomeConfig) {
+        metronome.update(transform)
+        follow(metronome.config.value) // at once, not a dispatch later: the ring is under a finger
+    }
+
+    /** Shows [config] and hands it to a running player; nothing happens when it is already shown. */
+    private fun follow(config: MetronomeConfig) {
+        if (config == _state.value.config) return
+        _state.update { it.copy(config = config) }
+        if (_state.value.isPlaying) player.update(config)
     }
 
     fun dismissMessage() = _state.update { it.copy(userMessage = null) }

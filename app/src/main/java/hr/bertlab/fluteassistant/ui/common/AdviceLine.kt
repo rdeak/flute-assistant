@@ -21,8 +21,8 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 
 /**
  * The quieter line saying what to change: roll the flute, the air, the fingers, come closer, or

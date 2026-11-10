@@ -3,12 +3,17 @@
 
 package hr.bertlab.fluteassistant.ui.tuner
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
+import hr.bertlab.fluteassistant.audio.TONE_VOLUME
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.HearingTracker
+import hr.bertlab.fluteassistant.domain.listen.ListenRules
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.tuner.FluteRange
+import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeReferenceTonePlayer
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
-import hr.bertlab.fluteassistant.domain.tuner.FluteRange
-import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.fakes.FakeTunerEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,7 +54,7 @@ class TunerViewModelTest {
     private fun quiet(level: Float = 0.3f) = PitchFrame(null, 0.0, level)
 
     /** A held note: enough agreeing frames for the tuner to trust it. */
-    private fun steady(freq: Double) = repeat(TunerViewModel.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
+    private fun steady(freq: Double) = repeat(ListenRules.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
 
     private fun listeningViewModel(): TunerViewModel = TunerViewModel(engine, settings, tonePlayer, logger).apply {
         onPermissionResult(true)
@@ -71,7 +76,7 @@ class TunerViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.state.value.isListening)
 
-        repeat(TunerViewModel.SMOOTHING_WINDOW) { engine.frames.tryEmit(pitched(440.0)) }
+        repeat(ListenRules.SMOOTHING_WINDOW) { engine.frames.tryEmit(pitched(440.0)) }
         advanceUntilIdle()
 
         val reading = vm.state.value.reading
@@ -95,7 +100,7 @@ class TunerViewModelTest {
     fun `a brief blip never shows a note`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         advanceUntilIdle()
-        repeat(TunerViewModel.LOCK_FRAMES - 1) { engine.frames.tryEmit(pitched(440.0)) } // a bump, a syllable
+        repeat(ListenRules.LOCK_FRAMES - 1) { engine.frames.tryEmit(pitched(440.0)) } // a bump, a syllable
         advanceUntilIdle()
         assertNull(vm.state.value.reading)
     }
@@ -144,7 +149,7 @@ class TunerViewModelTest {
         steady(440.0)
         advanceUntilIdle()
 
-        repeat(TunerViewModel.HOLD_FRAMES - 1) { engine.frames.tryEmit(silence) }
+        repeat(ListenRules.HOLD_FRAMES - 1) { engine.frames.tryEmit(silence) }
         advanceUntilIdle()
         assertNotNull(vm.state.value.reading)
 
@@ -262,7 +267,7 @@ class TunerViewModelTest {
         vm.playTargetNote()
         assertTrue(vm.state.value.isPlayingReference)
         assertEquals(
-            listOf(FakeReferenceTonePlayer.Played(440.0, TunerViewModel.REFERENCE_TONE_MS, TunerViewModel.REFERENCE_TONE_VOLUME)),
+            listOf(FakeReferenceTonePlayer.Played(440.0, TunerViewModel.REFERENCE_TONE_MS, TONE_VOLUME)),
             tonePlayer.played,
         )
 
@@ -327,10 +332,10 @@ class TunerViewModelTest {
     fun `a wandering pitch clears the reading after the hold`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        repeat(TunerViewModel.HOLD_FRAMES - 1) { engine.frames.tryEmit(pitched(300.0 + it * 7)) } // a glissando: no three frames agree
+        repeat(ListenRules.HOLD_FRAMES - 1) { engine.frames.tryEmit(pitched(300.0 + it * 7)) } // a glissando: no three frames agree
         advanceUntilIdle()
         assertNotNull(vm.state.value.reading)
-        engine.frames.tryEmit(pitched(300.0 + (TunerViewModel.HOLD_FRAMES - 1) * 7))
+        engine.frames.tryEmit(pitched(300.0 + (ListenRules.HOLD_FRAMES - 1) * 7))
         advanceUntilIdle()
         assertNull(vm.state.value.reading)
     }
@@ -353,7 +358,7 @@ class TunerViewModelTest {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
         // Two frames are unsteady while the pitch moves, then each frame is shown nearer A♯4.
-        frames(a4(60.0), TunerViewModel.LOCK_FRAMES - 1 + TunerViewModel.SWITCH_FRAMES - 1)
+        frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         advanceUntilIdle()
         assertEquals(70, vm.state.value.reading!!.midi)
         assertEquals(69, vm.state.value.homeMidi)
@@ -369,9 +374,9 @@ class TunerViewModelTest {
     fun `back on the note the drift starts again`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        frames(a4(60.0), TunerViewModel.LOCK_FRAMES - 1 + TunerViewModel.SWITCH_FRAMES - 1)
+        frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         steady(440.0)
-        frames(a4(60.0), TunerViewModel.LOCK_FRAMES - 1 + TunerViewModel.SWITCH_FRAMES - 1)
+        frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         advanceUntilIdle()
         assertEquals(69, vm.state.value.homeMidi)
     }
@@ -380,7 +385,7 @@ class TunerViewModelTest {
     fun `a clear step to another note moves the ring at once`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        frames(a4(100.0), TunerViewModel.LOCK_FRAMES) // A♯4 in tune
+        frames(a4(100.0), ListenRules.LOCK_FRAMES) // A♯4 in tune
         advanceUntilIdle()
         assertEquals(70, vm.state.value.homeMidi)
         assertEquals(TuningStatus.IN_TUNE, vm.state.value.status)
@@ -390,7 +395,7 @@ class TunerViewModelTest {
     fun `after silence the ring takes the next note at once`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        repeat(TunerViewModel.HOLD_FRAMES) { engine.frames.tryEmit(silence) }
+        repeat(ListenRules.HOLD_FRAMES) { engine.frames.tryEmit(silence) }
         advanceUntilIdle()
         assertNull(vm.state.value.homeMidi)
         steady(a4(60.0))

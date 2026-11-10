@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.TabletHost
@@ -55,26 +55,7 @@ class FluteTabletTest {
                     FluteContent(
                         state = state,
                         metronome = metronome,
-                        onKeyPressed = {},
-                        onKeyReleased = {},
-                        onKeyActivated = {},
-                        onRestPressed = {},
-                        onRestReleased = {},
-                        onRestActivated = {},
-                        onBreath = {},
-                        onTogglePlayback = {},
-                        onEraseLast = {},
-                        onBpmChange = {},
-                        onTimeSignatureChange = {},
-                        onSpeedOpen = {},
-                        onSpeedDone = {},
-                        onShelfOpen = {},
-                        onBookChosen = {},
-                        onYourTurn = {},
-                        onStop = {},
-                        onRequestMic = {},
-                        onOpenSettings = {},
-                        onMicDismiss = {},
+                        actions = FluteActions(),
                     )
                 }
             }
@@ -133,7 +114,7 @@ class FluteTabletTest {
 
     @Test
     fun a_running_staff_keeps_its_scale() {
-        show(TabletSize.TEN_SIDEWAYS, FluteUiState(tune = twoNotes, playingIndex = 0))
+        show(TabletSize.TEN_SIDEWAYS, FluteUiState(tune = twoNotes, playing = Playing(0)))
         val below = bounds(book()).top - bounds(staff()).top
         assertNear("the book under the staff's top", StaffGeometry.bookButtonTop(4f / 3f).dp, below)
     }

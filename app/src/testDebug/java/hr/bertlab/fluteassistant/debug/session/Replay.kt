@@ -7,8 +7,8 @@ import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
-import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
 import java.util.Locale
 
 /**

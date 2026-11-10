@@ -41,10 +41,12 @@ import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
+import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
@@ -103,25 +105,20 @@ private val StaffCardPadding = 10.dp
  */
 @Composable
 internal fun NotesSideways(
-    state: NotesUiState,
+    state: NotesRound,
     choosingNotes: Boolean,
     onChoose: () -> Unit,
     onChosen: () -> Unit,
-    onNoteTapped: (Int) -> Unit,
-    onPlayAgain: () -> Unit,
-    onTogglePracticeNote: (Int) -> Unit,
-    onToggleSound: () -> Unit,
-    onSetGame: (NotesGame) -> Unit,
-    onHearAgain: () -> Unit,
+    actions: NotesActions,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val short = SidewaysGeometry.isShort(maxHeight.value)
-        val pills: @Composable () -> Unit = { GamePillsSideways(state.game, onSetGame, short) }
+        val pills: @Composable () -> Unit = { GamePillsSideways(state.game, actions.onSetGame, short) }
         when {
-            choosingNotes -> PickerSideways(state, pills, onTogglePracticeNote, onToggleSound, onChosen)
-            state.roundOver -> SummarySideways(state, pills, onChoose, onPlayAgain)
-            else -> QuestionSideways(state, pills, onChoose, onNoteTapped, onHearAgain)
+            choosingNotes -> PickerSideways(state, pills, actions.onTogglePracticeNote, actions.onToggleSound, onChosen)
+            state.roundOver -> SummarySideways(state, pills, onChoose, actions.onPlayAgain)
+            else -> QuestionSideways(state, pills, onChoose, actions.onNoteTapped, actions.onHearAgain)
         }
     }
 }
@@ -159,7 +156,7 @@ private fun GamePillsSideways(game: NotesGame, onSetGame: (NotesGame) -> Unit, s
  */
 @Composable
 private fun QuestionSideways(
-    state: NotesUiState,
+    state: NotesRound,
     pills: @Composable () -> Unit,
     onChoose: () -> Unit,
     onNoteTapped: (Int) -> Unit,
@@ -180,20 +177,11 @@ private fun QuestionSideways(
                 // As upright: the burst is drawn over the staff in the same box and takes no touch, so the slide goes through.
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     NoteStaff(
-                        currentMidi = state.currentMidi,
-                        wrongTaps = state.wrongTaps,
-                        lastWrongTap = state.lastWrongTap,
-                        solved = state.solved,
-                        practiceNotes = state.practiceNotes,
+                        state = state,
                         placing = placing,
                         onPlacingChange = { placing = it },
                         onNoteTapped = onNoteTapped,
                         modifier = Modifier.fillMaxSize(),
-                        phrase = state.phrase,
-                        placed = state.placed,
-                        locked = state.phrasePlaying,
-                        hearing = state.hearing,
-                        sounding = state.sounding,
                     )
                     StreakBurst(state.streak, Modifier.matchParentSize())
                 }
@@ -208,7 +196,7 @@ private fun QuestionSideways(
  * [placing] a note, as that is answering.
  */
 @Composable
-private fun QuestionPanel(state: NotesUiState, placing: Int?, onHearAgain: () -> Unit, modifier: Modifier) {
+private fun QuestionPanel(state: NotesRound, placing: Int?, onHearAgain: () -> Unit, modifier: Modifier) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
@@ -290,7 +278,7 @@ private fun SidewaysPickButton(
  */
 @Composable
 private fun PickerSideways(
-    state: NotesUiState,
+    state: NotesRound,
     pills: @Composable () -> Unit,
     onTogglePracticeNote: (Int) -> Unit,
     onToggleSound: () -> Unit,
@@ -352,7 +340,7 @@ private val PickerKeyGap = 10.dp
  * shrinks to the height the rest leaves, so the keys keep theirs, and two rows of keys close the gaps.
  */
 @Composable
-private fun SummarySideways(state: NotesUiState, pills: @Composable () -> Unit, onChoose: () -> Unit, onPlayAgain: () -> Unit) {
+private fun SummarySideways(state: NotesRound, pills: @Composable () -> Unit, onChoose: () -> Unit, onPlayAgain: () -> Unit) {
     SidewaysPage(
         column = {
             pills()
@@ -373,13 +361,13 @@ private fun SummarySideways(state: NotesUiState, pills: @Composable () -> Unit, 
                 val gap = if (maxWidth < 500.dp) 16.dp else 26.dp
                 // What the phone's emoji font draws, as it is not the same everywhere: the row is sized from it, not from a guess.
                 val room = maxWidth - trophy * emojiWidthShare(TROPHY_EMOJI) - gap
-                val star = minOf(StarMax, room / (emojiWidthShare(STAR_EMOJI) * NotesUiState.ROUND_LENGTH))
+                val star = minOf(StarMax, room / (emojiWidthShare(STAR_EMOJI) * NotesRound.ROUND_LENGTH))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     // A perfect round hops higher, as upright (the sparkles beside it are upright's alone).
-                    Emoji(TROPHY_EMOJI, fontSize = fontSizeOf(trophy), modifier = Modifier.trophyHop(big = state.score == NotesUiState.ROUND_LENGTH))
+                    Emoji(TROPHY_EMOJI, fontSize = fontSizeOf(trophy), modifier = Modifier.trophyHop(big = state.score == NotesRound.ROUND_LENGTH))
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(

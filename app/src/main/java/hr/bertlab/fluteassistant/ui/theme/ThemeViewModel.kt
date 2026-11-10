@@ -5,8 +5,8 @@ package hr.bertlab.fluteassistant.ui.theme
 
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import hr.bertlab.fluteassistant.domain.model.ThemeChoice
-import hr.bertlab.fluteassistant.domain.repository.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.ThemeChoice
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

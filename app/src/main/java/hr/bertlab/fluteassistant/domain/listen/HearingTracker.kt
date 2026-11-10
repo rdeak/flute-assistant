@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 
-package hr.bertlab.fluteassistant.ui.tuner
+package hr.bertlab.fluteassistant.domain.listen
 
 /**
  * Notices sound that keeps coming but never becomes a note, so the tuner can tell the child
- * why (see [Hearing]). Pure Kotlin: [TunerViewModel] feeds it one frame at a time.
+ * why (see [Hearing]). Pure Kotlin: the tuner's view model and the flute's "Your turn" feed it one frame at a time.
  *
  * A frame that is neither [FrameDecision.SHOWN] nor [FrameDecision.IGNORED] and whose level is
  * at least [SOUND_LEVEL] is a sound frame and joins the run. A shown frame, or [reset], ends the
@@ -69,7 +69,7 @@ class HearingTracker {
 
     companion object {
         /**
-         * The level (0..1, as in [hr.bertlab.fluteassistant.audio.tuner.PitchFrame.level]) from
+         * The level (0..1, as in [hr.bertlab.fluteassistant.domain.listen.PitchFrame.level]) from
          * which a frame counts as sound rather than room noise: about -45 dBFS. A starting value
          * to be confirmed from `levelMean` in `tuner.summary` on a real phone.
          */
@@ -97,3 +97,11 @@ class HearingTracker {
         const val ADVICE_HOLD_FRAMES = 46
     }
 }
+
+/**
+ * What the microphone makes of the sound when no note can be read: [CLEAR] when there is
+ * nothing to report, [QUIET_UNCLEAR] for about a second of sound too faint for a note (the
+ * phone is too far away), [LOUD_UNCLEAR] for about a second of sound at a good level that still
+ * yields no steady note (a breathy or wobbling tone).
+ */
+enum class Hearing { CLEAR, QUIET_UNCLEAR, LOUD_UNCLEAR }

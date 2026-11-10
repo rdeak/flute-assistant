@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 
-package hr.bertlab.fluteassistant.ui.tuner
+package hr.bertlab.fluteassistant.domain.listen
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -79,7 +78,7 @@ class NoteOnsetTrackerTest {
         // tuner's ring does, but nobody played a new note, so nothing is judged.
         val tracker = NoteOnsetTracker()
         feed(tracker, List(3) { pitched(60) })
-        val drifted = feed(tracker, List(2 + TunerViewModel.SWITCH_FRAMES) { pitched(60, cents = 60.0) })
+        val drifted = feed(tracker, List(2 + ListenRules.SWITCH_FRAMES) { pitched(60, cents = 60.0) })
         assertEquals(listOf(FrameDecision.UNSTEADY, FrameDecision.UNSTEADY), drifted.take(2).decisions())
         val shown = drifted.drop(2)
         assertTrue(shown.all { it.decision == FrameDecision.SHOWN })
@@ -116,7 +115,7 @@ class NoteOnsetTrackerTest {
         val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.4f)
         val room = PitchFrame(null, 0.0, level = 0.3f)
         feed(tracker, List(3) { note })
-        feed(tracker, List(TunerViewModel.HOLD_FRAMES - 1) { room })
+        feed(tracker, List(ListenRules.HOLD_FRAMES - 1) { room })
         assertEquals("not yet: a blink of this length is still inside the note", 60, tracker.sounding)
         feed(tracker, listOf(room))
         assertNull(tracker.sounding)

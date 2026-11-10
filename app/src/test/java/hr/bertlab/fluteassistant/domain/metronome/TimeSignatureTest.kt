@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 
-package hr.bertlab.fluteassistant.domain.model
+package hr.bertlab.fluteassistant.domain.metronome
 
-import hr.bertlab.fluteassistant.domain.model.BeatStrength.MEDIUM
-import hr.bertlab.fluteassistant.domain.model.BeatStrength.STRONG
-import hr.bertlab.fluteassistant.domain.model.BeatStrength.WEAK
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength.MEDIUM
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength.STRONG
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength.WEAK
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

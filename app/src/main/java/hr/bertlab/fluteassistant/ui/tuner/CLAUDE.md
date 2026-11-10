@@ -8,7 +8,7 @@ whose channel buffers the frames rather than conflating them: since the night of
 flute's "Your turn" counts frames, a gap being two in a row, and a busy main thread must delay a
 frame, never lose one; the tuner processes every frame too, cheaply) and cancelling releases it; it
 throws `SecurityException` without RECORD_AUDIO. Its `WINDOW_SIZE` (4096) and `HOP_SIZE` (2048)
-are public: the replay of a recorded session frames audio with them (`ui/flute/CLAUDE.md`,
+are public: the replay of a recorded session frames audio with them (`ui/flute/DESIGN.md`,
 "Sessions"). It hands every hop to an `AudioTap` on its IO thread (`opened`, `samples`,
 `closed`): the debug build's session recorder, which keeps the samples of a "Your turn" run;
 the release build binds `AudioTap.None`. A hop whose blocking read the collector cancelled
@@ -32,8 +32,8 @@ holds the last reading for about 0.9 s of silence or unsteadiness before clearin
 `NoteMath.frequencyToNote` turns the median into a `NoteReading`. Two modes (`TunerMode`,
 remembered through `SettingsStore.saveTunerMode`, default `IDENTIFY`): `IDENTIFY` names the
 nearest note (`TunerUiState.identifiedMidi`: the reading's note, but a drift just past the halfway
-point to a neighbour, still within `NEAR_TARGET_CENTS` of the old note, moves it only after
-`TunerViewModel.SWITCH_FRAMES`, about 0.5 s, so it never flickers; the first note after silence
+point to a neighbour, still within `ListenRules.NEAR_CENTS` of the old note, moves it only after
+`ListenRules.SWITCH_FRAMES`, about 0.5 s, so it never flickers; the first note after silence
 and a clear step to another note move it at once) and measures against it; `TARGET` lets the
 child pick the note to play with the
 ‹ › half-step buttons of `TargetNote` (`FluteRange`: c1 to c4, MIDI 60 to 96, default a1 / A4, remembered through
@@ -47,7 +47,7 @@ note or octave played in target mode) and `gaugeCents` (cents from `homeMidi`) w
 place that threshold lives (the bubble sits in its ring exactly when the status says
 "Perfect!" and jumps clear of it as soon as it does not). There is no tolerance
 setting on purpose: one good default beats a control. In target mode a reading within
-`NEAR_TARGET_CENTS` (70) of the chosen note or of its octaves is still that note or that octave
+`ListenRules.NEAR_CENTS` (70) of the chosen note or of its octaves is still that note or that octave
 (`TargetMismatch.NONE`, `OCTAVE_UP` / `OCTAVE_DOWN`), so a1 played sixty cents flat reads
 "Too low", not "That's gis1". `HearingTracker` turns level plus
 `FrameDecision` into `Hearing` (sound from `SOUND_LEVEL`, quiet or loud around `CLOSE_LEVEL`,
@@ -68,13 +68,13 @@ it) and ignores microphone frames meanwhile. `FluteFingerings.keysFor(midi)` is 
 Boehm chart (Woodwind Fingering Guide basic fingerings; no entry for MIDI 94 and 95) that
 `FingeringDiagram` draws.
 
-Two pieces of this path are shared with the flute's "Your turn" (`ui/flute/CLAUDE.md`, since
+Two pieces of this path are shared with the flute's "Your turn" (`ui/flute/DESIGN.md`, since
 2026-11-04): `NoteOnsetTracker`, a pure class that applies the same frame rules as this view
 model's "Which?" mode (the probability gate, the lock, the median, the drift-and-switch of
 `identify`) and additionally says when a *new* note begins (an `Onset`, `fresh` or by a step):
 after a gap, after a tongued stop inside the same pitch, or by a clear step to another note
 without one (a slur, a fingered change). The rules there are the flute's own, from the review of
-2026-11-04 and the first child test the same night (`ui/flute/CLAUDE.md` has the story and every
+2026-11-04 and the first child test the same night (`ui/flute/DESIGN.md` has the story and every
 threshold): a gap is `ONSET_GAP_FRAMES` uncounted frames that also fell under `GAP_LEVEL_RATIO`
 (half) of the sounding note's mean level or back to the room's floor the tracker learns between
 notes, because the 0.85 gate blinks on a breathy tone and a blink that keeps the loudness must not
@@ -92,14 +92,14 @@ nothing about the rules changed. The other piece is `FrameSummary` (its own file
 the body of `tuner.summary` and of the flute's `flute.listen_summary`. `TunerViewModel` still
 runs its own copy of those rules; moving it onto the tracker is a refactor for another day, and
 the constants (`MIN_PROBABILITY`, `LOCK_FRAMES`, `LOCK_CENTS`, `SMOOTHING_WINDOW`,
-`SWITCH_FRAMES`, `NEAR_TARGET_CENTS`) are referenced, never copied. The microphone card
+`SWITCH_FRAMES`, `NEAR_CENTS`, all in `domain/listen/ListenRules`) are referenced, never copied. The microphone card
 (`ui/common/MicrophonePermissionCard`) and the advice line (`ui/common/AdviceLine`) moved out of
 `TunerScreen` for the same reason; the tuner shows them unchanged. Only the open tab holds the
 microphone, so the tuner and the flute never listen at once.
 
 Log events (tag `FA.Tuner`): `mic.open` (source, rate, buffer), `mic.close`, `tuner.permission`,
 `tuner.frame` (verbose: f, p, level, `FrameDecision`), `tuner.summary` every
-`TunerViewModel.SUMMARY_FRAMES` frames (counts per decision, pMin/pMax/pMean against `gate`,
+`ListenRules.SUMMARY_FRAMES` frames (counts per decision, pMin/pMax/pMean against `gate`,
 levelMean, reading, target, mode, hearing), `tuner.reading` when the shown note changes,
 `tuner.hearing` (hearing, levelMean) when it changes, `tuner.target`, `tuner.mode`,
 `tuner.reference`, `tuner.error`, `reference.error`.
@@ -121,7 +121,7 @@ flute, air, fingers, come closer, a clear note), never a number.
 ## Sideways
 
 Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "Tuner"; what every tab
-shares sideways is in `../CLAUDE.md`). `TunerContent` branches on `LocalSideways` before its padded column:
+shares sideways is in `../DESIGN.md`). `TunerContent` branches on `LocalSideways` before its padded column:
 the microphone card first (it branches itself, below), then `TunerSideways` (`TunerSideways.kt`). One layout,
 as the height leaves little choice. The numbers come from `SidewaysGeometry`, which the unit tests pin.
 

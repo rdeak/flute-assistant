@@ -39,10 +39,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.notes.speed
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -66,7 +69,7 @@ class NotesSidewaysTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private lateinit var state: MutableState<NotesUiState>
+    private lateinit var state: MutableState<NotesRound>
     private var phone by mutableStateOf(Phone(915, 411))
     private var sideways by mutableStateOf(true)
     private val tapped = mutableListOf<Int>()
@@ -88,7 +91,7 @@ class NotesSidewaysTest {
     }
 
     private fun show(
-        initial: NotesUiState,
+        initial: NotesRound,
         at: Phone = Phone(915, 411),
         locale: Locale = Locale.ENGLISH,
         fontScale: Float = 1f,
@@ -102,13 +105,15 @@ class NotesSidewaysTest {
                     SideEffect { density = forced }
                     NotesContent(
                         state = state.value,
-                        onNoteTapped = { tapped += it },
-                        onPlayAgain = { playAgainRequests++ },
-                        onTogglePracticeNote = { toggled += it },
-                        onToggleSound = { soundToggles++ },
-                        onSetGame = { games += it },
-                        onHearAgain = { hearAgainRequests++ },
-                        onPhraseShown = { phraseShownRequests++ },
+                        actions = NotesActions(
+                            onNoteTapped = { tapped += it },
+                            onPlayAgain = { playAgainRequests++ },
+                            onTogglePracticeNote = { toggled += it },
+                            onToggleSound = { soundToggles++ },
+                            onSetGame = { games += it },
+                            onHearAgain = { hearAgainRequests++ },
+                            onPhraseShown = { phraseShownRequests++ },
+                        ),
                     )
                 }
             }
@@ -116,12 +121,12 @@ class NotesSidewaysTest {
     }
 
     /** A round in progress asking [midi], with the default notes chosen. */
-    private fun asking(midi: Int = 60) = NotesUiState(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = midi)
+    private fun asking(midi: Int = 60) = NotesRound(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = midi)
 
     /** A finished round with [score] notes found first time. */
     private fun over(score: Int, bestStreak: Int = 5) = asking(60).copy(
         roundOver = true,
-        results = List(score) { true } + List(NotesUiState.ROUND_LENGTH - score) { false },
+        results = List(score) { true } + List(NotesRound.ROUND_LENGTH - score) { false },
         taps = 13,
         bestStreak = bestStreak,
         roundMillis = 83_000L,
@@ -373,6 +378,7 @@ class NotesSidewaysTest {
      */
     @Test
     fun hear_draws_the_phrase_and_locks_sideways_too() {
+        needsDevice()
         show(asking(67).copy(game = NotesGame.HEAR, phrase = listOf(64, 65, 67), placed = 2, phrasePlaying = true), at = Phone(915, 411))
         val staff = hearStaff().assertIsDisplayed()
         staff().assertDoesNotExist()
@@ -783,7 +789,7 @@ class NotesSidewaysTest {
     }
 
     /** All fifteen notes chosen: seven letters, so seven dots. */
-    private fun allFifteen(state: NotesUiState) = state.copy(practiceNotes = StaffNotes.ALL.toSet())
+    private fun allFifteen(state: NotesRound) = state.copy(practiceNotes = StaffNotes.ALL.toSet())
 
     /**
      * What a row of [count] dots of [size] dp comes to on this screen: each dot and each 3 dp gap is

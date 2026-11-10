@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
@@ -77,25 +78,46 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
  */
 @Composable
 fun NotesScreen(
-    state: NotesUiState,
+    state: NotesRound,
     viewModel: NotesViewModel,
     modifier: Modifier = Modifier,
 ) {
     DisposableEffect(Unit) {
         onDispose { viewModel.stopSound() }
     }
-    NotesContent(
-        state = state,
-        onNoteTapped = viewModel::onNoteTapped,
-        onPlayAgain = viewModel::resetRound,
-        onTogglePracticeNote = viewModel::togglePracticeNote,
-        onToggleSound = viewModel::toggleSound,
-        onSetGame = viewModel::setGame,
-        onHearAgain = viewModel::hearAgain,
-        onPhraseShown = viewModel::onPhraseShown,
-        modifier = modifier,
-    )
+    val actions = remember(viewModel) {
+        NotesActions(
+            onNoteTapped = viewModel::onNoteTapped,
+            onPlayAgain = viewModel::resetRound,
+            onTogglePracticeNote = viewModel::togglePracticeNote,
+            onToggleSound = viewModel::toggleSound,
+            onSetGame = viewModel::setGame,
+            onHearAgain = viewModel::hearAgain,
+            onPhraseShown = viewModel::onPhraseShown,
+        )
+    }
+    NotesContent(state = state, actions = actions, modifier = modifier)
 }
+
+/**
+ * Everything the notes tab can ask for, as one object, so [NotesContent] takes its state and this.
+ * Each action defaults to doing nothing, so a test names only the ones it looks at.
+ */
+class NotesActions(
+    /** A place on the staff was tapped: the note there. */
+    val onNoteTapped: (Int) -> Unit = {},
+    /** Again, on the round's summary. */
+    val onPlayAgain: () -> Unit = {},
+    /** A note of the picker, and its Sound switch. */
+    val onTogglePracticeNote: (Int) -> Unit = {},
+    val onToggleSound: () -> Unit = {},
+    /** One of the two game pills. */
+    val onSetGame: (NotesGame) -> Unit = {},
+    /** Hear's speaker bubble. */
+    val onHearAgain: () -> Unit = {},
+    /** A Hear phrase came on screen and wants playing (the view model plays each once). */
+    val onPhraseShown: () -> Unit = {},
+)
 
 /**
  * The whole game, top to bottom: the two game pills, then one hero row (the streak's flames,
@@ -104,20 +126,14 @@ fun NotesScreen(
  * "Which notes?" while choosing), then the stage with the staff and its feedback line, or the round
  * summary, or the picker, whose own big OK button closes it (the Pick button hides meanwhile, so
  * there is one way out), and at the bottom the round's stars. The pills stay on all three screens.
- * Choosing notes pauses the question in place; it comes back untouched. [onPhraseShown] asks for
+ * Choosing notes pauses the question in place; it comes back untouched. [NotesActions.onPhraseShown] asks for
  * Hear's phrase to be played while the staff is on screen: as a new phrase comes, and as the picker
  * closes over one drawn under it.
  */
 @Composable
 fun NotesContent(
-    state: NotesUiState,
-    onNoteTapped: (Int) -> Unit,
-    onPlayAgain: () -> Unit,
-    onTogglePracticeNote: (Int) -> Unit,
-    onToggleSound: () -> Unit,
-    onSetGame: (NotesGame) -> Unit,
-    onHearAgain: () -> Unit,
-    onPhraseShown: () -> Unit,
+    state: NotesRound,
+    actions: NotesActions,
     modifier: Modifier = Modifier,
 ) {
     // Kept above the branch, so the picker stays open when the phone turns.
@@ -127,7 +143,7 @@ fun NotesContent(
     // child cannot see, and it plays when OK closes the picker. Above the branch too, so a turn neither asks again nor loses
     // the ask; the ViewModel plays each phrase once, so asking again for one already heard plays nothing.
     LaunchedEffect(state.phraseId, state.game, choosingNotes) {
-        if (!choosingNotes) onPhraseShown()
+        if (!choosingNotes) actions.onPhraseShown()
     }
 
     // A phone on its side has its own layout ([NotesSideways]): the same screens, arranged for the width.
@@ -137,12 +153,7 @@ fun NotesContent(
             choosingNotes = choosingNotes,
             onChoose = { choosingNotes = true },
             onChosen = { choosingNotes = false },
-            onNoteTapped = onNoteTapped,
-            onPlayAgain = onPlayAgain,
-            onTogglePracticeNote = onTogglePracticeNote,
-            onToggleSound = onToggleSound,
-            onSetGame = onSetGame,
-            onHearAgain = onHearAgain,
+            actions = actions,
             modifier = modifier,
         )
         return
@@ -162,13 +173,13 @@ fun NotesContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            GamePills(game = state.game, onSetGame = onSetGame)
+            GamePills(game = state.game, onSetGame = actions.onSetGame)
             HeroRow(
                 state = state,
                 choosingNotes = choosingNotes,
                 placing = placing,
                 onChoose = { choosingNotes = true },
-                onHearAgain = onHearAgain,
+                onHearAgain = actions.onHearAgain,
             )
             Stage(
                 modifier = Modifier
@@ -178,10 +189,10 @@ fun NotesContent(
                 when {
                     choosingNotes -> PracticeNotePicker(
                         selected = state.practiceNotes,
-                        onToggle = onTogglePracticeNote,
+                        onToggle = actions.onTogglePracticeNote,
                         progress = state.progress,
                         soundOn = state.soundOn,
-                        onToggleSound = onToggleSound,
+                        onToggleSound = actions.onToggleSound,
                         onDone = { choosingNotes = false },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -189,7 +200,7 @@ fun NotesContent(
                     )
                     state.roundOver -> RoundSummary(
                         state = state,
-                        onPlayAgain = onPlayAgain,
+                        onPlayAgain = actions.onPlayAgain,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
@@ -198,7 +209,7 @@ fun NotesContent(
                         state = state,
                         placing = placing,
                         onPlacingChange = { placing = it },
-                        onNoteTapped = onNoteTapped,
+                        onNoteTapped = actions.onNoteTapped,
                     )
                 }
             }
@@ -243,7 +254,7 @@ private val HeadlineFloor = 11.sp
  */
 @Composable
 private fun HeroRow(
-    state: NotesUiState,
+    state: NotesRound,
     choosingNotes: Boolean,
     placing: Int?,
     onChoose: () -> Unit,
@@ -446,7 +457,7 @@ internal fun LetterDots(
  */
 @Composable
 private fun ColumnScope.Question(
-    state: NotesUiState,
+    state: NotesRound,
     placing: Int?,
     onPlacingChange: (Int?) -> Unit,
     onNoteTapped: (Int) -> Unit,
@@ -459,20 +470,11 @@ private fun ColumnScope.Question(
     // The burst is drawn over the staff in the same box and takes no touch, so the slide goes through to the staff.
     Box(Modifier.fillMaxWidth().weight(1f)) {
         NoteStaff(
-            currentMidi = state.currentMidi,
-            wrongTaps = state.wrongTaps,
-            lastWrongTap = state.lastWrongTap,
-            solved = state.solved,
-            practiceNotes = state.practiceNotes,
+            state = state,
             placing = placing,
             onPlacingChange = onPlacingChange,
             onNoteTapped = onNoteTapped,
             modifier = Modifier.fillMaxSize(),
-            phrase = state.phrase,
-            placed = state.placed,
-            locked = state.phrasePlaying,
-            hearing = state.hearing,
-            sounding = state.sounding,
         )
         StreakBurst(state.streak, Modifier.matchParentSize())
     }
@@ -495,7 +497,7 @@ private fun ColumnScope.Question(
  */
 @Composable
 internal fun FeedbackLine(
-    state: NotesUiState,
+    state: NotesRound,
     placing: Int?,
     modifier: Modifier = Modifier,
     maxFont: TextUnit = 32.sp,

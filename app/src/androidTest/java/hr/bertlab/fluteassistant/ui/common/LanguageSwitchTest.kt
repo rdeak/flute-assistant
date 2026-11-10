@@ -11,8 +11,8 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.FontScale
-import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
@@ -57,6 +57,7 @@ class LanguageSwitchTest {
      */
     @Test
     fun the_flags_do_not_grow_with_the_text_size() {
+        needsDevice()
         var fontScale by mutableFloatStateOf(1f)
         compose.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {

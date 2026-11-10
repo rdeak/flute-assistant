@@ -3,9 +3,11 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import hr.bertlab.fluteassistant.audio.TONE_VOLUME
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.Phrases
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
@@ -13,7 +15,6 @@ import hr.bertlab.fluteassistant.fakes.FakeClock
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeReferenceTonePlayer
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
-import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -103,7 +104,7 @@ class NotesViewModelTest {
             FakeReferenceTonePlayer.Played(
                 NoteMath.midiToFrequency(asked),
                 NotesViewModel.FEEDBACK_MS,
-                TunerViewModel.REFERENCE_TONE_VOLUME,
+                TONE_VOLUME,
             ),
             tonePlayer.played.single(),
         )
@@ -158,9 +159,9 @@ class NotesViewModelTest {
     @Test
     fun `ten notes end the round and play again starts fresh`() = runTest(dispatcher) {
         val vm = viewModel()
-        repeat(NotesUiState.ROUND_LENGTH) { answerRight(vm) }
+        repeat(NotesRound.ROUND_LENGTH) { answerRight(vm) }
         assertTrue(vm.state.value.roundOver)
-        assertEquals(NotesUiState.ROUND_LENGTH, vm.state.value.answered)
+        assertEquals(NotesRound.ROUND_LENGTH, vm.state.value.answered)
         assertFalse(vm.state.value.solved)
 
         val before = vm.state.value
@@ -262,7 +263,7 @@ class NotesViewModelTest {
     @Test
     fun `play again mid-feedback drops the old feedback`() = runTest(dispatcher) {
         val vm = viewModel()
-        repeat(NotesUiState.ROUND_LENGTH - 1) { answerRight(vm) }
+        repeat(NotesRound.ROUND_LENGTH - 1) { answerRight(vm) }
         vm.onNoteTapped(vm.current) // the tenth, still sounding
         val stopsBefore = tonePlayer.stopCount
         vm.resetRound()
@@ -348,7 +349,7 @@ class NotesViewModelTest {
         vm.onNoteTapped(vm.otherNote()) // a wrong first tap starts the clock too
         clock.now += 3_000L
         answerRight(vm) // note 1 found 3 s in; the feedback delay is dispatcher time, not clock time
-        repeat(NotesUiState.ROUND_LENGTH - 2) {
+        repeat(NotesRound.ROUND_LENGTH - 2) {
             clock.now += 3_000L
             answerRight(vm)
         }
@@ -365,7 +366,7 @@ class NotesViewModelTest {
         clock.now = 100_000L
         answerRight(vm)
         clock.now += 5_000L
-        repeat(NotesUiState.ROUND_LENGTH - 1) { answerRight(vm) }
+        repeat(NotesRound.ROUND_LENGTH - 1) { answerRight(vm) }
         assertEquals(5_000L, vm.state.value.roundMillis) // the new round timed from its own first tap
     }
 
@@ -374,7 +375,7 @@ class NotesViewModelTest {
         val vm = viewModel()
         (StaffNotes.DEFAULT_PRACTICE - setOf(60, 62)).forEach(vm::togglePracticeNote)
         repeat(10) {
-            repeat(NotesUiState.ROUND_LENGTH) { answerRight(vm) }
+            repeat(NotesRound.ROUND_LENGTH) { answerRight(vm) }
             assertTrue(vm.state.value.roundOver)
             val last = vm.current
             vm.resetRound()
@@ -494,7 +495,7 @@ class NotesViewModelTest {
 
         answerPhrase(vm) // three more: nine in all
         assertEquals(9, vm.state.value.answered)
-        assertEquals(Phrases.lengthFor(4, NotesUiState.ROUND_LENGTH - 9), vm.state.value.phrase.size)
+        assertEquals(Phrases.lengthFor(4, NotesRound.ROUND_LENGTH - 9), vm.state.value.phrase.size)
         assertEquals(2, vm.state.value.phrase.size)
         assertFalse(vm.state.value.roundOver)
 
@@ -506,10 +507,10 @@ class NotesViewModelTest {
     fun `ten answered notes end the round in hear too`() = runTest(dispatcher) {
         val vm = hearing()
         var phrases = 0
-        while (!vm.state.value.roundOver && phrases++ < NotesUiState.ROUND_LENGTH) answerPhrase(vm)
+        while (!vm.state.value.roundOver && phrases++ < NotesRound.ROUND_LENGTH) answerPhrase(vm)
         val state = vm.state.value
         assertTrue(state.roundOver)
-        assertEquals(NotesUiState.ROUND_LENGTH, state.results.size)
+        assertEquals(NotesRound.ROUND_LENGTH, state.results.size)
         assertFalse(state.solved)
         assertFalse(state.phrasePlaying)
         assertNotNull(state.roundMillis)
@@ -525,7 +526,7 @@ class NotesViewModelTest {
     @Test
     fun `a find round is logged when it ends too`() = runTest(dispatcher) {
         val vm = viewModel()
-        repeat(NotesUiState.ROUND_LENGTH) { answerRight(vm) }
+        repeat(NotesRound.ROUND_LENGTH) { answerRight(vm) }
         val round = logger.events("notes.round").single()
         assertEquals("FIND", round["game"])
         assertEquals(10, round["score"])
@@ -678,7 +679,7 @@ class NotesViewModelTest {
         FakeReferenceTonePlayer.Played(
             NoteMath.midiToFrequency(it),
             NotesViewModel.NOTE_MS,
-            TunerViewModel.REFERENCE_TONE_VOLUME,
+            TONE_VOLUME,
         )
     }
 
@@ -925,7 +926,7 @@ class NotesViewModelTest {
             FakeReferenceTonePlayer.Played(
                 NoteMath.midiToFrequency(phrase[1]),
                 NotesViewModel.NOTE_MS,
-                TunerViewModel.REFERENCE_TONE_VOLUME,
+                TONE_VOLUME,
             ),
             tonePlayer.played.last(),
         )
@@ -1129,11 +1130,11 @@ class NotesViewModelTest {
 
         // And the round's last phrase: the summary comes up with nothing lit.
         val last = hearing()
-        while (last.state.value.answered + (last.state.value.phrase.size - last.state.value.placed) < NotesUiState.ROUND_LENGTH) {
+        while (last.state.value.answered + (last.state.value.phrase.size - last.state.value.placed) < NotesRound.ROUND_LENGTH) {
             answerPhrase(last)
         }
         repeat(Phrases.MAX_LENGTH) { if (!last.state.value.solved) last.onNoteTapped(last.current) }
-        assertEquals(NotesUiState.ROUND_LENGTH, last.state.value.answered)
+        assertEquals(NotesRound.ROUND_LENGTH, last.state.value.answered)
         runCurrent()
         assertEquals(0, last.state.value.sounding)
 

@@ -6,17 +6,17 @@ package hr.bertlab.fluteassistant.ui.notes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import hr.bertlab.fluteassistant.audio.TONE_VOLUME
 import hr.bertlab.fluteassistant.audio.tuner.ReferenceTonePlayer
 import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
-import hr.bertlab.fluteassistant.domain.notes.Phrases
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.domain.repository.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
-import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,15 +25,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.max
 import kotlin.random.Random
 
 /**
- * One round of the notes tab, in either game, of [NotesUiState.ROUND_LENGTH] answered notes.
- * Find asks a note from the chosen set and judges each tap on the staff; Hear plays a short
- * phrase and asks for it back, note by note. Both sound what is found, and after the tenth
- * note wait for [resetRound]. The chosen notes and the game are remembered through [SettingsStore],
- * and so is the sticker book ([NotesUiState.progress]), which both games feed.
+ * The notes tab: it keeps the current [NotesRound], whose rules are the round's own
+ * ([NotesRound.tapped], [NotesRound.next], [NotesRound.open]), and does what a round cannot:
+ * it sounds what is found, plays Hear's phrase, waits out the feedback, and after the tenth
+ * note waits for [resetRound]. The chosen notes and the game are remembered through
+ * [SettingsStore], and so is the sticker book ([NotesRound.progress]), which both games feed.
  */
 @HiltViewModel
 class NotesViewModel internal constructor(
@@ -48,8 +47,8 @@ class NotesViewModel internal constructor(
     constructor(settings: SettingsStore, tonePlayer: ReferenceTonePlayer, clock: MonotonicClock, logger: Logger) :
         this(settings, tonePlayer, clock, logger, Random.Default)
 
-    private val _state: MutableStateFlow<NotesUiState>
-    val state: StateFlow<NotesUiState>
+    private val _state: MutableStateFlow<NotesRound>
+    val state: StateFlow<NotesRound>
 
     /**
      * The wait after a found note: Find's green second, after which the next note comes, and Hear's
@@ -61,11 +60,8 @@ class NotesViewModel internal constructor(
     /** Hear's playback of the phrase, heard or just answered; after an answer, when it ends the next phrase comes. */
     private var playbackJob: Job? = null
 
-    /** The [NotesUiState.phraseId] last played, so the screen showing a phrase again does not play it again. */
+    /** The [NotesRound.phraseId] last played, so the screen showing a phrase again does not play it again. */
     private var heardId = -1
-
-    /** When the round's first tap happened, so the summary can say how long the round took; null before it. */
-    private var roundStartedAt: Long? = null
 
     /**
      * True while the note this game started is still sounding. The player is a singleton the
@@ -77,124 +73,64 @@ class NotesViewModel internal constructor(
     init {
         val notes = StaffNotes.sanitize(settings.loadPracticeNotes())
         _state = MutableStateFlow(
-            openingState(
-                notes = notes,
-                game = settings.loadNotesGame(),
-                soundOn = settings.loadNoteSound(),
-                progress = settings.loadNoteProgress(),
-                previous = null,
-            ),
+            open(notes, settings.loadNotesGame(), settings.loadNoteSound(), settings.loadNoteProgress(), previous = null),
         )
         state = _state.asStateFlow()
     }
 
-    /** The child tapped the place of [midi] on the staff. Ignored while the last answer still shows or a phrase plays. */
+    /**
+     * The child tapped the place of [midi] on the staff ([NotesRound.tapped]; ignored while the last
+     * answer still shows or a phrase plays). A note found sounds, and the round moves on when its
+     * feedback is over: Find's green second, or the playback of Hear's finished phrase.
+     */
     fun onNoteTapped(midi: Int) {
-        val current = _state.value
-        if (current.solved || current.roundOver || current.phrasePlaying) return
-        val now = clock.nowMillis()
-        val startedAt = roundStartedAt ?: now.also { roundStartedAt = it }
-        if (midi == current.currentMidi) {
-            val firstTry = current.wrongTaps.isEmpty()
-            val streak = if (firstTry) current.streak + 1 else 0
-            val results = current.results + firstTry
-            val progress = if (firstTry) moveBook(current.progress, midi, found = true) else current.progress
-            val grew = progress.countOf(midi) > current.progress.countOf(midi)
-            // Find ends with every note; Hear only with the phrase's last, whose playback is the feedback.
-            val lastNote = !current.hearing || current.placed == current.phrase.size - 1
-            _state.update {
-                val scored = it.copy(
-                    taps = it.taps + 1,
-                    results = results,
-                    streak = streak,
-                    bestStreak = max(it.bestStreak, streak),
-                    progress = progress,
-                    grewThisRound = if (grew) it.grewThisRound + midi else it.grewThisRound,
-                    askedThisRound = it.askedThisRound + midi,
-                )
-                if (lastNote) {
-                    scored.copy(
-                        solved = true,
-                        roundMillis = if (results.size >= NotesUiState.ROUND_LENGTH) now - startedAt else it.roundMillis,
-                    )
-                } else {
-                    // The next column is live at once: no lock, no green second.
-                    scored.copy(
-                        placed = it.placed + 1,
-                        currentMidi = it.phrase[it.placed + 1],
-                        wrongTaps = emptySet(),
-                        lastWrongTap = null,
-                    )
+        val before = _state.value
+        val after = before.tapped(midi, clock.nowMillis())
+        if (after === before) return
+        _state.value = after
+        if (after.progress != before.progress) {
+            // Find and Hear both come through here, so they feed one book. A known note no longer
+            // changes, so `notes.known` is logged the one time a note reaches NoteProgress.KNOWN_AT.
+            settings.saveNoteProgress(after.progress)
+            val asked = before.currentMidi
+            if (after.progress.isKnown(asked) && !before.progress.isKnown(asked)) logger.i(LogTags.NOTES, "notes.known", "midi" to asked)
+        }
+        if (midi != before.currentMidi) return // a miss: its cross is all there is
+        when {
+            !before.hearing -> {
+                if (before.soundOn) soundNote(midi, FEEDBACK_MS)
+                feedbackJob?.cancel()
+                feedbackJob = viewModelScope.launch {
+                    delay(FEEDBACK_MS.toLong())
+                    if (tonePending) releasePlayer() // the data has played out; release the track
+                    advance()
                 }
             }
-            when {
-                !current.hearing -> {
-                    if (current.soundOn) soundNote(midi, FEEDBACK_MS)
-                    feedbackJob?.cancel()
-                    feedbackJob = viewModelScope.launch {
-                        delay(FEEDBACK_MS.toLong())
-                        if (tonePending) releasePlayer() // the data has played out; release the track
-                        advance()
-                    }
+            after.solved -> playPhrase(lead = false) // the phrase's last note: its playback is the feedback
+            else -> if (before.soundOn) {
+                soundNote(midi, NOTE_MS)
+                // Release the track when the note has played out, as Find does; the next column is live meanwhile.
+                feedbackJob?.cancel()
+                feedbackJob = viewModelScope.launch {
+                    delay(NOTE_MS.toLong())
+                    if (tonePending) releasePlayer()
                 }
-                lastNote -> playPhrase(lead = false)
-                else -> if (current.soundOn) {
-                    soundNote(midi, NOTE_MS)
-                    // Release the track when the note has played out, as Find does; the next column is live meanwhile.
-                    feedbackJob?.cancel()
-                    feedbackJob = viewModelScope.launch {
-                        delay(NOTE_MS.toLong())
-                        if (tonePending) releasePlayer()
-                    }
-                }
-            }
-        } else {
-            // Only the first miss for a note costs it a step; the rest of the crosses cost nothing more.
-            val progress = if (current.wrongTaps.isEmpty()) {
-                moveBook(current.progress, current.currentMidi, found = false)
-            } else {
-                current.progress
-            }
-            // A miss spoils the phrase for the staircase; Find has no phrase to spoil.
-            _state.update {
-                it.copy(
-                    wrongTaps = it.wrongTaps + midi,
-                    lastWrongTap = midi,
-                    taps = it.taps + 1,
-                    streak = 0,
-                    phraseClean = it.phraseClean && !it.hearing,
-                    progress = progress,
-                )
             }
         }
     }
 
-    /**
-     * [book] after [midi] was found on the first try ([found]) or missed for the first time, saved
-     * at once when it changed. Find and Hear both come through here, so they feed one book. A
-     * known note no longer changes, so `notes.known` is logged the one time a note reaches
-     * [NoteProgress.KNOWN_AT].
-     */
-    private fun moveBook(book: NoteProgress, midi: Int, found: Boolean): NoteProgress {
-        val moved = if (found) book.found(midi) else book.missed(midi)
-        if (moved == book) return book
-        settings.saveNoteProgress(moved)
-        if (moved.isKnown(midi) && !book.isKnown(midi)) logger.i(LogTags.NOTES, "notes.known", "midi" to midi)
-        return moved
-    }
-
     private fun soundNote(midi: Int, durationMs: Int) {
-        tonePlayer.play(NoteMath.midiToFrequency(midi), durationMs, TunerViewModel.REFERENCE_TONE_VOLUME)
+        tonePlayer.play(NoteMath.midiToFrequency(midi), durationMs, TONE_VOLUME)
         tonePending = true
     }
 
     /**
      * Plays the phrase on screen, tone by tone, from the start; one already playing is cut. The
      * phrase sounds whether Sound is on or not: it is the question, and a silent reward is
-     * nothing. A phrase just answered ([NotesUiState.solved]) moves on when it has played, the
+     * nothing. A phrase just answered ([NotesRound.solved]) moves on when it has played, the
      * playback being its feedback. With [lead] the playback first waits [LEAD_MS], a breath for a
      * phrase that has just come on screen; the phrase counts as playing from the start of it, but
-     * no note is [NotesUiState.sounding] yet. Each note is `sounding` while its tone lasts.
+     * no note is [NotesRound.sounding] yet. Each note is `sounding` while its tone lasts.
      */
     private fun playPhrase(lead: Boolean) {
         // A placed note's release is still due; it would cut the first tone short.
@@ -210,7 +146,7 @@ class NotesViewModel internal constructor(
             if (lead) delay(LEAD_MS.toLong())
             for ((index, midi) in shown.phrase.withIndex()) {
                 _state.update { it.copy(sounding = index) }
-                tonePlayer.play(NoteMath.midiToFrequency(midi), NOTE_MS, TunerViewModel.REFERENCE_TONE_VOLUME)
+                tonePlayer.play(NoteMath.midiToFrequency(midi), NOTE_MS, TONE_VOLUME)
                 tonePending = true
                 delay(NOTE_MS.toLong())
                 _state.update { it.copy(sounding = null) }
@@ -224,7 +160,7 @@ class NotesViewModel internal constructor(
     }
 
     /**
-     * The screen shows a phrase and wants it played, once per [NotesUiState.phraseId]: showing
+     * The screen shows a phrase and wants it played, once per [NotesRound.phraseId]: showing
      * the same one again (the screen came back) plays nothing.
      */
     fun onPhraseShown() {
@@ -240,50 +176,11 @@ class NotesViewModel internal constructor(
         playPhrase(lead = false)
     }
 
-    /** Ends the round after the tenth note; otherwise puts the next note, or the next phrase, up. */
+    /** Ends the round after the tenth note; otherwise puts the next note, or the next phrase, up ([NotesRound.next]). */
     private fun advance() {
-        val current = _state.value
-        val next = when {
-            current.results.size >= NotesUiState.ROUND_LENGTH ->
-                current.copy(
-                    solved = false,
-                    wrongTaps = emptySet(),
-                    lastWrongTap = null,
-                    phrasePlaying = false,
-                    sounding = null,
-                    roundOver = true,
-                )
-            current.hearing -> {
-                val length = Phrases.nextLength(current.phraseLength, current.phraseClean)
-                val left = NotesUiState.ROUND_LENGTH - current.answered
-                val phrase = Phrases.draw(
-                    current.practiceNotes,
-                    Phrases.lengthFor(length, left),
-                    random,
-                    avoidFirst = current.phrase.first(),
-                )
-                logPhrase(phrase, current.phraseId + 1)
-                current.copy(
-                    solved = false,
-                    wrongTaps = emptySet(),
-                    lastWrongTap = null,
-                    phrasePlaying = false,
-                    sounding = null,
-                    phrase = phrase,
-                    placed = 1,
-                    currentMidi = phrase[1],
-                    phraseId = current.phraseId + 1,
-                    phraseLength = length,
-                    phraseClean = true,
-                )
-            }
-            else -> current.copy(
-                solved = false,
-                wrongTaps = emptySet(),
-                lastWrongTap = null,
-                currentMidi = draw(current.practiceNotes, avoid = current.currentMidi),
-            )
-        }
+        val before = _state.value
+        val next = before.next(random)
+        if (next.phraseId != before.phraseId) logPhrase(next)
         _state.value = next
         if (next.roundOver) {
             logger.d(
@@ -334,58 +231,24 @@ class NotesViewModel internal constructor(
         feedbackJob?.cancel()
         playbackJob?.cancel()
         if (tonePending) releasePlayer()
-        roundStartedAt = null
         val previous = _state.value
-        _state.value = openingState(notes, game, previous.soundOn, previous.progress, previous)
+        _state.value = open(notes, game, previous.soundOn, previous.progress, previous)
     }
 
-    /**
-     * What a round opens with over [notes] in [game]. [previous] is the screen it replaces, null
-     * at the start: the round does not open with its note, or its phrase's first note, again,
-     * and the sound switch, the progress and the phrase counter go on. Hear opens with two notes,
-     * the first given; nothing sounds here.
-     */
-    private fun openingState(
-        notes: Set<Int>,
-        game: NotesGame,
-        soundOn: Boolean,
-        progress: NoteProgress,
-        previous: NotesUiState?,
-    ): NotesUiState {
-        val phraseId = previous?.phraseId ?: 0
-        if (game == NotesGame.FIND) {
-            return NotesUiState(
-                practiceNotes = notes,
-                currentMidi = draw(notes, avoid = previous?.currentMidi),
-                soundOn = soundOn,
-                phraseId = phraseId,
-                progress = progress,
-            )
-        }
-        val phrase = Phrases.draw(notes, Phrases.MIN_LENGTH, random, avoidFirst = previous?.phrase?.firstOrNull())
-        logPhrase(phrase, phraseId + 1)
-        return NotesUiState(
-            practiceNotes = notes,
-            currentMidi = phrase[1],
-            soundOn = soundOn,
-            game = game,
-            phrase = phrase,
-            placed = 1,
-            phraseId = phraseId + 1,
-            progress = progress,
-        )
-    }
+    /** A fresh round ([NotesRound.open]), nothing sounding yet; Hear's first phrase is logged. */
+    private fun open(notes: Set<Int>, game: NotesGame, soundOn: Boolean, progress: NoteProgress, previous: NotesRound?): NotesRound =
+        NotesRound.open(notes, game, soundOn, progress, random, previous).also { if (it.hearing) logPhrase(it) }
 
     /**
-     * A phrase drawn, with the [phraseId] it goes on screen with: every reset and every note switched in the
+     * The phrase [round] drew, with the id it goes on screen with: every reset and every note switched in the
      * picker draws one, so the id tells a phrase nobody saw from the next one, which replaced it.
      */
-    private fun logPhrase(phrase: List<Int>, phraseId: Int) {
+    private fun logPhrase(round: NotesRound) {
         logger.d(
             LogTags.NOTES, "notes.phrase",
-            "length" to phrase.size,
-            "notes" to phrase.joinToString(" "),
-            "phraseId" to phraseId,
+            "length" to round.phrase.size,
+            "notes" to round.phrase.joinToString(" "),
+            "phraseId" to round.phraseId,
         )
     }
 
@@ -421,12 +284,6 @@ class NotesViewModel internal constructor(
     private fun releasePlayer() {
         tonePlayer.stop()
         tonePending = false
-    }
-
-    /** A random note from [notes], not [avoid] unless it is the only one. */
-    private fun draw(notes: Set<Int>, avoid: Int?): Int {
-        val candidates = (notes - setOfNotNull(avoid)).ifEmpty { notes }.sorted()
-        return candidates[random.nextInt(candidates.size)]
     }
 
     override fun onCleared() {

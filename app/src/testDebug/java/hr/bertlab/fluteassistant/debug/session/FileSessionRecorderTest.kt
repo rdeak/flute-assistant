@@ -3,8 +3,8 @@
 
 package hr.bertlab.fluteassistant.debug.session
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.core.log.LogTags
+import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pulse
@@ -13,12 +13,12 @@ import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
-import hr.bertlab.fluteassistant.ui.flute.ListenFrame
-import hr.bertlab.fluteassistant.ui.tuner.FrameDecision
-import hr.bertlab.fluteassistant.ui.tuner.Hearing
-import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

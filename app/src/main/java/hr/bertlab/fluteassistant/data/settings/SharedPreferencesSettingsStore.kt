@@ -9,13 +9,13 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.flute.Songbook
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.ThemeChoice
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.domain.repository.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.ThemeChoice
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import javax.inject.Inject

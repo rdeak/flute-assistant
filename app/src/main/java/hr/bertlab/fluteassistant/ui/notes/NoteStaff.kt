@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toSize
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -129,8 +130,8 @@ private const val G_LINE = 4
 private const val LEDGER_HALF = 1f
 
 /**
- * A treble staff that fills whatever height it is given: the places shown are
- * [StaffNotes.visiblePositions] of [practiceNotes] (the staff and its two neighbouring spaces,
+ * The staff of the round in [state]. A treble staff that fills whatever height it is given: the places shown are
+ * [StaffNotes.visiblePositions] of [NotesRound.practiceNotes] (the staff and its two neighbouring spaces,
  * plus the ledger-line notes only as far as a chosen note needs them), and the size of a place
  * follows from the height, so the fewer places the bigger they are. Every place is a
  * full-width band, the spaces faintly tinted, the lines thick in the text colour, the clef
@@ -139,24 +140,24 @@ private const val LEDGER_HALF = 1f
  * The child answers by touch and slide: a finger down puts a see-through note on the nearest
  * place ([placing], reported through [onPlacingChange]) and turns its band yellow; it follows
  * the finger with a small tick at each new place, and lifting the finger answers that place
- * through [onNoteTapped]. Sliding off the staff cancels. Each of [wrongTaps] gets a cross,
- * the latest ([lastWrongTap]) with an arrow pointing up or down towards [currentMidi]; once
- * [solved], the note sits on its place in its letter's colour with sparkles. The staff takes
- * no touch while the answer shows, nor while the phrase sounds ([locked]).
+ * through [onNoteTapped]. Sliding off the staff cancels. Each of [NotesRound.wrongTaps] gets a cross,
+ * the latest ([NotesRound.lastWrongTap]) with an arrow pointing up or down towards [NotesRound.currentMidi]; once
+ * [NotesRound.solved], the note sits on its place in its letter's colour with sparkles. The staff takes
+ * no touch while the answer shows, nor while the phrase sounds ([NotesRound.phrasePlaying]).
  *
- * In Hear the staff holds the whole [phrase] across the width, one column a note
- * ([phraseColumns]): the first [placed] notes sit in their columns in their letters' colours
+ * In Hear the staff holds the whole [NotesRound.phrase] across the width, one column a note
+ * ([phraseColumns]): the first [NotesRound.placed] notes sit in their columns in their letters' colours
  * (never with sparkles or dashes, as they are given or done), and everything else above, the
  * far places' dashed ledger stubs, the see-through note, the crosses and the sparkles of the
- * last note, belongs to the column of the note to place, [placed]. In Find the [phrase] is
- * empty and the staff is the one column in the middle. [hearing] only changes the staff's
+ * last note, belongs to the column of the note to place, [NotesRound.placed]. In Find the [NotesRound.phrase] is
+ * empty and the staff is the one column in the middle. [NotesRound.hearing] only changes the staff's
  * description for a screen reader.
  *
  * Under every note, in Hear, a slot for each note still to find: a dashed capsule in its column from the
  * top place to the bottom one with a ❓ in it, the next one pale yellow and the later ones faint, so the child
  * sees what the staff is asking and how much is left (the first child test, 2026-11-09). The ❓ of the note to
  * place gives way to the see-through note while a finger is down, and every ❓ gives way to the crosses while a
- * wrong tap stands. While the phrase plays, the note at index [sounding] lights: a halo behind its head, or
+ * wrong tap stands. While the phrase plays, the note at index [NotesRound.sounding] lights: a halo behind its head, or
  * its slot a strong yellow with a bigger ❓. Slots are drawn before every note, so a slot never hides one.
  *
  * For assistive technology every place is also a button named by position, never by note
@@ -164,21 +165,22 @@ private const val LEDGER_HALF = 1f
  */
 @Composable
 fun NoteStaff(
-    currentMidi: Int,
-    wrongTaps: Set<Int>,
-    lastWrongTap: Int?,
-    solved: Boolean,
-    practiceNotes: Set<Int>,
+    state: NotesRound,
     placing: Int?,
     onPlacingChange: (Int?) -> Unit,
     onNoteTapped: (Int) -> Unit,
     modifier: Modifier = Modifier,
-    phrase: List<Int> = emptyList(),
-    placed: Int = 0,
-    locked: Boolean = false,
-    hearing: Boolean = false,
-    sounding: Int? = null,
 ) {
+    val currentMidi = state.currentMidi
+    val wrongTaps = state.wrongTaps
+    val lastWrongTap = state.lastWrongTap
+    val solved = state.solved
+    val practiceNotes = state.practiceNotes
+    val phrase = state.phrase
+    val placed = state.placed
+    val locked = state.phrasePlaying
+    val hearing = state.hearing
+    val sounding = state.sounding
     val colors = FluteTheme.colors
     val haptics = LocalHapticFeedback.current
     val staffDescription = stringResource(if (hearing) R.string.staff_description_hear else R.string.staff_description)

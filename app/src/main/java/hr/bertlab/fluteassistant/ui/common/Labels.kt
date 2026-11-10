@@ -18,12 +18,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 
 /*
  * Display names live in string resources so the app can be localised (English by default,
@@ -43,6 +43,16 @@ fun NotesGame.labelRes(): Int = when (this) {
     NotesGame.HEAR -> R.string.hear_game
 }
 
+/** The animal's name, for a screen reader: the speed is never read as a number. */
+@StringRes
+fun TempoBand.labelRes(): Int = when (this) {
+    TempoBand.SNAIL -> R.string.band_snail
+    TempoBand.TURTLE -> R.string.band_turtle
+    TempoBand.DUCK -> R.string.band_duck
+    TempoBand.RABBIT -> R.string.band_rabbit
+    TempoBand.CHEETAH -> R.string.band_cheetah
+}
+
 /** The advice line's words, or null when there is nothing to say. */
 @StringRes
 fun TunerAdvice.labelRes(): Int? = when (this) {
@@ -56,10 +66,6 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.CHECK_FINGERS -> R.string.advice_check_fingers
     TunerAdvice.PLAY_AGAIN -> R.string.advice_play_again
 }
-
-/** One line for the playback notification, e.g. "120 BPM · 4/4". */
-fun MetronomeConfig.summary(resources: Resources): String =
-    resources.getString(R.string.config_summary, bpm, timeSignature.label)
 
 /**
  * Note name with octave for a MIDI number in the user's language. English uses scientific

@@ -23,14 +23,14 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.RETRY_STAR_ALPHA
+import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.dashedBorder
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
-
-/** A star for a note that took more than one try: still earned, but faint. */
-const val RETRY_STAR_ALPHA = 0.35f
 
 /**
  * One place per note of the round: a star when found on the first try, a faint star when it
@@ -48,9 +48,9 @@ fun RoundProgress(
 ) {
     val description = pluralStringResource(
         R.plurals.round_progress,
-        NotesUiState.ROUND_LENGTH,
+        NotesRound.ROUND_LENGTH,
         results.size,
-        NotesUiState.ROUND_LENGTH,
+        NotesRound.ROUND_LENGTH,
     )
     if (twoColumns) {
         Row(
@@ -59,8 +59,8 @@ fun RoundProgress(
         ) {
             repeat(2) { column ->
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    repeat(NotesUiState.ROUND_LENGTH / 2) { row ->
-                        Place(index = column * (NotesUiState.ROUND_LENGTH / 2) + row, results = results, roundOver = roundOver)
+                    repeat(NotesRound.ROUND_LENGTH / 2) { row ->
+                        Place(index = column * (NotesRound.ROUND_LENGTH / 2) + row, results = results, roundOver = roundOver)
                     }
                 }
             }
@@ -75,7 +75,7 @@ fun RoundProgress(
             .height(32.dp)
             .clearAndSetSemantics { contentDescription = description },
     ) {
-        repeat(NotesUiState.ROUND_LENGTH) { index -> Place(index, results, roundOver) }
+        repeat(NotesRound.ROUND_LENGTH) { index -> Place(index, results, roundOver) }
     }
 }
 
@@ -105,5 +105,3 @@ private fun Place(index: Int, results: List<Boolean>, roundOver: Boolean) {
         }
     }
 }
-
-const val STAR_EMOJI = "⭐" // star

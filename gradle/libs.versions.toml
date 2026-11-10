@@ -16,6 +16,8 @@ coroutines = "1.11.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
+# Runs the screen tests on the JVM; see the sourceSets block in app/build.gradle.kts.
+robolectric = "4.17"
 
 [libraries]
 # Kotlin Gradle plugin, only used on the root build classpath to raise AGP's built-in Kotlin version.
@@ -51,6 +53,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

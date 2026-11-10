@@ -1,1 +1,1 @@
-How the digital flute works, with the reasons behind it, is in `../../ui/flute/CLAUDE.md`, and the songbook (`Songbook.kt`, the books and their storage) in `../../ui/flute/SONGBOOK.md`; read them before changing anything here.
+The rules of the digital flute. What must not be broken is in `../../ui/flute/CLAUDE.md`; how it works, with the reasons behind it, is in `../../ui/flute/DESIGN.md`, and the songbook (`Songbook.kt`, the books and their storage) in `../../ui/flute/SONGBOOK.md`. Read the part that covers what you change before changing it.

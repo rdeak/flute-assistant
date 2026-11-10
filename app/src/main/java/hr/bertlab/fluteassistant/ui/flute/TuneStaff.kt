@@ -82,12 +82,15 @@ import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.flute.WrongNote
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.RETRY_STAR_ALPHA
+import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
@@ -112,8 +115,6 @@ import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.TOP_LINE_Y
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.partWidth
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.slotWidth
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.yOf
-import hr.bertlab.fluteassistant.ui.notes.RETRY_STAR_ALPHA
-import hr.bertlab.fluteassistant.ui.notes.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import hr.bertlab.fluteassistant.ui.theme.Nunito

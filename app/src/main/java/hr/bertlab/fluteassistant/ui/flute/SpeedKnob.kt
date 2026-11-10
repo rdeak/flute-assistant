@@ -24,12 +24,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.AppTab
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.PressDepth
 import hr.bertlab.fluteassistant.ui.common.facingRight
-import hr.bertlab.fluteassistant.ui.metronome.tempoBand
+import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
@@ -52,7 +53,7 @@ fun SpeedKnob(
     running: Boolean = false,
 ) {
     val band = tempoBand(bpm)
-    val description = stringResource(R.string.flute_speed_knob, stringResource(band.labelRes))
+    val description = stringResource(R.string.flute_speed_knob, stringResource(band.labelRes()))
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     Box(modifier) {

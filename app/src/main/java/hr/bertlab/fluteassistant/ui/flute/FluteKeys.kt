@@ -90,19 +90,19 @@ private const val EraseRepeatMs = 120L
  * The fifteen keys ([StaffNotes.ALL]) in three rows, one per octave, highest on top as on
  * the staff (c3 alone, then c2 to h2, then c1 to h1), each key in its letter's colour with
  * its name; the key of [litMidi] sinks onto its shadow inside a yellow ring. A finger down
- * calls [onPress] at once and the finger lifting, or sliding off, calls [onRelease]; sliding
+ * calls [FluteActions.onKeyPressed] at once and the finger lifting, or sliding off, calls [FluteActions.onKeyReleased]; sliding
  * onto another key does not press it, so every note in the tune is a deliberate tap. A
- * screen reader activates a key through [onActivate]. Every row is [keyHeight] tall, [KeyHeight] as
+ * screen reader activates a key through [FluteActions.onKeyActivated]. Every row is [keyHeight] tall, [KeyHeight] as
  * on the canvas unless the phone is on its side, and the three rows sit centred in the height they
  * are given. A key's width comes from the width given, less [keyGap] between each two keys.
  *
  * At the end of the top row, apart from c3 with the rest of the row empty between, stand three
  * plain keys, each one note key wide and over a note key of the row below (g2, a2, h2), so a tool is
  * never bigger than a note and a slip off c3 lands on nothing (since 2026-11-05; before that they
- * were two keys wide each and filled the row): the rest key (💤), held like a note key ([onRestPress],
- * [onRestRelease], [onRestActivate]) and sunk while [restLit], the breath key (😮‍💨), which calls
- * [onBreath] as the finger goes down (the rest before the breath since 2026-11-05, at the user's
- * request; the other way round before), and the erase key (🧽), which calls [onErase] as the
+ * were two keys wide each and filled the row): the rest key (💤), held like a note key ([FluteActions.onRestPressed],
+ * [FluteActions.onRestReleased], [FluteActions.onRestActivated]) and sunk while [restLit], the breath key (😮‍💨), which calls
+ * [FluteActions.onBreath] as the finger goes down (the rest before the breath since 2026-11-05, at the user's
+ * request; the other way round before), and the erase key (🧽), which calls [FluteActions.onEraseLast] as the
  * finger goes down and again and again while it stays, like a keyboard's backspace, faded and inert
  * while [eraseEnabled] is false (in the key row since 2026-11-04, at the user's request; it was a
  * round button at the end of the Play row).
@@ -111,15 +111,8 @@ private const val EraseRepeatMs = 120L
 fun FluteKeys(
     litMidi: Int?,
     restLit: Boolean,
-    onPress: (Int) -> Unit,
-    onRelease: (Int) -> Unit,
-    onActivate: (Int) -> Unit,
-    onRestPress: () -> Unit,
-    onRestRelease: () -> Unit,
-    onRestActivate: () -> Unit,
-    onBreath: () -> Unit,
     eraseEnabled: Boolean,
-    onErase: () -> Unit,
+    actions: FluteActions,
     modifier: Modifier = Modifier,
     keyHeight: Dp = KeyHeight,
     keyGap: Dp = KeyGap,
@@ -153,9 +146,9 @@ fun FluteKeys(
                         FluteKey(
                             midi = midi,
                             lit = midi == litMidi,
-                            onPress = onPress,
-                            onRelease = onRelease,
-                            onActivate = onActivate,
+                            onPress = actions.onKeyPressed,
+                            onRelease = actions.onKeyReleased,
+                            onActivate = actions.onKeyActivated,
                             modifier = Modifier
                                 .width(keyWidth)
                                 .fillMaxHeight(),
@@ -172,22 +165,22 @@ fun FluteKeys(
                         }
                         RestKey(
                             lit = restLit,
-                            onPress = onRestPress,
-                            onRelease = onRestRelease,
-                            onActivate = onRestActivate,
+                            onPress = actions.onRestPressed,
+                            onRelease = actions.onRestReleased,
+                            onActivate = actions.onRestActivated,
                             modifier = Modifier
                                 .width(keyWidth)
                                 .fillMaxHeight(),
                         )
                         BreathKey(
-                            onBreath = onBreath,
+                            onBreath = actions.onBreath,
                             modifier = Modifier
                                 .width(keyWidth)
                                 .fillMaxHeight(),
                         )
                         EraseKey(
                             enabled = eraseEnabled,
-                            onErase = onErase,
+                            onErase = actions.onEraseLast,
                             modifier = Modifier
                                 .width(keyWidth)
                                 .fillMaxHeight(),

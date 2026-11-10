@@ -18,7 +18,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
@@ -33,7 +34,6 @@ import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import hr.bertlab.fluteassistant.ui.metronome.TempoWheelState
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.ActionStop
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 
 /*
  * The flute on a phone on its side (spec `2026-11-05-landscape-design.md`, "Flute"; mockups

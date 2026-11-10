@@ -1,17 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
 
-package hr.bertlab.fluteassistant.ui.flute
+package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
-import hr.bertlab.fluteassistant.domain.flute.Pulse
-import hr.bertlab.fluteassistant.domain.flute.StepMark
-import hr.bertlab.fluteassistant.domain.flute.TuneItem
-import hr.bertlab.fluteassistant.domain.flute.Verdict
-import hr.bertlab.fluteassistant.ui.tuner.FrameDecision
-import hr.bertlab.fluteassistant.ui.tuner.Hearing
-import hr.bertlab.fluteassistant.ui.tuner.NoteOnsetTracker
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 
 /**
  * What the phone did with one microphone frame of a "Your turn" run: the frame itself, what
@@ -39,7 +35,7 @@ data class ListenFrame(
 /**
  * Keeps a "Your turn" run for inspection afterwards: [start] when the child presses the button
  * (before the microphone opens, with the tune on the staff, the pulse it was written in and the
- * room's floor the tracker still holds), [frame] for every frame the view model processed, in
+ * room's floor the tracker still holds), [frame] for every frame the run processed, in
  * order, [end] with the marks when the run is over. The debug build records every run into a
  * folder on the phone (`ui/flute/CLAUDE.md`, "Sessions"); the release build binds [None] and
  * keeps nothing.

@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,7 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
@@ -45,17 +47,15 @@ import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
-import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeMinHeight
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeStage
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
-import hr.bertlab.fluteassistant.ui.metronome.MetronomeViewModel
 import hr.bertlab.fluteassistant.ui.metronome.closesTempoWheel
 import hr.bertlab.fluteassistant.ui.metronome.rememberTempoWheelState
-import hr.bertlab.fluteassistant.ui.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.ActionListen
 import hr.bertlab.fluteassistant.ui.theme.ActionStop
@@ -63,11 +63,10 @@ import hr.bertlab.fluteassistant.ui.theme.ActionStop
 /**
  * Stateful entry point: opens the flute's sound while the screen is started (visible) and
  * closes it when it stops, the way the tuner holds the microphone, then renders the stateless
- * [FluteContent]. The [metronome] state and view model are the metronome tab's own: the speed knob
- * on the staff shows its tempo and the panel the knob opens sets it, and a book picked on the shelf
- * with a tune in it gives the metronome that tune's speed and beat ([FluteViewModel.openBook] first
- * reads the metronome's for the book left, so the metronome's setters run only after it returns;
- * an empty book or the open one leaves the metronome as it is). "Your turn" needs the
+ * [FluteContent]. The [metronome] state is the metronome tab's own, for the speed knob on the
+ * staff, the staff's time signature and the panel the knob opens; what that panel sets, and the
+ * speed and beat a picked book brings, go through [FluteViewModel] to the one place the tempo and
+ * the beat are kept, so this screen needs nothing else of the metronome's. "Your turn" needs the
  * microphone: a tap with RECORD_AUDIO granted starts listening at once, without it the tap asks
  * the phone and the answer goes to [FluteViewModel.onMicResult] (a yes listens, a no shows the
  * microphone card, whose "Yes" asks again and whose "Settings" opens the app's page). The tab never
@@ -78,7 +77,6 @@ fun FluteScreen(
     state: FluteUiState,
     viewModel: FluteViewModel,
     metronome: MetronomeUiState,
-    metronomeViewModel: MetronomeViewModel,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -91,44 +89,73 @@ fun FluteScreen(
         viewModel.enterTab()
         onStopOrDispose { viewModel.leaveTab() }
     }
-    FluteContent(
-        state = state,
-        metronome = metronome,
-        onKeyPressed = viewModel::onKeyPressed,
-        onKeyReleased = viewModel::onKeyReleased,
-        onKeyActivated = viewModel::onKeyActivated,
-        onRestPressed = viewModel::onRestPressed,
-        onRestReleased = viewModel::onRestReleased,
-        onRestActivated = viewModel::onRestActivated,
-        onBreath = viewModel::onBreath,
-        onTogglePlayback = viewModel::togglePlayback,
-        onEraseLast = viewModel::eraseLast,
-        onYourTurn = {
-            if (micGranted()) viewModel.startListening() else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        },
-        onStop = viewModel::stopRun,
-        onBpmChange = metronomeViewModel::setBpm,
-        onTimeSignatureChange = metronomeViewModel::setTimeSignature,
-        onSpeedOpen = viewModel::openSpeed,
-        onSpeedDone = viewModel::closeSpeed,
-        onShelfOpen = viewModel::openShelf,
-        onBookChosen = { index ->
-            // openBook reads the metronome's speed and beat for the book left, so the setters come after it.
-            viewModel.openBook(index)?.let { pulse ->
-                metronomeViewModel.setBpm(pulse.bpm)
-                metronomeViewModel.setTimeSignature(pulse.timeSignature)
-            }
-        },
-        onRequestMic = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-        onOpenSettings = {
-            context.startActivity(
-                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
-            )
-        },
-        onMicDismiss = viewModel::dismissMic,
-        modifier = modifier,
-    )
+    val actions = remember(viewModel, micLauncher, context) {
+        FluteActions(
+            onKeyPressed = viewModel::onKeyPressed,
+            onKeyReleased = viewModel::onKeyReleased,
+            onKeyActivated = viewModel::onKeyActivated,
+            onRestPressed = viewModel::onRestPressed,
+            onRestReleased = viewModel::onRestReleased,
+            onRestActivated = viewModel::onRestActivated,
+            onBreath = viewModel::onBreath,
+            onEraseLast = viewModel::eraseLast,
+            onTogglePlayback = viewModel::togglePlayback,
+            onYourTurn = {
+                if (micGranted()) viewModel.startListening() else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            },
+            onStop = viewModel::stopRun,
+            onBpmChange = viewModel::setBpm,
+            onTimeSignatureChange = viewModel::setTimeSignature,
+            onSpeedOpen = viewModel::openSpeed,
+            onSpeedDone = viewModel::closeSpeed,
+            onShelfOpen = viewModel::openShelf,
+            onBookChosen = viewModel::openBook,
+            onRequestMic = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+            onOpenSettings = {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
+                )
+            },
+            onMicDismiss = viewModel::dismissMic,
+        )
+    }
+    FluteContent(state = state, metronome = metronome, actions = actions, modifier = modifier)
 }
+
+/**
+ * Everything the flute tab can ask for, as one object, so [FluteContent] takes its state and this
+ * rather than a callback for every key and button. Each action defaults to doing nothing, so a
+ * test names only the ones it looks at.
+ */
+class FluteActions(
+    val onKeyPressed: (Int) -> Unit = {},
+    val onKeyReleased: (Int) -> Unit = {},
+    val onKeyActivated: (Int) -> Unit = {},
+    val onRestPressed: () -> Unit = {},
+    val onRestReleased: () -> Unit = {},
+    val onRestActivated: () -> Unit = {},
+    val onBreath: () -> Unit = {},
+    val onEraseLast: () -> Unit = {},
+    /** Play. */
+    val onTogglePlayback: () -> Unit = {},
+    /** "Your turn"; the stateful entry asks for the microphone first if need be. */
+    val onYourTurn: () -> Unit = {},
+    /** The one wide Stop while the tune runs. */
+    val onStop: () -> Unit = {},
+    /** The speed panel's ring and beat buttons: they set the metronome's tempo and beat. */
+    val onBpmChange: (Int) -> Unit = {},
+    val onTimeSignatureChange: (TimeSignature) -> Unit = {},
+    /** The speed knob was tapped, and OK on the panel it opens. */
+    val onSpeedOpen: () -> Unit = {},
+    val onSpeedDone: () -> Unit = {},
+    /** The book button was tapped, and a book of the shelf picked (its index). */
+    val onShelfOpen: () -> Unit = {},
+    val onBookChosen: (Int) -> Unit = {},
+    /** The microphone card, while [FluteUiState.micDenied]: Yes, Settings and Not now. */
+    val onRequestMic: () -> Unit = {},
+    val onOpenSettings: () -> Unit = {},
+    val onMicDismiss: () -> Unit = {},
+)
 
 private val PlayRowHeight = 84.dp
 private val PlayShadow = 8.dp
@@ -148,11 +175,11 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * in the last "Your turn", and over the staff's top left the [SpeedKnob], the
  * metronome's animal for the tempo in [metronome], where printed music writes the tempo, and under
  * the clef, beside the names, the [BookButton], the sweet of the open book ([FluteUiState.openBook]),
- * whose tap is [onShelfOpen]; then the octave rows of [FluteKeys], with the rest, the breath and
- * the erase key ([onEraseLast], faded while the tune is empty) at the end of the top row, apart
+ * whose tap is [FluteActions.onShelfOpen]; then the octave rows of [FluteKeys], with the rest, the breath and
+ * the erase key ([FluteActions.onEraseLast], faded while the tune is empty) at the end of the top row, apart
  * from c3, taking the height left, and the Play row: two big buttons sharing its width, each stacking its icon over its
- * word, "Play" (green, [onTogglePlayback], faded while the tune is empty) and "Your turn" (blue,
- * [onYourTurn], faded while the tune holds no note). On an ordinary phone held
+ * word, "Play" (green, [FluteActions.onTogglePlayback], faded while the tune is empty) and "Your turn" (blue,
+ * [FluteActions.onYourTurn], faded while the tune holds no note). On an ordinary phone held
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
  * and the whole screen scrolls.
  *
@@ -163,20 +190,20 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
  * waiting over the step the child is to play), the knob itself empty and inert, and the book button faded and inert,
  * still showing its sweet, which does not walk the staff; between the stage and the bottom
  * row the tuner's advice line speaks only while the sound stays unclear, and the bottom row is one
- * wide red Stop ([onStop]) where Play was, so the thumb finds it. The marks stay when the run
- * ends. The microphone's permission is the stateful entry's business ([onRequestMic],
- * [onOpenSettings], [onMicDismiss] serve the microphone card while [FluteUiState.micDenied]).
+ * wide red Stop ([FluteActions.onStop]) where Play was, so the thumb finds it. The marks stay when the run
+ * ends. The microphone's permission is the stateful entry's business ([FluteActions.onRequestMic],
+ * [FluteActions.onOpenSettings], [FluteActions.onMicDismiss] serve the microphone card while [FluteUiState.micDenied]).
  *
- * A tap on the knob ([onSpeedOpen]) swaps all of that, in place, for the metronome tab's own
+ * A tap on the knob ([FluteActions.onSpeedOpen]) swaps all of that, in place, for the metronome tab's own
  * [MetronomeStage] (the beat bubbles with their − and +, the tempo ring with its wheel, set
- * through [onTimeSignatureChange] and [onBpmChange]) and one big green OK. OK ([onSpeedDone])
+ * through [FluteActions.onTimeSignatureChange] and [FluteActions.onBpmChange]) and one big green OK. OK ([FluteActions.onSpeedDone])
  * is the only way back, as the notes tab's picker is; the choice survives rotation. The panel
  * lays out as the metronome tab does, shrinking its ring to a short screen and scrolling only
  * below [MetronomeMinHeight].
  *
- * A tap on the book button ([onShelfOpen]) swaps the stage, the keys and the Play row, in place,
+ * A tap on the book button ([FluteActions.onShelfOpen]) swaps the stage, the keys and the Play row, in place,
  * for the [TuneShelf]: the six books ([FluteUiState.shelf]), the open one's cover yellow. One tap
- * on a book closes the shelf and is [onBookChosen] with its index, the open book's too (which
+ * on a book closes the shelf and is [FluteActions.onBookChosen] with its index, the open book's too (which
  * changes nothing). Unlike the speed panel there is no OK; as in the panel and the notes picker,
  * the back button is not handled. An open shelf survives rotation as the panel does. Its three rows share the height and scroll only
  * below [ShelfMinHeight]; on its side the six books stand in one row, which never scrolls.
@@ -189,26 +216,7 @@ private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
 fun FluteContent(
     state: FluteUiState,
     metronome: MetronomeUiState,
-    onKeyPressed: (Int) -> Unit,
-    onKeyReleased: (Int) -> Unit,
-    onKeyActivated: (Int) -> Unit,
-    onRestPressed: () -> Unit,
-    onRestReleased: () -> Unit,
-    onRestActivated: () -> Unit,
-    onBreath: () -> Unit,
-    onTogglePlayback: () -> Unit,
-    onEraseLast: () -> Unit,
-    onYourTurn: () -> Unit,
-    onStop: () -> Unit,
-    onBpmChange: (Int) -> Unit,
-    onTimeSignatureChange: (TimeSignature) -> Unit,
-    onSpeedOpen: () -> Unit,
-    onSpeedDone: () -> Unit,
-    onShelfOpen: () -> Unit,
-    onBookChosen: (Int) -> Unit,
-    onRequestMic: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onMicDismiss: () -> Unit,
+    actions: FluteActions,
     modifier: Modifier = Modifier,
 ) {
     var choosingSpeed by rememberSaveable { mutableStateOf(false) }
@@ -223,9 +231,9 @@ fun FluteContent(
             if (sideways) {
                 // The card is a page of its own there, with the margins of one: it gets the whole tab.
                 MicrophonePermissionCard(
-                    onRequestPermission = onRequestMic,
-                    onOpenSettings = onOpenSettings,
-                    onDismiss = onMicDismiss,
+                    onRequestPermission = actions.onRequestMic,
+                    onOpenSettings = actions.onOpenSettings,
+                    onDismiss = actions.onMicDismiss,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {
@@ -235,9 +243,9 @@ fun FluteContent(
                         .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
                 ) {
                     MicrophonePermissionCard(
-                        onRequestPermission = onRequestMic,
-                        onOpenSettings = onOpenSettings,
-                        onDismiss = onMicDismiss,
+                        onRequestPermission = actions.onRequestMic,
+                        onOpenSettings = actions.onOpenSettings,
+                        onDismiss = actions.onMicDismiss,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
@@ -248,14 +256,14 @@ fun FluteContent(
             val wheel = rememberTempoWheelState()
             val closePanel = {
                 choosingSpeed = false
-                onSpeedDone()
+                actions.onSpeedDone()
             }
             if (sideways) {
                 FluteSpeedSideways(
                     metronome = metronome,
                     wheel = wheel,
-                    onBpmChange = onBpmChange,
-                    onTimeSignatureChange = onTimeSignatureChange,
+                    onBpmChange = actions.onBpmChange,
+                    onTimeSignatureChange = actions.onTimeSignatureChange,
                     onDone = closePanel,
                     modifier = Modifier.closesTempoWheel(wheel),
                 )
@@ -271,8 +279,8 @@ fun FluteContent(
                     MetronomeStage(
                         state = metronome,
                         wheel = wheel,
-                        onBpmChange = onBpmChange,
-                        onTimeSignatureChange = onTimeSignatureChange,
+                        onBpmChange = actions.onBpmChange,
+                        onTimeSignatureChange = actions.onTimeSignatureChange,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
@@ -289,7 +297,7 @@ fun FluteContent(
         } else if (choosingBook) {
             val chooseBook = { index: Int ->
                 choosingBook = false
-                onBookChosen(index)
+                actions.onBookChosen(index)
             }
             if (sideways) {
                 // One row of six in the whole window less the margins: nothing scrolls, and there is no column.
@@ -326,7 +334,7 @@ fun FluteContent(
             val staffPlace = rememberLazyListState()
             val staffScale = when {
                 !running -> if (sideways && zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f
-                sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value)
+                sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT)
                 else -> RunningStaffScale
             }
             // The walking animal's hop: it hops only on the staff, so only while the tune runs.
@@ -357,7 +365,7 @@ fun FluteContent(
                         bpm = metronome.config.bpm,
                         running = running,
                         onClick = {
-                            onSpeedOpen()
+                            actions.onSpeedOpen()
                             choosingSpeed = true
                         },
                         modifier = Modifier.align(Alignment.TopStart),
@@ -366,7 +374,7 @@ fun FluteContent(
                         sweet = Sweet.entries[state.openBook],
                         running = running,
                         onClick = {
-                            onShelfOpen()
+                            actions.onShelfOpen()
                             choosingBook = true
                         },
                         modifier = Modifier
@@ -379,15 +387,8 @@ fun FluteContent(
                 FluteKeys(
                     litMidi = state.litMidi,
                     restLit = state.restLit,
-                    onPress = onKeyPressed,
-                    onRelease = onKeyReleased,
-                    onActivate = onKeyActivated,
-                    onRestPress = onRestPressed,
-                    onRestRelease = onRestReleased,
-                    onRestActivate = onRestActivated,
-                    onBreath = onBreath,
                     eraseEnabled = !state.isEmpty,
-                    onErase = onEraseLast,
+                    actions = actions,
                     modifier = keysModifier,
                     keyHeight = keyHeight,
                     keyGap = keyGap,
@@ -404,7 +405,7 @@ fun FluteContent(
                         icon = AppIcons.Play,
                         text = stringResource(R.string.flute_play),
                         color = ActionGo,
-                        onClick = onTogglePlayback,
+                        onClick = actions.onTogglePlayback,
                         enabled = !state.isEmpty,
                         stacked = true,
                         modifier = Modifier.weight(1f),
@@ -413,7 +414,7 @@ fun FluteContent(
                         icon = AppIcons.Microphone,
                         text = stringResource(R.string.flute_your_turn),
                         color = ActionListen,
-                        onClick = onYourTurn,
+                        onClick = actions.onYourTurn,
                         enabled = state.canListen,
                         stacked = true,
                         modifier = Modifier.weight(1f),
@@ -422,7 +423,7 @@ fun FluteContent(
             }
             if (sideways) {
                 if (running) {
-                    FluteRunningSideways(tune = tune, advice = state.advice, onStop = onStop)
+                    FluteRunningSideways(tune = tune, advice = state.advice, onStop = actions.onStop)
                 } else {
                     FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
                 }
@@ -452,7 +453,7 @@ fun FluteContent(
                             icon = AppIcons.Stop,
                             text = stringResource(R.string.stop),
                             color = ActionStop,
-                            onClick = onStop,
+                            onClick = actions.onStop,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = PlayShadow),
