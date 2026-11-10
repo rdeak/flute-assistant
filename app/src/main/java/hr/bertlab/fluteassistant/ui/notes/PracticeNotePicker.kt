@@ -67,7 +67,7 @@ import hr.bertlab.fluteassistant.ui.theme.InkOnFill
  * The game's notes in rows by octave, highest on top as on the staff and the flute: c3
  * alone, then c2 to h2, then c1 to h1, left-aligned so the letters line up.
  */
-val OCTAVE_ROWS: List<List<Int>> = StaffNotes.ALL.chunked(7).reversed()
+private val OCTAVE_ROWS: List<List<Int>> = StaffNotes.ALL.chunked(7).reversed()
 
 /**
  * The notes the game may ask, one pill each in [OCTAVE_ROWS]: the chosen ones a sticker in

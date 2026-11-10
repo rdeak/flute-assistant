@@ -26,9 +26,9 @@ songbook's six books (`SONGBOOK.md`), each stored as `"<bpm>;<time signature nam
 `book_0` to `book_5`, and `SettingsStore.saveBook` keeps the open one across restarts (before that
 the single tune lived under the key `tune`, which the migration there moves into the first book).
 `Bars.write` (`domain/flute/Bars.kt`, since 2026-11-02) is how the
-staff writes the tune in bars of the metronome tab's time signature (`FluteUiState.timeSignature`,
-read at creation, in `enterTab()` and when OK closes the speed panel, all through
-`syncTimeSignature()`, and set to the book's when a book with a tune in it is opened; a bar is `beatsPerBar * 8 / noteValue` half beats of the
+staff writes the tune in bars of the metronome tab's time signature (`FluteContent` hands `TuneStaff`
+the metronome state's own, since 2026-11-10: the flute's state keeps no copy, and a book with a tune
+in it sets the metronome's through `openBook()`'s pulse; a bar is `beatsPerBar * 8 / noteValue` half beats of the
 flute's quarter-note beat, so 6/8 holds three quarters): `LineMark.Step` / `Breath` / `BarLine`, a
 bar line after every full bar (the last too), a note or rest that runs past one split there into
 `StepPart`s (the longest lengths that fit, a 2½-beat piece as a half and an eighth) that the staff
@@ -45,7 +45,7 @@ its names, so they line up and scroll as one (the user: "align note names with t
 right"), and the held step's band covers both ("a yellow rectangle covering notes and names at the
 same time"). That replaced, the same evening, a 96 dp single-name bubble and then a separate line
 of pills (`TuneLine`, deleted); the hold dots and, on this tab, the fingering are gone, and
-`FluteUiState.shown` is no longer drawn. A screen reader reads the row ("Your tune, N notes") and
+the state's `shown` field, drawn by nothing since, went on 2026-11-10. A screen reader reads the row ("Your tune, N notes") and
 each step once ("G4, 2 beats", "Breathe here"). `TuneStaff` draws a real five-line staff from `StaffGeometry` (pure
 Kotlin, in dp: lines 18 apart, three quarters of the canvas's 24, to leave room for the bubble and
 for the stems, a note step 9, `StaffNotes.positionOf` for the height, every stem up on the right
@@ -86,9 +86,9 @@ a dark mode, text size or display size change in the phone's settings). `FluteVi
 `docs/superpowers/specs/2026-11-02-flute-rest-and-breath-design.md`) opens the player in `enterTab()`
 and closes it in `leaveTab()` (`FluteScreen`'s `LifecycleStartEffect`, so the first press is
 never late and nothing plays off screen; a turn of the phone does neither, and Home or another tab
-still logs `flute.stop reason=leave` for a tune that was running); `onKeyPressed(midi)` sounds the key at once, shows
-it (`FluteUiState.shown`, a `Shown.Note`, `Rest` or `Breath`) and appends it as an eighth (not at the cap, where it only sounds), then grows
-it while the key stays down at `Tune.growAtMs` (`heldLength`, and the step's length in `tune`,
+still logs `flute.stop reason=leave` for a tune that was running); `onKeyPressed(midi)` sounds the key at once
+and appends it as an eighth (not at the cap, where it only sounds), then grows
+it while the key stays down at `Tune.growAtMs` (the step's length in `tune`,
 which the staff shows); `onKeyReleased(midi)` silences it and records the length the hold made from
 `MonotonicClock` (`Tune.lengthOf`, the same rule, so the note never changes at lift-off), ignored
 unless that key is the one held (the newest press wins; sliding off a key releases it); a key the
@@ -112,7 +112,7 @@ before it); a note past the window is a repeat, a new note;
 `onRestPressed` / `onRestReleased` / `onRestActivated` are the same for the rest key without a
 sound (`restHeld`; a rest that takes over a held note silences it, since a note taking over a
 note deliberately skips the note off), and `onBreath` ends a held key and appends a breath unless
-the last step is one (a breath at the cap or after a breath is only shown); `togglePlayback()`
+the last step is one (a breath at the cap or after a breath adds nothing); `togglePlayback()`
 plays the tune from the start at the metronome's tempo, each note for its length, lighting it
 on the staff, on its name and on its key, silent for each rest's whole length (its symbol and
 its pill ringed, the rest key sunk: `restLit`) and straight past each breath, and
@@ -189,8 +189,8 @@ short screen as on the metronome tab, and it carries `closesTempoWheel` with its
 `rememberTempoWheelState()`. The knob's `onClick` calls `FluteViewModel.openSpeed()` and then sets
 `choosingSpeed`: it stops a tune playing back (`flute.stop`, reason `speed`) and ends a held key
 as `leaveTab()` does, and leaves the tone player open. OK clears `choosingSpeed` and calls
-`closeSpeed()`, which runs `syncTimeSignature()` (the read `enterTab()` makes: the staff is
-rewritten in the time signature chosen in the panel) and logs; a tempo change needs nothing more,
+`closeSpeed()`, which logs (the staff reads the metronome's time signature, so it is already
+rewritten in the one chosen in the panel); a tempo change needs nothing more,
 since lengths are kept in beats and the next press and Play read the new pulse. Leaving the flute
 tab with the panel open drops it (`MainScreen` composes only the open tab, so `choosingSpeed` goes
 with `FluteContent`, as the notes picker's does): the child comes back to the tune, and no

@@ -105,14 +105,6 @@ class FluteUiStateTest {
     }
 
     @Test
-    fun `the shown note is only a note`() {
-        assertEquals(67, FluteUiState(shown = Shown.Note(67)).shownMidi)
-        assertNull(FluteUiState(shown = Shown.Rest).shownMidi)
-        assertNull(FluteUiState(shown = Shown.Breath).shownMidi)
-        assertNull(FluteUiState().shownMidi)
-    }
-
-    @Test
     fun `the shelf shows the open book's live tune and the others as stored`() {
         val books = List(6) { Book() }.toMutableList().also { it[2] = Book(listOf(TuneNote(64, NoteLength.QUARTER))) }
         val state = FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), openBook = 0, books = books)

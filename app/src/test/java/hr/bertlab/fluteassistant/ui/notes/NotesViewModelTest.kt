@@ -168,7 +168,7 @@ class NotesViewModelTest {
         vm.onNoteTapped(vm.otherNote())
         assertEquals(before, vm.state.value)
 
-        vm.playAgain()
+        vm.resetRound()
         val fresh = vm.state.value
         assertFalse(fresh.roundOver)
         assertTrue(fresh.results.isEmpty())
@@ -240,7 +240,7 @@ class NotesViewModelTest {
         repeat(20) {
             val asked = vm.current
             answerRight(vm)
-            if (vm.state.value.roundOver) vm.playAgain() else assertNotEquals(asked, vm.current)
+            if (vm.state.value.roundOver) vm.resetRound() else assertNotEquals(asked, vm.current)
         }
     }
 
@@ -265,7 +265,7 @@ class NotesViewModelTest {
         repeat(NotesUiState.ROUND_LENGTH - 1) { answerRight(vm) }
         vm.onNoteTapped(vm.current) // the tenth, still sounding
         val stopsBefore = tonePlayer.stopCount
-        vm.playAgain()
+        vm.resetRound()
         val first = vm.current
         assertEquals(stopsBefore + 1, tonePlayer.stopCount)
 
@@ -360,7 +360,7 @@ class NotesViewModelTest {
         assertTrue(vm.state.value.roundOver)
         assertEquals(30_000L, vm.state.value.roundMillis)
 
-        vm.playAgain()
+        vm.resetRound()
         assertNull(vm.state.value.roundMillis)
         clock.now = 100_000L
         answerRight(vm)
@@ -377,7 +377,7 @@ class NotesViewModelTest {
             repeat(NotesUiState.ROUND_LENGTH) { answerRight(vm) }
             assertTrue(vm.state.value.roundOver)
             val last = vm.current
-            vm.playAgain()
+            vm.resetRound()
             assertNotEquals(last, vm.current)
         }
     }
@@ -589,7 +589,7 @@ class NotesViewModelTest {
         repeat(12) {
             val opened = vm.state.value.phrase.first()
             answerPhrase(vm)
-            if (vm.state.value.roundOver) vm.playAgain() // a new round does not open with it either
+            if (vm.state.value.roundOver) vm.resetRound() // a new round does not open with it either
             assertNotEquals(opened, vm.state.value.phrase.first())
         }
     }
@@ -612,7 +612,7 @@ class NotesViewModelTest {
         assertEquals(phraseId + 1, state.phraseId)
 
         answerPhrase(vm)
-        vm.playAgain()
+        vm.resetRound()
         state = vm.state.value
         assertTrue(state.hearing)
         assertEquals(2, state.phrase.size)
@@ -1265,7 +1265,7 @@ class NotesViewModelTest {
         assertTrue(vm.state.value.grewThisRound.isNotEmpty())
         assertTrue(vm.state.value.askedThisRound.isNotEmpty())
 
-        vm.playAgain()
+        vm.resetRound()
         assertEquals(progress, vm.state.value.progress)
         assertTrue(vm.state.value.grewThisRound.isEmpty())
         assertTrue(vm.state.value.askedThisRound.isEmpty())

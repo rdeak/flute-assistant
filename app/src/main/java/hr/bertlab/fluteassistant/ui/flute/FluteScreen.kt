@@ -345,7 +345,7 @@ fun FluteContent(
                         tune = state.tune,
                         litIndex = state.litIndex,
                         heldIndex = state.heldIndex,
-                        timeSignature = state.timeSignature,
+                        timeSignature = metronome.config.timeSignature,
                         marks = state.marks,
                         animal = animal,
                         wrong = state.wrong,

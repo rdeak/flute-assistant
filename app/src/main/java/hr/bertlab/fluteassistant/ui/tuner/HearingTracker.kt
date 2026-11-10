@@ -8,32 +8,25 @@ package hr.bertlab.fluteassistant.ui.tuner
  * why (see [Hearing]). Pure Kotlin: [TunerViewModel] feeds it one frame at a time.
  *
  * A frame that is neither [FrameDecision.SHOWN] nor [FrameDecision.IGNORED] and whose level is
- * at least [soundLevel] is a sound frame and joins the run. A shown frame, or [reset], ends the
- * run at once. Frames under [soundLevel] are tolerated inside the run (a beginner breathes
- * between short notes) until [gapFrames] of them come in a row, which also ends it; once the
- * advice shows, the run lasts through up to [holdFrames] of them instead (about two seconds), and
+ * at least [SOUND_LEVEL] is a sound frame and joins the run. A shown frame, or [reset], ends the
+ * run at once. Frames under [SOUND_LEVEL] are tolerated inside the run (a beginner breathes
+ * between short notes) until [UNCLEAR_GAP_FRAMES] of them come in a row, which also ends it; once the
+ * advice shows, the run lasts through up to [ADVICE_HOLD_FRAMES] of them instead (about two seconds), and
  * sound after such a pause goes on with the same run and the same advice at once, so the line does
  * not blink off and wait another second each time the child breathes. Once the run holds
- * [unclearFrames] sound frames (about a second) [hearing] becomes [Hearing.QUIET_UNCLEAR] when the
- * mean level of the last [unclearFrames] sound frames is under [closeLevel], else
+ * [UNCLEAR_FRAMES] sound frames (about a second) [hearing] becomes [Hearing.QUIET_UNCLEAR] when the
+ * mean level of the last [UNCLEAR_FRAMES] sound frames is under [CLOSE_LEVEL], else
  * [Hearing.LOUD_UNCLEAR], re-evaluated on every sound frame. That sliding window, not the whole
  * run, is what makes moving the phone closer noticed within a second. Once one of the two is shown,
- * it changes to the other only when the mean is [closeMargin] past [closeLevel] (about 3 dB either
+ * it changes to the other only when the mean is [CLOSE_MARGIN] past [CLOSE_LEVEL] (about 3 dB either
  * way), so a sound hovering at the boundary keeps the line it has instead of flipping between
  * "come closer" and "play one clear note" (seen on the user's phone on 2026-11-04).
  *
  * Both levels are starting values, to be confirmed from `levelMean` in `tuner.summary` on a
  * real phone (the emulator has no microphone).
  */
-class HearingTracker(
-    private val soundLevel: Float = SOUND_LEVEL,
-    private val closeLevel: Float = CLOSE_LEVEL,
-    private val closeMargin: Float = CLOSE_MARGIN,
-    private val unclearFrames: Int = UNCLEAR_FRAMES,
-    private val gapFrames: Int = UNCLEAR_GAP_FRAMES,
-    private val holdFrames: Int = ADVICE_HOLD_FRAMES,
-) {
-    /** The levels of the last [unclearFrames] sound frames of the run; empty when there is no run. */
+class HearingTracker {
+    /** The levels of the last [UNCLEAR_FRAMES] sound frames of the run; empty when there is no run. */
     private val levels = ArrayDeque<Float>()
     private var gap = 0
 
@@ -49,22 +42,22 @@ class HearingTracker(
         when {
             decision == FrameDecision.IGNORED -> Unit
             decision == FrameDecision.SHOWN -> reset()
-            level >= soundLevel -> {
+            level >= SOUND_LEVEL -> {
                 gap = 0
                 levels.addLast(level)
-                if (levels.size > unclearFrames) levels.removeFirst()
-                if (levels.size == unclearFrames) hearing = judge(levelMean)
+                if (levels.size > UNCLEAR_FRAMES) levels.removeFirst()
+                if (levels.size == UNCLEAR_FRAMES) hearing = judge(levelMean)
             }
-            levels.isNotEmpty() && ++gap >= (if (hearing == Hearing.CLEAR) gapFrames else holdFrames) -> reset()
+            levels.isNotEmpty() && ++gap >= (if (hearing == Hearing.CLEAR) UNCLEAR_GAP_FRAMES else ADVICE_HOLD_FRAMES) -> reset()
         }
         return hearing
     }
 
-    /** Quiet or loud for a window whose mean level is [mean], keeping the one already shown until the mean is [closeMargin] past [closeLevel]. */
+    /** Quiet or loud for a window whose mean level is [mean], keeping the one already shown until the mean is [CLOSE_MARGIN] past [CLOSE_LEVEL]. */
     private fun judge(mean: Double): Hearing = when (hearing) {
-        Hearing.QUIET_UNCLEAR -> if (mean >= closeLevel + closeMargin) Hearing.LOUD_UNCLEAR else Hearing.QUIET_UNCLEAR
-        Hearing.LOUD_UNCLEAR -> if (mean < closeLevel - closeMargin) Hearing.QUIET_UNCLEAR else Hearing.LOUD_UNCLEAR
-        Hearing.CLEAR -> if (mean < closeLevel) Hearing.QUIET_UNCLEAR else Hearing.LOUD_UNCLEAR
+        Hearing.QUIET_UNCLEAR -> if (mean >= CLOSE_LEVEL + CLOSE_MARGIN) Hearing.LOUD_UNCLEAR else Hearing.QUIET_UNCLEAR
+        Hearing.LOUD_UNCLEAR -> if (mean < CLOSE_LEVEL - CLOSE_MARGIN) Hearing.QUIET_UNCLEAR else Hearing.LOUD_UNCLEAR
+        Hearing.CLEAR -> if (mean < CLOSE_LEVEL) Hearing.QUIET_UNCLEAR else Hearing.LOUD_UNCLEAR
     }
 
     /** Ends the run: back to [Hearing.CLEAR] with an empty window. */

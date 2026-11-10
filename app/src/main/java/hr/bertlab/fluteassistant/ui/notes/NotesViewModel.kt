@@ -32,7 +32,7 @@ import kotlin.random.Random
  * One round of the notes tab, in either game, of [NotesUiState.ROUND_LENGTH] answered notes.
  * Find asks a note from the chosen set and judges each tap on the staff; Hear plays a short
  * phrase and asks for it back, note by note. Both sound what is found, and after the tenth
- * note wait for [playAgain]. The chosen notes and the game are remembered through [SettingsStore],
+ * note wait for [resetRound]. The chosen notes and the game are remembered through [SettingsStore],
  * and so is the sticker book ([NotesUiState.progress]), which both games feed.
  */
 @HiltViewModel
@@ -297,13 +297,11 @@ class NotesViewModel internal constructor(
         }
     }
 
-    /** Starts a fresh round with the same notes and game, not opening with the note just answered. */
-    fun playAgain() = resetRound()
-
     /**
      * Throws the round away: score, streak, taps and any feedback in progress go, the chosen
      * notes and the game stay, and a new note or phrase is drawn. Called when the child leaves
-     * the tab, so coming back always starts from zero, and by [playAgain].
+     * the tab, so coming back always starts from zero, and by Again on the summary; the new round
+     * does not open with the note just answered.
      */
     fun resetRound() = startRound(_state.value.practiceNotes, _state.value.game)
 

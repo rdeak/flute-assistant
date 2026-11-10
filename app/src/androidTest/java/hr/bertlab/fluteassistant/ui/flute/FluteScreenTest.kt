@@ -101,16 +101,18 @@ class FluteScreenTest {
     /**
      * Renders [FluteContent] in [locale]. A [height] puts it in a box that tall (a short screen);
      * a [restoration] renders it through that tester, so a test can emulate the Activity's
-     * re-creation with `rememberSaveable` state saved and restored.
+     * re-creation with `rememberSaveable` state saved and restored. The staff's [timeSignature] is
+     * the metronome's, as on the phone.
      */
     private fun show(
         initial: FluteUiState,
         locale: Locale = Locale.ENGLISH,
         height: Dp? = null,
         restoration: StateRestorationTester? = null,
+        timeSignature: TimeSignature = TimeSignature.FOUR_FOUR,
     ) {
         state = mutableStateOf(initial)
-        metronome = mutableStateOf(MetronomeUiState(config = MetronomeConfig(bpm = 120)))
+        metronome = mutableStateOf(MetronomeUiState(config = MetronomeConfig(bpm = 120, timeSignature = timeSignature)))
         val content: @Composable () -> Unit = {
             LocaleProvider(locale) {
                 val flute: @Composable () -> Unit = {
@@ -146,6 +148,11 @@ class FluteScreenTest {
             }
         }
         if (restoration != null) restoration.setContent(content) else compose.setContent(content)
+    }
+
+    /** The metronome takes [timeSignature], as its tab or the flute's speed panel sets it. */
+    private fun setTimeSignature(timeSignature: TimeSignature) {
+        metronome.value = metronome.value.copy(config = metronome.value.config.copy(timeSignature = timeSignature))
     }
 
     @Test
@@ -197,8 +204,6 @@ class FluteScreenTest {
                 tune = listOf(TuneNote(67, NoteLength.QUARTER)),
                 heldMidi = 67,
                 heldIndex = 0,
-                shown = Shown.Note(67),
-                heldLength = NoteLength.QUARTER,
             ),
         )
         compose.onAllNodesWithText("G4").assertCountEquals(1) // the key; the line's pill is read by its description, the staff is silent
@@ -242,7 +247,7 @@ class FluteScreenTest {
 
     @Test
     fun the_pill_reads_stop_while_playing() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playingIndex = 1, shown = Shown.Note(67)))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playingIndex = 1))
         compose.onNodeWithText("Stop").assertIsDisplayed()
         compose.onNodeWithText("Play").assertDoesNotExist()
     }
@@ -250,7 +255,7 @@ class FluteScreenTest {
     @Test
     fun the_line_scrolls_to_the_newest_note() {
         val tune = List(29) { TuneNote(if (it % 2 == 0) 60 else 62, NoteLength.QUARTER) } + TuneNote(84, NoteLength.QUARTER)
-        show(FluteUiState(tune = tune, heldMidi = 84, heldIndex = 29, shown = Shown.Note(84)))
+        show(FluteUiState(tune = tune, heldMidi = 84, heldIndex = 29))
         compose.onNode(hasContentDescription("C6, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))).assertIsDisplayed()
     }
 
@@ -325,9 +330,9 @@ class FluteScreenTest {
 
     @Test
     fun holding_a_key_does_not_move_the_keys() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), shown = Shown.Note(60)))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
-        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0, heldLength = NoteLength.HALF)
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0)
         compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
         state.value = FluteUiState()
@@ -381,7 +386,6 @@ class FluteScreenTest {
         show(
             FluteUiState(
                 tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.EIGHTH), TuneRest(NoteLength.HALF), TuneBreath),
-                shown = Shown.Breath,
             ),
         )
         val line = hasAnyAncestor(hasContentDescription("Your tune, 1 note"))
@@ -393,7 +397,7 @@ class FluteScreenTest {
 
     @Test
     fun a_held_rest_is_written_on_the_staff_with_its_length() {
-        show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), restHeld = true, heldIndex = 0, shown = Shown.Rest, heldLength = NoteLength.HALF))
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), restHeld = true, heldIndex = 0))
         compose.onAllNodesWithContentDescription("Rest").assertCountEquals(1) // the key
         compose.onNodeWithContentDescription("Rest, 2 beats").assertExists()
     }
@@ -410,10 +414,11 @@ class FluteScreenTest {
 
     @Test
     fun the_line_starts_with_the_metronome_time_signature() {
-        show(FluteUiState(timeSignature = TimeSignature.THREE_FOUR))
+        show(FluteUiState(), timeSignature = TimeSignature.THREE_FOUR)
         compose.onNodeWithContentDescription("Time signature 3/4").assertIsDisplayed()
         compose.onNodeWithText("👆 Tap or hold a note").assertIsDisplayed()
-        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER)), timeSignature = TimeSignature.SIX_EIGHT)
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER)))
+        setTimeSignature(TimeSignature.SIX_EIGHT)
         compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
         compose.onNodeWithContentDescription("Time signature 3/4").assertDoesNotExist()
     }
@@ -427,15 +432,15 @@ class FluteScreenTest {
 
     @Test
     fun the_time_signature_in_croatian() {
-        show(FluteUiState(timeSignature = TimeSignature.SIX_EIGHT), Locale("hr"))
+        show(FluteUiState(), Locale("hr"), timeSignature = TimeSignature.SIX_EIGHT)
         compose.onNodeWithContentDescription("Mjera 6/8").assertExists()
     }
 
     @Test
     fun a_new_time_signature_rewrites_the_staff_without_moving_the_keys() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0, shown = Shown.Note(60), heldLength = NoteLength.HALF))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), heldMidi = 60, heldIndex = 0))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
-        state.value = state.value.copy(timeSignature = TimeSignature.SIX_EIGHT)
+        setTimeSignature(TimeSignature.SIX_EIGHT)
         compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
         compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
@@ -768,7 +773,7 @@ class FluteScreenTest {
 
     @Test
     fun while_the_tune_runs_the_keys_and_the_sponge_are_gone_and_stop_is_wide() {
-        show(FluteUiState(tune = twoNotes, playingIndex = 0, shown = Shown.Note(60)))
+        show(FluteUiState(tune = twoNotes, playingIndex = 0))
         fun checkRunning() {
             compose.onNodeWithText("Stop").assertIsDisplayed()
             compose.onNodeWithText("Play").assertDoesNotExist()
@@ -883,7 +888,7 @@ class FluteScreenTest {
         state.value = state.value.copy(hearing = Hearing.CLEAR)
         compose.onNodeWithText("📱 Come closer to the phone").assertDoesNotExist()
         compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
-        state.value = FluteUiState(tune = twoNotes, playingIndex = 0, shown = Shown.Note(60))
+        state.value = FluteUiState(tune = twoNotes, playingIndex = 0)
         compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
     }
 

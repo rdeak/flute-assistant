@@ -50,9 +50,8 @@ import kotlin.math.roundToInt
  * language: the host applies the choice. [listOffset] moves the list across from the button, for
  * the rail, where it opens beside the flag. Whether the list is open is kept here, unless the caller
  * passes [isOpen] and [onOpenChange] together and keeps it, so that it stays open when the button
- * moves between the top bar and the rail. The button's flag is [flagSize] dp where that is given
- * (the rail's smaller buttons, where a flag sized in sp would outgrow them at a large text size)
- * and 24 sp otherwise.
+ * moves between the top bar and the rail. The button's flag is sized in dp, as a flag of 24 sp is
+ * bigger than the rail's 38 dp button at one and a half times the text size.
  */
 @Composable
 fun LanguageSwitch(
@@ -62,12 +61,11 @@ fun LanguageSwitch(
     listOffset: Dp = 0.dp,
     isOpen: Boolean? = null,
     onOpenChange: ((Boolean) -> Unit)? = null,
-    flagSize: Dp? = null,
 ) {
     var ownOpen by remember { mutableStateOf(false) }
     val open = isOpen ?: ownOpen
     val setOpen = onOpenChange ?: { ownOpen = it }
-    val flagFont = with(LocalDensity.current) { (flagSize ?: FlagSize).toSp().value.roundToInt() }
+    val flagFont = with(LocalDensity.current) { FlagSize.toSp().value.roundToInt() }
     val label = stringResource(R.string.language)
     val colors = FluteTheme.colors
     Box(modifier) {

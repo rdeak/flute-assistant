@@ -87,7 +87,7 @@ fun NotesScreen(
     NotesContent(
         state = state,
         onNoteTapped = viewModel::onNoteTapped,
-        onPlayAgain = viewModel::playAgain,
+        onPlayAgain = viewModel::resetRound,
         onTogglePracticeNote = viewModel::togglePracticeNote,
         onToggleSound = viewModel::toggleSound,
         onSetGame = viewModel::setGame,

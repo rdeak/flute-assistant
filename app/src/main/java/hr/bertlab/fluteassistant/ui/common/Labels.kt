@@ -144,10 +144,3 @@ private const val TINT_SHARE = 0.3f
 /** Index of the letter (C = 0 to B = 6) each pitch class is written on, sharps on the letter below. */
 private val LETTER_OF_PITCH_CLASS = intArrayOf(0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6)
 
-/** Note name without the octave, e.g. "A♯" (or "B" in Croatian), for the big tuner display. */
-fun noteName(resources: Resources, midi: Int): String =
-    resources.getStringArray(R.array.note_names)[Math.floorMod(midi, 12)]
-
-@Composable
-@ReadOnlyComposable
-fun noteName(midi: Int): String = noteName(LocalResources.current, midi)

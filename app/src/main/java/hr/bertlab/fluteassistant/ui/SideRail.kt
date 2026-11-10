@@ -121,15 +121,10 @@ internal fun SideRail(
                 listOffset = railWidth - flagStart + SidewaysGeometry.MARGIN.dp,
                 isOpen = languageOpen,
                 onOpenChange = onLanguageOpenChange,
-                // In dp, as a flag of 24 sp is bigger than the 38 dp button at one and a half times the text size.
-                flagSize = FlagSize,
             )
         }
     }
 }
-
-/** The flag in the rail's round button, 24 dp whatever the text size. */
-private val FlagSize = 24.dp
 
 /** The room either side of the rail's contents. */
 private val RailPadding = 6.dp

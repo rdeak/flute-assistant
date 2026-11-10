@@ -129,7 +129,6 @@ class FluteViewModel @Inject constructor(
         _state = MutableStateFlow(
             FluteUiState(
                 tune = Tune.sanitize(shelf.books[shelf.open].tune),
-                timeSignature = settings.loadMetronomeConfig().timeSignature,
                 openBook = shelf.open,
                 books = shelf.books,
             ),
@@ -175,12 +174,8 @@ class FluteViewModel @Inject constructor(
     )
     private var letGo: LetGo? = null
 
-    /**
-     * The tab came on screen: open the output now so the first press is not late, and write the
-     * staff in the metronome tab's time signature, which may have changed there meanwhile.
-     */
+    /** The tab came on screen: open the output now so the first press is not late. */
     fun enterTab() {
-        syncTimeSignature()
         tonePlayer.open()
     }
 
@@ -263,8 +258,10 @@ class FluteViewModel @Inject constructor(
         activationJob?.cancel()
         val current = _state.value
         val added = !current.atCap && current.tune.lastOrNull() != TuneBreath
-        _state.update { s -> s.copy(tune = if (added) s.tune + TuneBreath else s.tune, shown = Shown.Breath) }
-        if (added) save()
+        if (added) {
+            _state.update { it.copy(tune = it.tune + TuneBreath) }
+            save()
+        }
         logger.d(LogTags.FLUTE, "flute.breath", "added" to added)
     }
 
@@ -305,7 +302,6 @@ class FluteViewModel @Inject constructor(
                     it.copy(
                         playingIndex = index,
                         playingHalfBeat = 0,
-                        shown = if (item is TuneNote) Shown.Note(item.midi) else Shown.Rest,
                         beatPulse = if (clicks.firstOrNull() == 0) it.beatPulse + 1 else it.beatPulse,
                     )
                 }
@@ -410,9 +406,8 @@ class FluteViewModel @Inject constructor(
         logger.d(LogTags.FLUTE, "flute.speed_open", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
     }
 
-    /** OK on the metronome's ring: the tune is back, and its staff is written in the time signature chosen there. */
+    /** OK on the metronome's ring: the tune is back, its staff in the time signature chosen there (the screen reads the metronome's). */
     fun closeSpeed() {
-        syncTimeSignature()
         val pulse = pulse()
         logger.d(LogTags.FLUTE, "flute.speed_done", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
     }
@@ -457,10 +452,8 @@ class FluteViewModel @Inject constructor(
                 tune = Tune.sanitize(target.tune),
                 openBook = index,
                 books = s.books.toMutableList().also { it[open] = leaving },
-                timeSignature = if (target.isEmpty) s.timeSignature else target.timeSignature,
                 marks = emptyMap(),
                 wrong = null,
-                shown = null,
             )
         }
         letGo = null
@@ -648,9 +641,9 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * The key of [first] (a note or a rest, an eighth so far) went down at [now]: add it, show it,
-     * and grow it at each of [Tune.growAtMs] while the key stays down. At the cap it is shown but
-     * not added.
+     * The key of [first] (a note or a rest, an eighth so far) went down at [now]: add it and grow
+     * it at each of [Tune.growAtMs] while the key stays down. At the cap the key is held but
+     * nothing is added.
      */
     private fun startHold(first: TuneItem, now: Long) {
         pressedAt = now
@@ -658,12 +651,7 @@ class FluteViewModel @Inject constructor(
         letGo = null
         val heldMidi = (first as? TuneNote)?.midi
         _state.update { s ->
-            val held = s.copy(
-                heldMidi = heldMidi,
-                restHeld = first is TuneRest,
-                shown = heldMidi?.let(Shown::Note) ?: Shown.Rest,
-                heldLength = NoteLength.EIGHTH,
-            )
+            val held = s.copy(heldMidi = heldMidi, restHeld = first is TuneRest)
             if (s.atCap) held.copy(heldIndex = null) else held.copy(tune = s.tune + first, heldIndex = s.tune.size)
         }
         save()
@@ -700,13 +688,7 @@ class FluteViewModel @Inject constructor(
         letGo = null
         val length = Tune.lengthOf(elapsed, pressPulse)
         _state.update { s ->
-            val held = s.copy(
-                heldMidi = again.midi,
-                restHeld = again.midi == null,
-                shown = again.midi?.let(Shown::Note) ?: Shown.Rest,
-                heldIndex = again.index,
-                heldLength = length,
-            )
+            val held = s.copy(heldMidi = again.midi, restHeld = again.midi == null, heldIndex = again.index)
             held.copy(tune = held.withHeldLength(length))
         }
         growFrom(elapsed)
@@ -753,7 +735,7 @@ class FluteViewModel @Inject constructor(
 
     /** The held key's note or rest reached [length]: show it on the staff, its shape and its room growing. */
     private fun grow(length: NoteLength) {
-        _state.update { s -> s.copy(tune = s.withHeldLength(length), heldLength = length) }
+        _state.update { s -> s.copy(tune = s.withHeldLength(length)) }
     }
 
     /** Records the held note or rest at the length [heldMs] makes and lets go of the key, which a press of it may go on with ([rejoinable]). */
@@ -764,7 +746,7 @@ class FluteViewModel @Inject constructor(
         val held = _state.value
         val added = held.heldIndex != null // false at the cap, where the press was not added
         _state.update { s ->
-            s.copy(tune = s.withHeldLength(length), heldMidi = null, restHeld = false, heldIndex = null, heldLength = null)
+            s.copy(tune = s.withHeldLength(length), heldMidi = null, restHeld = false, heldIndex = null)
         }
         val now = clock.nowMillis()
         letGo = LetGo(held.heldMidi, held.heldIndex, pressedAt ?: (now - heldMs), pressPulse, at = now, length = length)
@@ -796,11 +778,6 @@ class FluteViewModel @Inject constructor(
     private fun pulse(): Pulse {
         val config = settings.loadMetronomeConfig()
         return Pulse(config.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM), config.timeSignature)
-    }
-
-    /** The staff is written in the metronome tab's time signature, which may have changed there meanwhile. */
-    private fun syncTimeSignature() {
-        _state.update { it.copy(timeSignature = settings.loadMetronomeConfig().timeSignature) }
     }
 
     /**

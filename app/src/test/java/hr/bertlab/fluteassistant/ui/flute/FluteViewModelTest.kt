@@ -104,7 +104,6 @@ class FluteViewModelTest {
         settings.tune = listOf(TuneNote(60, HALF), TuneNote(61, QUARTER), TuneNote(84, WHOLE))
         val vm = viewModel()
         assertEquals(listOf(TuneNote(60, HALF), TuneNote(84, WHOLE)), vm.current.tune)
-        assertNull(vm.current.shownMidi)
     }
 
     @Test
@@ -140,9 +139,7 @@ class FluteViewModelTest {
         assertEquals(on(67), tonePlayer.sounding)
         assertEquals(67, vm.current.heldMidi)
         assertEquals(0, vm.current.heldIndex)
-        assertEquals(67, vm.current.shownMidi)
         assertEquals(listOf(TuneNote(67, EIGHTH)), vm.current.tune)
-        assertEquals(EIGHTH, vm.current.heldLength)
         assertEquals(vm.current.tune, settings.tune)
     }
 
@@ -154,8 +151,6 @@ class FluteViewModelTest {
         assertNull(tonePlayer.sounding)
         assertNull(vm.current.heldMidi)
         assertNull(vm.current.heldIndex)
-        assertNull(vm.current.heldLength)
-        assertEquals(67, vm.current.shownMidi)
         assertEquals(listOf(TuneNote(67, QUARTER)), vm.current.tune)
         assertEquals(vm.current.tune, settings.tune)
         val event = logger.events("flute.note").single()
@@ -182,21 +177,19 @@ class FluteViewModelTest {
         advanceTimeBy(1)
         runCurrent()
         assertEquals(QUARTER, vm.current.tune[0].length)
-        assertEquals(QUARTER, vm.current.heldLength)
         advanceTimeBy(375)
         runCurrent()
-        assertEquals(HALF, vm.current.heldLength)
+        assertEquals(HALF, vm.current.tune[0].length)
         advanceTimeBy(500)
         runCurrent()
         assertEquals(DOTTED_HALF, vm.current.tune[0].length)
         advanceTimeBy(500)
         runCurrent()
         assertEquals(WHOLE, vm.current.tune[0].length)
-        assertEquals(WHOLE, vm.current.heldLength)
         clock.now += 1800
         vm.onKeyReleased(67)
         assertEquals(listOf(TuneNote(67, WHOLE)), vm.current.tune)
-        assertNull(vm.current.heldLength)
+        assertFalse(vm.current.isHolding)
         advanceTimeBy(5000)
         assertEquals(listOf(TuneNote(67, WHOLE)), vm.current.tune)
     }
@@ -253,7 +246,7 @@ class FluteViewModelTest {
         val vm = viewModel()
         vm.onKeyPressed(67)
         assertEquals(on(67), tonePlayer.sounding)
-        assertEquals(67, vm.current.shownMidi)
+        assertEquals(67, vm.current.heldMidi)
         assertNull(vm.current.heldIndex)
         assertNull(vm.current.litIndex)
         assertEquals(200, vm.current.tune.size)
@@ -286,7 +279,6 @@ class FluteViewModelTest {
         val vm = playingViewModel()
         assertTrue(vm.current.isPlaying)
         assertEquals(0, vm.current.playingIndex)
-        assertEquals(60, vm.current.shownMidi)
         assertEquals(on(60), tonePlayer.sounding)
         assertEquals(60, vm.current.litMidi)
         advanceTimeBy(421) // a beat is 500 ms, the last 80 of them silent
@@ -295,13 +287,11 @@ class FluteViewModelTest {
         advanceTimeBy(80)
         assertEquals(1, vm.current.playingIndex)
         assertEquals(on(67), tonePlayer.sounding)
-        assertEquals(67, vm.current.shownMidi)
         advanceTimeBy(920) // two beats
         assertEquals(4, tonePlayer.offCount)
         advanceTimeBy(80)
         assertNull(vm.current.playingIndex)
         assertFalse(vm.current.isPlaying)
-        assertEquals(67, vm.current.shownMidi)
         val play = logger.events("flute.play").single()
         assertEquals(2, play["notes"])
         assertEquals(120, play["bpm"])
@@ -469,20 +459,14 @@ class FluteViewModelTest {
         assertTrue(vm.current.restHeld)
         assertTrue(vm.current.restLit)
         assertEquals(0, vm.current.heldIndex)
-        assertEquals(Shown.Rest, vm.current.shown)
-        assertNull(vm.current.shownMidi)
-        assertEquals(EIGHTH, vm.current.heldLength)
         assertTrue(tonePlayer.notesOn.isEmpty())
         advanceTimeBy(751)
         runCurrent()
         assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
-        assertEquals(HALF, vm.current.heldLength)
         clock.now += 1000
         vm.onRestReleased()
         assertEquals(listOf(TuneRest(HALF)), vm.current.tune)
         assertFalse(vm.current.restHeld)
-        assertNull(vm.current.heldLength)
-        assertEquals(Shown.Rest, vm.current.shown)
         assertEquals(vm.current.tune, settings.tune)
         assertEquals(0, tonePlayer.offCount)
         val event = logger.events("flute.rest").single()
@@ -526,7 +510,6 @@ class FluteViewModelTest {
         vm.tap(60, 500)
         vm.onBreath()
         assertEquals(listOf(TuneNote(60, QUARTER), TuneBreath), vm.current.tune)
-        assertEquals(Shown.Breath, vm.current.shown)
         assertEquals(vm.current.tune, settings.tune)
         vm.onBreath()
         assertEquals(2, vm.current.tune.size)
@@ -556,7 +539,6 @@ class FluteViewModelTest {
         assertEquals(0, vm.current.playingIndex)
         advanceTimeBy(501)
         assertEquals(1, vm.current.playingIndex)
-        assertEquals(Shown.Rest, vm.current.shown)
         assertNull(tonePlayer.sounding)
         assertTrue(vm.current.restLit)
         assertNull(vm.current.litMidi)
@@ -605,15 +587,14 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `at the cap a rest or a breath is shown but not added`() {
+    fun `at the cap a rest or a breath is not added`() {
         settings.tune = List(200) { TuneNote(60, QUARTER) }
         val vm = viewModel()
         vm.onRestPressed()
-        assertEquals(Shown.Rest, vm.current.shown)
+        assertTrue(vm.current.restHeld)
         assertNull(vm.current.heldIndex)
         vm.onRestReleased()
         vm.onBreath()
-        assertEquals(Shown.Breath, vm.current.shown)
         assertEquals(200, vm.current.tune.size)
         assertEquals(TuneNote(60, QUARTER), vm.current.tune.last())
         assertEquals(false, logger.events("flute.rest").single()["added"])
@@ -636,16 +617,6 @@ class FluteViewModelTest {
         assertFalse(vm.current.restHeld)
         assertEquals(listOf(TuneRest(QUARTER), TuneRest(QUARTER)), vm.current.tune)
         assertTrue(vm.current.isPlaying)
-    }
-
-    @Test
-    fun `the line takes the metronome's time signature, read again when the tab opens`() {
-        settings.config = MetronomeConfig(timeSignature = TimeSignature.THREE_FOUR)
-        val vm = viewModel()
-        assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
-        settings.config = MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT)
-        vm.enterTab()
-        assertEquals(TimeSignature.SIX_EIGHT, vm.current.timeSignature)
     }
 
     @Test
@@ -681,13 +652,13 @@ class FluteViewModelTest {
         settings.config = MetronomeConfig(bpm = 120, timeSignature = TimeSignature.SIX_EIGHT)
         val vm = viewModel()
         vm.onKeyPressed(67)
-        assertEquals(EIGHTH, vm.current.heldLength) // one click
+        assertEquals(EIGHTH, vm.current.tune[0].length) // one click
         advanceTimeBy(751)
         runCurrent()
-        assertEquals(QUARTER, vm.current.heldLength) // two clicks of 500 ms make a beat
+        assertEquals(QUARTER, vm.current.tune[0].length) // two clicks of 500 ms make a beat
         advanceTimeBy(750)
         runCurrent()
-        assertEquals(HALF, vm.current.heldLength) // four
+        assertEquals(HALF, vm.current.tune[0].length) // four
     }
 
     @Test
@@ -818,12 +789,13 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `closing the speed panel reads the metronome's time signature again`() {
+    fun `closing the speed panel logs the speed and beat chosen there`() {
         val vm = viewModel()
-        settings.config = MetronomeConfig(timeSignature = TimeSignature.THREE_FOUR)
+        settings.config = MetronomeConfig(bpm = 90, timeSignature = TimeSignature.THREE_FOUR)
         vm.closeSpeed()
-        assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
-        assertEquals(1, logger.events("flute.speed_done").size)
+        val done = logger.events("flute.speed_done").single()
+        assertEquals(90, done["bpm"])
+        assertEquals("3/4", done["time"])
     }
 
     @Test
@@ -841,7 +813,6 @@ class FluteViewModelTest {
         assertEquals(67, vm.current.heldMidi)
         assertEquals(0, vm.current.heldIndex)
         assertEquals(listOf(TuneNote(67, EIGHTH)), vm.current.tune) // still the one note
-        assertEquals(EIGHTH, vm.current.heldLength)
         advanceTimeBy(55) // ¾ of a beat after the first press: the hold grows from where it was
         runCurrent()
         assertEquals(QUARTER, vm.current.tune[0].length)
@@ -863,7 +834,6 @@ class FluteViewModelTest {
         vm.tap(67, 370)
         clock.now += 10 // 380 ms into the hold: it passed ¾ of a beat during the gap
         vm.onKeyPressed(67)
-        assertEquals(QUARTER, vm.current.heldLength)
         assertEquals(listOf(TuneNote(67, QUARTER)), vm.current.tune)
     }
 
@@ -922,10 +892,9 @@ class FluteViewModelTest {
         assertTrue(vm.current.restHeld)
         assertEquals(0, vm.current.heldIndex)
         assertEquals(listOf(TuneRest(EIGHTH)), vm.current.tune) // still the one rest
-        assertEquals(EIGHTH, vm.current.heldLength)
         advanceTimeBy(126) // 250 ms into the rest, it grows at ¾ of a beat: 125 ms on
         runCurrent()
-        assertEquals(QUARTER, vm.current.heldLength)
+        assertEquals(listOf(TuneRest(QUARTER)), vm.current.tune)
         clock.now += 300 // 550 ms of rest all told: a quarter
         advanceTimeBy(174)
         vm.onRestReleased()
@@ -1327,7 +1296,6 @@ class FluteViewModelTest {
         assertEquals(listOf(TuneNote(62, HALF)), vm.current.tune)
         assertEquals(1, vm.current.openBook)
         assertEquals(1, settings.openBook)
-        assertEquals(TimeSignature.THREE_FOUR, vm.current.timeSignature)
     }
 
     @Test
@@ -1349,7 +1317,6 @@ class FluteViewModelTest {
         assertTrue(vm.current.isEmpty)
         assertEquals(5, vm.current.openBook)
         assertEquals(5, settings.openBook)
-        assertEquals(TimeSignature.SIX_EIGHT, vm.current.timeSignature)
         assertEquals(MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT), settings.config)
     }
 
@@ -1472,7 +1439,6 @@ class FluteViewModelTest {
         vm.openBook(1)
         assertTrue(vm.current.marks.isEmpty())
         assertNull(vm.current.wrong)
-        assertNull(vm.current.shown)
     }
 
     @Test

@@ -4,23 +4,14 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.Book
-import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.Tune
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
 import hr.bertlab.fluteassistant.ui.tuner.Hearing
 import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
-
-/** The step last shown: a note, a rest or a breath (held, last pressed, or playing). */
-sealed interface Shown {
-    data class Note(val midi: Int) : Shown
-    data object Rest : Shown
-    data object Breath : Shown
-}
 
 /** A wrong note heard in "Your turn": [midi] came out for the step at [index] of the tune. */
 data class WrongNote(val index: Int, val midi: Int)
@@ -35,8 +26,6 @@ data class FluteUiState(
     val restHeld: Boolean = false,
     /** Where the held key's note or rest sits in [tune]; null at the cap, where a press is not added. */
     val heldIndex: Int? = null,
-    /** The held key, the last one pressed, or the step playing now; null before the first tap. No view shows it since the staff (2026-11-02). */
-    val shown: Shown? = null,
     /** The step of [tune] playing; null when not playing. */
     val playingIndex: Int? = null,
     /**
@@ -45,10 +34,6 @@ data class FluteUiState(
      * while [playingIndex] is set.
      */
     val playingHalfBeat: Int = 0,
-    /** How long the held key's note or rest has grown so far ([NoteLength.ofBeats]); null when no key is held. */
-    val heldLength: NoteLength? = null,
-    /** The metronome tab's time signature, which the staff is written in (bar lines, ties). */
-    val timeSignature: TimeSignature = TimeSignature.FOUR_FOUR,
     /**
      * Goes up by one on every click while the tune plays back, and on every step the animal hops
      * to while the flute listens; never reset, only its changes key the animal's hop (like
@@ -110,9 +95,6 @@ data class FluteUiState(
 
     /** Whether a note key or the rest key is under a finger. */
     val isHolding: Boolean get() = heldMidi != null || restHeld
-
-    /** [shown] when it is a note; null for a rest, a breath or nothing yet. */
-    val shownMidi: Int? get() = (shown as? Shown.Note)?.midi
 
     /** The note key drawn pressed: the playing note's, else the held key. */
     val litMidi: Int? get() = playingIndex?.let { (tune.getOrNull(it) as? TuneNote)?.midi } ?: heldMidi

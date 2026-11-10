@@ -315,7 +315,6 @@ internal fun AppLanguageSwitch(
     listOffset: Dp = 0.dp,
     isOpen: Boolean? = null,
     onOpenChange: ((Boolean) -> Unit)? = null,
-    flagSize: Dp? = null,
 ) {
     // From the resources the words themselves come from, not from `LocalConfiguration`: a turn
     // hands Compose its configuration through `onConfigurationChanged` and nothing here can say
@@ -332,7 +331,6 @@ internal fun AppLanguageSwitch(
         listOffset = listOffset,
         isOpen = isOpen,
         onOpenChange = onOpenChange,
-        flagSize = flagSize,
     )
 }
 

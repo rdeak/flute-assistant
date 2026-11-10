@@ -312,7 +312,7 @@ private fun StatTile(
     faint: Boolean = false,
     animal: Boolean = false,
     compact: Boolean = false,
-    height: Dp = if (compact) COMPACT_TILE_HEIGHT else TILE_HEIGHT,
+    height: Dp,
 ) {
     val colors = FluteTheme.colors
     val shape = RoundedCornerShape(24.dp)

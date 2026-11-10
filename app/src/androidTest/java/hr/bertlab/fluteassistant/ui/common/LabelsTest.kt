@@ -77,14 +77,6 @@ class LabelsTest {
     }
 
     @Test
-    fun note_names_without_octave_follow_the_locale() {
-        assertEquals("B", noteName(resources(Locale.ENGLISH), 71))
-        assertEquals("H", noteName(resources(Locale("hr")), 71))
-        assertEquals("A♯", noteName(resources(Locale.ENGLISH), 70))
-        assertEquals("B", noteName(resources(Locale("hr")), 70))
-    }
-
-    @Test
     fun notes_games_are_named() {
         // The emoji is part of the word, so the pill draws none of its own.
         assertEquals("🔎 Find", resources(Locale.ENGLISH).getString(NotesGame.FIND.labelRes()))

@@ -24,7 +24,7 @@ the time per note: cheetah up to 2 s, rabbit 3.5 s, duck 6 s, turtle 10 s, then 
 accuracy is only one to three stars (`aimStars`: 90 % and 70 %). The chosen
 notes persist through `SettingsStore.savePracticeNotes` (`practice_notes`, a string set), the last one cannot be switched off, and any change to them starts a fresh round; the sound of
 a found note can be switched off (`toggleSound`, `SettingsStore.saveNoteSound`, a switch row
-under the picker's rows); `resetRound()` (also behind `playAgain`) throws the round away and is
+under the picker's rows); `resetRound()` (also what Again on the summary calls) throws the round away and is
 called by the tab bar when the tab is left, and `stopSound()` when the screen is disposed (it means "the screen went away" now, see Hear), so
 the tuner's microphone does not hear the tone. A `Random` is passed through an internal
 secondary constructor for deterministic tests. `NoteStaff` draws the staff on a Canvas
