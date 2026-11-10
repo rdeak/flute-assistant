@@ -231,7 +231,7 @@ class TabletFitTest {
     }
 
     @Test
-    fun the_microphone_card_fits() = assertFitsEverywhere { Tuner(TunerUiState(permissionGranted = false)) }
+    fun the_microphone_card_fits() = assertFitsEverywhere { Tuner(TunerUiState(permissionGranted = false, micBlocked = true)) }
 
     @Test
     fun the_notes_question_fits() = assertFitsEverywhere { Notes(asking) }

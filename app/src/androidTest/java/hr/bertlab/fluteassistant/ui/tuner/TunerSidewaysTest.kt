@@ -450,7 +450,7 @@ class TunerSidewaysTest {
     fun the_words_stand_to_the_right_of_the_window() {
         show(listening(430.0), Phone(915, 411))
         val window = bounds(window())
-        val status = bounds(word("⬇️ Too low"))
+        val status = bounds(word("⬆️ A little higher"))
         val advice = bounds(word("🔄 Roll the flute out a little"))
         assertTrue("the status starts at ${status.left}, the window ends at ${window.right}", status.left >= window.right)
         assertTrue("the advice is under the status", advice.top >= status.bottom - SLACK)
@@ -461,12 +461,12 @@ class TunerSidewaysTest {
     private class Case(val state: TunerUiState, val english: List<String>, val croatian: List<String>)
 
     private val longest = listOf(
-        Case(listening(880.0), listOf("⬆️ An octave too high", "🍃 Gentler air"), listOf("⬆️ Oktavu previsoko", "🍃 Nježniji zrak")),
-        Case(listening(261.63, targetMidi = 72), listOf("⬇️ An octave too low", "💨 Faster air"), listOf("⬇️ Oktavu prenisko", "💨 Brži zrak")),
-        Case(listening(329.63), listOf("⬇️ That's E4", "👀 Check your fingers"), listOf("⬇️ To je e1", "👀 Provjeri prste")),
-        Case(listening(440.0, targetMidi = 67), listOf("⬆️ That's A4", "👀 Check your fingers"), listOf("⬆️ To je a1", "👀 Provjeri prste")),
-        Case(listening(430.0), listOf("⬇️ Too low", "🔄 Roll the flute out a little"), listOf("⬇️ Prenisko", "🔄 Zakreni flautu malo od sebe")),
-        Case(listening(443.0), listOf("⬆️ Too high", "🔄 Roll the flute in a little"), listOf("⬆️ Previsoko", "🔄 Zakreni flautu malo k sebi")),
+        Case(listening(880.0), listOf("⬇️ An octave lower", "🍃 Gentler air"), listOf("⬇️ Oktavu niže", "🍃 Nježniji zrak")),
+        Case(listening(261.63, targetMidi = 72), listOf("⬆️ An octave higher", "💨 Faster air"), listOf("⬆️ Oktavu više", "💨 Brži zrak")),
+        Case(listening(329.63), listOf("⬆️ That's E4", "👀 Check your fingers"), listOf("⬆️ To je e1", "👀 Provjeri prste")),
+        Case(listening(440.0, targetMidi = 67), listOf("⬇️ That's A4", "👀 Check your fingers"), listOf("⬇️ To je a1", "👀 Provjeri prste")),
+        Case(listening(430.0), listOf("⬆️ A little higher", "🔄 Roll the flute out a little"), listOf("⬆️ Malo više", "🔄 Zakreni flautu malo od sebe")),
+        Case(listening(443.0), listOf("⬇️ A little lower", "🔄 Roll the flute in a little"), listOf("⬇️ Malo niže", "🔄 Zakreni flautu malo k sebi")),
         Case(
             listening(null).copy(hearing = Hearing.LOUD_UNCLEAR),
             listOf("👂 Play A4", "🎵 Play one long, clear note"),
@@ -522,7 +522,7 @@ class TunerSidewaysTest {
 
     @Test
     fun the_microphone_card_fits() {
-        show(TunerUiState(permissionGranted = false))
+        show(TunerUiState(permissionGranted = false, micBlocked = true))
         PHONES.forEach { each ->
             on(each)
             listOf("Can I listen?", "Yes", "Settings").forEach { text ->

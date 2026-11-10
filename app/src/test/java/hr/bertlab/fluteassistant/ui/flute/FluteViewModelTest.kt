@@ -1297,6 +1297,20 @@ class FluteViewModelTest {
         assertFalse(vm.current.micDenied)
     }
 
+    @Test
+    fun `settings are offered only when the phone will not ask again`() = runTest(dispatcher) {
+        settings.tune = listOf(q(60))
+        val vm = viewModel()
+        vm.onMicResult(granted = false, canAskAgain = true)
+        assertTrue(vm.current.micDenied)
+        assertFalse("the phone will ask again, so Yes is enough", vm.current.micBlocked)
+        vm.onMicResult(granted = false, canAskAgain = false)
+        assertTrue("the phone will not ask again: only Settings is left", vm.current.micBlocked)
+        vm.onMicResult(granted = true, canAskAgain = true)
+        runCurrent()
+        assertFalse(vm.current.micBlocked)
+    }
+
     // ---- The songbook: opening the shelf and switching books ----
 
     @Test

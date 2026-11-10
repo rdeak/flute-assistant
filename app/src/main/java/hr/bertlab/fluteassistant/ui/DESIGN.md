@@ -98,6 +98,25 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   selectable group for a screen reader), lifted from the tuner's `TunerModeChoice` on 2026-11-07 and shared by the
   tuner's two modes and the notes tab's two games. Change it for both.
 
+## The phone's Back
+
+Since 2026-11-10 (the review of that day: on the emulator, Back on the notes picker and on the shelf dropped to the
+launcher, and no `BackHandler` stood anywhere; the user's phone has three navigation buttons, so Back is one tap
+under the tab bar). Each panel that takes a tab's place takes Back as its own way back, and nothing new is drawn:
+
+- the notes picker: as its OK (`NotesContent`);
+- the flute's speed panel: as its OK, after an open tempo wheel, which closes first; the shelf: as a tap on the open
+  book (`flute.shelf_close`); the microphone card: as Not now; a tune that runs, Play or Your turn: as Stop
+  (`FluteContent`, a handler in each branch, and Compose asks the one composed last first);
+- the metronome tab: an open tempo wheel closes (`MetronomeContent`);
+- the language list and the credits are a popup and a dialog and always closed on Back.
+
+With nothing open Back is the phone's: it leaves the app, as before, and a running metronome plays on. The tuner
+takes none (its microphone card has no way back: the tab is the microphone). The handlers stand above each
+`LocalSideways` branch, so a phone on its side has them too. Tests press it with `BackKey` (androidTest, `ui/common`):
+`Watch()` in the content, `press`, and `taken` for "Back is the phone's here"; a Back nothing takes would close the
+test's own Activity, so `press` refuses one.
+
 ## Sideways (a phone on its side)
 
 Since 2026-11-05; the design, the mockups and who decided what are in

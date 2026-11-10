@@ -105,6 +105,16 @@ internal fun phraseColumns(count: Int): List<Float> =
     if (count <= 1) listOf(NOTE_COLUMN) else List(count) { NOTE_COLUMN + (it - (count - 1) / 2f) * COLUMN_STEP }
 
 /**
+ * The columns that hold a slot, the stand-in for a note still to find. In Hear, every note of the phrase from
+ * [placed] on, less the one just found while [solved] (its head stands there). In Find, which has no phrase, its
+ * one column until its note is found (since 2026-11-10: Find's staff showed nothing to do, as Hear's had).
+ */
+internal fun slotIndices(phraseSize: Int, placed: Int, solved: Boolean): List<Int> = when {
+    phraseSize == 0 -> if (solved) emptyList() else listOf(0)
+    else -> (placed until phraseSize).filterNot { solved && it == placed }
+}
+
+/**
  * Room kept above the highest place and below the lowest, in places, so the clef's loop and
  * tail (a space beyond the staff each way) are never cut; the end places' strips extend
  * over it.
@@ -153,7 +163,8 @@ private const val LEDGER_HALF = 1f
  * empty and the staff is the one column in the middle. [NotesRound.hearing] only changes the staff's
  * description for a screen reader.
  *
- * Under every note, in Hear, a slot for each note still to find: a dashed capsule in its column from the
+ * Under every note, a slot for each note still to find ([slotIndices]: Hear's phrase from the note to place on,
+ * and Find's one note): a dashed capsule in its column from the
  * top place to the bottom one with a ❓ in it, the next one pale yellow and the later ones faint, so the child
  * sees what the staff is asking and how much is left (the first child test, 2026-11-09). The ❓ of the note to
  * place gives way to the see-through note while a finger is down, and every ❓ gives way to the crosses while a
@@ -282,7 +293,7 @@ fun NoteStaff(
                 }
             }
 
-            // Hear: the slot of a note still to find, under every note. The note to place has a pale yellow and an outline in
+            // The slot of a note still to find, under every note. The note to place has a pale yellow and an outline in
             // the text colour (the outline colour is nearly the card's own at night); the later ones only a light outline.
             // The ❓ gives way to the see-through note while a finger is down, and to the crosses and the arrow while a
             // wrong tap stands: they are drawn over the middle of the column, where the ❓ is.
@@ -313,16 +324,15 @@ fun NoteStaff(
                     )
                 }
             }
-            // The notes still to find; once solved, the found note stands where the current slot was.
-            for (index in placed until phrase.size) {
-                if (!(solved && index == placed)) slot(index)
-            }
+            // The notes still to find (Find's one too); once solved, the found note stands where the current slot was.
+            val slots = slotIndices(phrase.size, placed, solved)
+            slots.forEach(::slot)
 
             // The ledger lines the far places need, dashed until a note sits on them. In Hear the column being answered
             // has its slot, and the stub is clipped to the capsule: cut to its half width it still poked out at the
             // rounded end, where the capsule is narrower than that.
             val ledgerHalf = pitch * LEDGER_HALF
-            val slotDrawn = !solved && placed < phrase.size
+            val slotDrawn = placed in slots
             val stubHalf = if (slotDrawn) min(ledgerHalf, slotHalf) else ledgerHalf
             val dashes = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 6.dp.toPx()))
             fun stubs() {

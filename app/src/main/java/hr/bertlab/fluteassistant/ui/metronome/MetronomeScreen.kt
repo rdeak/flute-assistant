@@ -7,6 +7,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -79,6 +80,8 @@ fun MetronomeContent(
     modifier: Modifier = Modifier,
 ) {
     val wheel = rememberTempoWheelState()
+    // The phone's Back closes an open wheel, as a touch outside it does; otherwise it is the phone's.
+    BackHandler(enabled = wheel.editing) { wheel.editing = false }
 
     if (LocalSideways.current) {
         MetronomeSideways(

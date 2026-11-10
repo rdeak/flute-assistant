@@ -70,13 +70,15 @@
     <!-- Shown in silence; the argument is the chosen note, e.g. "A4" -->
     <string name="play_note_prompt">👂 Play %1$s</string>
     <string name="in_tune">🎉 Perfect!</string>
-    <string name="too_low">⬇️ Too low</string>
-    <string name="too_high">⬆️ Too high</string>
-    <!-- Target mode, a note that is not the chosen one; the argument is the heard note, e.g. "A4" -->
-    <string name="heard_lower_note">⬇️ That\'s %1$s</string>
-    <string name="heard_higher_note">⬆️ That\'s %1$s</string>
-    <string name="octave_too_low">⬇️ An octave too low</string>
-    <string name="octave_too_high">⬆️ An octave too high</string>
+    <!-- Off the note: the line says which way to go, and its arrow points the way the pitch window's own arrow
+         does (since 2026-11-10; it said "Too low" with an arrow down beside the window's arrow up) -->
+    <string name="too_low">⬆️ A little higher</string>
+    <string name="too_high">⬇️ A little lower</string>
+    <!-- Target mode, a note that is not the chosen one; the argument is the heard note, e.g. "A4"; the arrow is the way to the chosen one -->
+    <string name="heard_lower_note">⬆️ That\'s %1$s</string>
+    <string name="heard_higher_note">⬇️ That\'s %1$s</string>
+    <string name="octave_too_low">⬆️ An octave higher</string>
+    <string name="octave_too_high">⬇️ An octave lower</string>
     <!-- What a screen reader says for the pitch window (ui/tuner/TunerScreen.kt) -->
     <string name="pitch_listening">Listening, no note heard yet</string>
     <string name="pitch_home">Home ring for %1$s, nothing heard yet</string>

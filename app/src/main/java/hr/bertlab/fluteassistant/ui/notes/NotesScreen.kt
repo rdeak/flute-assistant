@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -125,7 +126,7 @@ class NotesActions(
  * again, and the "Pick" button that opens the note picker; the headline once the round is over;
  * "Which notes?" while choosing), then the stage with the staff and its feedback line, or the round
  * summary, or the picker, whose own big OK button closes it (the Pick button hides meanwhile, so
- * there is one way out), and at the bottom the round's stars. The pills stay on all three screens.
+ * there is one way out on screen; the phone's Back closes it too), and at the bottom the round's stars. The pills stay on all three screens.
  * Choosing notes pauses the question in place; it comes back untouched. [NotesActions.onPhraseShown] asks for
  * Hear's phrase to be played while the staff is on screen: as a new phrase comes, and as the picker
  * closes over one drawn under it.
@@ -138,6 +139,9 @@ fun NotesContent(
 ) {
     // Kept above the branch, so the picker stays open when the phone turns.
     var choosingNotes by rememberSaveable { mutableStateOf(false) }
+
+    // The phone's Back closes the picker as its OK does; with the staff or the summary on screen it is the phone's.
+    BackHandler(enabled = choosingNotes) { choosingNotes = false }
 
     // A phrase plays as it comes on screen, never under the picker: a note switched there, or the Hear pill, draws one the
     // child cannot see, and it plays when OK closes the picker. Above the branch too, so a turn neither asks again nor loses
@@ -489,8 +493,9 @@ private fun ColumnScope.Question(
  * takes no answer then. "That's it!" goes first: after a phrase's last note the phrase plays back
  * as the answer's feedback, and the line says so rather than "Listen" (a fresh phrase is not solved).
  * Waiting in Hear, after all of those, it asks "Find the next note" (the slot's ❓ is its symbol; the
- * first child test, 2026-11-09, found the staff said nothing of what to do). Waiting in Find the line
- * is empty; it keeps its [height] either way, so nothing jumps. The line shrinks to fit down to
+ * first child test, 2026-11-09, found the staff said nothing of what to do). Waiting in Find it says
+ * "Slide, let go" already, how to answer, before the first touch (since 2026-11-10: it was empty there,
+ * the same nothing Hear had). It keeps its [height] always, so nothing jumps. The line shrinks to fit down to
  * [minFont], [FeedbackFloor] by default so that the prompt keeps to one line at twice the text on a 360 dp
  * phone, and a caller short of room breaks it between words ([maxLines]), with a [style]
  * of relative line height so that the lines follow the font.
@@ -519,7 +524,7 @@ internal fun FeedbackLine(
         placing != null -> stringResource(R.string.notes_placing)
         state.wrongTaps.isNotEmpty() -> stringResource(R.string.notes_wrong)
         state.hearing -> stringResource(R.string.hear_prompt)
-        else -> ""
+        else -> stringResource(R.string.notes_placing)
     }
     Text(
         text = feedback,

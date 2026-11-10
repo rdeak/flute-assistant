@@ -63,7 +63,8 @@ import javax.inject.Inject
  *   itself; Stop ([stopRun]), erase, the speed knob, the book button, a key and leaving the tab
  *   end it early and keep the marks so far; any change to the tune clears them. [onMicResult]
  *   receives the phone's answer about the microphone; a no shows the microphone card
- *   ([FluteUiState.micDenied]) until [dismissMic].
+ *   ([FluteUiState.micDenied]) until [dismissMic], with Settings on it once the phone will not ask
+ *   again ([FluteUiState.micBlocked]).
  * - **Books.** The tune is saved to the open book of [SettingsStore]'s shelf (with the
  *   metronome's speed and beat) on every change ([save]), and the open book's tune is restored,
  *   sanitised, on creation. [openBook] switches to another of the [Songbook.SIZE] books: the book
@@ -294,9 +295,9 @@ class FluteViewModel @Inject constructor(
     }
 
     /** The phone's answer about the microphone, asked for by "Your turn": a yes goes on to listen, a no shows the microphone card. */
-    fun onMicResult(granted: Boolean) {
+    fun onMicResult(granted: Boolean, canAskAgain: Boolean = true) {
         logger.i(LogTags.FLUTE, "flute.mic", "granted" to granted)
-        _state.update { it.copy(micDenied = !granted) }
+        _state.update { it.copy(micDenied = !granted, micBlocked = !granted && !canAskAgain) }
         if (granted) startListening()
     }
 

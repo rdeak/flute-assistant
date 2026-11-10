@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
@@ -69,9 +71,14 @@ fun TunerScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { granted -> viewModel.onPermissionResult(granted) }
+    ) { granted ->
+        // After a no, the phone says whether it would show its question again; when it would not, only its settings are left.
+        val canAskAgain = activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO) } ?: true
+        viewModel.onPermissionAnswer(granted, canAskAgain)
+    }
 
     // Check the permission whenever the screen appears; ask the system only once automatically
     // (the card below offers a manual retry).
@@ -151,7 +158,7 @@ fun TunerContent(
         } else {
             MicrophonePermissionCard(
                 onRequestPermission = onRequestPermission,
-                onOpenSettings = onOpenSettings,
+                onOpenSettings = onOpenSettings.takeIf { state.micBlocked },
                 modifier = modifier.fillMaxSize(),
             )
         }
@@ -168,7 +175,7 @@ fun TunerContent(
             if (!state.permissionGranted) {
                 MicrophonePermissionCard(
                     onRequestPermission = onRequestPermission,
-                    onOpenSettings = onOpenSettings,
+                    onOpenSettings = onOpenSettings.takeIf { state.micBlocked },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),

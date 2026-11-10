@@ -682,7 +682,7 @@ class FluteSidewaysTest {
      */
     @Test
     fun the_microphone_card_shows_not_now_on_every_phone() {
-        show(FluteUiState(tune = twoNotes, micDenied = true))
+        show(FluteUiState(tune = twoNotes, micDenied = true, micBlocked = true))
         PHONES.forEach { each ->
             on(each)
             listOf("Can I listen?", "Settings", "Not now", "Yes").forEach { name ->
@@ -709,7 +709,7 @@ class FluteSidewaysTest {
     @Test
     fun the_microphone_cards_way_back_is_whole_in_croatian_at_large_text() {
         phone = Phone(640, 360)
-        show(FluteUiState(tune = twoNotes, micDenied = true), Locale("hr"), fontScale = 1.5f)
+        show(FluteUiState(tune = twoNotes, micDenied = true, micBlocked = true), Locale("hr"), fontScale = 1.5f)
         listOf("Postavke", "Ne sad", "Da").forEach { name ->
             assertInside(name, word(name).assertIsDisplayed(), shadow = 8.dp)
             assertWhole(name)

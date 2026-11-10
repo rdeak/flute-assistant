@@ -17,6 +17,8 @@ data class TunerUiState(
     val permissionGranted: Boolean = false,
     /** True once the system permission dialog has been shown, so it is not re-shown on every visit. */
     val permissionRequested: Boolean = false,
+    /** True once the phone has said no and will not ask again: only then does the card offer Settings. */
+    val micBlocked: Boolean = false,
     val isListening: Boolean = false,
     /** Smoothed reading of the note being played, or null during silence. */
     val reading: NoteReading? = null,

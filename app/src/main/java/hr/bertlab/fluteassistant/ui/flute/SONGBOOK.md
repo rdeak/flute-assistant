@@ -118,10 +118,14 @@ their letters' colours, the label always five bubbles wide so every label is the
 bubbles shrink on a 360 dp phone, where five of 22 dp do not fit; sideways the label is as many bubbles as
 fit). The open book's cover is `Sun`,
 the others `colors.raised`, and dark mode follows `FluteColors` as every other card. An empty book
-has its sweet faded and a blank label; there is no number and no word anywhere on the shelf. One tap
+has its sweet whole, as every book, and a blank label in a dashed, pale outline (`dashedBorder` in `colors.border`,
+the app's sign for an empty place: the staff's hint, an unchosen note; since 2026-11-10, from the review of that day:
+its sweet was faded before, and faded is how a button that cannot be pressed looks everywhere else, Play on an empty
+tune, the sponge, while an empty book is the very one to tap for a second tune; `an_empty_book_shows_its_sweet_whole`
+and `an_empty_books_label_is_dashed` pin it on the emulator); there is no number and no word anywhere on the shelf. One tap
 on a book is `onChoose(index)`, which closes the shelf and, in `FluteScreen`, calls `openBook`
-(which gives the metronome the book's speed and beat itself); the open book's tap only closes it; there is no OK and the back button
-is not handled, as in the speed panel and the notes picker, and a stray tap loses nothing, since
+(which gives the metronome the book's speed and beat itself); the open book's tap only closes it, and so does the phone's Back (`ui/DESIGN.md`, "The phone's Back"); there is no OK,
+and a stray tap loses nothing, since
 every tune is kept as it is. The sweet is sized from its cover, not set: `sweetSize` is 0.32 of the
 cover's height (the mockup's 36 px sweet on a 112 px cover, a third of its height), at least 40 dp
 (`SweetMinSize`, on the shortest cover) and at most half the room between the spine and the cover's

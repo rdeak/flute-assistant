@@ -80,9 +80,21 @@ class TunerViewModel @Inject constructor(
         _state.update { it.copy(permissionRequested = true) }
     }
 
+    /**
+     * The phone's answer to the question itself (the first opening, or the card's "Yes"). A no the
+     * phone will not ask about again ([canAskAgain] false) leaves its settings as the only way, so
+     * the card offers them from then on ([TunerUiState.micBlocked]); a no it will ask about again
+     * takes the offer back.
+     */
+    fun onPermissionAnswer(granted: Boolean, canAskAgain: Boolean) {
+        onPermissionResult(granted)
+        if (!granted) _state.update { it.copy(micBlocked = !canAskAgain) }
+    }
+
+    /** What the screen finds when it looks (on appearing, on coming back from the phone's settings): a yes ends the block. */
     fun onPermissionResult(granted: Boolean) {
         if (granted != _state.value.permissionGranted) logger.i(LogTags.TUNER, "tuner.permission", "granted" to granted)
-        _state.update { it.copy(permissionGranted = granted) }
+        _state.update { it.copy(permissionGranted = granted, micBlocked = it.micBlocked && !granted) }
         if (!granted) stopListening()
     }
 

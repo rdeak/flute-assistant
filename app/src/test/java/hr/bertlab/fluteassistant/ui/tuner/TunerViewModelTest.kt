@@ -203,6 +203,21 @@ class TunerViewModelTest {
     }
 
     @Test
+    fun `settings are offered only when the phone will not ask again`() = runTest(dispatcher) {
+        val vm = TunerViewModel(engine, settings, tonePlayer, logger)
+        vm.onPermissionAnswer(granted = false, canAskAgain = true)
+        assertFalse(vm.state.value.permissionGranted)
+        assertFalse("the phone will ask again, so Yes is enough", vm.state.value.micBlocked)
+        vm.onPermissionAnswer(granted = false, canAskAgain = false)
+        assertTrue("the phone will not ask again: only Settings is left", vm.state.value.micBlocked)
+        vm.onPermissionResult(false) // the screen's own check, on coming back to the tab: it knows nothing new
+        assertTrue(vm.state.value.micBlocked)
+        vm.onPermissionResult(true) // granted in the phone's settings
+        assertTrue(vm.state.value.permissionGranted)
+        assertFalse(vm.state.value.micBlocked)
+    }
+
+    @Test
     fun `revoking permission stops listening`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         advanceUntilIdle()

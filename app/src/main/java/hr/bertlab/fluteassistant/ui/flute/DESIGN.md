@@ -220,8 +220,8 @@ wheel, one composable shared with `MetronomeContent`, so the flute never redraws
 metronome state and `MetronomeViewModel`'s `setBpm` / `setTimeSignature` (every change is saved
 by the metronome as before and passed on to a running one), and one
 `BigActionButton` OK (`speed_done`, `AppIcons.Done`, `ActionGo`) alone where Play was: no keys,
-no sponge, no sound (Play on the tune is the preview), and OK the only way back (the back button
-is not handled, as in the notes picker). The panel's column is `fitOrScroll` at
+no sponge, no sound (Play on the tune is the preview), and OK the way back (the phone's Back does the
+same since 2026-11-10, closing an open wheel first: `ui/DESIGN.md`, "The phone's Back"). The panel's column is `fitOrScroll` at
 `MetronomeMinHeight` rather than `FitsHeight`, which describes the keys, so the ring shrinks on a
 short screen as on the metronome tab, and it carries `closesTempoWheel` with its own
 `rememberTempoWheelState()`. The knob's `onClick` calls `FluteViewModel.openSpeed()` and then sets
@@ -243,7 +243,8 @@ on `ActionListen` blue; the two buttons stack their icon over their word, `BigAc
 = true)`, because two icon-beside-word pills do not fit a phone's width; faded while the tune
 holds no note, `FluteUiState.canListen`). A tap (`FluteScreen` asks for RECORD_AUDIO first if
 need be; a no shows `MicrophonePermissionCard` in place of everything, with its quiet "Not now"
-(`mic_not_now`) the way back, `FluteUiState.micDenied`) calls `FluteViewModel.startListening()`:
+(`mic_not_now`) the way back, `FluteUiState.micDenied`, and "Settings" on it only once the phone will not ask
+again, `FluteUiState.micBlocked`, which `onMicResult` is told by `FluteScreen`: `ui/tuner/CLAUDE.md`, "Asking for the microphone") calls `FluteViewModel.startListening()`:
 it opens the tuner's `TunerEngine`, builds a `TuneCheck` (`domain/flute/TuneCheck.kt`) over the
 tune and waits on its first `TuneNote` (`listenIndex`; rests and breaths are passed over). Frames
 go through `NoteOnsetTracker` (`domain/listen/`, the tuner's own rules plus "a new note began", an

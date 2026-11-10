@@ -64,6 +64,32 @@ class SharedActionsTest {
         assertEquals(1, requests)
     }
 
+    /**
+     * Settings is the one button that leaves the app, so the card shows it only when its caller gives it: once the
+     * phone will not ask about the microphone again, and Settings is the only way left.
+     */
+    @Test
+    fun the_microphone_card_offers_settings_only_when_given() {
+        var opens = 0
+        val blocked = mutableStateOf(false)
+        compose.setContent {
+            LocaleProvider(Locale.ENGLISH) {
+                MicrophonePermissionCard(
+                    onRequestPermission = {},
+                    onOpenSettings = if (blocked.value) ({ opens++ }) else null,
+                    onDismiss = {},
+                )
+            }
+        }
+        compose.onNodeWithText("Yes").assertIsDisplayed()
+        compose.onNodeWithText("Not now").assertIsDisplayed()
+        compose.onNodeWithText("Settings").assertDoesNotExist()
+        blocked.value = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Settings").performClick()
+        assertEquals(1, opens)
+    }
+
     @Test
     fun the_microphone_card_speaks_croatian() {
         compose.setContent {

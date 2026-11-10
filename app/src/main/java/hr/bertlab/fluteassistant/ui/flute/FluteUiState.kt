@@ -45,6 +45,8 @@ data class FluteUiState(
     val marks: Map<Int, StepMark> = emptyMap(),
     /** True after the phone said no to the microphone on this tab, while the microphone card is shown. */
     val micDenied: Boolean = false,
+    /** True when that no was one the phone will not ask about again: only then does the card offer Settings. */
+    val micBlocked: Boolean = false,
     /** Which of the [Songbook.SIZE] books of the shelf is open: the one [tune] belongs to and every change is saved to. */
     val openBook: Int = 0,
     /** The shelf as last stored; the open entry may lag behind [tune], so the shelf draws [shelf]. */

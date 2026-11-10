@@ -27,9 +27,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -47,10 +49,13 @@ class MetronomeScreenTest {
     private var chosenBpm: Int? = null
     private var chosenSignature: TimeSignature? = null
 
+    private val back = BackKey()
+
     private fun show(initial: MetronomeUiState, locale: Locale = Locale.ENGLISH) {
         state = mutableStateOf(initial)
         compose.setContent {
             LocaleProvider(locale) {
+                back.Watch()
                 MetronomeContent(
                     state = state.value,
                     onTogglePlayback = { toggles++ },
@@ -112,6 +117,18 @@ class MetronomeScreenTest {
         compose.onNodeWithText("120").performClick()
         compose.onNodeWithText("119").assertIsDisplayed()
         compose.onNodeWithText("121").assertIsDisplayed()
+    }
+
+    @Test
+    fun back_closes_the_open_wheel_and_nothing_else() {
+        show(MetronomeUiState(config = MetronomeConfig(bpm = 120)))
+        assertFalse("with the wheel closed Back is the phone's", back.taken(compose))
+        compose.onNodeWithText("120").performClick()
+        compose.onNodeWithText("119").assertIsDisplayed()
+        back.press(compose)
+        compose.onNodeWithText("119").assertDoesNotExist()
+        compose.onNodeWithText("120").assertIsDisplayed()
+        assertFalse(back.taken(compose))
     }
 
     @Test

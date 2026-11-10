@@ -60,6 +60,7 @@ import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -101,6 +102,7 @@ class FluteScreenTest {
     private var micRequests = 0
     private var settingsOpens = 0
     private var micDismissals = 0
+    private val back = BackKey()
 
     /**
      * Renders [FluteContent] in [locale]. A [height] puts it in a box that tall (a short screen);
@@ -119,6 +121,7 @@ class FluteScreenTest {
         metronome = mutableStateOf(MetronomeUiState(config = MetronomeConfig(bpm = 120, timeSignature = timeSignature)))
         val content: @Composable () -> Unit = {
             LocaleProvider(locale) {
+                back.Watch()
                 val flute: @Composable () -> Unit = {
                     FluteContent(
                         state = state.value,
@@ -655,6 +658,114 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Lollipop, open now").assertDoesNotExist()
     }
 
+    /** The cover of the shelf's book that a screen reader hears as [description], as it is drawn. */
+    private fun coverPixels(description: String): PixelMap =
+        compose.onNodeWithContentDescription(description).captureToImage().toPixelMap()
+
+    /**
+     * An empty book is the one to tap for a new tune, and faded means "cannot be pressed" everywhere else in the
+     * app, so its sweet is drawn whole: the same picture as when the book holds notes. The sweet stands over the
+     * label, in the cover's upper half, and the label is the same size either way, so it does not move.
+     */
+    @Test
+    fun an_empty_book_shows_its_sweet_whole() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = List(6) { Book() }))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        val empty = coverPixels("Cookie, empty")
+        compose.runOnIdle { state.value = state.value.copy(books = threeNoteCookie) }
+        val full = coverPixels("Cookie, 3 notes")
+        var differing = 0
+        for (y in empty.height * 22 / 100 until empty.height * 54 / 100) {
+            for (x in empty.width * 15 / 100 until empty.width * 85 / 100) if (empty[x, y] != full[x, y]) differing++
+        }
+        assertEquals("an empty book's sweet should be drawn as a full one's, not faded", 0, differing)
+    }
+
+    /**
+     * The longest unbroken stretch of dark ink along any row of a cover's label: the label stands in the lower half,
+     * clear of the spine at the start (12 dp of ink) and of the cover's outline at the other edge.
+     */
+    private fun longestInkRun(cover: PixelMap): Int {
+        var longest = 0
+        for (y in cover.height * 56 / 100 until cover.height * 78 / 100) {
+            var run = 0
+            for (x in cover.width * 12 / 100 until cover.width * 95 / 100) {
+                run = if (cover[x, y].luminance() < 0.3f) run + 1 else 0
+                longest = maxOf(longest, run)
+            }
+        }
+        return longest
+    }
+
+    /** An empty book's label is a dashed, pale outline, as every empty place in the app is; a full one's is solid ink. */
+    @Test
+    fun an_empty_books_label_is_dashed() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        val full = coverPixels("Cookie, 3 notes")
+        val empty = coverPixels("Cupcake, empty")
+        assertTrue("a full book's label has a solid outline, ${longestInkRun(full)} of ${full.width} px", longestInkRun(full) > full.width / 3)
+        assertTrue("an empty book's label has no solid outline, ${longestInkRun(empty)} of ${empty.width} px", longestInkRun(empty) < empty.width / 10)
+    }
+
+    // ---- The phone's Back ----
+
+    @Test
+    fun back_leaves_the_app_while_the_child_writes() {
+        show(FluteUiState(tune = twoNotes))
+        assertFalse("nothing is open, so Back is the phone's, as before", back.taken(compose))
+    }
+
+    @Test
+    fun back_closes_the_speed_panel_as_ok_does() {
+        show(FluteUiState(tune = twoNotes))
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        back.press(compose)
+        assertEquals(1, speedDones)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        assertFalse("the panel is closed, so Back is the phone's again", back.taken(compose))
+    }
+
+    @Test
+    fun back_closes_an_open_wheel_before_the_speed_panel() {
+        show(FluteUiState(tune = twoNotes))
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        compose.onNodeWithText("120").performClick()
+        compose.onNodeWithText("119").assertIsDisplayed()
+        back.press(compose)
+        compose.onNodeWithText("119").assertDoesNotExist()
+        assertEquals(0, speedDones)
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertIsDisplayed()
+        back.press(compose)
+        assertEquals(1, speedDones)
+    }
+
+    @Test
+    fun back_closes_the_shelf_on_the_open_book() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        back.press(compose)
+        assertEquals(listOf(0), chosenBooks)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        assertFalse(back.taken(compose))
+    }
+
+    @Test
+    fun back_is_not_now_on_the_microphone_card() {
+        show(FluteUiState(tune = twoNotes, micDenied = true))
+        back.press(compose)
+        assertEquals(1, micDismissals)
+    }
+
+    @Test
+    fun back_stops_a_tune_that_runs() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        back.press(compose)
+        assertEquals(1, stops)
+    }
+
     @Test
     fun the_shelf_survives_re_creation() {
         val restoration = StateRestorationTester(compose)
@@ -953,13 +1064,15 @@ class FluteScreenTest {
         show(FluteUiState(tune = twoNotes, micDenied = true))
         compose.onNodeWithText("Can I listen?").assertIsDisplayed()
         compose.onNodeWithText("Yes").assertIsDisplayed()
-        compose.onNodeWithText("Settings").assertIsDisplayed()
+        // Settings leaves the app, so it waits until the phone will not ask again.
+        compose.onNodeWithText("Settings").assertDoesNotExist()
         compose.onNodeWithText("Not now").assertIsDisplayed()
         compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
         compose.onNodeWithText("Play").assertDoesNotExist()
         compose.onNodeWithText("Listen to me").assertDoesNotExist()
         compose.onNodeWithText("Yes").performClick()
         assertEquals(1, micRequests)
+        state.value = state.value.copy(micBlocked = true)
         compose.onNodeWithText("Settings").performClick()
         assertEquals(1, settingsOpens)
         compose.onNodeWithText("Not now").performClick()
@@ -971,7 +1084,7 @@ class FluteScreenTest {
 
     @Test
     fun croatian_mic_card() {
-        show(FluteUiState(tune = twoNotes, micDenied = true), Locale("hr"))
+        show(FluteUiState(tune = twoNotes, micDenied = true, micBlocked = true), Locale("hr"))
         compose.onNodeWithText("Smijem li slušati?").assertIsDisplayed()
         compose.onNodeWithText("Da").assertIsDisplayed()
         compose.onNodeWithText("Postavke").assertIsDisplayed()

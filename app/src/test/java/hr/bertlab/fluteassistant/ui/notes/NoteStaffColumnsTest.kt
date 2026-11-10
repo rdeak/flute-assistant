@@ -21,4 +21,18 @@ class NoteStaffColumnsTest {
         assertColumns(listOf(0.26f, 0.42f, 0.58f, 0.74f), phraseColumns(4))
         assertEquals(listOf(0.5f), phraseColumns(0))
     }
+
+    /** Find is a phrase of one with nothing given: its one column has a slot until its note is found. */
+    @Test
+    fun `find has one slot until its note is found`() {
+        assertEquals(listOf(0), slotIndices(phraseSize = 0, placed = 0, solved = false))
+        assertEquals(emptyList<Int>(), slotIndices(phraseSize = 0, placed = 0, solved = true))
+    }
+
+    @Test
+    fun `hear has a slot for every note still to find`() {
+        assertEquals(listOf(1, 2, 3), slotIndices(phraseSize = 4, placed = 1, solved = false))
+        assertEquals(listOf(2, 3), slotIndices(phraseSize = 4, placed = 1, solved = true))
+        assertEquals(emptyList<Int>(), slotIndices(phraseSize = 2, placed = 1, solved = true))
+    }
 }

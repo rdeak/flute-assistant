@@ -64,6 +64,7 @@ import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.BigActionHeight
+import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.needsDevice
@@ -95,11 +96,13 @@ class NotesScreenTest {
     private var hearAgainRequests = 0
     private var phraseShownRequests = 0
     private var soundToggles = 0
+    private val back = BackKey()
 
     private fun show(initial: NotesRound, locale: Locale = Locale.ENGLISH, dark: Boolean = false) {
         state = mutableStateOf(initial)
         compose.setContent {
             LocaleProvider(locale) {
+                back.Watch()
                 val content = @Composable {
                     NotesContent(
                         state = state.value,
@@ -914,22 +917,24 @@ class NotesScreenTest {
         assertFalse("the halo goes out with the sound: ${halo()}", isYellowish(halo()))
     }
 
-    /** Find has one note and no phrase: no slot (yellow), no ❓ and no halo, asking or solved. */
+    /**
+     * Find has one note and no phrase: its column holds the slot (the pale yellow capsule and its ❓) while the note
+     * is asked, since 2026-11-10, and neither once it is found; it has no halo either way.
+     */
     @Test
-    fun find_draws_no_slot_no_question_mark_and_no_halo() {
+    fun find_draws_its_slot_until_its_note_is_found() {
         needsDevice()
-        fun assertTheStaffIsBare(says: String) {
-            val staff = staffPixels(staffDescription)
-            val spot = staff.at(0.5f, 8, 0.3f) // the bare half of the D line's place, far from the G
-            assertFalse("$says: nothing yellow in the column away from the note: $spot", isYellowish(spot))
-            assertFalse("$says: no ❓ down the column", staff.any(0.5f, 0f, staff.totalPitches - 0.1f, ::isRed))
-        }
+        // The bare half of the D line's place, far from the G: inside the capsule, clear of the ❓ and the note.
+        fun spot() = staffPixels(staffDescription).at(0.5f, 8, 0.3f)
+        fun mark() = staffPixels(staffDescription).let { it.any(0.5f, 0f, it.totalPitches - 0.1f, ::isRed) }
         show(asking(67))
-        assertTheStaffIsBare("asking")
+        assertTrue("asking: the column is the slot's pale yellow away from the note: ${spot()}", isYellowish(spot()))
+        assertTrue("asking: a ❓ in the column", mark())
 
         compose.runOnIdle { state.value = state.value.copy(solved = true) }
         compose.waitForIdle()
-        assertTheStaffIsBare("solved")
+        assertFalse("solved: nothing yellow in the column away from the note: ${spot()}", isYellowish(spot()))
+        assertFalse("solved: no ❓ down the column", mark())
     }
 
     /** A finger down is answering: the line says how, not what, and the ❓ gives way to the see-through note. */
@@ -1006,7 +1011,46 @@ class NotesScreenTest {
         staff.performTouchInput { moveTo(Offset(x, yOf(c4))) }
         staff.performTouchInput { up() }
         assertEquals(listOf(60), tapped)
-        compose.onNodeWithText("👆 Slide, let go").assertDoesNotExist()
+    }
+
+    /**
+     * Find says how to answer before the first touch, as Hear's line does: a staff that says nothing reads as
+     * nothing to do (the first child test of Hear, 2026-11-09, and Find had the same blank line).
+     */
+    @Test
+    fun find_says_how_to_answer_before_the_first_touch() {
+        show(asking())
+        compose.onNodeWithText("👆 Slide, let go").assertIsDisplayed()
+    }
+
+    @Test
+    fun find_says_how_to_answer_in_croatian() {
+        show(asking(), Locale("hr"))
+        compose.onNodeWithText("👆 Povuci i pusti").assertIsDisplayed()
+    }
+
+    /** Find's one column has the slot Hear's columns have: the ❓ in the middle of the staff, until a finger is down. */
+    @Test
+    fun find_has_a_slot_for_the_note_to_find() {
+        needsDevice()
+        show(asking())
+        assertTrue("Find's column has a ❓ at rest", staffPixels(staffDescription).any(0.5f, 6f, 8f, ::isRed))
+        compose.onNodeWithContentDescription(staffDescription).performTouchInput { down(center) }
+        assertFalse("no ❓ while a finger is down", staffPixels(staffDescription).any(0.5f, 6f, 8f, ::isRed))
+    }
+
+    // ---- The phone's Back ----
+
+    @Test
+    fun back_closes_the_picker_as_ok_does() {
+        show(asking())
+        assertFalse("with the staff on screen Back is the phone's", back.taken(compose))
+        compose.onNodeWithContentDescription("Choose notes").performClick()
+        compose.onNodeWithText("Which notes?").assertIsDisplayed()
+        back.press(compose)
+        compose.onNodeWithText("Which notes?").assertDoesNotExist()
+        compose.onNodeWithContentDescription(staffDescription).assertIsDisplayed()
+        assertFalse(back.taken(compose))
     }
 
     @Test
@@ -1094,7 +1138,9 @@ class NotesScreenTest {
         needsDevice()
         // D4 answered by mistake right under the asked E4: the cross may not reach into E4's
         // place, or the child has nothing clear to aim at next. Whatever the miss changed in
-        // the note column is the cross (the arrow beside it is drawn further right).
+        // the note column is the cross (the arrow beside it is drawn further right), but for the
+        // slot's ❓, which a miss takes away: it stood in the middle of the column, seven of the
+        // staff's fourteen pitches down and 1.4 tall, far above D4, and those rows are left out.
         show(asking(64))
         val staff = compose.onNodeWithContentDescription(staffDescription)
         val staffBounds = staff.getBoundsInRoot()
@@ -1102,7 +1148,9 @@ class NotesScreenTest {
         compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1) }
         val after = staff.captureToImage().toPixelMap()
         val columns = (after.width * 0.42f).toInt()..(after.width * 0.58f).toInt()
-        val changed = (0 until after.height).filter { y -> columns.any { x -> before[x, y] != after[x, y] } }
+        val pitch = after.height / 14f
+        val mark = (6 * pitch).toInt()..(8 * pitch).toInt()
+        val changed = (0 until after.height).filter { y -> y !in mark && columns.any { x -> before[x, y] != after[x, y] } }
         assertTrue("no cross painted", changed.isNotEmpty())
         val d4 = compose.onNodeWithContentDescription("Staff position 2").getBoundsInRoot()
         val d4Rows = with(compose.density) { (d4.top - staffBounds.top).roundToPx()..(d4.bottom - staffBounds.top).roundToPx() }

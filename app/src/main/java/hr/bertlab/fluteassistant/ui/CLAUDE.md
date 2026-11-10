@@ -39,6 +39,13 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   them out of their room.
 - The credits stay behind a long press on the logo, with plain-text addresses (never links, so a
   child cannot leave the app). Keep them: `NOTICE` section 7(b) and Play both need them in the app.
+  The one button that does leave the app, the microphone card's Settings, shows only once the phone
+  will not ask again (`tuner/CLAUDE.md`, "Asking for the microphone").
+- **The phone's Back** is the way back the screen itself shows, wherever one is open: OK on the
+  notes picker and the flute's speed panel, a tap on the open book on the shelf, Not now on the
+  flute's microphone card, Stop while a tune runs, and it closes an open tempo wheel first. With
+  nothing open it is the phone's and leaves the app. A new panel gets a `BackHandler` and a test
+  with `BackKey` (androidTest): `DESIGN.md`, "The phone's Back".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
 - `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both.
 - **A test of a fit compares bounds.** `assertIsDisplayed` does not prove one: what spills past a

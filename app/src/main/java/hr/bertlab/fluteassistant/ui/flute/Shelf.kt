@@ -24,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -42,12 +41,12 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
-import hr.bertlab.fluteassistant.ui.common.DISABLED_ALPHA
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.dashedBorder
 import hr.bertlab.fluteassistant.ui.common.fadedUnless
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
@@ -379,8 +378,10 @@ internal fun coverNotesThatFit(labelWidth: Dp): Int =
  * One book of the shelf, drawn as a little book (`sweets-shelf-v2.html`): a cover with a dark
  * spine down its start edge and the page edges showing past its other edge, its [sweet] large in
  * the middle ([sweetSize]: about a third of the cover's height) and under it a label with the tune's first notes ([Book.coverNotes]) in their
- * letters' colours. An empty book has its sweet faded and a blank label; the [open] one's cover is
- * [Sun]. The book is one radio button whose description says it all, so the bubbles stay silent.
+ * letters' colours. An empty book has its sweet whole, as every book, and a blank label with a dashed, pale
+ * outline, the app's sign for an empty place (since 2026-11-10; its sweet was faded before, and faded is
+ * what a button that cannot be pressed looks like, where an empty book is the one to tap for a new tune);
+ * the [open] one's cover is [Sun]. The book is one radio button whose description says it all, so the bubbles stay silent.
  */
 @Composable
 private fun BookCover(
@@ -422,15 +423,16 @@ private fun BookCover(
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                Emoji(sweet.emoji, fontSize = sweetFont, modifier = if (book.isEmpty) Modifier.alpha(DISABLED_ALPHA) else Modifier)
-                CoverLabel(book.coverNotes)
+                Emoji(sweet.emoji, fontSize = sweetFont)
+                CoverLabel(book.coverNotes, empty = book.isEmpty)
             }
         }
     }
 }
 
 /**
- * The cover's white label: the [notes] as small bubbles, blank for an empty book. Upright it is as
+ * The cover's white label: the [notes] as small bubbles in a solid ink outline, and for an [empty] book
+ * blank in a dashed, pale one ([dashedBorder], as the staff's hint and every other empty place). Upright it is as
  * wide as [Songbook.COVER_NOTES] bubbles, so every book's label is the same size, an empty one
  * too; where the cover is too narrow for five [CoverNoteSize] bubbles (a 360 dp phone) the bubbles
  * shrink to fit. On a phone on its side ([LocalSideways]) the books are narrower, and the label is
@@ -438,7 +440,7 @@ private fun BookCover(
  * of the notes, every book's label again the same size.
  */
 @Composable
-private fun CoverLabel(notes: List<Int>) {
+private fun CoverLabel(notes: List<Int>, empty: Boolean) {
     val colors = FluteTheme.colors
     val sideways = LocalSideways.current
     BoxWithConstraints {
@@ -454,7 +456,8 @@ private fun CoverLabel(notes: List<Int>) {
                 .size(bubble * slots + gaps + LabelInset, bubble + LabelInset)
                 .clip(LabelShape)
                 .background(colors.card)
-                .border(LabelOutline, colors.outline, LabelShape)
+                // The dashes are drawn twice as wide on the outline and the clip keeps the inner half, the outline's own width.
+                .then(if (empty) Modifier.dashedBorder(LabelOutline, colors.border, LabelShape) else Modifier.border(LabelOutline, colors.outline, LabelShape))
                 .padding(LabelPadding + LabelOutline),
         ) {
             notes.take(slots).forEach { midi -> NoteBubble(midi = midi, size = bubble, fontSize = fontSize, depth = 0.dp) }

@@ -42,10 +42,12 @@ import hr.bertlab.fluteassistant.ui.theme.Sun
 /**
  * Shown until the microphone may be used, by the tuner on opening and by the flute's "Your turn"
  * when the phone has said no: a big friendly microphone, one question, one reassuring line, a big
- * "Yes" that asks the phone ([onRequestPermission]), and quieter pills for the app's settings
- * ([onOpenSettings], for when the phone will not ask again) and, when the caller gives one, a way
- * back ([onDismiss], "Not now"; the flute, which works without the microphone). The way back is a
- * quiet pill, not a second big green button, so the card has one "go".
+ * "Yes" that asks the phone ([onRequestPermission]), and quieter pills, each only when the caller
+ * gives it: the app's settings ([onOpenSettings]) and a way back ([onDismiss], "Not now"; the flute,
+ * which works without the microphone). Settings is the one button in the app that leaves it, so a
+ * caller gives it only once the phone will not ask again and Yes can do nothing more (since
+ * 2026-11-10; before, a child met it on the tuner's first opening). The way back is a quiet pill,
+ * not a second big green button, so the card has one "go".
  *
  * On a phone on its side ([LocalSideways]) the card is a whole page of its own, which the caller
  * gives all of its room, with no padding: the disc and the words beside it in the card, the quiet
@@ -54,7 +56,7 @@ import hr.bertlab.fluteassistant.ui.theme.Sun
 @Composable
 fun MicrophonePermissionCard(
     onRequestPermission: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenSettings: (() -> Unit)?,
     modifier: Modifier = Modifier,
     onDismiss: (() -> Unit)? = null,
 ) {
@@ -99,17 +101,21 @@ fun MicrophonePermissionCard(
             color = ActionGo,
             onClick = onRequestPermission,
         )
-        Spacer(Modifier.height(20.dp))
-        // Side by side when they fit, "Not now" under Settings when they do not (a 360 dp phone with
-        // large text): a flow, so neither pill is ever squeezed or cut.
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            QuietPill(text = stringResource(R.string.open_settings), emoji = GEAR_EMOJI, onClick = onOpenSettings)
-            if (onDismiss != null) {
-                QuietPill(text = stringResource(R.string.mic_not_now), emoji = null, onClick = onDismiss)
+        if (onOpenSettings != null || onDismiss != null) {
+            Spacer(Modifier.height(20.dp))
+            // Side by side when they fit, "Not now" under Settings when they do not (a 360 dp phone with
+            // large text): a flow, so neither pill is ever squeezed or cut.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (onOpenSettings != null) {
+                    QuietPill(text = stringResource(R.string.open_settings), emoji = GEAR_EMOJI, onClick = onOpenSettings)
+                }
+                if (onDismiss != null) {
+                    QuietPill(text = stringResource(R.string.mic_not_now), emoji = null, onClick = onDismiss)
+                }
             }
         }
     }
@@ -123,7 +129,7 @@ fun MicrophonePermissionCard(
 @Composable
 private fun MicrophonePermissionSideways(
     onRequestPermission: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onOpenSettings: (() -> Unit)?,
     modifier: Modifier,
     onDismiss: (() -> Unit)?,
 ) {
@@ -131,9 +137,9 @@ private fun MicrophonePermissionSideways(
     SidewaysPage(
         modifier = modifier,
         column = {
-            // One child, so that the column's two ends are the quiet buttons and "Yes".
+            // One child, so that the column's two ends are the quiet buttons (none, one or both) and "Yes".
             Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
-                SidewaysPlainButton(GEAR_EMOJI, stringResource(R.string.open_settings), onOpenSettings)
+                if (onOpenSettings != null) SidewaysPlainButton(GEAR_EMOJI, stringResource(R.string.open_settings), onOpenSettings)
                 if (onDismiss != null) SidewaysPlainButton(null, stringResource(R.string.mic_not_now), onDismiss)
             }
             SidewaysActionButton(

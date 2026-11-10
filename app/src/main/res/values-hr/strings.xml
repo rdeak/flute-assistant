@@ -60,12 +60,12 @@
     <string name="fingering_for">Prstomet za %1$s</string>
     <string name="play_note_prompt">👂 Odsviraj %1$s</string>
     <string name="in_tune">🎉 Savršeno!</string>
-    <string name="too_low">⬇️ Prenisko</string>
-    <string name="too_high">⬆️ Previsoko</string>
-    <string name="heard_lower_note">⬇️ To je %1$s</string>
-    <string name="heard_higher_note">⬆️ To je %1$s</string>
-    <string name="octave_too_low">⬇️ Oktavu prenisko</string>
-    <string name="octave_too_high">⬆️ Oktavu previsoko</string>
+    <string name="too_low">⬆️ Malo više</string>
+    <string name="too_high">⬇️ Malo niže</string>
+    <string name="heard_lower_note">⬆️ To je %1$s</string>
+    <string name="heard_higher_note">⬇️ To je %1$s</string>
+    <string name="octave_too_low">⬆️ Oktavu više</string>
+    <string name="octave_too_high">⬇️ Oktavu niže</string>
     <!-- What a screen reader says for the pitch window (ui/tuner/TunerScreen.kt) -->
     <string name="pitch_listening">Slušam, još ništa ne čujem</string>
     <string name="pitch_home">Kućica za %1$s, još ništa ne čujem</string>

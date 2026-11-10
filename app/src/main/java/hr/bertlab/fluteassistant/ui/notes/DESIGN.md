@@ -69,7 +69,7 @@ note's bubble or, in Hear, the speaker bubble, and a "Pick" button with a dot pe
 staff and one feedback line, and ten round places at the bottom (a star for first time, a faint star for a retry,
 yellow for the current note); "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in octave
 rows, highest on top, each chosen key a sticker that fills as the note is learned ("The sticker book"), the "Sound"
-switch row and a big OK, the only way back. The end-of-round summary has no numbers on screen either: a trophy, ten
+switch row and a big OK, the way back (and the phone's Back, `ui/DESIGN.md`). The end-of-round summary has no numbers on screen either: a trophy, ten
 stars, tiles for the best streak (flames), the aim (one to three stars) and the speed (an animal), and the keys of the
 notes asked.
 
@@ -155,8 +155,9 @@ given notes do not count.
   (3 dp, 6 on and 4 off) in `colors.text`, ink by day and white by night, as the staff's lines are: `colors.outline` is
   almost the card's own navy at night and the dashes were lost (2026-11-09, from the first screenshots). The later ones
   have no fill, the light `colors.border` outline and a ❓ at 0.35, so the child sees how many are left. The slots are
-  drawn after the bands, lines and clef and before every note, so a slot never hides one; none is drawn in Find, nor
-  for the note just found (its head stands there). The ❓ steps aside for what stands in its place: while a finger is
+  drawn after the bands, lines and clef and before every note, so a slot never hides one; none is drawn
+  for the note just found (its head stands there). Find has the same slot in its one column until its note is found
+  (`slotIndices`, since 2026-11-10: "Find says what to do" below). The ❓ steps aside for what stands in its place: while a finger is
   down the current slot loses its ❓ (the see-through note takes its place and slides inside the capsule, and the yellow
   band crosses it, so column and place make a crosshair), and while a wrong tap stands the current slot and the later
   ones all lose theirs, because the cross and the arrow are drawn over the middle of the column and landed on a ❓
@@ -164,11 +165,19 @@ given notes do not count.
   stub of a far place (c1) in the current column is cut to the slot's half width and clipped to the capsule (a
   `clipPath` of its rounded rect) while that slot is drawn, so it stays inside the capsule and does not poke out: cut
   to the half width alone it still poked about 2 dp out at the capsule's rounded end, where the capsule is narrower
-  than that; Find's stub and the stubs of a head's own ledger lines are as before. The faded ❓ is drawn into a layer
+  than that; the stubs of a head's own ledger lines are as before. The faded ❓ is drawn into a layer
   with alpha (one `Paint`, made once), as `drawText`'s alpha fades only the colour, and an emoji brings its own. Pinned
   by `the_note_to_find_has_a_slot_and_later_notes_fainter_ones`,
   `the_question_mark_gives_way_to_the_finger`, `a_miss_takes_the_question_marks_off_the_slots_and_keeps_the_capsules`,
   `the_slot_of_the_note_to_find_has_a_bright_outline_at_night` and `the_far_places_stub_stays_inside_the_slot`.
+- **Find says what to do** (2026-11-10, from the review of that day, which the user answered with "start"). Hear
+  got its slot and its line after the first child test; Find, the game the tab opens on, still showed a name, an
+  empty staff and an empty line until a finger was down: the same nothing. Now Find's column has the current slot
+  (the pale yellow capsule with the ❓, which steps aside for the finger and for a miss's cross exactly as in Hear)
+  until its note is found, and the feedback line says "👆 Slide, let go" at rest as well as while a finger is down,
+  so no new words were needed. Whether "Povuci i pusti" at rest reads as "drag the bubble down" is for a child to
+  show; "❓ Nađi notu", Hear's own shape, is the one-string swap if it does. Pinned by `NoteStaffColumnsTest`,
+  `find_says_how_to_answer_before_the_first_touch` and, on the emulator, `find_has_a_slot_for_the_note_to_find`.
 - **The sound lights its note.** `NotesRound.sounding` is the index in `phrase` of the note sounding during a
   playback (null in the breath before it, in the gaps and when nothing plays). `NoteStaff` lights that index: a head
   gets a halo behind it (`Sun` at 0.7, 1 pitch round it, or less where the next capsule's edge is nearer, a column step
@@ -464,7 +473,7 @@ slot, miss, outline, stub, halo, lighting, finger-and-❓ and Find tests read th
 the stub's start, where a dashed line always has a dash, since the other end can fall in a gap),
 `the_note_sounding_lights_up`, `the_playback_after_the_last_note_lights_the_found_note`,
 `the_halo_stops_at_the_next_capsule`, `the_halo_is_a_whole_pitch_where_there_is_room`,
-`the_question_mark_gives_way_to_the_finger` and `find_draws_no_slot_no_question_mark_and_no_halo`. The prompt tests read
+`the_question_mark_gives_way_to_the_finger` and `find_draws_its_slot_until_its_note_is_found` (it was `find_draws_no_slot_no_question_mark_and_no_halo` until Find got its slot on 2026-11-10). The prompt tests read
 the text, not the pixels. Also instrumented: `NotesSidewaysTest` (the column at 360 and 411 tall, the pills on all three screens, the keys in the card, a turn not asking for the phrase again, the Hear prompt whole in the panel),
 `LabelsTest` (the pills' words in both languages) and `SharedPreferencesSettingsStoreTest` (the game and the book, read
 leniently). A test of a fit compares `getUnclippedBoundsInRoot()` with the room: `assertIsDisplayed` does not prove

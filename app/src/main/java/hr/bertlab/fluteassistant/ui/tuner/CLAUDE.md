@@ -56,7 +56,7 @@ place that threshold lives (the bubble sits in its ring exactly when the status 
 setting on purpose: one good default beats a control. In target mode a reading within
 `ListenRules.NEAR_CENTS` (70) of the chosen note or of its octaves is still that note or that octave
 (`TargetMismatch.NONE`, `OCTAVE_UP` / `OCTAVE_DOWN`), so a1 played sixty cents flat reads
-"Too low", not "That's gis1". `HearingTracker` turns level plus
+"A little higher", not "That's gis1". `HearingTracker` turns level plus
 `FrameDecision` into `Hearing` (sound from `SOUND_LEVEL`, quiet or loud around `CLOSE_LEVEL`,
 reported after `UNCLEAR_FRAMES` sound frames, a gap of `UNCLEAR_GAP_FRAMES` tolerated; since
 2026-11-04, at the user's "make the advice line steadier" after a phone test with breathy flute
@@ -125,6 +125,16 @@ grey with "…". In "Tune" the window sits between ‹ › with a "Hear" pill un
 note, one status line and, under it, one quieter advice line that says what to change (roll the
 flute, air, fingers, come closer, a clear note), never a number.
 
+**One direction on screen** (2026-11-10, found on the user's phone with real sound). Off the note, the status line
+says which way to go and its arrow points the way the window's own arrow does: "⬆️ A little higher" / "⬆️ Malo više"
+under a bubble that floats below its ring with ↑ beside it, "⬇️ An octave lower" / "⬇️ Oktavu niže", "⬆️ That's E4"
+(the arrow is the way to the chosen note). Until then it said what was wrong, "⬇️ Too low", under the window's ↑: two
+arrows pointing opposite ways for one thing, and a child had to turn "too low" into "go up". The string names
+(`too_low`, `octave_too_high`, `heard_lower_note` ...) still say what is wrong, as `TuningStatus` does; only the words
+changed. Do not put an arrow on that line that points against the window's. The screen reader's sentences
+(`pitch_low` ...) already said both. The Play listing and its copy in `docs/release/play-console.md` still quote
+"Too high" and "Too low": the user changes the listing.
+
 ## Sideways
 
 Since 2026-11-05 (spec `docs/superpowers/specs/2026-11-05-landscape-design.md`, "Tuner"; what every tab
@@ -164,7 +174,13 @@ as the height leaves little choice. The numbers come from `SidewaysGeometry`, wh
 - **Asking for the microphone** (tuner and flute): `MicrophonePermissionCard` branches itself, so the flute
   gets it free. The disc on the left of the card (up to 0.38 of its width), "Can I listen?" and its line beside
   it; Yes low on the right, Settings at the top of the column, and the flute's Your turn adds its quiet Not
-  now under Settings (it has no emoji).
+  now under Settings (it has no emoji). **Settings shows only once the phone will not ask again** (2026-11-10):
+  it is the one button in the app that leaves it, and until then a child met it on the tuner's very first
+  opening. The card takes `onOpenSettings` as null until then; the screens' permission launchers ask
+  `shouldShowRequestPermissionRationale` after a no and tell the view model (`TunerViewModel.onPermissionAnswer`,
+  `FluteViewModel.onMicResult`), which keeps `micBlocked` in its state, so it survives a tab switch; a grant ends it.
+  After the app restarts the pill is back at the first "Yes" the phone refuses to ask for. A question dismissed
+  without an answer counts as blocked too (the phone gives the same answers), which only shows the pill early.
 
 ## The microphone in split screen
 

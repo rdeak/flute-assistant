@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
@@ -69,8 +72,8 @@ import hr.bertlab.fluteassistant.ui.theme.ActionStop
  * the beat are kept, so this screen needs nothing else of the metronome's. "Your turn" needs the
  * microphone: a tap with RECORD_AUDIO granted starts listening at once, without it the tap asks
  * the phone and the answer goes to [FluteViewModel.onMicResult] (a yes listens, a no shows the
- * microphone card, whose "Yes" asks again and whose "Settings" opens the app's page). The tab never
- * asks for the microphone on its own; only the button does.
+ * microphone card, whose "Yes" asks again and which offers "Settings", the app's page, only once
+ * the phone will not ask again). The tab never asks for the microphone on its own; only the button does.
  */
 @Composable
 fun FluteScreen(
@@ -80,8 +83,11 @@ fun FluteScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        viewModel.onMicResult(granted)
+        // After a no, the phone says whether it would show its question again; when it would not, only its settings are left.
+        val canAskAgain = activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO) } ?: true
+        viewModel.onMicResult(granted, canAskAgain)
     }
     fun micGranted() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
         PackageManager.PERMISSION_GRANTED
@@ -201,20 +207,23 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  * A tap on the knob ([FluteActions.onSpeedOpen]) swaps all of that, in place, for the metronome tab's own
  * [MetronomeStage] (the beat bubbles with their − and +, the tempo ring with its wheel, set
  * through [FluteActions.onTimeSignatureChange] and [FluteActions.onBpmChange]) and one big green OK. OK ([FluteActions.onSpeedDone])
- * is the only way back, as the notes tab's picker is; the choice survives rotation. The panel
+ * is the way back, as on the notes tab's picker; the choice survives rotation. The panel
  * lays out as the metronome tab does, shrinking its ring to a short screen and scrolling only
  * below [MetronomeMinHeight].
  *
  * A tap on the book button ([FluteActions.onShelfOpen]) swaps the stage, the keys and the Play row, in place,
  * for the [TuneShelf]: the six books ([FluteUiState.shelf]), the open one's cover yellow. One tap
  * on a book closes the shelf and is [FluteActions.onBookChosen] with its index, the open book's too (which
- * changes nothing). Unlike the speed panel there is no OK; as in the panel and the notes picker,
- * the back button is not handled. An open shelf survives rotation as the panel does. Its three rows share the height and scroll only
+ * changes nothing). Unlike the speed panel there is no OK. An open shelf survives rotation as the panel does. Its three rows share the height and scroll only
  * below [ShelfMinHeight]; on its side the six books stand in one row, which never scrolls.
  *
  * On a phone on its side ([LocalSideways]) the same pieces stand side by side: [FluteWritingSideways],
  * [FluteRunningSideways] and [FluteSpeedSideways]. Both choices are kept above the branch, so a panel
  * stays open while the phone turns.
+ *
+ * The phone's Back is each of these screens' own way back: OK on the speed panel (an open tempo wheel
+ * closes first), a tap on the open book on the shelf, Not now on the microphone card, Stop while the
+ * tune runs. While the child writes it is the phone's, and leaves the app.
  */
 @Composable
 fun FluteContent(
@@ -232,11 +241,12 @@ fun FluteContent(
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         if (state.micDenied) {
             // The phone said no to the microphone: the tuner's card, with its quiet "Not now" as the way back.
+            BackHandler(onBack = actions.onMicDismiss)
             if (sideways) {
                 // The card is a page of its own there, with the margins of one: it gets the whole tab.
                 MicrophonePermissionCard(
                     onRequestPermission = actions.onRequestMic,
-                    onOpenSettings = actions.onOpenSettings,
+                    onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
                     onDismiss = actions.onMicDismiss,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -248,7 +258,7 @@ fun FluteContent(
                 ) {
                     MicrophonePermissionCard(
                         onRequestPermission = actions.onRequestMic,
-                        onOpenSettings = actions.onOpenSettings,
+                        onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
                         onDismiss = actions.onMicDismiss,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -262,6 +272,9 @@ fun FluteContent(
                 choosingSpeed = false
                 actions.onSpeedDone()
             }
+            // Back is OK; an open wheel closes first (the later handler is asked first).
+            BackHandler(onBack = closePanel)
+            BackHandler(enabled = wheel.editing) { wheel.editing = false }
             if (sideways) {
                 FluteSpeedSideways(
                     metronome = metronome,
@@ -303,6 +316,8 @@ fun FluteContent(
                 choosingBook = false
                 actions.onBookChosen(index)
             }
+            // Back is a tap on the open book: the shelf closes and nothing changes.
+            BackHandler { chooseBook(state.openBook) }
             if (sideways) {
                 // One row of six in the whole window less the margins: nothing scrolls, and there is no column.
                 TuneShelf(
@@ -333,6 +348,8 @@ fun FluteContent(
             val fits = maxHeight >= FitsHeight
             val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
             val running = state.isRunning
+            // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
+            BackHandler(enabled = running, onBack = actions.onStop)
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
             // out in places of their own, and a staff made anew at each swap would scroll in from its start.
             val staffPlace = rememberLazyListState()

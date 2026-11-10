@@ -16,7 +16,7 @@ emoji sets draw all five facing left, so each is mirrored; Samsung's draws the s
 right, so on a Samsung phone the snail is not), a yellow knob with the current animal that is
 dragged round, a tap on an animal jumps to its band (the rabbit again to 120), and the tempo figure
 alone in the middle (the band's name above it was dropped on 2026-10-24; a screen reader hears it as
-the ring's state; tap the figure for the in-place `TempoWheel`; there are no tempo −/+ buttons: the
+the ring's state; tap the figure for the in-place `TempoWheel`, which a touch outside it or the phone's Back closes; there are no tempo −/+ buttons: the
 user turned them down again on 2026-10-24); then one Play / Stop pill (no volume control: the
 phone's buttons set loudness).
 
