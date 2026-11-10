@@ -21,6 +21,13 @@ which a tongued stop between two notes of one pitch drops where the window's lev
 produces the estimate; the engine uses `YinPitchDetector.forFlute`, which searches only one
 semitone beyond `FluteRange` (so voices and mains hum below the flute cannot register as low
 notes) and gates at `QUIET_ROOM_RMS` (about -60 dBFS, a value only a real phone can confirm).
+It reads the newest half of the window (since 2026-11-10; `differenceAt` sums over the stretch
+that ends on the window's last sample), so a frame's pitch and its `minLevel` describe the same
+hop: it read the oldest half before and heard every note one frame, 43 ms, late, which the
+phone's recorded sessions of 2026-11-05 showed (60 of 66 notes moved a frame or two earlier, no
+mark changed; a comparison with TarsosDSP's YIN and McLeod on the same sessions found nothing
+else worth having, so the library was turned down). `YinPitchDetectorTest` pins both ends: a note
+that began inside the newest hop is heard, and a frame whose newest hop is silent has no pitch.
 `TunerViewModel` gates on probability (`MIN_PROBABILITY` 0.85 on top of YIN's own 0.2
 threshold: two stacked confidence gates whose combined cliff sits at about 9 dB breath-noise
 signal-to-noise, right where a beginner's airy tone lives; the KDoc on `MIN_PROBABILITY`

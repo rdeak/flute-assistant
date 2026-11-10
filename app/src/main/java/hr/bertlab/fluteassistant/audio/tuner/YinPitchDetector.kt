@@ -25,6 +25,12 @@ data class PitchEstimate(val frequency: Double, val probability: Double)
  *    minimum by `k` sharpens the estimate by roughly a factor of `k`, which matters for
  *    high notes where one period spans only ~20 samples.
  *
+ * It reads the newest half of the buffer, where the caller appends each hop (`differenceAt`).
+ * Until 2026-11-10 it read the oldest half, as YIN is usually written, and so heard every note
+ * one frame (43 ms) late: on the phone's recorded "Your turn" sessions of 2026-11-05 the change
+ * moved 60 of 66 notes one or two frames earlier and no mark. The listening rules count frames,
+ * so check a change here on the recorded sessions (the `sessions` skill), not on tone alone.
+ *
  * Pure Kotlin, no Android dependencies, so it is unit-tested on the JVM.
  *
  * [threshold] is the first of two confidence gates: a frame is returned only when the
@@ -51,7 +57,7 @@ class YinPitchDetector(
     private val cmnd = DoubleArray(halfSize)
 
     /**
-     * @param buffer exactly [bufferSize] mono samples in [-1, 1].
+     * @param buffer exactly [bufferSize] mono samples in [-1, 1], the oldest first.
      * @return the detected pitch, or null for silence / unpitched input.
      */
     fun detect(buffer: FloatArray): PitchEstimate? {
@@ -98,9 +104,15 @@ class YinPitchDetector(
         return sqrt(energy / buffer.size)
     }
 
+    /**
+     * The squared difference between a stretch of [halfSize] samples and the same stretch [tau]
+     * later, the later one ending on the buffer's last sample: the newest sound, which the
+     * caller puts at the end.
+     */
     private fun differenceAt(x: FloatArray, tau: Int): Double {
         var sum = 0.0
-        for (i in 0 until halfSize) {
+        val end = bufferSize - tau
+        for (i in end - halfSize until end) {
             val delta = (x[i] - x[i + tau]).toDouble()
             sum += delta * delta
         }

@@ -106,4 +106,28 @@ class YinPitchDetectorTest {
         assertNull(flute.detect(sine(440.0, amplitude = 0.0005))) // about -69 dBFS: hiss, a quiet room
         assertNotNull(flute.detect(sine(440.0, amplitude = 0.01))) // about -43 dBFS: a soft note
     }
+
+    // The engine appends every hop at the end of the window, so the newest sound has the highest
+    // indices. The detector follows that end: the listening rules count frames, and a pitch read
+    // from the oldest samples shows every note one frame (43 ms) late.
+
+    /** A 440 Hz tone in [from, to) of the window and silence around it; index 0 is the oldest sample. */
+    private fun toneIn(from: Int, to: Int): FloatArray =
+        FloatArray(4096) { i -> if (i in from until to) (0.5 * sin(2 * PI * 440.0 * i / sampleRate)).toFloat() else 0f }
+
+    @Test
+    fun `hears a note that began inside the newest hop`() {
+        val flute = YinPitchDetector.forFlute(sampleRate)
+        val estimate = flute.detect(toneIn(from = 2300, to = 4096)) // began 37 ms ago
+        assertNotNull("no pitch for a note 37 ms old", estimate)
+        val cents = 1200.0 * kotlin.math.log2(estimate!!.frequency / 440.0)
+        // Ten cents, the tuner's in-tune band, not two: the silence before the note is in what is read.
+        assertTrue("got ${estimate.frequency} Hz", kotlin.math.abs(cents) <= 10.0)
+    }
+
+    @Test
+    fun `a frame whose newest hop is silent has no pitch`() {
+        val flute = YinPitchDetector.forFlute(sampleRate)
+        assertNull(flute.detect(toneIn(from = 0, to = 2000))) // stopped 44 ms ago
+    }
 }

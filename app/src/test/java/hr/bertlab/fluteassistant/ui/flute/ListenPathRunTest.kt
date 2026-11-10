@@ -15,6 +15,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.random.Random
 
 /** [ListenPath] itself: how it frames audio and what it reports per hop; the sound cases are in [ListenPathTest]. */
 class ListenPathRunTest {
@@ -57,7 +58,10 @@ class ListenPathRunTest {
         val deaf = ListenPath.run(samples, rate, tune, rules = NoteOnsetTracker.Rules(stopDrop = 0.5f)).heard.size
         assertTrue("stopDrop 0.5 hears no tongued stop: $deaf of $heard", deaf < heard)
         // One hop of noise louder than the seeded floor: the floor rises by one FLOOR_RISE from the seed, not from nothing.
-        val noise = FloatArray(hop) { if (it % 2 == 0) 0.1f else -0.1f }
-        assertEquals(0.3f + NoteOnsetTracker.FLOOR_RISE, ListenPath.run(noise, rate, tune, floor = 0.3f).steps.single().floor!!, 1e-6f)
+        // Random, not a +/- pattern: that is a tone at half the rate, and the detector reads the newest hop.
+        val random = Random(3)
+        val noise = FloatArray(hop) { (random.nextFloat() - 0.5f) * 0.2f }
+        val step = ListenPath.run(noise, rate, tune, floor = 0.3f).steps.single()
+        assertEquals(step.toString(), 0.3f + NoteOnsetTracker.FLOOR_RISE, step.floor!!, 1e-6f)
     }
 }
