@@ -90,7 +90,13 @@ grows. Text on the staff (the time signature, the emoji) is measured at a fixed 
 stays in the staff at any font scale. The staff with its names is `TuneStaffHeight` (241 dp, the staff 175) at every tune, so
 the keys never move; c³'s stem (87 dp above the top line) may reach 12 dp into the stage's padding
 and c¹'s ring and tie 8 dp into the gap above the names, which `StaffGeometryTest` checks for
-every height; with the names the stage fits a 412 x 915 phone without scrolling. Where the
+every height; with the names the stage fits a 412 x 915 phone without scrolling. The tab needs 642 dp
+upright (`FitsHeight` in `FluteScreen.kt`: the stage, three key rows, the Play row, their gaps and the
+column's padding), and whatever a phone has over that goes over and under the keys, so that Stop
+stands where Play was; under it the keys keep their least height and the tab scrolls. Until 2026-11-10
+`FitsHeight` counted 664, so the user's Galaxy A55, whose three navigation buttons leave the tab 653 dp
+(the emulator's Medium Phone leaves 709), was laid out as a phone too short: the blocks at their least
+gaps, the spare height under the Play row and Stop 100 dp over Play's place. Where the
 drawing differs from the canvas: `.superpowers/design/flute-assistant-screens/README.md`. Sound:
 `FluteTimbre` (`audio/flute/`, the harmonics the tuner's `ReferenceToneSynth` now shares)
 under `SustainedToneSynth`, a phase-continuous oscillator with an attack (30 ms) / sustain /
@@ -163,10 +169,17 @@ The speed knob and its panel (the user's pick of 2026-11-03 from three mockups, 
 tab's tempo and in its time signature, and the flute now shows and sets both. `SpeedKnob` is the
 ring's knob moved to the staff, where printed music writes the tempo: a `ChunkyButton` in `Sun`,
 `CircleShape`, `SpeedKnobSize` (54 dp) across with a 5 dp shadow, laid by `FluteContent` over `TuneStaff`'s
-box at its top left so it touches only the faint clef's tip (the clef's top is `TOP_LINE_Y -
-LINE_GAP`, 57 dp, the signature stands clear of it below, and `NOTES_CLIP`, also 57 dp, keeps
-every note, stem, ring and band from running under it); nothing on the staff moved for it, and it
-shows on an empty tune too. Since the evening of 2026-11-04 it carries two pictures: the tab bar's drum
+box at its top left, `KNOB_LIFT` (8 dp) above the box's top, in the stage's padding
+(`StaffGeometry.knobTop`), clear of the faint clef (the clef's tip is `TOP_LINE_Y - LINE_GAP`, 57 dp,
+the signature stands lower still, and `NOTES_CLIP`, also 57 dp, keeps every note, stem, ring and band
+from running under the knob); nothing on the staff moved for it, and it shows on an empty tune too.
+The lift is of 2026-11-10: until then the knob's top was the box's, the rule was that the badge may
+touch the clef's tip, and the knob's own shadow, which nobody had counted, lay 2.8 dp over the tip,
+which the user saw on their phone ("G clef overlaps with metronome button"). Now the shadow and the
+badge end 5 dp short of the clef's line at every size the staff is drawn
+(`StaffGeometry.knobClefAir`, `StaffGeometryTest`): where the staff is drawn smaller than at rest (a
+tablet on its side, 0.91) the clef's tip comes up and the knob, which keeps its size, goes up as far,
+the staff being centred in a taller card there. Since the evening of 2026-11-04 it carries two pictures: the tab bar's drum
 (`AppTab.METRONOME.emoji`, `StaffGeometry.KNOB_DRUM`, 26 dp, `KNOB_DRUM_SHIFT` up and left of the
 middle), which says what it opens, and in `AnimalBadge` at its lower right the animal of the speed
 (`tempoBand(bpm).emoji`, `KNOB_BADGE_ANIMAL`, 19 dp, `facingRight`), which says how fast. Before that it
@@ -178,8 +191,8 @@ badge, which the user liked with the two swapped, to this: "E" of the second pag
 swap's white 24 dp badge the near-white rabbit disappeared, so the badge is `Sun` and `KNOB_BADGE` (29 dp)
 across with a `KNOB_BADGE_EDGE` outline. Both emoji are sized in dp (`emojiSizeFor`), so a large font
 scale cannot push them out. The badge is the button's sibling, not its content, because `ChunkyButton`
-clips to its disc and the badge reaches `KNOB_BADGE_OVERHANG` (3 dp) past the box, to `NOTES_CLIP` and
-the clef's tip and no further (`StaffGeometryTest`); it has no gesture, so a tap on it goes through to
+clips to its disc and the badge reaches `KNOB_BADGE_OVERHANG` (3 dp) past the knob's box, to `NOTES_CLIP`
+and no further (`StaffGeometryTest`); it has no gesture, so a tap on it goes through to
 the knob, and it sinks with the knob through a shared `MutableInteractionSource` and `PressDepth`. The
 emoji have no semantics, so `FluteScreenTest` checks them through the knob's pixels. Its bpm is `MetronomeUiState.config.bpm`, hoisted from `MainScreen`
 through `FluteScreen` into `FluteContent`, so a change made on the metronome tab shows the
@@ -325,7 +338,8 @@ head; it slides to each new place in `FLASH_DURATION_MS` with `FastOutSlowInEasi
 so it lands as the hop ends, across bar lines and breaths too, and in Your turn from the note just
 played to the next, which it reaches with a hop (`beatPulse` goes up on every advance and at the
 start). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
-`StaffGeometry.ANIMAL_Y` (27 dp, the knob's middle, unscaled like the knob) from the box's top,
+`StaffGeometry.ANIMAL_Y` (27 dp, unscaled like the knob: the knob's middle until the knob was lifted
+8 dp on 2026-11-10, the animal's line staying where its hop keeps inside the box) from the box's top,
 `ANIMAL_SIZE` (24 dp) times the scale tall, placed in `Modifier.offset {}` from the row's
 `layoutInfo` (the first item shown, plus the dp from its start, which `StaffGeometry.markWidth`
 sums), so it follows the row's scrolling with no recomposition, and clipped at the row's sides

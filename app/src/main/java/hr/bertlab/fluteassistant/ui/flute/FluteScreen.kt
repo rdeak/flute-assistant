@@ -161,11 +161,15 @@ private val PlayRowHeight = 84.dp
 private val PlayShadow = 8.dp
 
 /**
- * Everything below this height cannot hold the keys: the stage (the staff with the names under
- * it), three key rows and the Play row, plus the gaps between them.
+ * Everything below this height cannot hold the keys: the column's own padding (4 dp over, 16 under),
+ * the stage (the staff with the names under it, in the stage's 16 dp padding, which holds its
+ * border), three key rows and the Play row with its shadow, and the two gaps between them. It is
+ * 642 dp, what the column measures; until 2026-11-10 it counted 22 dp more, so a phone that leaves
+ * the tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too
+ * short, its spare height under the Play row and Stop far over Play's place.
  */
-private val FitsHeight = 20.dp + (38.dp + TuneStaffHeight) +
-    14.dp + FluteKeysMinHeight + 14.dp + PlayRowHeight + PlayShadow + 16.dp
+private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
+    14.dp + FluteKeysMinHeight + 14.dp + PlayRowHeight + PlayShadow
 
 /**
  * The whole flute tab, top to bottom: a stage with the child's tune on a staff ([TuneStaff]: the
@@ -368,7 +372,9 @@ fun FluteContent(
                             actions.onSpeedOpen()
                             choosingSpeed = true
                         },
-                        modifier = Modifier.align(Alignment.TopStart),
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .offset(y = StaffGeometry.knobTop(staffScale).dp),
                     )
                     BookButton(
                         sweet = Sweet.entries[state.openBook],

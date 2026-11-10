@@ -7,6 +7,7 @@ import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -54,10 +55,11 @@ class StaffGeometryTest {
     }
 
     @Test
-    fun `the running animal walks at the knob's height, above the staff, inside its box, over no head but c3's edge`() {
+    fun `the running animal walks near the knob's height, above the staff, inside its box, over no head but c3's edge`() {
         val s = RunningStaffScale
         val half = StaffGeometry.ANIMAL_SIZE * s / 2
-        // Level with the knob's middle: the knob does not grow with the running staff, so neither does this height.
+        // Half a knob under the box's top, where the knob's middle was before the knob was lifted: the
+        // knob does not grow with the running staff, so neither does this height.
         assertEquals(StaffGeometry.CORNER_BUTTON / 2, StaffGeometry.ANIMAL_Y)
         // At the top of its hop (8 dp) it is still inside the staff's box, and it stands clear of the top line.
         assertTrue(StaffGeometry.ANIMAL_Y - half - 8f >= 0f)
@@ -98,11 +100,24 @@ class StaffGeometryTest {
     }
 
     @Test
-    fun `the knob's badge stops where the notes start and at the clef's tip, and holds its animal`() {
+    fun `the knob's badge stops where the notes start and holds its animal`() {
         val badgeEnd = StaffGeometry.CORNER_BUTTON + StaffGeometry.KNOB_BADGE_OVERHANG
         assertTrue("no note may run under it", badgeEnd <= StaffGeometry.NOTES_CLIP)
-        assertTrue("it may only touch the clef's tip", badgeEnd <= StaffGeometry.TOP_LINE_Y - StaffGeometry.LINE_GAP)
         assertTrue(StaffGeometry.KNOB_BADGE_ANIMAL <= StaffGeometry.KNOB_BADGE - 2 * StaffGeometry.KNOB_BADGE_EDGE)
+    }
+
+    @Test
+    fun `the knob, its shadow and its badge keep clear of the clef's tip at every size the staff is drawn`() {
+        // At rest on a phone, on a tablet on its side (the smallest the staff is drawn) and while the tune runs.
+        val tabletOnItsSide = TabletGeometry.sidewaysStaffScale(zoom = 10f)
+        assertTrue(tabletOnItsSide < 1f)
+        for (s in listOf(1f, tabletOnItsSide, 0.95f, RunningStaffScale)) {
+            assertTrue("scale $s: ${StaffGeometry.knobClefAir(s)} dp between them", StaffGeometry.knobClefAir(s) >= 4.5f)
+        }
+        // Upright the knob stands in the stage's padding (16 dp, 3 of them its border): white is left over it.
+        assertTrue(-StaffGeometry.knobTop(1f) <= 16f - 3f - 4f)
+        // It does not grow with the running staff, and stays where it is at rest.
+        assertEquals(StaffGeometry.knobTop(1f), StaffGeometry.knobTop(RunningStaffScale))
     }
 
     @Test

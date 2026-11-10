@@ -7,6 +7,9 @@ import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_X
+import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_Y
+import kotlin.math.hypot
 
 /**
  * Where [TuneStaff] draws everything, in dp. The canvas of 2026-11-02 drew the staff with lines
@@ -88,6 +91,10 @@ internal object StaffGeometry {
      */
     const val CLEF_BOTTOM = TOP_LINE_Y + 5.12f * CLEF_UNIT
 
+    /** The clef's tip, its highest point and the nearest it comes to the speed knob: a space over the top line. */
+    const val CLEF_TIP_X = CLEF_X + TREBLE_CLEF_TIP_X * CLEF_UNIT
+    const val CLEF_TIP_Y = TOP_LINE_Y + TREBLE_CLEF_TIP_Y * CLEF_UNIT
+
     /**
      * The buttons in the staff's left corner (since 2026-11-04): the round speed knob at the top
      * and, under the clef, beside the names row, the open book as a little book with its sweet,
@@ -103,7 +110,8 @@ internal object StaffGeometry {
      * disc's middle to leave the badge its corner, and the speed's animal, [KNOB_BADGE_ANIMAL] tall,
      * in a round badge [KNOB_BADGE] across with a [KNOB_BADGE_EDGE] edge at the disc's lower right. The
      * badge reaches [KNOB_BADGE_OVERHANG] past the knob's box to the right and below: to
-     * [NOTES_CLIP], so no note runs under it, and to the clef's tip, no further.
+     * [NOTES_CLIP], so no note runs under it, and no further. The knob, its shadow and the badge keep
+     * clear of the clef ([KNOB_LIFT], [knobClefAir]).
      */
     const val KNOB_DRUM = 26f
     const val KNOB_DRUM_SHIFT = 4f
@@ -113,10 +121,44 @@ internal object StaffGeometry {
     const val KNOB_BADGE_OVERHANG = 3f
 
     /**
+     * How far the knob stands above the staff's box, in the stage's padding (since 2026-11-10, the
+     * user on their phone: "G clef overlaps with metronome button"). Until then its top was the
+     * box's, the rule let the badge touch the clef's tip and nobody counted the knob's shadow, which
+     * lay 2.8 dp over the tip. Lifted, the shadow ends 5 dp short of the clef's line and 5 dp of
+     * white are left between the knob and the stage's border; nothing on the staff moved.
+     */
+    const val KNOB_LIFT = 8f
+
+    /**
+     * Where the knob's top is, from the top of the staff's box, with the staff drawn at [scale]. A
+     * staff drawn smaller than at rest (a tablet on its side) brings the clef's tip up, and the knob,
+     * which keeps its size, goes up as far: the staff is centred in a taller card there, so there is
+     * room. A staff drawn bigger (a tune running) takes the clef away from it, and the knob stays.
+     */
+    fun knobTop(scale: Float): Float = -KNOB_LIFT - (1f - minOf(scale, 1f)) * CLEF_TIP_Y
+
+    /**
+     * The air, with the staff drawn at [scale], between the clef's line at its tip and the nearest of
+     * the knob's shadow and its badge (the knob's own disc is above its shadow); under zero they overlap.
+     */
+    fun knobClefAir(scale: Float): Float {
+        val top = knobTop(scale)
+        val tipX = CLEF_TIP_X * scale
+        val tipY = CLEF_TIP_Y * scale
+        val knob = CORNER_BUTTON / 2
+        val badge = KNOB_BADGE / 2
+        val badgeMiddle = CORNER_BUTTON + KNOB_BADGE_OVERHANG - badge
+        val toShadow = hypot(tipX - knob, tipY - (top + CORNER_SHADOW + knob)) - knob
+        val toBadge = hypot(tipX - badgeMiddle, tipY - (top + badgeMiddle)) - badge
+        return minOf(toShadow, toBadge) - CLEF_STROKE * CLEF_UNIT * scale / 2
+    }
+
+    /**
      * The knob's animal while the tune runs (since the evening of 2026-11-04, the user's pick "A"
      * from a moving true-size mockup; it walked the marks row before): it leaves the knob and walks
-     * the staff at the knob's height, its middle [ANIMAL_Y] from the top of the staff's box at
-     * every scale, as the knob does not grow with the running staff; [ANIMAL_SIZE] tall at rest
+     * the staff near the knob's height (the knob's middle until the knob went up by [KNOB_LIFT]; the
+     * animal's line stayed, as its hop must keep inside the box), its middle [ANIMAL_Y] from the top
+     * of the staff's box at every scale, as the knob does not grow with the running staff; [ANIMAL_SIZE] tall at rest
      * scale (the running staff draws it a third bigger). Its hop (8 dp) keeps it inside the box,
      * and it stands over the stems of the notes from f² up, never over a head but c³'s top edge.
      */

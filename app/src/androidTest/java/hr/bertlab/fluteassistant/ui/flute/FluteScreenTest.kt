@@ -447,6 +447,10 @@ class FluteScreenTest {
         assertTrue("the knob $knobBounds should sit above the time signature $signature", knobBounds.bottom <= signature.top + 1.dp)
         assertTrue("the knob $knobBounds should start left of the time signature $signature", knobBounds.left < signature.left)
         assertTrue("the knob should be 54 dp, was ${knobBounds.width}", abs((knobBounds.width - 54.dp).value) <= 0.5f)
+        // The clef's tip is one space (18 dp) over the top line, where the signature's box starts. The
+        // knob's shadow, 5 dp under it, ends over the tip with white between (it lay on the tip until 2026-11-10).
+        val shadowEnd = knobBounds.bottom + 5.dp
+        assertTrue("the knob's shadow, ending at $shadowEnd, should end over the clef's tip", shadowEnd + 3.dp <= signature.top - 18.dp)
         compose.runOnIdle { metronome.value = MetronomeUiState(config = MetronomeConfig(bpm = 60)) }
         compose.onNodeWithContentDescription("Speed: Turtle, tap to change").assertIsDisplayed()
     }
@@ -793,6 +797,24 @@ class FluteScreenTest {
         val running = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
         val expected = tuneStaffHeight(RunningStaffScale)
         assertTrue("running the staff is ${running.height}, expected $expected", abs((running.height - expected).value) <= 1f)
+    }
+
+    /**
+     * What a Galaxy A55 with three navigation buttons leaves the tab, about 652 dp (2026-11-10): the
+     * stage, the keys and the Play row need 642 of it. The height check counted 664, so that phone
+     * was laid out as one too short: its spare height lay under the Play row instead of round the
+     * keys, and Stop stood 100 dp over Play's place.
+     */
+    @Test
+    fun a_phone_that_only_just_holds_the_tab_is_laid_out_like_a_taller_one() {
+        show(FluteUiState(tune = twoNotes), height = 652.dp)
+        val keys = compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot()
+        val expected = FluteKeysMinHeight + 10.dp
+        assertTrue("the keys' room should take the spare height: ${keys.height}, expected $expected", abs((keys.height - expected).value) <= 1f)
+        val play = compose.onNodeWithText("Play").getBoundsInRoot()
+        state.value = state.value.copy(listening = Listening(index = 0))
+        val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
+        assertTrue("Stop ($stop) should stand where Play ($play) was", abs((stop.bottom - play.bottom).value) <= 1f)
     }
 
     @Test

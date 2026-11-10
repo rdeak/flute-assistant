@@ -12,6 +12,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 
 /**
+ * The clef's tip in units from its origin: the highest point of [drawTrebleClef]'s line, where the
+ * stem turns back down into the sweep. Whatever stands over the clef (the flute's speed knob) keeps
+ * clear of this point, and the line is half its width thicker around it.
+ */
+const val TREBLE_CLEF_TIP_X = 1.55f
+const val TREBLE_CLEF_TIP_Y = -1.0f
+
+/**
  * A stroked treble clef, drawn in [unit]s from [origin]: the hook and dot at the bottom, the
  * stem up to the loop at the top, the sweep back down and the curl around the G line. The notes
  * game and the flute's staff both draw it, each as faint as its canvas board, the line
@@ -24,7 +32,7 @@ fun DrawScope.drawTrebleClef(unit: Float, origin: Offset, color: Color, strokeUn
         moveTo(x(0.6f), y(4.7f))
         cubicTo(x(0.65f), y(5.1f), x(1.1f), y(5.12f), x(1.05f), y(4.65f))
         cubicTo(x(1.0f), y(3.8f), x(1.1f), y(2.0f), x(1.3f), y(0.5f))
-        cubicTo(x(1.35f), y(-0.2f), x(1.5f), y(-0.8f), x(1.55f), y(-1.0f))
+        cubicTo(x(1.35f), y(-0.2f), x(1.5f), y(-0.8f), x(TREBLE_CLEF_TIP_X), y(TREBLE_CLEF_TIP_Y))
         cubicTo(x(1.7f), y(-0.9f), x(1.85f), y(-0.3f), x(1.75f), y(0.3f))
         cubicTo(x(1.65f), y(1.2f), x(0.9f), y(1.9f), x(0.5f), y(2.4f))
         cubicTo(x(0.1f), y(2.9f), x(0.1f), y(3.5f), x(0.5f), y(3.9f))

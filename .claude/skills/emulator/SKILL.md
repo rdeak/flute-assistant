@@ -28,6 +28,7 @@ adb exec-out screencap -p > shot.png
 adb shell settings put system accelerometer_rotation 0                                # then turn it by hand:
 adb shell settings put system user_rotation 1                                         # sideways (3 the other way, 0 upright)
 adb shell wm size 945x2100                                                            # the 800 x 360 dp phone; 945x1680 is 640 x 360; `wm size reset` after
+adb shell wm size 1080x2253                                                           # the user's Galaxy A55 upright: its three navigation buttons leave the tab 653 dp, the AVD 709
 ```
 
 There is no tablet AVD and `avdmanager` is not installed, so the phone AVD fakes one by its size and
