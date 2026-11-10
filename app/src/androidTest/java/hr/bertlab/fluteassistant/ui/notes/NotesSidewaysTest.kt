@@ -41,7 +41,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.domain.notes.speed
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
@@ -402,10 +401,10 @@ class NotesSidewaysTest {
     }
 
     /**
-     * Ten notes asked are two rows of keys under the tiles, 36 x 40 sideways. The card is 312 dp inside at
-     * 360 tall, which with the column's 16 dp gaps was short: the keys came out 88 of their 96 dp at 640 wide.
-     * Two rows bring the gaps to 10 and the headline takes the height the rest leaves. A squeezed column cuts
-     * the second row, so its height says whether it held; the 10 dp over the first row is a learned key's star.
+     * Ten notes asked are two rows of five keys under the headline, each as large as the column's width holds
+     * (51 x 58 dp at 640 wide, 62 x 70 at 915). The card is 312 dp inside at 360 tall; the headline takes the
+     * height the keys leave. A squeezed column cuts the second row, so its height says whether it held; the
+     * 10 dp over the first row is a learned key's star.
      */
     @Test
     fun the_summary_keys_stay_in_the_card_with_ten_asked_at_360_tall() {
@@ -418,11 +417,11 @@ class NotesSidewaysTest {
                 val keys = yourNotes().assertIsDisplayed()
                 assertInTheCard(each, "the keys", keys)
                 assertInTheCardsHeight(each, "the keys", keys)
-                assertNear("$each, \"$headline\": the keys' height", 96.dp, height(keys))
-                val tiles = bounds(compose.onNodeWithContentDescription("Streak of 5"))
-                assertNear("$each: a tile's height", 92.dp, tiles.bottom - tiles.top)
-                assertTrue("$each, \"$headline\": the keys start ${bounds(keys).top - tiles.bottom} under the tiles", bounds(keys).top - tiles.bottom >= 10.dp - SLACK)
+                // Two whole rows: two keys with their shadows and the 8 dp between (130 dp with the smallest keys,
+                // 156 with the largest); the 10 dp kept over them for a star is outside the block.
+                assertTrue("$each, \"$headline\": the keys are ${height(keys)} tall", height(keys) >= 128.dp && height(keys) <= 157.dp)
                 val title = word(headline).assertIsDisplayed()
+                assertTrue("$each, \"$headline\": the keys start under the headline", bounds(keys).top >= bounds(title).bottom - SLACK)
                 assertWholeWords(each, headline)
                 assertInTheCard(each, "\"$headline\"", title)
                 assertInTheCardsHeight(each, "\"$headline\"", title)
@@ -650,10 +649,11 @@ class NotesSidewaysTest {
     fun the_summary_shows_again_and_pick_and_no_digits() {
         show(over(8))
         word("🌟 Great job!").assertIsDisplayed()
+        // The trophy says the score to a screen reader; the tiles and the card's stars are gone (2026-11-10).
         compose.onNodeWithContentDescription("Right first time: 8 of 10").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Streak of 5").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Aim: 2 of 3 stars").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Speed: Turtle").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Streak of 5").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Aim: 2 of 3 stars").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Speed: Turtle").assertDoesNotExist()
         pick().assertIsDisplayed()
         word("Pick").assertIsDisplayed()
         word("Again").assertIsDisplayed()
@@ -681,33 +681,31 @@ class NotesSidewaysTest {
         word("Which notes?").assertIsDisplayed()
     }
 
+    /** The trophy stands left of the headline, and the keys of the notes asked under the headline, in the card. */
     @Test
-    fun the_summary_has_one_row_of_ten_stars() {
-        show(over(8))
-        val stars = compose.onNodeWithContentDescription("Right first time: 8 of 10")
-        assertTrue("one row, ${width(stars)} wide and ${height(stars)} tall", width(stars) > height(stars) * 6)
-        val streak = compose.onNodeWithContentDescription("Streak of 5")
-        val aim = compose.onNodeWithContentDescription("Aim: 2 of 3 stars")
-        val speed = compose.onNodeWithContentDescription("Speed: Turtle")
-        assertTrue("the tiles stand in a row", bounds(streak).right <= bounds(aim).left && bounds(aim).right <= bounds(speed).left)
-        assertTrue("the stars are over the tiles", bounds(stars).bottom <= bounds(streak).top)
-        assertNear("a tile's height", 92.dp, height(streak))
+    fun the_summary_has_the_trophy_beside_the_headline_over_the_keys() {
+        show(over(8).copy(askedThisRound = StaffNotes.DEFAULT_PRACTICE))
+        val trophy = bounds(compose.onNodeWithContentDescription("Right first time: 8 of 10"))
+        val headline = bounds(word("🌟 Great job!"))
+        val keys = bounds(yourNotes().assertIsDisplayed())
+        assertTrue("the trophy $trophy is left of the headline $headline", trophy.right <= headline.left + SLACK)
+        assertTrue("the keys $keys are under the headline $headline", keys.top >= headline.bottom - SLACK)
+        assertTrue("the keys $keys are right of the trophy $trophy", keys.left >= trophy.right - SLACK)
     }
 
     /**
-     * The stars' size comes from the measured width of the emoji on the phone (a Samsung's are not
-     * Google's), so on the narrowest phone, where the room and not the 27 dp cap decides, the row
-     * fills the column the trophy leaves and cannot run out of it. The headline fills that column.
+     * Five keys are as large as the column beside the trophy holds: on the narrowest phone they fill it (51 dp
+     * each), and they never run out of it.
      */
     @Test
-    fun the_stars_fill_the_room_the_trophy_leaves_on_the_narrowest_phone() {
-        show(over(8))
+    fun five_keys_fill_the_room_the_trophy_leaves_on_the_narrowest_phone() {
+        show(over(8).copy(askedThisRound = StaffNotes.DEFAULT_PRACTICE))
         on(Phone(640, 360))
-        val stars = bounds(compose.onNodeWithContentDescription("Right first time: 8 of 10"))
+        val keys = bounds(yourNotes())
         val room = width(word("🌟 Great job!"))
-        val row = stars.right - stars.left
-        assertTrue("the stars are $row wide in a column of $room", row <= room + SLACK)
-        assertTrue("the stars are $row wide in a column of $room, a guess left too much of it unused", row >= room * 0.93f)
+        val row = keys.right - keys.left
+        assertTrue("the keys are $row wide in a column of $room", row <= room + SLACK)
+        assertTrue("the keys are $row wide in a column of $room, smaller than it holds", row >= room * 0.93f)
     }
 
     @Test
@@ -746,7 +744,7 @@ class NotesSidewaysTest {
             val summary = "$each, the summary"
             assertInside(each, "$summary: the headline", word("🌟 Great job!").assertIsDisplayed())
             assertInTheCard(each, "the headline", word("🌟 Great job!"))
-            listOf("Right first time: 8 of 10", "Streak of 5", "Aim: 2 of 3 stars", "Speed: Turtle").forEach {
+            listOf("Right first time: 8 of 10").forEach {
                 val node = compose.onNodeWithContentDescription(it).assertIsDisplayed()
                 assertInside(each, "$summary: $it", node)
                 assertInTheCard(each, it, node)
@@ -943,17 +941,11 @@ class NotesSidewaysTest {
                 assertWholeWords(each, headline)
                 assertInside(each, "\"$headline\"", node)
                 assertInTheCard(each, "\"$headline\"", node)
-                // Everything the card holds stays in it, whatever the headline took.
+                // The trophy, which says the score to a screen reader, stays in the card whatever the headline took.
                 val label = if (locale.language == "hr") "Točno iz prve: $score od 10" else "Right first time: $score of 10"
-                val stars = compose.onNodeWithContentDescription(label).assertIsDisplayed()
-                assertInside(each, "$each: the stars", stars)
-                assertInTheCard(each, "the stars", stars)
-                assertTrue("$each: the stars are under \"$headline\"", bounds(stars).top >= bounds(node).bottom - SLACK)
-                // The three tiles (their words are not in the tree, a tile being one description): the streak's is in the card, under the stars.
-                val streak = compose.onNodeWithContentDescription(if (locale.language == "hr") "Niz od 5" else "Streak of 5").assertIsDisplayed()
-                assertInside(each, "$each: the streak tile", streak)
-                assertInTheCardsHeight(each, "the streak tile", streak)
-                assertTrue("$each: the tiles are under the stars", bounds(streak).top >= bounds(stars).bottom - SLACK)
+                val trophy = compose.onNodeWithContentDescription(label).assertIsDisplayed()
+                assertInside(each, "$each: the trophy", trophy)
+                assertInTheCard(each, "the trophy", trophy)
             }
         }
     }

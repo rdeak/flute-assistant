@@ -12,6 +12,7 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.ui.flute.FluteSound
@@ -41,9 +42,16 @@ class ReplayTest {
     private val tune: List<TuneItem> = listOf(TuneNote(71, QUARTER), TuneNote(71, QUARTER), TuneNote(71, HALF))
     private val samples = FluteSound.render(FluteSound.sound(gapsMs = 50, roomDb = -10.0, floorDb = -50.0))
 
-    /** Records the run as the phone would and returns its folder; [extraHops] of audio after the last row, as a Stop with frames still buffered leaves. */
-    private fun recorded(extraHops: Int = 0): File {
-        val run = ListenPath.run(samples, rate, tune)
+    /**
+     * Records the run as the phone would and returns its folder; [extraHops] of audio after the last row, as a Stop
+     * with frames still buffered leaves. The phone heard [samples] under [rules].
+     */
+    private fun recorded(
+        extraHops: Int = 0,
+        samples: FloatArray = this.samples,
+        rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
+    ): File {
+        val run = ListenPath.run(samples, rate, tune, rules)
         val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
         r.start(tune, Pulse(90), floor = null)
         r.opened(rate, "MIC")
@@ -69,6 +77,34 @@ class ReplayTest {
         assertTrue(report, report.contains("diff: none"))
         assertEquals(report, 3, Regex("verdict=right").findAll(report.substringBefore("diff:")).count())
         assertTrue(report, report.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
+        assertFalse("recorded under today's rules, so there is nothing more to say: $report", report.contains("today's rules"))
+    }
+
+    /**
+     * A session recorded before a rule existed ran without it, so its `session.rules` line does not name it: the
+     * replay that is compared with the phone runs without it too (no diff: the phone did what its rules said), and
+     * the report then says what today's rules make of the same sound. Here: notes far too faint for the floor, which
+     * the phone of that day counted.
+     */
+    @Test
+    fun `a session older than a rule replays under its own rules, and the report adds today's`() {
+        val faint = FluteSound.render(FluteSound.sound(gapsMs = 50, toneDb = -45.0, roomDb = -10.0, floorDb = -70.0))
+        val dir = recorded(samples = faint, rules = NoteOnsetTracker.Rules(minLevel = 0f))
+        val log = File(dir, "session.log")
+        val written = log.readText()
+        assertTrue(written, written.contains(" minLevel=0.45"))
+        log.writeText(written.replace(" minLevel=0.45", "")) // as a build before the floor wrote it
+        val session = Session.load(dir)
+        assertNull(session.rules["minLevel"])
+        assertEquals(0f, Replay.recordedRules(session).minLevel)
+
+        val report = Replay.report(session)
+        val then = report.substringBefore("today's rules")
+        assertTrue(report, then.contains("diff: none"))
+        assertTrue(report, then.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
+        assertTrue(report, report.contains("today's rules differ: minLevel=0.45 (recorded 0.0)"))
+        val now = report.substringAfter("today's rules").substringBefore("phone:")
+        assertTrue("under the floor nothing of it is a note: $report", now.contains("marks=\n") && !now.contains("verdict="))
     }
 
     @Test

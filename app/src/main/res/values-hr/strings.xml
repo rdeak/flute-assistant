@@ -114,12 +114,7 @@
     <string name="round_great">🌟 Odlično!</string>
     <string name="round_good">👍 Dobro!</string>
     <string name="round_keep_going">💪 Vježbaj dalje!</string>
-    <string name="summary_streak">Niz</string>
-    <string name="summary_aim">Točnost</string>
-    <string name="summary_speed">Brzina</string>
     <string name="summary_stars">Točno iz prve: %1$d od %2$d</string>
-    <string name="aim_description">Točnost: %1$d od 3 zvjezdice</string>
-    <string name="speed_description">Brzina: %1$s</string>
     <string name="play_again">Opet</string>
     <string name="choose_notes">Odaberi note</string>
     <string name="pick_notes">Odaberi</string>
@@ -174,6 +169,7 @@
     <string name="flute_mark_retry">pogodak iz drugog puta</string>
     <string name="flute_mark_heard">čujem %1$s</string>
     <string name="flute_listen_here">sviraj ovu</string>
+    <string name="flute_play_prompt">🪈 Odsviraj %1$s</string>
     <!-- Croatian music schools name octaves c1, c2, c3 (jednocrtna, dvocrtna, trocrtna), with
          the one-lined octave starting at middle C -->
     <bool name="note_octaves_helmholtz">true</bool>

@@ -11,7 +11,9 @@ import kotlin.math.log2
  * Turns microphone frames into notes the way the tuner's "Which?" mode does, and says when a
  * *new* note begins, which is what the flute's "Your turn" judges. Pure Kotlin, one frame at a
  * time, with the tuner's own thresholds: a frame counts only with a frequency and a probability
- * of at least [ListenRules.MIN_PROBABILITY]; a note is sounding once the last
+ * of at least [ListenRules.MIN_PROBABILITY], and, which is the flute's own, a level of at least
+ * [MIN_LEVEL] (a clear pitch far under a flute at the phone is the room's: [FrameDecision.FAINT]);
+ * a note is sounding once the last
  * [ListenRules.LOCK_FRAMES] counted frames agree within [ListenRules.LOCK_CENTS]; the median
  * of [ListenRules.SMOOTHING_WINDOW] frames names it; a sound that has only drifted past the
  * halfway point to a neighbouring note keeps the old note until it has lasted
@@ -66,6 +68,7 @@ class NoteOnsetTracker(
         val stopDrop: Float = STOP_DROP,
         val restartRise: Float = RESTART_RISE,
         val restartFrames: Int = RESTART_FRAMES,
+        val minLevel: Float = MIN_LEVEL,
     ) {
         /** Name and value of every rule, in declaration order, the value as Kotlin prints it. */
         fun fields(): List<Pair<String, String>> = listOf(
@@ -75,6 +78,7 @@ class NoteOnsetTracker(
             "gapLevelRatio" to gapLevelRatio.toString(), "floorMargin" to floorMargin.toString(), "floorRise" to floorRise.toString(),
             "recentFrames" to recentFrames.toString(), "attackFrames" to attackFrames.toString(), "stopDrop" to stopDrop.toString(),
             "restartRise" to restartRise.toString(), "restartFrames" to restartFrames.toString(),
+            "minLevel" to minLevel.toString(),
         )
 
         /** These rules with the one named [name] set to [value] (rounded for a frame count); an unknown name is refused. */
@@ -98,6 +102,7 @@ class NoteOnsetTracker(
                 "stopDrop" -> copy(stopDrop = f)
                 "restartRise" -> copy(restartRise = f)
                 "restartFrames" -> copy(restartFrames = n)
+                "minLevel" -> copy(minLevel = f)
                 else -> throw IllegalArgumentException("no rule named $name")
             }
         }
@@ -152,6 +157,7 @@ class NoteOnsetTracker(
         noticeStop(frame)
         val frequency = frame.frequency ?: return uncounted(FrameDecision.SILENT, frame.level)
         if (frame.probability < rules.gate) return uncounted(FrameDecision.LOW_PROBABILITY, frame.level)
+        if (frame.level < rules.minLevel) return uncounted(FrameDecision.FAINT, frame.level)
         gap = 0
         unheard = 0
         levelSum += frame.level
@@ -333,5 +339,24 @@ class NoteOnsetTracker(
          * of up to 80 ms plus the swell); later, the stop was the end of the note.
          */
         const val RESTART_FRAMES = 4
+
+        /**
+         * The level under which a frame with a clear pitch still does not count ([FrameDecision.FAINT]):
+         * 0.45, about -33 dBFS. A voice across the room or a television has a clear pitch too, and
+         * until 2026-11-10 "Your turn" judged it: on the user's phone a run earned a star and five
+         * wrong marks before anything was played, from sounds whose counted frames were never louder
+         * than 0.36, while every note of the real flute sessions of 2026-11-05 was judged at 0.67 or
+         * over (their median 0.79). 0.45 stands between the two, 5 dB over the loudest of that room
+         * and 13 dB under the softest of those notes, and is where [HearingTracker] stops calling a
+         * sound "close" for good ([HearingTracker.CLOSE_LEVEL] less its margin), so what is left out
+         * is what "Come closer to the phone" is already said for: faint frames from
+         * [HearingTracker.SOUND_LEVEL] up are sound to it, and a second of them brings that line.
+         * A frame under it does not count, as one under the probability gate does not: a note goes on
+         * through such frames and ends by the gap rules. One room and one sitting of real playing
+         * stand behind the number; it is a [Rules] value, in every session's `session.rules`, so a
+         * session where a child's soft playing was left out says so (the `sessions` skill, a sweep
+         * of `minLevel`). The tuner does not apply it: its ring may show a quiet note.
+         */
+        const val MIN_LEVEL = 0.45f
     }
 }

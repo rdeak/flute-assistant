@@ -35,6 +35,14 @@ change that part). The songbook is in `SONGBOOK.md`.
 - "Your turn" is opt-in, child-paced and score-free: pitch only, nothing timed, no number, marks
   not saved. A miss never shows silence: the heard note, or the listening dots, stands under the
   step waited on.
+- The room under the stage while it listens adds nothing while things go right: "Play B4" until the
+  first note is judged, then silence; after a wrong note the wanted note's fingering over "Check
+  your fingers" until the right one (the user's pick of 2026-11-10). Not the fingering under every
+  note, and no fingering on a phone on its side: `DESIGN.md`, "The room under the stage".
+- The room is not judged: a clear pitch under `NoteOnsetTracker.MIN_LEVEL` (0.45) is not a note
+  (`FrameDecision.FAINT`) and can earn no mark; the child sees the dots and, after a second of it,
+  "Come closer". Change the number only from recorded sessions (a sweep of `minLevel`), never by
+  feel: `DESIGN.md`, "The room is not judged".
 - The engine's frames are buffered, never conflated: `NoteOnsetTracker` counts frames.
 - A turn of the phone stops nothing (`../CLAUDE.md`, "Rules"). `FluteKey` and `RestKey` release in a
   `finally`, so a key held through a turn ends its note. `staffPlace` is created in `FluteContent`'s
@@ -51,7 +59,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 | The staff's drawing, the names row, its sizes | the second paragraph ("The stage") |
 | Key presses, the rejoin window, the rest key, Play | the same paragraph, from "`FluteViewModel` (Activity-scoped" |
 | The keys; the speed knob and its panel | "The keys", "The speed knob and its panel" |
-| Your turn: the listening rules, the heard-note bubble, the advice | "Your turn" |
+| Your turn: the listening rules, the loudness floor, the heard-note bubble, the advice, the room under the stage | "Your turn" |
 | The running staff, the walking animal, the marks row | "While the tune runs" |
 | A phone on its side; a tablet | "Sideways", "Tablets" |
 | Books and the shelf | `SONGBOOK.md` |

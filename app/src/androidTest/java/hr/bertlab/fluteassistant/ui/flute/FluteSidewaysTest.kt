@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
@@ -832,5 +833,31 @@ class FluteSidewaysTest {
         val SLACK = 1.dp
 
         val twoNotes = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+    }
+
+    // ---- The listening room on a phone on its side (the user's "3C" of 2026-11-10) ----
+
+    /**
+     * On its side the line stands at the top of the right column, as the advice does, on every phone; the fingering
+     * does not show there: the column is 116 dp wide and the diagram would be about 17 dp tall.
+     */
+    @Test
+    fun on_its_side_the_room_is_the_line_in_the_column_and_no_fingering() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        PHONES.forEach { each ->
+            on(each)
+            val stop = bounds(word("Stop"))
+            val prompt = bounds(word("🪈 Play C4").assertIsDisplayed())
+            assertTrue("$each: the prompt $prompt is in the column of Stop $stop", prompt.left >= stop.left - SLACK && prompt.right <= stop.right + SLACK && prompt.bottom <= stop.top)
+        }
+        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64))) }
+        PHONES.forEach { each ->
+            on(each)
+            val stop = bounds(word("Stop"))
+            val check = bounds(word("👀 Check your fingers").assertIsDisplayed())
+            assertTrue("$each: the line $check is in the column of Stop $stop", check.left >= stop.left - SLACK && check.right <= stop.right + SLACK && check.bottom <= stop.top)
+            assertWholeWords("👀 Check your fingers")
+            compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        }
     }
 }

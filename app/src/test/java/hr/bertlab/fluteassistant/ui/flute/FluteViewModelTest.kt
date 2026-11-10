@@ -983,7 +983,8 @@ class FluteViewModelTest {
 
     private fun q(midi: Int) = TuneNote(midi, QUARTER)
 
-    private fun pitched(midi: Int) = PitchFrame(freq(midi), 0.97, level = 0.4f)
+    /** A frame of a note at a real flute's level at the phone (the recorded sessions: 0.67 and over), clear of the tracker's floor. */
+    private fun pitched(midi: Int) = PitchFrame(freq(midi), 0.97, level = 0.7f)
     private val silentFrame = PitchFrame(null, 0.0, level = 0f)
 
     private fun TestScope.emit(frame: PitchFrame) {

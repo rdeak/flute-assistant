@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -108,7 +109,10 @@ internal fun FluteWritingSideways(
  * A tune running, Play or Your turn, the screen a child reads from a music stand: the keys and the
  * two buttons are gone, the card widens to the right column, and the column holds the advice at its
  * top and Stop low on the right, in Listen to me's corner, under the thumb that started the run.
- * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`.
+ * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`. [prompt], "Play B4" before the first note
+ * of a "Your turn" is judged, stands where the advice does. The fingering a wrong note brings upright
+ * does not show here: the column is 116 dp wide and the diagram would be about 17 dp tall; its line,
+ * "Check your fingers", is one of the advices and does.
  */
 @Composable
 internal fun FluteRunningSideways(
@@ -116,11 +120,12 @@ internal fun FluteRunningSideways(
     advice: TunerAdvice,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
+    prompt: AnnotatedString? = null,
 ) {
     SidewaysPage(
         modifier = modifier,
         column = {
-            AdviceLine(advice, wrap = true)
+            if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
             SidewaysActionButton(
                 icon = AppIcons.Stop,
                 text = stringResource(R.string.stop),

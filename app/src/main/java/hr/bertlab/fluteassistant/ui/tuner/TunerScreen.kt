@@ -48,6 +48,8 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
+import hr.bertlab.fluteassistant.ui.common.FINGERING_ASPECT_RATIO
+import hr.bertlab.fluteassistant.ui.common.FingeringDiagram
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard

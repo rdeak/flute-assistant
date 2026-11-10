@@ -3,6 +3,12 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import kotlinx.coroutines.delay
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -166,7 +172,10 @@ private fun keyShape(height: Dp) = RoundedCornerShape(height * 0.4f)
  * so no number is on the key; a screen reader hears the name, and "learned" after it once the star is
  * there. With [onClick] it is the picker's button, to switch the note off; without, a plain key in the
  * same look, for the summary. [grew] is a note that moved up this round: a sparkle over the other corner
- * and the trophy's hop.
+ * and the trophy's hop. The summary's keys are larger than the picker's: [scale] is how much, and the
+ * name, the star and the sparkle grow by it. With [from], the progress a round began with, the colour
+ * starts as high as the note was then and rises (or sinks, after a miss) to where [progress] has it,
+ * a little after the key appears: the round's reward, seen as it is earned.
  *
  * The star and the sparkle hang outside the outline, so they are drawn beside the key and not in it
  * ([chunky] clips what it holds to the key's shape): whatever holds a [NoteKey] must not clip it.
@@ -179,13 +188,15 @@ internal fun NoteKey(
     width: Dp = 44.dp,
     height: Dp = 50.dp,
     grew: Boolean = false,
+    scale: Float = 1f,
+    from: NoteProgress? = null,
     onClick: (() -> Unit)? = null,
 ) {
     val colors = FluteTheme.colors
     val shape = keyShape(height)
     val letter = noteColor(midi)
     val tint = noteTint(midi)
-    val share = progress.countOf(midi).coerceIn(0, NoteProgress.KNOWN_AT).toFloat() / NoteProgress.KNOWN_AT
+    val share = risingShare(shareOf(progress, midi), from?.let { shareOf(it, midi) })
     val known = progress.isKnown(midi)
     // Ink on a light ground, the theme's text on the dark tint of night. The name sits across the fill's edge while the
     // note is under way, so where the two grounds want different colours (night) it is drawn twice, each copy clipped to its ground.
@@ -197,7 +208,8 @@ internal fun NoteKey(
         else -> null
     }
     // The star and the sparkle are pictures, in dp, so large text does not grow them past the room kept over a key.
-    val corner = with(LocalDensity.current) { CornerEmoji.toSp().value.toInt() }
+    val corner = with(LocalDensity.current) { (CornerEmoji * scale).toSp().value.toInt() }
+    val labelSize = LabelSize * scale
     // Under the name. The key itself clips to its shape, so the fill needs no clip of its own, and its outline is drawn over it.
     val inside: @Composable BoxScope.() -> Unit = {
         Box(
@@ -211,11 +223,11 @@ internal fun NoteKey(
                 },
         )
         if (oneColor != null) {
-            PillLabel(midi, known = known, color = oneColor)
+            PillLabel(midi, known = known, color = oneColor, fontSize = labelSize)
         } else {
             // The copy a screen reader and a test find is the tint's; the fill's is a picture only.
-            ClippedToGround(share, onFill = false) { PillLabel(midi, known = known, color = onTint) }
-            ClippedToGround(share, onFill = true) { PillLabel(midi, color = onFill, hidden = true) }
+            ClippedToGround(share, onFill = false) { PillLabel(midi, known = known, color = onTint, fontSize = labelSize) }
+            ClippedToGround(share, onFill = true) { PillLabel(midi, color = onFill, hidden = true, fontSize = labelSize) }
         }
     }
     val hop = if (grew) Modifier.trophyHop() else Modifier
@@ -244,6 +256,34 @@ internal fun NoteKey(
         }
     }
 }
+
+/** How much of a key the colour fills for [midi] at [progress]: nothing at 0, all of it at [NoteProgress.KNOWN_AT]. */
+private fun shareOf(progress: NoteProgress, midi: Int): Float =
+    progress.countOf(midi).coerceIn(0, NoteProgress.KNOWN_AT).toFloat() / NoteProgress.KNOWN_AT
+
+/**
+ * The share of a key its colour fills right now. With no [start] (the picker) it is [target] at once. With one
+ * (the summary) it begins at [start] and, [RISE_DELAY_MS] after the key appears, moves to [target] over
+ * [RISE_MS], so the child sees the note grow; the phone's own "remove animations" setting makes it a jump.
+ */
+@Composable
+private fun risingShare(target: Float, start: Float?): Float {
+    if (start == null) return target
+    val share = remember { Animatable(start) }
+    LaunchedEffect(target) {
+        if (share.value != target) {
+            delay(RISE_DELAY_MS)
+            share.animateTo(target, tween(RISE_MS))
+        }
+    }
+    return share.value
+}
+
+private const val RISE_DELAY_MS = 400L
+private const val RISE_MS = 900
+
+/** A key's name at the picker's size; the summary's larger keys scale it. */
+private val LabelSize = 22.sp
 
 /**
  * A key-sized box that draws [content], centred, only on one ground of the key: the filled part, the
@@ -291,12 +331,13 @@ private fun PillLabel(
     known: Boolean = false,
     color: Color = Color.Unspecified,
     hidden: Boolean = false,
+    fontSize: TextUnit = LabelSize,
 ) {
     val label = noteLabel(midi)
     val description = if (known) stringResource(R.string.note_known, label) else label
     Text(
         text = noteText(midi),
-        style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+        style = MaterialTheme.typography.titleLarge.copy(fontSize = fontSize),
         color = if (muted) FluteTheme.colors.mutedText else color,
         maxLines = 1,
         modifier = if (hidden) Modifier.clearAndSetSemantics { } else Modifier.semantics { contentDescription = description },

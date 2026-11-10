@@ -38,6 +38,7 @@ internal class FrameSummary {
         "shown" to counts[FrameDecision.SHOWN.ordinal],
         "unsteady" to counts[FrameDecision.UNSTEADY.ordinal],
         "lowProb" to counts[FrameDecision.LOW_PROBABILITY.ordinal],
+        "faint" to counts[FrameDecision.FAINT.ordinal],
         "silent" to counts[FrameDecision.SILENT.ordinal],
         "ignored" to counts[FrameDecision.IGNORED.ordinal],
         "pitched" to pitched,
@@ -58,5 +59,9 @@ internal class FrameSummary {
     }
 }
 
-/** What the tuner did with one microphone frame; logged per frame when verbose and counted in the summary. */
-enum class FrameDecision { IGNORED, SILENT, LOW_PROBABILITY, UNSTEADY, SHOWN }
+/**
+ * What the tuner did with one microphone frame; logged per frame when verbose and counted in the summary.
+ * [FAINT] is the flute's alone: a clear pitch under [NoteOnsetTracker.MIN_LEVEL], too quiet to be the flute at
+ * the phone (the tuner never decides it, so its summary's `faint` is 0).
+ */
+enum class FrameDecision { IGNORED, SILENT, LOW_PROBABILITY, FAINT, UNSTEADY, SHOWN }

@@ -13,8 +13,9 @@ import kotlin.math.pow
 
 class NoteOnsetTrackerTest {
 
+    /** A frame of a note at a real flute's level at the phone: the recorded sessions judged every note at 0.67 or over. */
     private fun pitched(midi: Int, cents: Double = 0.0, probability: Double = 0.97) =
-        PitchFrame(NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0), probability, level = 0.4f)
+        PitchFrame(NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0), probability, level = 0.7f)
 
     private val silent = PitchFrame(null, 0.0, level = 0f)
 
@@ -108,12 +109,12 @@ class NoteOnsetTrackerTest {
 
     @Test
     fun `a pause the level never falls under still ends the note after HOLD_FRAMES, so its repeat is new`() {
-        // Soft or distant playing over a room's noise: the pause stays over half the note's level,
+        // Playing over a room's noise: the pause stays over half the note's level,
         // so by level it is no gap, and the note would never end. The tuner's own hold count ends
-        // it instead, so a repeat after a real pause is a new note however quiet the child plays.
+        // it instead, so a repeat after a real pause is a new note however loud the room is.
         val tracker = NoteOnsetTracker()
-        val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.4f)
-        val room = PitchFrame(null, 0.0, level = 0.3f)
+        val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.7f)
+        val room = PitchFrame(null, 0.0, level = 0.5f)
         feed(tracker, List(3) { note })
         feed(tracker, List(ListenRules.HOLD_FRAMES - 1) { room })
         assertEquals("not yet: a blink of this length is still inside the note", 60, tracker.sounding)
@@ -125,14 +126,14 @@ class NoteOnsetTrackerTest {
     @Test
     fun `a pause at the room's floor ends a note that stays over half its level`() {
         // The room is heard before the child plays, so the tracker knows its floor; a pause that
-        // falls back to it is a gap even for a soft note, where half the level is under the floor.
+        // falls back to it is a gap even where half the note's level (0.35) is under the floor (0.37).
         val tracker = NoteOnsetTracker()
-        val room = PitchFrame(null, 0.0, level = 0.23f)
-        val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.4f)
+        val room = PitchFrame(null, 0.0, level = 0.37f)
+        val note = PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.7f)
         feed(tracker, List(10) { room })
         feed(tracker, List(3) { note })
         // A blink inside the note keeps its loudness, well over the floor: not a gap.
-        feed(tracker, List(2) { PitchFrame(null, 0.0, level = 0.4f) })
+        feed(tracker, List(2) { PitchFrame(null, 0.0, level = 0.7f) })
         assertEquals(60, tracker.sounding)
         feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { room })
         assertNull(tracker.sounding)
@@ -171,7 +172,7 @@ class NoteOnsetTrackerTest {
         val tracker = NoteOnsetTracker()
         val results = feed(
             tracker,
-            listOf(note(60, 0.4f), note(60, 0.5f), note(60, 0.6f, minLevel = 0.2f), note(60, 0.6f, minLevel = 0.2f), note(60, 0.6f), note(60, 0.6f)),
+            listOf(note(60, 0.5f), note(60, 0.6f), note(60, 0.7f, minLevel = 0.2f), note(60, 0.7f, minLevel = 0.2f), note(60, 0.7f), note(60, 0.7f)),
         )
         assertEquals(listOf(null, null, 60, null, null, null), results.onsets())
     }
@@ -234,7 +235,8 @@ class NoteOnsetTrackerTest {
         assertEquals("0.002", fields["floorRise"])
         assertEquals("0.12", fields["stopDrop"])
         assertEquals("70.0", fields["nearCents"])
-        assertEquals(16, fields.size)
+        assertEquals("0.45", fields["minLevel"])
+        assertEquals(17, fields.size)
     }
 
     @Test
@@ -243,6 +245,51 @@ class NoteOnsetTrackerTest {
         assertEquals(3, NoteOnsetTracker.Rules().with("restartFrames", 3.0).restartFrames)
         assertEquals(0.9, NoteOnsetTracker.Rules().with("gate", 0.9).gate, 0.0)
         assertThrows(IllegalArgumentException::class.java) { NoteOnsetTracker.Rules().with("nope", 1.0) }
+    }
+
+    // ---- Too faint to be the flute at the phone ----
+
+    /**
+     * A clear, steady pitch far under the level of a flute at the phone, a voice across the room or a television,
+     * is no note: on the user's phone (2026-11-10) such sounds, never louder than 0.36, earned a star and five
+     * wrong marks before anything was played, where every note of the real flute sessions was judged at 0.67 or over.
+     */
+    @Test
+    fun `a clear pitch too faint to be the flute at the phone is not a note`() {
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, List(10) { pitched(64).copy(level = 0.36f) })
+        assertEquals(List(10) { FrameDecision.FAINT }, results.decisions())
+        assertEquals(List<Int?>(10) { null }, results.onsets())
+        assertNull(tracker.sounding)
+    }
+
+    @Test
+    fun `the same pitch at the level of a flute at the phone is a note`() {
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, List(3) { pitched(64).copy(level = 0.67f) })
+        assertEquals(listOf(null, null, 64), results.onsets())
+    }
+
+    /**
+     * A note does not end at the floor: its frames under it stop counting, as frames under the probability gate do,
+     * and the note goes on until they fall well under its own level (the gap rule) or stay out too long.
+     */
+    @Test
+    fun `a note goes on through its own frames under the floor and ends when they fall well under its level`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(64).copy(level = 0.75f) })
+        val fading = feed(tracker, List(3) { pitched(64).copy(level = 0.42f) }) // under the floor, over half the note's level
+        assertEquals(List(3) { FrameDecision.FAINT }, fading.decisions())
+        assertEquals(64, tracker.sounding)
+        feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { pitched(64).copy(level = 0.3f) }) // under half of it: a gap
+        assertNull(tracker.sounding)
+    }
+
+    @Test
+    fun `the floor is a rule a replay can move`() {
+        assertTrue("minLevel" in NoteOnsetTracker.Rules().fields().map { it.first })
+        val none = NoteOnsetTracker(NoteOnsetTracker.Rules().with("minLevel", 0.0))
+        assertEquals(listOf(null, null, 64), feed(none, List(3) { pitched(64).copy(level = 0.36f) }).onsets())
     }
 
     @Test

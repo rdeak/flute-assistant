@@ -67,6 +67,7 @@ import hr.bertlab.fluteassistant.ui.common.BigActionHeight
 import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
@@ -1173,8 +1174,13 @@ class NotesScreenTest {
         compose.onNodeWithText("C4").assertIsDisplayed() // the question stays
     }
 
+    /**
+     * The summary is one message since 2026-11-10 (the user's "4C"): the trophy, the keys of the notes asked and
+     * Again. The three tiles (streak, aim, speed) and the card's own row of stars are gone: the stars under the card
+     * are the score, and the trophy says it to a screen reader.
+     */
     @Test
-    fun the_summary_shows_stars_and_animals_but_no_numbers() {
+    fun the_summary_is_a_trophy_the_notes_and_again_with_no_numbers() {
         show(
             asking(60).copy(
                 roundOver = true,
@@ -1186,9 +1192,11 @@ class NotesScreenTest {
         )
         compose.onNodeWithText("🌟 Great job!").assertIsDisplayed()
         compose.onNodeWithContentDescription("Right first time: 8 of 10").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Streak of 5").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Aim: 2 of 3 stars").assertIsDisplayed() // 77 %
-        compose.onNodeWithContentDescription("Speed: Turtle").assertIsDisplayed() // 8.3 s a note
+        compose.onNodeWithTag("trophy", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Streak of 5").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Aim: 2 of 3 stars").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Speed: Turtle").assertDoesNotExist()
+        listOf("Streak", "Aim", "Speed").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
         compose.onNodeWithText("8 / 10").assertDoesNotExist()
         compose.onNodeWithContentDescription(staffDescription).assertDoesNotExist()
         compose.onNodeWithText("Again").performClick()
@@ -1235,28 +1243,24 @@ class NotesScreenTest {
     /**
      * The summary in the tab of the phone the spec drew it for, 411 x 713 dp: its 915 dp screen less the
      * bars, which leaves the stage 442 dp inside (713 less the column's 4 and 16, the pills' 69, the hero
-     * row's 76, the places' 32, three gaps of 14 and the stage's own 32). One row of keys with the trophy at
-     * 90 sp is the tightest case: about 15 dp to spare over the least the summary takes (at 100 sp it was 1 dp,
-     * too little for a phone whose emoji font draws taller lines). Ten notes asked take a second row, which the
-     * trophy gives way to (50 sp, smaller than with five asked), with about 8 dp to spare. The test's own window is
-     * the whole emulator, with room to spare, and a column short of height does not overflow: it squeezes
-     * the later children, so Again must keep its full height ([BigActionHeight]) and end above the ten places.
-     * Nothing scrolls with five asked or with ten: the second row and the 10 dp over the first row (for a star
-     * and a sparkle) took about 5 dp more than this stage holds with the trophy at 60 sp, so with two rows it
-     * is 50 sp.
+     * row's 76, the places' 32, three gaps of 14 and the stage's own 32). Since 2026-11-10 the summary is the
+     * trophy, the keys and Again: with five notes asked (one row of keys) and with ten (two rows of five) the
+     * trophy keeps its 90 sp and there is room to spare. The test's own window is the whole emulator, and a
+     * column short of height does not overflow: it squeezes the later children, so Again must keep its full
+     * height ([BigActionHeight]) and end above the ten places. Nothing scrolls with five asked or with ten.
      */
     /**
      * The summary fits the stage as it is, with [asked] notes asked: Again whole and above the round's places,
-     * the keys clear of the tiles by the 10 dp a star or a sparkle hangs over a key, and nothing scrolls.
+     * the keys clear of the trophy by the 10 dp a star or a sparkle hangs over a key, and nothing scrolls.
      */
     private fun assertTheSummaryFits(asked: String) {
         val keys = compose.onNode(hasContentDescription("Your notes", substring = true)).getUnclippedBoundsInRoot()
-        val tiles = compose.onNodeWithContentDescription("Streak of 5").getUnclippedBoundsInRoot()
+        val trophy = compose.onNodeWithTag("trophy", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val again = compose.onNodeWithText("Again").getUnclippedBoundsInRoot()
         val places = compose.onNodeWithContentDescription("Round progress, 10 of 10 notes").getUnclippedBoundsInRoot()
         assertAgainIsWhole(again.height, "with $asked asked")
-        // A learned key's star and a grown key's sparkle hang 10 dp over the key: the tiles must not be under them.
-        assertTrue("with $asked asked, the keys $keys start less than 10 dp under the tiles $tiles", keys.top - tiles.bottom >= 10.dp)
+        // A learned key's star and a grown key's sparkle hang 10 dp over the key: the trophy must not be under them.
+        assertTrue("with $asked asked, the keys $keys start less than 10 dp under the trophy $trophy", keys.top - trophy.bottom >= 10.dp - 0.5.dp)
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0) // it fits as it is: nothing scrolls
         assertTrue("with $asked asked, the keys $keys run into Again $again", keys.bottom <= again.top)
         assertTrue("with $asked asked, Again $again should end above the places $places", again.bottom <= places.top)
@@ -1271,7 +1275,53 @@ class NotesScreenTest {
         compose.waitForIdle()
         assertTheSummaryFits("ten")
         val trophyWithTen = tagged("trophy").height
-        assertTrue("the trophy is $trophyWithTen tall with ten notes asked and $trophyWithFive with five", trophyWithTen < trophyWithFive)
+        assertTrue("the trophy is $trophyWithTen tall with ten notes asked and $trophyWithFive with five", trophyWithTen <= trophyWithFive + 0.5.dp)
+    }
+
+    /**
+     * The notes are the reward, so their keys are large: five fill the stage's width (61 dp each of the 339 dp a
+     * 411 dp phone's stage holds, where the picker's are 44), and ten stand in two rows of five, not seven and three.
+     */
+    @Test
+    fun the_summarys_keys_are_large_and_stand_in_rows_of_five() {
+        showInWindow(DpSize(411.dp, 713.dp), over(8).copy(askedThisRound = StaffNotes.DEFAULT_PRACTICE))
+        fun block() = compose.onNode(hasContentDescription("Your notes", substring = true)).getUnclippedBoundsInRoot()
+        val five = block()
+        assertTrue("five keys are ${five.width} wide", five.width >= 330.dp && five.width <= 340.dp)
+        // One row: the key (69.3) and its shadow (4); the 10 dp kept over it for a star is outside the block.
+        assertTrue("one row is ${five.height} tall", abs((five.height - 73.3.dp).value) <= 1.5f)
+        compose.runOnIdle { state.value = over(8).copy(askedThisRound = tenNotes) }
+        compose.waitForIdle()
+        val ten = block()
+        assertTrue("ten keys are ${ten.width} wide, two rows of five", ten.width >= 330.dp && ten.width <= 340.dp)
+        // Two rows and the 8 dp between them.
+        assertTrue("two rows are ${ten.height} tall", abs((ten.height - 154.6.dp).value) <= 2f)
+    }
+
+    /**
+     * The keys' colour rises as the summary opens: a key starts as full as its note was when the round began and
+     * ends where the round took it. E4 here went from nothing to half: before the rise the key's lower part is its
+     * pale tint, after it the letter's own colour. The spot is a quarter of the key up from its bottom, clear of the name.
+     */
+    @Test
+    fun the_keys_colour_rises_from_where_the_round_began() {
+        needsDevice()
+        compose.mainClock.autoAdvance = false
+        show(over(8).copy(askedThisRound = setOf(64), grewThisRound = setOf(64), startProgress = NoteProgress.EMPTY, progress = NoteProgress(mapOf(64 to 4))))
+        compose.mainClock.advanceTimeByFrame()
+        fun spot(): Color {
+            val block = compose.onNode(hasContentDescription("Your notes", substring = true))
+            val image = block.captureToImage().toPixelMap()
+            // One key, centred in the block; its lower quarter, left of the middle (the name stands in the middle).
+            return image[image.width / 2 - image.width / 12, image.height - image.height / 4]
+        }
+        val before = spot()
+        compose.mainClock.advanceTimeBy(3_000)
+        val after = spot()
+        val letter = noteColor(64)
+        fun near(a: Color, b: Color) = abs(a.red - b.red) < 0.06f && abs(a.green - b.green) < 0.06f && abs(a.blue - b.blue) < 0.06f
+        assertFalse("before the rise the lower part of the key is not yet $letter: $before", near(before, letter))
+        assertTrue("after the rise the lower part of the key is the letter's colour $letter: $after", near(after, letter))
     }
 
     /**
@@ -1287,10 +1337,10 @@ class NotesScreenTest {
 
     /**
      * At the tab's minimum height, 411 x 623 dp (below it the tab itself scrolls), the stage is about 352 dp
-     * inside. With the trophy at its smallest and the tiles at 92 dp the summary may still not fit, ten notes
-     * asked surely not; it then scrolls and does not squeeze Again, which a child must always reach: it stays
-     * 84 dp tall (a squeezed one was 13 dp with five notes asked and 6 dp with ten) and scrolling brings it into
-     * view. At 650 dp with ten asked the tab still fits its column, so the one thing that may scroll is the
+     * inside. The trophy gives way and the summary fits, with five notes asked and with ten; were it ever short,
+     * it scrolls and does not squeeze Again, which a child must always reach: it stays 84 dp tall (a squeezed
+     * one was 13 dp with five notes asked and 6 dp with ten, when the summary still had its tiles) and scrolling
+     * brings it into view. At 650 dp with ten asked the tab still fits its column, so the one thing that may scroll is the
      * summary's own column.
      */
     @Test
@@ -1320,19 +1370,23 @@ class NotesScreenTest {
     }
 
     /**
-     * Seven keys of 44 dp and their gaps are 344 dp and the stage is 339 dp inside on a 411 dp phone: the
-     * keys shrink together and not the last one alone. The labels sit in the middle of their keys, so
-     * their centres are as far apart as the keys are wide, and the same all along the row, give or take the
-     * pixel each label is rounded to (the squeezed last key was 3 dp off).
+     * Ten notes stand in two rows of five, and every key of both rows is as wide as the others: five of the
+     * largest keys and their gaps are 342 dp and the stage is 339 dp inside on a 411 dp phone, so they shrink
+     * a little, together and not the last one alone. The labels sit in the middle of their keys, so their
+     * centres are as far apart as a key and a gap are wide, the same all along both rows, give or take the
+     * pixel each label is rounded to.
      */
     @Test
-    fun a_full_row_of_keys_shrinks_all_its_keys_alike() {
+    fun the_keys_of_both_rows_are_as_wide_as_each_other() {
         show(over(8).copy(askedThisRound = tenNotes))
-        val centres = listOf("C4", "D4", "E4", "F4", "G4", "A4", "B4").map {
+        fun centres(names: List<String>) = names.map {
             compose.onNodeWithContentDescription(it, useUnmergedTree = true).getUnclippedBoundsInRoot().let { b -> (b.left + b.right) / 2 }
         }
-        val steps = centres.zipWithNext { a, b -> (b - a).value }
+        val first = centres(listOf("C4", "D4", "E4", "F4", "G4"))
+        val second = centres(listOf("A4", "B4", "C5", "D5", "E5"))
+        val steps = first.zipWithNext { a, b -> (b - a).value } + second.zipWithNext { a, b -> (b - a).value }
         assertTrue("the keys are not as wide as each other: the centres are $steps dp apart", steps.max() - steps.min() < 1f)
+        assertTrue("the second row starts under the first: $first $second", abs((first.first() - second.first()).value) < 1f)
     }
 
     /** Ten first-try notes put a sparkle on each side of the trophy; nine do not. */

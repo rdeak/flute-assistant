@@ -73,7 +73,8 @@ one advice line under the status (spec: revision 5 of
 `ReferenceTonePlayer` (`ReferenceToneSynth` renders it, `AudioTrackReferenceTonePlayer` plays
 it) and ignores microphone frames meanwhile. `FluteFingerings.keysFor(midi)` is the C-foot
 Boehm chart (Woodwind Fingering Guide basic fingerings; no entry for MIDI 94 and 95) that
-`FingeringDiagram` draws.
+`FingeringDiagram` draws (`ui/common` since 2026-11-10: the flute's listening room shows it too, after a wrong
+note).
 
 Two pieces of this path are shared with the flute's "Your turn" (`ui/flute/DESIGN.md`, since
 2026-11-04): `NoteOnsetTracker`, a pure class that applies the same frame rules as this view
@@ -86,7 +87,9 @@ threshold): a gap is `ONSET_GAP_FRAMES` uncounted frames that also fell under `G
 (half) of the sounding note's mean level or back to the room's floor the tracker learns between
 notes, because the 0.85 gate blinks on a breathy tone and a blink that keeps the loudness must not
 split one held note in two (it would count a written repeat as played), while `HOLD_FRAMES` of
-them at any level are a pause; a tongued stop is heard in `PitchFrame.minLevel`; and a drift past
+them at any level are a pause; a frame with a clear pitch under `MIN_LEVEL` (0.45, since 2026-11-10) does not
+count at all, so the room's voices are not judged (`FrameDecision.FAINT`; the tuner's own path has no such floor and
+its ring may show a quiet note); a tongued stop is heard in `PitchFrame.minLevel`; and a drift past
 the halfway point that switches the sounding note after `SWITCH_FRAMES` (a long note sagging as
 the breath runs out) is no new note, since nobody played one, where the tuner's ring simply moves.
 All are read against `flute.heard` and `flute.listen_summary` on a phone and pinned by
@@ -106,7 +109,7 @@ microphone, so the tuner and the flute never listen at once.
 
 Log events (tag `FA.Tuner`): `mic.open` (source, rate, buffer), `mic.close`, `tuner.permission`,
 `tuner.frame` (verbose: f, p, level, `FrameDecision`), `tuner.summary` every
-`ListenRules.SUMMARY_FRAMES` frames (counts per decision, pMin/pMax/pMean against `gate`,
+`ListenRules.SUMMARY_FRAMES` frames (counts per decision, `faint` among them since 2026-11-10 and always 0 here, as only the flute's tracker decides it; pMin/pMax/pMean against `gate`,
 levelMean, reading, target, mode, hearing), `tuner.reading` when the shown note changes,
 `tuner.hearing` (hearing, levelMean) when it changes, `tuner.target`, `tuner.mode`,
 `tuner.reference`, `tuner.error`, `reference.error`.

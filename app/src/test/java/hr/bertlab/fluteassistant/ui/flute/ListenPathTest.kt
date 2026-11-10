@@ -6,7 +6,9 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -41,7 +43,9 @@ class ListenPathTest {
 
     @Test
     fun `a repeat played softer than the note before it is still counted`() {
-        val run = listen(FluteSound.sound(gapsMs = 50, secondDb = -30.0))
+        // Eight decibels softer, as it was at the synthetic default (-22 and -30), now at a real flute's level at the
+        // phone: at -30 the repeat lay on the tracker's floor (0.45, about -33 dBFS of RMS), which is the room's side.
+        val run = listen(FluteSound.sound(gapsMs = 50, toneDb = -14.0, secondDb = -22.0))
         assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
         assertEquals(3, run.heard.size)
     }
@@ -96,6 +100,29 @@ class ListenPathTest {
         assertEquals(run.heard.toString(), 3, run.heard.size)
     }
 
-    /** Frames [samples] as the engine does and runs the flute's listening path over them. */
-    private fun listen(samples: DoubleArray): ListenPath.Run = ListenPath.run(FluteSound.render(samples), rate, tune)
+    /**
+     * Before the child plays the room is not silent: a voice across it or a television has a clear pitch too, far
+     * under a flute at the phone. On the user's phone (2026-11-10) twenty seconds of that earned a star and five
+     * wrong marks before the first note. Here the three notes sound twice, 26 dB apart: the faint ones are the
+     * room's and nothing is judged while they sound, the loud ones are the child's and earn the three stars. With
+     * the floor switched off the phone of that day is back: the room's notes are the ones judged.
+     */
+    @Test
+    fun `sound far too faint to be the flute at the phone is not judged before the child plays`() {
+        val room = FluteSound.sound(gapsMs = 400, toneDb = -40.0, floorDb = -60.0)
+        val child = FluteSound.sound(gapsMs = 400, toneDb = -14.0, floorDb = -60.0)
+        val roomMs = room.size * 1000L / rate
+
+        val run = listen(room + child)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+        assertEquals(run.heard.toString(), 3, run.heard.size)
+        assertTrue("nothing is judged while only the room sounds: ${run.heard}", run.heard.all { it.atMs > roomMs })
+
+        val before = listen(room + child, NoteOnsetTracker.Rules(minLevel = 0f))
+        assertTrue("without the floor the room's sound is judged: ${before.heard}", before.heard.any { it.index != null && it.atMs < roomMs })
+    }
+
+    /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules]. */
+    private fun listen(samples: DoubleArray, rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules()): ListenPath.Run =
+        ListenPath.run(FluteSound.render(samples), rate, tune, rules)
 }

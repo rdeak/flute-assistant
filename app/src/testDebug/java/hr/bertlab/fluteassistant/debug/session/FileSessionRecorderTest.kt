@@ -77,7 +77,7 @@ class FileSessionRecorderTest {
         assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345"))
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2} .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(18, rules.size)
+        assertEquals(19, rules.size)
         assertEquals("0.85", rules["gate"])
         assertEquals("0.002", rules["floorRise"])
         assertEquals("0.12", rules["stopDrop"])

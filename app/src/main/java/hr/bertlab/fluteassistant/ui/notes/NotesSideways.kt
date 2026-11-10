@@ -333,11 +333,12 @@ private val PickerKeyHeight = 62.dp
 private val PickerKeyGap = 10.dp
 
 /**
- * The trophy beside the headline, the ten stars in one row, the three tiles and the keys of the notes
- * asked, all in the card and still no numbers; the pills over Pick over Again in the column. The trophy
- * and the stars are sized from the card's width, so the narrowest phone still holds them, and from dp,
- * so large text does not grow them out of the card. Nothing scrolls: the headline is measured last and
- * shrinks to the height the rest leaves, so the keys keep theirs, and two rows of keys close the gaps.
+ * The trophy beside the headline, and under the headline the keys of the notes asked, large, all in the
+ * card and still no numbers; the pills over Pick over Again in the column. The trophy is sized from the
+ * card's width, so the narrowest phone still holds it, and from dp, so large text does not grow it out of
+ * the card; the keys take the size the room beside the trophy gives them ([summaryKeySize]). Nothing
+ * scrolls: the headline is measured last and shrinks to the height the keys leave, and two rows of keys
+ * close the gaps. Since 2026-11-10 the card holds no row of stars and no tiles, as upright ([RoundSummary]).
  */
 @Composable
 private fun SummarySideways(state: NotesRound, pills: @Composable () -> Unit, onChoose: () -> Unit, onPlayAgain: () -> Unit) {
@@ -359,15 +360,12 @@ private fun SummarySideways(state: NotesRound, pills: @Composable () -> Unit, on
                 fun fontSizeOf(size: Dp): Int = with(density) { size.toSp().value.toInt() }
                 val trophy = (maxWidth * 0.2f).coerceIn(TrophyMin, TrophyMax)
                 val gap = if (maxWidth < 500.dp) 16.dp else 26.dp
-                // What the phone's emoji font draws, as it is not the same everywhere: the row is sized from it, not from a guess.
-                val room = maxWidth - trophy * emojiWidthShare(TROPHY_EMOJI) - gap
-                val star = minOf(StarMax, room / (emojiWidthShare(STAR_EMOJI) * NotesRound.ROUND_LENGTH))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     // A perfect round hops higher, as upright (the sparkles beside it are upright's alone).
-                    Emoji(TROPHY_EMOJI, fontSize = fontSizeOf(trophy), modifier = Modifier.trophyHop(big = state.score == NotesRound.ROUND_LENGTH))
+                    Trophy(state, fontSize = fontSizeOf(trophy))
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(
@@ -376,7 +374,7 @@ private fun SummarySideways(state: NotesRound, pills: @Composable () -> Unit, on
                         ),
                         modifier = Modifier.weight(1f),
                     ) {
-                        // Weighted, so it is measured after the rest and its autoSize fits the height they leave.
+                        // Weighted, so it is measured after the keys and its autoSize fits the height they leave.
                         Text(
                             text = stringResource(headlineFor(state.score)),
                             style = MaterialTheme.typography.headlineMedium.copy(fontSize = 32.sp, lineHeight = 1.2.em),
@@ -385,10 +383,7 @@ private fun SummarySideways(state: NotesRound, pills: @Composable () -> Unit, on
                             autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = 32.sp),
                             modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
                         )
-                        // Unbounded, so a row too wide for the card would show in its size rather than be squeezed.
-                        SummaryStars(state, fontSize = fontSizeOf(star), modifier = Modifier.wrapContentWidth(unbounded = true))
-                        SummaryTiles(state, compact = true)
-                        SummaryKeys(state, keyWidth = SummaryKeyWidth, keyHeight = SummaryKeyHeight, gap = SummaryKeyGap)
+                        SummaryKeys(state, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -398,35 +393,6 @@ private fun SummarySideways(state: NotesRound, pills: @Composable () -> Unit, on
 
 private val TrophyMin = 72.dp
 private val TrophyMax = 130.dp
-private val StarMax = 27.dp
-
-/** The keys of the summary sideways, smaller than upright's 44 x 50: a row of seven is 276 dp, and the narrowest card leaves the column 288. */
-private val SummaryKeyWidth = 36.dp
-private val SummaryKeyHeight = 40.dp
-private val SummaryKeyGap = 4.dp
-
-/**
- * The room between the headline, the stars, the tiles and the keys. Two rows of keys (106 dp with the
- * 10 over them for a star) did not fit the 312 dp a 360 tall card holds at 16 (the keys came out 88 of
- * their 96 at 640 wide), so they bring it to 10.
- */
+/** The room between the headline and the keys; two rows of keys bring it to 10, so the headline keeps more of a 360 dp tall card. */
 private val SummaryGap = 16.dp
 private val SummaryGapTwoRows = 10.dp
-
-/** The size an emoji is measured at to find how wide it is for its size; a width follows the size. */
-private val EmojiMeasureSize = 100.dp
-
-/**
- * How wide [emoji] comes out for each unit of the size it is drawn at, as [Emoji] draws it, measured
- * on this phone: Google's emoji are about 1.2 times as wide as they are high and Samsung's are not.
- */
-@Composable
-private fun emojiWidthShare(emoji: String): Float {
-    val density = LocalDensity.current
-    val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.titleLarge
-    return remember(emoji, measurer, style, density) {
-        val size = with(density) { EmojiMeasureSize.toSp() }
-        measurer.measure(emoji, style.copy(fontSize = size, lineHeight = size * 1.2f)).size.width / with(density) { EmojiMeasureSize.toPx() }
-    }
-}

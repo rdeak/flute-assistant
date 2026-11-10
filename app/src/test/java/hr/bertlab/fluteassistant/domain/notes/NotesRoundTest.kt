@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.domain.notes
 
-import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -25,30 +24,18 @@ class NotesRoundTest {
         assertEquals(2, s.score)
     }
 
+    /**
+     * A round remembers how far each note was learned when it began: the summary's keys start from there and rise
+     * to where the round took them. Answers move [NotesRound.progress] and leave it alone.
+     */
     @Test
-    fun `the round's speed is an animal for the time per note`() {
-        fun speed(millis: Long?) = NotesRound(practiceNotes = setOf(60), currentMidi = 60, roundMillis = millis).speed()
-        assertNull(speed(null))
-        assertEquals(TempoBand.CHEETAH, speed(20_000L))
-        assertEquals(TempoBand.RABBIT, speed(30_000L))
-        assertEquals(TempoBand.DUCK, speed(60_000L))
-        assertEquals(TempoBand.TURTLE, speed(100_000L))
-        assertEquals(TempoBand.SNAIL, speed(100_010L))
-    }
-
-    @Test
-    fun `aim is one to three stars from the accuracy`() {
-        assertEquals(1, state(results = emptyList(), taps = 0).aimStars())
-        assertEquals(3, state(results = List(10) { true }, taps = 11).aimStars())
-        assertEquals(2, state(results = List(10) { true }, taps = 14).aimStars())
-        assertEquals(1, state(results = List(10) { true }, taps = 15).aimStars())
-    }
-
-    @Test
-    fun `accuracy is correct taps out of all taps`() {
-        assertEquals(67, state(results = listOf(true, false), taps = 3).accuracyPercent)
-        assertNull(state(results = emptyList(), taps = 0).accuracyPercent)
-        assertEquals(100, state(results = List(10) { true }, taps = 10).accuracyPercent)
+    fun `a round remembers the progress it began with`() {
+        val began = NoteProgress(mapOf(60 to 3))
+        val round = NotesRound.open(setOf(60), NotesGame.FIND, soundOn = false, began, Random(1), previous = null)
+        assertEquals(began, round.startProgress)
+        val answered = round.tapped(60, now = 0L)
+        assertEquals(4, answered.progress.countOf(60))
+        assertEquals(began, answered.startProgress)
         assertEquals(10, NotesRound.ROUND_LENGTH)
     }
 

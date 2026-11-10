@@ -317,6 +317,50 @@ frames are buffered, never conflated (`ui/tuner/CLAUDE.md`): the tracker counts 
 main thread is busiest right after a judged note, when the staff scrolls and the animal hops, which
 is just when the next note's gap frames arrive.
 
+The room under the stage (since 2026-11-10, the user's "3C" of four drawn options: A as it was, B a line to start,
+C this, D the fingering under every note; the page is https://claude.ai/artifact/PbsKoRyeJvf17VzucDwKDz). While the tune
+runs the keys are gone and their room held only the advice line, so a "Your turn" began with a ringed note, the grey
+dots and no word of what to do, and a wrong note showed what came out but not what to do about it (the review of that
+day; the lesson of the Hear game's child test, a waiting screen says what it waits for, had not reached this screen).
+Now, `ListenRoom` in `FluteScreen.kt`: from the start of a run until its first note is judged, right or wrong, the
+line says "🪈 Play B4" / "🪈 Odsviraj h¹" (`flute_play_prompt`, the note with its raised octave as its pill has it;
+`FluteUiState.promptMidi`; the flute and not the tuner's ear, because the picture shows what the child does), and once
+a note was judged it says nothing, as before: the ring and the dots do, and a line changing under every note would
+pull the eye off the staff. After a wrong note the advice is "👀 Check your fingers" (`Listening.advice` gives
+`CHECK_FINGERS` while a wrong note stands, after the microphone's own advices and a held repeat, which keep their
+place) and over it stands the fingering of the note that was wanted (`FluteUiState.fingeringMidi`, the tuner's
+`FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage), until the right note is played: the
+heard note says what came out, this says how to get the other. Nothing is added while things go right, which is why
+the user chose it over the fingering under every note (the child would read the picture and not the notes). Playing
+the tune back shows nothing there. On a short screen, where the room is not spread by weight, it grows to hold the
+fingering and the tab scrolls. A phone on its side has the line alone, at the top of its column where the advice
+stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the diagram would be about 17 dp tall, and
+from a music stand's distance its keys could not be read anyway. Tests: `ListenRunTest` (the advice and its order),
+`FluteUiStateTest` (the two values), `FluteScreenTest` ("The room under the stage") and `FluteSidewaysTest` (the line
+in the column, no fingering).
+
+The room is not judged (since 2026-11-10; `NoteOnsetTracker.MIN_LEVEL`, the rule `minLevel`). In the review of that
+day, on the user's phone, a run waited about twenty seconds before the first test note, and in that time the room
+(a voice or a television would fit the pitches) earned the first note its star and the second five wrong marks: a
+clear pitch passes the probability gate however quiet it is. The recorded session (`2026-11-10_19-02-37`, pinned
+locally) replayed with no diff, so the rules did it. Its room's counted frames were never louder than 0.36; every
+note of the real flute sessions of 2026-11-05 was judged at 0.67 or over (median 0.79); the test notes from the
+laptop's speaker were 0.47 to 0.66. A sweep of `minLevel` over that run hears exactly the eleven test notes and
+nothing of the room at every value from 0.30 to 0.45, and starts losing the test notes at 0.50; the three real
+sessions earn the same marks at every value up to 0.60. So the floor is 0.45: a frame with a clear pitch under it
+does not count (`FrameDecision.FAINT`), as one under the gate does not, which means a note goes on through such
+frames and ends by the gap rules, and a note whose swell passes through the floor is heard a frame later. What the
+child sees for sound left out is what the screen already had: no heard bubble, the listening dots, and after about a
+second of sound from `HearingTracker.SOUND_LEVEL` up, "Come closer to the phone" (0.45 is where `HearingTracker`
+stops calling a sound close: `CLOSE_LEVEL` less its margin). So a miss still never shows silence, and a sound nobody
+played at the phone can earn no mark. What it costs: a child playing very softly or far from the phone is asked to
+come closer instead of being judged; one room and one sitting of real playing stand behind the number, so a session
+where that happened is the thing to sweep (`-Psweep=minLevel:0,0.3,0.4,0.45`). A voice right at the phone is as loud
+as a flute and is still judged; no level can tell them apart. The tuner does not apply the floor. Tests:
+`NoteOnsetTrackerTest` ("too faint to be the flute at the phone"), `ListenRunTest` (the advice), `ListenPathTest`
+(synthetic room sound before the child plays, with the floor and without). The synthetic tests' notes moved from
+0.4 to 0.7 with it: 0.4 was a guess from before sessions were recorded, and is the room's side of the floor now.
+
 While the tune runs, in Play as in Your turn (`FluteUiState.isRunning`), the keys and the sponge
 go away and `TuneStaff` is drawn at `RunningStaffScale` (4/3 upright: lines 24 dp apart, the canvas's
 original size, for a phone on a music stand at arm's length; sideways see "Sideways" below; the geometry stays one table in dp
@@ -400,7 +444,8 @@ written repeat of the note just judged passed over with a faint star because the
 was heard, once per such step),
 `flute.listen_summary` every `ListenRules.SUMMARY_FRAMES` frames and once more at the end (the
 tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
-passed the gate at all), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
+passed the gate at all, and since 2026-11-10, in `faint`, how many frames had a clear pitch but were under the
+level of a flute at the phone), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
 (stars, retries, when the last note is judged), `flute.listen_stop` (reason: pill, key, erase,
 leave, speed or book, so every `flute.listen` has a closing line), `flute.listen_error` (message, when
 the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the

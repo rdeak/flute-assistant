@@ -14,7 +14,8 @@ import java.util.Locale
 /**
  * Runs the listening path again over a recorded [Session]'s audio ([ListenPath], the real
  * detector, tracker and check) and compares it with what the phone did: [report] writes the
- * timeline and the [diff]; [sweep] replays with one rule at other values. No difference means the
+ * timeline and the [diff], under the rules the session was recorded with ([recordedRules]), and adds what
+ * today's rules hear where they are others; [sweep] replays with one of today's rules at other values. No difference means the
  * phone did what the rules say, and the rules can be worked on here; a difference means timing
  * on the phone (a delayed or lost frame), and the first differing frame says where.
  */
@@ -37,7 +38,27 @@ object Replay {
         return Diff(first, count, maxOf(0, replay.size - phone.size))
     }
 
-    fun report(session: Session, rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules()): String {
+    /** Rules younger than the first recorded sessions, each with the value that switches it off: what a build before it did. */
+    private val OFF = mapOf("minLevel" to 0.0)
+
+    /**
+     * The rules the phone ran [session] under: its `session.rules` line. A rule the line does not name is younger
+     * than the recording and did not act on the phone, so it is switched off ([OFF]); a name that is a rule no
+     * longer is left out.
+     */
+    fun recordedRules(session: Session): NoteOnsetTracker.Rules {
+        val names = NoteOnsetTracker.Rules().fields().map { it.first }.toSet()
+        var rules = NoteOnsetTracker.Rules()
+        for ((name, off) in OFF) if (name !in session.rules) rules = rules.with(name, off)
+        for ((name, value) in session.rules) if (name in names) rules = rules.with(name, value.toDouble())
+        return rules
+    }
+
+    /**
+     * The replay under [rules], by default the ones the session was recorded with, which is what the diff against
+     * the phone's rows must be made with; where today's rules are others, what they make of the same sound follows.
+     */
+    fun report(session: Session, rules: NoteOnsetTracker.Rules = recordedRules(session)): String {
         val rate = session.audio.sampleRate
         val run = ListenPath.run(session.audio.samples, rate, session.tune, rules, session.floor)
         val out = StringBuilder()
@@ -65,6 +86,14 @@ object Replay {
                     break
                 }
             }
+        }
+        val today = NoteOnsetTracker.Rules()
+        if (today != rules) {
+            val changed = today.fields().zip(rules.fields()).filter { (now, then) -> now.second != then.second }
+            out.appendLine("today's rules differ: " + changed.joinToString(" ") { (now, then) -> "${now.first}=${now.second} (recorded ${then.second})" })
+            val now = ListenPath.run(session.audio.samples, rate, session.tune, today, session.floor)
+            for (step in now.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
+            out.appendLine("  marks=" + Session.spell(now.marks))
         }
         out.appendLine("phone:")
         for (step in session.rows) if (step.onset != null) out.appendLine("  " + onset(step, rate))

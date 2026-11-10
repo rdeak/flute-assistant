@@ -3,6 +3,17 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.ui.common.noteText
+import hr.bertlab.fluteassistant.ui.common.noteLabel
+import hr.bertlab.fluteassistant.ui.common.noteColor
+import hr.bertlab.fluteassistant.ui.common.FingeringDiagram
+import hr.bertlab.fluteassistant.ui.common.FINGERING_ASPECT_RATIO
+import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.aspectRatio
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -348,6 +359,8 @@ fun FluteContent(
             val fits = maxHeight >= FitsHeight
             val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
             val running = state.isRunning
+            // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
+            val prompt = state.promptMidi?.let { playPrompt(it) }
             // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
             BackHandler(enabled = running, onBack = actions.onStop)
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
@@ -446,7 +459,7 @@ fun FluteContent(
             }
             if (sideways) {
                 if (running) {
-                    FluteRunningSideways(tune = tune, advice = state.advice, onStop = actions.onStop)
+                    FluteRunningSideways(tune = tune, advice = state.advice, onStop = actions.onStop, prompt = prompt)
                 } else {
                     FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
                 }
@@ -463,14 +476,14 @@ fun FluteContent(
                         tune(Modifier)
                     }
                     if (running) {
-                        // The keys' room: the advice line alone in it, and one wide Stop where Play was.
+                        // The keys' room: the listening room in it, and one wide Stop where Play was.
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .then(if (fits) Modifier.weight(1f) else Modifier.height(AdviceLineHeight)),
+                                .then(if (fits) Modifier.weight(1f) else Modifier.heightIn(min = AdviceLineHeight)),
                         ) {
-                            AdviceLine(state.advice)
+                            ListenRoom(state, prompt)
                         }
                         BigActionButton(
                             icon = AppIcons.Stop,
@@ -496,6 +509,50 @@ fun FluteContent(
         }
     }
 }
+
+/**
+ * The room under the stage while the tune runs, where the keys were (the user's "3C" of 2026-11-10, picked from
+ * drawn options). While things go right it holds one line and nothing else: [prompt], "Play B4", from the start
+ * of a "Your turn" until its first note is judged, and the advice when there is some. After a wrong note it shows
+ * how the note that was wanted is fingered ([FluteUiState.fingeringMidi], the tuner's own diagram) over "Check
+ * your fingers", until the right note is played: the heard note under the step says what came out, this says
+ * what to do. Playing the tune back shows nothing here, as before. A phone on its side has the line alone, in
+ * its column ([FluteRunningSideways]): the column is too narrow for the diagram.
+ */
+@Composable
+private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ListenRoomGap)) {
+        state.fingeringMidi?.let { midi ->
+            FingeringDiagram(
+                keys = FluteFingerings.keysFor(midi),
+                noteLabel = noteLabel(midi),
+                color = noteColor(midi),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(FINGERING_ASPECT_RATIO),
+            )
+        }
+        if (prompt != null) AdviceLine(prompt) else AdviceLine(state.advice)
+    }
+}
+
+/** "Play B4" for the note [midi], the words from `flute_play_prompt` and the note with its raised octave ([noteText]). */
+@Composable
+private fun playPrompt(midi: Int): AnnotatedString {
+    val words = LocalResources.current.getString(R.string.flute_play_prompt).split(NOTE_PLACE, limit = 2)
+    val note = noteText(midi)
+    return buildAnnotatedString {
+        append(words[0])
+        append(note)
+        append(words.getOrElse(1) { "" })
+    }
+}
+
+/** Where the note goes in `flute_play_prompt`, read unformatted. */
+private const val NOTE_PLACE = "%1\$s"
+
+/** The room between the fingering and the line under it. */
+private val ListenRoomGap = 12.dp
 
 /** The advice line's own height, for the short screen where the keys' room is not spread by weight. */
 private val AdviceLineHeight = 28.dp

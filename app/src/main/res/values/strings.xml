@@ -136,14 +136,8 @@
     <string name="round_great">🌟 Great job!</string>
     <string name="round_good">👍 Good work!</string>
     <string name="round_keep_going">💪 Keep practising!</string>
-    <!-- Round summary: the three tiles' words, and what a screen reader says for the stars and tiles -->
-    <string name="summary_streak">Streak</string>
-    <string name="summary_aim">Aim</string>
-    <string name="summary_speed">Speed</string>
+    <!-- Round summary: what a screen reader hears for the trophy, the round's score (the tiles' words went on 2026-11-10) -->
     <string name="summary_stars">Right first time: %1$d of %2$d</string>
-    <string name="aim_description">Aim: %1$d of 3 stars</string>
-    <!-- The argument is one of the metronome's animals, e.g. "Rabbit" -->
-    <string name="speed_description">Speed: %1$s</string>
     <string name="play_again">Again</string>
     <!-- The Pick button's accessibility name (its word is pick_notes), the hero row's title while
          choosing, and the big button under the picker that closes it -->
@@ -208,6 +202,8 @@
     <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
     <string name="flute_mark_heard">heard %1$s</string>
     <string name="flute_listen_here">play this one</string>
+    <!-- The line under the staff when "Listen to me" starts, until the first note is judged; the argument is the note waited on, e.g. "B4". The flute shows what the child does. -->
+    <string name="flute_play_prompt">🪈 Play %1$s</string>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>

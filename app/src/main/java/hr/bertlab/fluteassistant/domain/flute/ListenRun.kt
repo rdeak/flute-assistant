@@ -40,13 +40,16 @@ data class Listening(
 ) {
     /**
      * The one line under the staff: stop and play it again when a written repeat is held on
-     * instead, else come closer or play one clear note when the sound stays unclear, else nothing.
+     * instead, else come closer or play one clear note when the sound stays unclear, else check
+     * the fingers while a wrong note stands (since 2026-11-10: the heard note said what came out,
+     * and nothing said what to do about it), else nothing.
      */
     val advice: TunerAdvice
         get() = when {
             repeatHeld -> TunerAdvice.PLAY_AGAIN
             hearing == Hearing.QUIET_UNCLEAR -> TunerAdvice.COME_CLOSER
             hearing == Hearing.LOUD_UNCLEAR -> TunerAdvice.CLEAR_NOTE
+            wrong != null -> TunerAdvice.CHECK_FINGERS
             else -> TunerAdvice.NONE
         }
 }

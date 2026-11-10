@@ -18,8 +18,11 @@ change that part).
 
 ## Rules
 
-- No numbers on screen: the summary is a trophy, stars, flames and an animal, a sticker shows no
-  count, and a screen reader hears none either.
+- No numbers on screen: the summary is a trophy, the keys of the notes asked and Again, a sticker
+  shows no count, and a screen reader hears none either but the round's score, on the trophy.
+- The summary is one message (the user's pick of 2026-11-10): no tiles and no second row of stars in
+  the card. The keys are the reward: large, in rows of up to five, their colour rising from where
+  the round began. Do not add a tile, a streak, an aim or a speed back without the user.
 - For a screen reader the staff's places are named by position ("Staff position N"), never by
   note, so it does not give the answer away.
 - The two game pills stay on all three screens (asking, choosing notes, the summary). Do not move

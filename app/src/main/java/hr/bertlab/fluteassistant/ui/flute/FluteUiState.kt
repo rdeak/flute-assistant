@@ -56,6 +56,26 @@ data class FluteUiState(
     val shelf: List<Book>
         get() = books.mapIndexed { index, book -> if (index == openBook) book.copy(tune = tune) else book }
 
+    /**
+     * The note the room under the stage asks for by name, "Play B4": the one waited on, from the start of a
+     * "Your turn" until its first note is judged, right or wrong, and while nothing else has the line. A waiting
+     * screen says what it waits for; once a note was judged the child has the idea, and the ring and the dots do.
+     */
+    val promptMidi: Int?
+        get() {
+            val run = listening ?: return null
+            if (marks.isNotEmpty() || run.wrong != null || run.finishing || run.advice != TunerAdvice.NONE) return null
+            return run.index?.let(::noteAt)
+        }
+
+    /**
+     * The note whose fingering the room under the stage shows: the one that was wanted, while a wrong note
+     * stands (until the right one is played). Nothing is added while things go right.
+     */
+    val fingeringMidi: Int? get() = listening?.wrong?.let { noteAt(it.index) }
+
+    private fun noteAt(index: Int): Int? = (tune.getOrNull(index) as? TuneNote)?.midi
+
     val isPlaying: Boolean get() = playing != null
     val isListening: Boolean get() = listening != null
     val isEmpty: Boolean get() = tune.isEmpty()

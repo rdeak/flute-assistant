@@ -3,9 +3,7 @@
 
 package hr.bertlab.fluteassistant.domain.notes
 
-import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import kotlin.math.max
-import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
@@ -34,7 +32,7 @@ data class NotesRound(
     /** Notes found on the first tap in a row, right now. */
     val streak: Int = 0,
     val bestStreak: Int = 0,
-    /** Every tap this round, right or wrong, for the accuracy. */
+    /** Every tap this round, right or wrong (the summary's aim tile read it until 2026-11-10; nothing on screen does now). */
     val taps: Int = 0,
     /** True once [ROUND_LENGTH] notes are answered and the summary is up. */
     val roundOver: Boolean = false,
@@ -64,6 +62,8 @@ data class NotesRound(
     val phraseClean: Boolean = true,
     /** How well each note is known, over every round and both games. */
     val progress: NoteProgress = NoteProgress.EMPTY,
+    /** [progress] as it was when the round began: where the summary's keys start their rise from. */
+    val startProgress: NoteProgress = NoteProgress.EMPTY,
     /** Notes that moved up in [progress] this round. */
     val grewThisRound: Set<Int> = emptySet(),
     /** Notes answered this round, first try or not. */
@@ -78,9 +78,6 @@ data class NotesRound(
 
     /** Notes found on the first tap. */
     val score: Int get() = results.count { it }
-
-    /** Right taps out of all taps, in whole percent (every answered note took exactly one right tap); null before the first tap. */
-    val accuracyPercent: Int? get() = if (taps == 0) null else (results.size * 100.0 / taps).roundToInt()
 
     /**
      * The round after the child tapped the place of [midi] on the staff at [now]. The same round
@@ -186,6 +183,7 @@ data class NotesRound(
                     soundOn = soundOn,
                     phraseId = phraseId,
                     progress = progress,
+                    startProgress = progress,
                 )
             }
             val phrase = Phrases.draw(notes, Phrases.MIN_LENGTH, random, avoidFirst = previous?.phrase?.firstOrNull())
@@ -198,6 +196,7 @@ data class NotesRound(
                 placed = 1,
                 phraseId = phraseId + 1,
                 progress = progress,
+                startProgress = progress,
             )
         }
 
@@ -206,34 +205,5 @@ data class NotesRound(
             val candidates = (notes - setOfNotNull(avoid)).ifEmpty { notes }.sorted()
             return candidates[random.nextInt(candidates.size)]
         }
-    }
-}
-
-/**
- * How fast a round went, as one of the metronome's animals ([TempoBand]) rather than a time:
- * the average time per note, the cheetah for under two seconds down to the snail for over
- * ten. Null until the round is over.
- */
-fun NotesRound.speed(): TempoBand? {
-    val perNote = (roundMillis ?: return null) / NotesRound.ROUND_LENGTH
-    return when {
-        perNote <= 2_000 -> TempoBand.CHEETAH
-        perNote <= 3_500 -> TempoBand.RABBIT
-        perNote <= 6_000 -> TempoBand.DUCK
-        perNote <= 10_000 -> TempoBand.TURTLE
-        else -> TempoBand.SNAIL
-    }
-}
-
-/**
- * How well the child aimed, one to three stars from [NotesRound.accuracyPercent]: three
- * from 90 %, two from 70 %, one otherwise (they found every note in the end).
- */
-fun NotesRound.aimStars(): Int {
-    val percent = accuracyPercent ?: return 1
-    return when {
-        percent >= 90 -> 3
-        percent >= 70 -> 2
-        else -> 1
     }
 }

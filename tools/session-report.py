@@ -23,7 +23,7 @@ import sys
 
 HOP = 2048
 NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-DECISIONS = ["SILENT", "LOW_PROBABILITY", "UNSTEADY", "SHOWN", "IGNORED"]
+DECISIONS = ["SILENT", "LOW_PROBABILITY", "FAINT", "UNSTEADY", "SHOWN", "IGNORED"]
 MARK_GLYPH = {"right": "★", "retry": "☆", "wrong": "✕", "ignored": "·"}
 MARK_WORD = {"right": "right, a star", "retry": "right after a stumble, a faint star", "wrong": "wrong", "ignored": "ignored"}
 
@@ -342,7 +342,7 @@ def build(session, folder):
 
     # lane C
     w('<text x="%d" y="%d" fill="var(--ink-2)" font-size="12" font-weight="600">Decision and the screen</text>' % (left, c_top - 8))
-    colors = {"SILENT": "var(--grid)", "LOW_PROBABILITY": "var(--s2)", "UNSTEADY": "var(--s4)", "SHOWN": "var(--s1)", "IGNORED": "var(--s7)"}
+    colors = {"SILENT": "var(--grid)", "LOW_PROBABILITY": "var(--s2)", "FAINT": "var(--axis)", "UNSTEADY": "var(--s4)", "SHOWN": "var(--s1)", "IGNORED": "var(--s7)"}
     start, cur = None, None
     def strip(i0, i1, d):
         w('<rect x="%.1f" y="%d" width="%.1f" height="%d" fill="%s"><title>%s</title></rect>' % (x_of(i0), c_top, max(0.5, x_of(i1) - x_of(i0) - 0.5), strip_h, colors.get(d, "var(--muted)"), d))

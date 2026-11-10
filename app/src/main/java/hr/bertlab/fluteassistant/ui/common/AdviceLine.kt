@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -44,9 +45,20 @@ fun AdviceLine(
     modifier: Modifier = Modifier,
     wrap: Boolean = false,
     wrapMaxFont: TextUnit = 19.sp,
+) = AdviceLine(AnnotatedString(advice.labelRes()?.let { stringResource(it) } ?: ""), modifier, wrap, wrapMaxFont)
+
+/**
+ * The same line for words that are not one of the advices: the flute's "Play B4" before the first note of
+ * a "Your turn", whose note carries its raised octave. Same place, same look, same wrapping.
+ */
+@Composable
+fun AdviceLine(
+    text: AnnotatedString,
+    modifier: Modifier = Modifier,
+    wrap: Boolean = false,
+    wrapMaxFont: TextUnit = 19.sp,
 ) {
     val style = MaterialTheme.typography.bodyLarge
-    val text = advice.labelRes()?.let { stringResource(it) } ?: ""
     if (wrap) {
         WrappedAdvice(text, style.copy(lineHeight = 1.3.em), wrapMaxFont, modifier)
         return
@@ -66,13 +78,13 @@ fun AdviceLine(
 
 /** [AdviceLine]'s block of up to four lines, no bigger than the biggest size at which every word of it fits a line. */
 @Composable
-private fun WrappedAdvice(text: String, style: TextStyle, maxFont: TextUnit, modifier: Modifier) {
+private fun WrappedAdvice(text: AnnotatedString, style: TextStyle, maxFont: TextUnit, modifier: Modifier) {
     val density = LocalDensity.current
     val measurer = rememberTextMeasurer()
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val referenceFont = with(density) { REFERENCE_PX.toSp() }
         val widestWord = remember(text, style, measurer, density) {
-            text.split(' ')
+            text.text.split(' ')
                 .filter { it.isNotEmpty() }
                 .maxOfOrNull { measurer.measure(it, style.copy(fontSize = referenceFont)).size.width } ?: 0
         }

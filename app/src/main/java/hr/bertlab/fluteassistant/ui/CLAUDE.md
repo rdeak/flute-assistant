@@ -48,6 +48,8 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   with `BackKey` (androidTest): `DESIGN.md`, "The phone's Back".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
 - `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both.
+  `FingeringDiagram` is shared by the tuner and the flute's listening room, and `AdviceLine` by
+  both too (it also takes the flute's "Play B4"): the same.
 - **A test of a fit compares bounds.** `assertIsDisplayed` does not prove one: what spills past a
   window is still displayed. Compare `getUnclippedBoundsInRoot()` with the room, and ask
   `GetTextLayoutResult` about words (`TabletFitTest.assertWhole`).

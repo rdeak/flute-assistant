@@ -1090,4 +1090,53 @@ class FluteScreenTest {
         compose.onNodeWithText("Postavke").assertIsDisplayed()
         compose.onNodeWithText("Ne sad").assertIsDisplayed()
     }
+
+    // ---- The room under the stage while the flute listens (the user's "3C" of 2026-11-10) ----
+
+    @Test
+    fun listening_asks_for_the_first_note_until_one_is_judged() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        compose.onNodeWithText("🪈 Play C4").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1), marks = mapOf(0 to StepMark.FIRST_TRY))
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        compose.onNodeWithText("🪈 Play G4").assertDoesNotExist()
+    }
+
+    /**
+     * After a wrong note the room shows how the wanted note is fingered, with "Check your fingers", between the
+     * stage and Stop and as wide as the stage, until the right note is played.
+     */
+    @Test
+    fun a_wrong_note_brings_the_wanted_notes_fingering() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64))))
+        val fingering = compose.onNodeWithContentDescription("Fingering for C4").assertIsDisplayed().getBoundsInRoot()
+        compose.onNodeWithText("👀 Check your fingers").assertIsDisplayed()
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        val staff = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
+        val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
+        val line = compose.onNodeWithText("👀 Check your fingers").getBoundsInRoot()
+        assertTrue("the fingering $fingering stands under the staff $staff", fingering.top >= staff.bottom)
+        assertTrue("the line $line stands under the fingering $fingering and over Stop $stop", line.top >= fingering.bottom && line.bottom <= stop.top)
+        assertTrue("the fingering is ${fingering.width} wide", fingering.width > 300.dp)
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1), marks = mapOf(0 to StepMark.RETRY))
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        compose.onNodeWithText("👀 Check your fingers").assertDoesNotExist()
+    }
+
+    @Test
+    fun playing_the_tune_back_asks_for_nothing() {
+        show(FluteUiState(tune = twoNotes, playing = Playing(0)))
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_listening_room_speaks_croatian() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"))
+        compose.onNodeWithText("🪈 Odsviraj c1").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64)))
+        compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
+        compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
+    }
 }

@@ -69,9 +69,8 @@ note's bubble or, in Hear, the speaker bubble, and a "Pick" button with a dot pe
 staff and one feedback line, and ten round places at the bottom (a star for first time, a faint star for a retry,
 yellow for the current note); "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in octave
 rows, highest on top, each chosen key a sticker that fills as the note is learned ("The sticker book"), the "Sound"
-switch row and a big OK, the way back (and the phone's Back, `ui/DESIGN.md`). The end-of-round summary has no numbers on screen either: a trophy, ten
-stars, tiles for the best streak (flames), the aim (one to three stars) and the speed (an animal), and the keys of the
-notes asked.
+switch row and a big OK, the way back (and the phone's Back, `ui/DESIGN.md`). The end-of-round summary has no numbers on screen either: a trophy, the
+keys of the notes asked, large, and Again ("The summary is one message" under "The sticker book").
 
 The hero row is 76 dp (it was 96 until the pills took their height) and the word "Find" that stood over the bubble is
 gone: the pill names the game. `NotesMinHeight` is 623 dp (it was 560: the pills' 64 dp and the 5 under them and the
@@ -235,8 +234,7 @@ given notes do not count.
   so Find never advances twice.
   `toggleSound` does not cut a playing phrase, as the phrase sounds with Sound off. `hearAgain()` plays the phrase on
   screen from the start; a tap on the bubble mid-playback restarts it.
-- The summary is Find's, with the same tiles. The speed animal counts the listening time too, so it runs slower in
-  Hear; honest, needs no words, left alone.
+- The summary is Find's.
 - **The pace** is 900 ms a note and 200 ms between (`NOTE_MS`, `GAP_MS`), about a note a second, a teacher's dictation
   pace. It was 450 and 100 until the first child test (2026-11-09: "note is too short"). A phrase that comes on screen
   waits `LEAD_MS`, 600 ms, before its first note ("👂 Listen" is already up), so two phrases never run into each other;
@@ -282,33 +280,48 @@ screen, a path across rounds, auto-unlocking notes, daily streaks, mixing Find a
   (pixels of the name above and below the edge).
 - **Pick's dots** (`letterDotColors`, `LetterDots`): one per letter among the chosen notes, solid in the letter's colour
   when every chosen note of that letter is known and the pale tint otherwise, so the row is the book's spine.
+- **The summary is one message** (2026-11-10, the user's "4C" of three drawn options: A as it was, B without the
+  duplicates, C this; the page is https://claude.ai/artifact/PbsKoRyeJvf17VzucDwKDz). The card holds the trophy, the
+  keys of the notes asked and Again, and nothing else. Until then it also held its own row of ten stars and three
+  tiles (the best streak in flames, the aim in one to three stars, the speed as one of the metronome's animals), which
+  were the user's canvas of 2026-10-24: the review of 2026-11-10 counted the same ten stars twice on one screen in two
+  orders (sorted in the card, in the round's order under it), the aim as a third way of saying them, and a slow animal
+  under "Great job!", which also rewards hurrying. The score is the row of places under the card, where the child
+  watched it fill; the trophy says it to a screen reader ("Right first time: 8 of 10", `summary_stars`, on the
+  trophy's box). Gone with the tiles: `SummaryStars`, `SummaryTiles`, the rules `aimStars`, `speed` and
+  `accuracyPercent` and the words `summary_streak`, `summary_aim`, `summary_speed`, `aim_description`,
+  `speed_description` (git keeps them). `NotesRound.taps` is still counted and nothing reads it; `bestStreak` and
+  `roundMillis` still go to the `notes.round` log line. Do not bring a tile back without the user.
 - **The summary's keys** (`SummaryKeys`, `RoundSummary.kt`) are the notes asked this round (`askedThisRound`), plain
-  `NoteKey`s in staff order, up to seven to a row (`summaryRows`: seven and three for ten asked), 44 x 50 and 6 apart,
-  rows 8 apart. This is a revision made while planning: the first draft showed every chosen note, and with fifteen
-  chosen three rows do not fit under the pills at any trophy size; the notes asked are what the round earned anyway. A
-  key that grew this round (`grewThisRound`) hops, the trophy's own hop, with ✨ (14 dp) over its top-left corner; one that
-  became known gets its star the same way. The keys of a row share the width equally (`weight(1f, fill = false)`), so
-  a full row of seven shrinks all alike on a 411 dp phone (its stage is 339 dp inside, seven keys take 344). The block
-  is one accessible node: "Your notes", then the names of the notes that grew. It keeps `KEY_OVERHANG` (10 dp) of room
-  above the first row for the star and sparkle.
-- **The trophy gives way** (`fitSummary`, `RoundSummary.kt`), to the room the stage has. At most 90 sp with one row of
-  keys and 50 sp with two (the spec said about 72 dp; at 60 sp the design phone's stage was still about 5 dp short with
-  two rows, and 90 rather than 100 leaves a phone with another emoji font a margin: the user's Galaxy A55 draws emoji
-  with Samsung's metrics). On a shorter stage the trophy takes the largest size that fits, down to 36 sp; when even
-  that is not enough the tiles drop from 104 to the sideways 92 dp (the upright look holds there: at twice the text
-  their two lines take about 77) and the trophy grows back into the 12 dp that frees. Most phones are shorter than the
-  design phone (360 x 800, 384 x 854, 393 x 873, 411 x 891), so before the fix wave of 2026-11-07, when the trophy had
-  only its two sizes, the summary scrolled on most of them with only a sliver of Again in view at the 623 dp minimum.
+  `NoteKey`s in staff order, and they are the reward, so they are large: up to 62 x 70 (1.4 times the picker's 44 x
+  50, the size the user chose from the drawing), 8 apart, in rows of up to five evened out (`summaryKeyRows`: six are
+  three and three, seven four and three, ten five and five; a round asks ten notes at most, so never more than two
+  rows), every key as wide as the widest row has room for and its height following (`summaryKeySize`: five fill a
+  411 dp phone's 339 dp stage at 61 dp each). A key's name, star and sparkle grow with it (`NoteKey`'s `scale`). The
+  first draft showed every chosen note, and with fifteen chosen three rows do not fit under the pills at any trophy
+  size; the notes asked are what the round earned anyway. A key that grew this round (`grewThisRound`) hops, the
+  trophy's own hop, with ✨ over its top-left corner; one that became known gets its star the same way. The block is
+  one accessible node: "Your notes", then the names of the notes that grew. It keeps `KEY_OVERHANG` (10 dp) of room
+  above the first row for the star and sparkle, outside its own bounds.
+- **The colour rises.** A round remembers the progress it began with (`NotesRound.startProgress`, set by `open`), and
+  each summary key starts as full as its note was then and moves to where the round took it, 400 ms after it appears
+  and over 900 ms (`risingShare` in `PracticeNotePicker.kt`; down after a miss, though mostly up): the child sees the
+  note grow instead of finding it grown. The picker's keys do not move. The phone's "remove animations" setting makes
+  it a jump. Pinned on the emulator by `the_keys_colour_rises_from_where_the_round_began`.
+- **The trophy gives way** (`fitSummary`, `RoundSummary.kt`), to the room the stage has, and the keys keep their size.
+  At most 90 sp (90 rather than 100 leaves a phone with another emoji font a margin: the user's Galaxy A55 draws emoji
+  with Samsung's metrics), down to 36 sp, the largest that fits with 16 dp left for the parts to stand apart (the
+  first render of ten notes asked on a 653 dp tab had the keys right on Again).
 - **The summary fits or scrolls.** Its column is `fitOrScroll` at a minimum worked out from its parts at the sizes
-  chosen (`summaryMinHeight`): the trophy and the stars measured with the phone's own emoji font (a line is 1.364 times
-  the size here, not the 1.2 `Emoji` asks for), the tiles, the key rows, Again (`BigActionHeight`, internal for this)
-  and 8 dp under it, with gaps of at least 2 dp. Upright on a 411 dp phone: the 915 dp phone (a tab of 713 dp, the
-  stage 442 inside) keeps 90 and 50 sp and nothing scrolls; a tab of 650 (the stage 379) takes a trophy of about 55 sp
-  with five notes asked and nothing scrolls; at the tab's 623 dp minimum (the stage 352) five asked take, by the sums,
-  the 92 dp tiles and a trophy of about 44 sp with a few dp to spare that another emoji font may eat, and ten asked
-  still scroll, at 36 sp and 92 dp, rather than squeeze Again, since a child must always reach it. Pinned by `RoundSummaryFitTest` (the rule, with the emulator's emoji line),
-  `the_summary_fits_the_stage_with_ten_notes_asked_and_two_rows` (713), `the_summary_fits_a_shorter_tab_with_five_notes_asked`
-  (650) and `the_summary_keeps_again_whole_at_the_tab_minimum` (623, and 650 with ten asked).
+  chosen (`summaryMinHeight`): the trophy measured with the phone's own emoji font (a line is 1.364 times the size
+  here, not the 1.2 `Emoji` asks for), the key rows, Again (`BigActionHeight`, internal for this) and 8 dp under it,
+  with gaps of at least 2 dp. Upright on a 411 dp phone nothing scrolls, with five notes asked or with ten, from the
+  915 dp phone (a tab of 713 dp, the stage 442 inside) down to the tab's 623 dp minimum (the stage 352); were a stage
+  shorter still, the summary scrolls rather than squeeze Again, since a child must always reach it. Pinned by
+  `RoundSummaryFitTest` (the rules, with the emulator's emoji line), `the_summarys_keys_are_large_and_stand_in_rows_of_five`,
+  `the_keys_of_both_rows_are_as_wide_as_each_other`, `the_summary_fits_the_stage_with_ten_notes_asked_and_two_rows` (713),
+  `the_summary_fits_a_shorter_tab_with_five_notes_asked` (650) and `the_summary_keeps_again_whole_at_the_tab_minimum`
+  (623, and 650 with ten asked).
 
 ## Celebrations
 
@@ -373,17 +386,14 @@ no emoji, the word alone, a "Game" group for a screen reader):
 - **Which notes?** The pills, Sound, OK low in the column; the title and the same rows as upright in the card, with
   bigger keys (78 x 62, shrinking to fit: about 72 at 800 wide, 48 at 640), the same `NoteKey`s with their fill and
   star. The ten places hide here. The column uses 266 of 330 dp at 360 tall and 296 of 381 at 411.
-- **End of the round.** The trophy hopping on the left of the card beside the headline, one row of ten stars, the three
-  tiles (92 tall) and the keys of the notes asked under them (36 x 40, 4 apart, rows 8 apart, with `SummaryKeys`' 10
-  dp of room on top); the pills, Pick and Again low in the column (254 of 330 at 360, 284 of 381 at 411). Still no
-  numbers. The star and trophy sizes are measured from the phone's own emoji font (`emojiWidthShare`), not guessed, so
-  the row fills the room the trophy leaves without leaving the card.
-- **Ten notes asked do not fit the 360 tall card at the usual gaps.** The card is 312 dp inside at 360 (363 at 411).
-  Two rows of keys (106 with the star's room and the gap) with 16 dp between the parts came to 322 at 800 x 360, and
-  the headline's second line at 640 x 360 made it worse. Built: the gaps are 10 dp when the keys take two rows (16
-  otherwise), and the headline is the column's one weighted child, measured last, so its `autoSize` takes the height
-  the rest leaves and the keys keep theirs. The tiles stay 92 (the spec offered 80). With five asked (the usual round)
-  nothing differs: 270 of 312 at 800 x 360.
+- **End of the round.** The trophy hopping on the left of the card beside the headline, and under the headline the
+  keys of the notes asked, as large as the room beside the trophy holds (`summaryKeySize` of that room: 51 x 58 at 640
+  wide, 62 x 70 at 915), with `SummaryKeys`' 10 dp of room on top; the pills, Pick and Again low in the column. Still
+  no numbers, and since 2026-11-10 no row of stars and no tiles, as upright. The trophy's size comes from the card's
+  width, in dp.
+- **Ten notes asked** are two rows of five (130 to 156 dp). The card is 312 dp inside at 360 tall (363 at 411): the
+  gaps are 10 dp when the keys take two rows (16 otherwise), and the headline is the column's one weighted child,
+  measured last, so its `autoSize` takes the height the keys leave and the keys keep theirs.
 - Pick has its letter dots on both the question and the summary, so it is one button on both; the summary
   mockup drew it without. The dots are 11 dp; seven of them (all fifteen notes) shrink to 9 on the 100 dp
   column, so that the row keeps 9 dp from the button's outline (`SidewaysGeometry.pickDotSize`).
@@ -426,10 +436,10 @@ twice while a phrase plays, the pill and the line (accepted).
 Ruled on 2026-11-07, so the code is right where the two disagree:
 
 - The short phone's sideways pills are 30 dp, not 38 (the column did not fit, above).
-- The sideways summary with ten notes asked takes 10 dp gaps and a shrinking headline, not 80 dp tiles (above).
-- The summary's trophy is at most 90 and 50 sp, not 120 and about 72 dp, and on a shorter stage it shrinks to fit, down
-  to 36 sp, and then the tiles drop to 92 dp; only below that does its column scroll (`fitOrScroll`). The spec had
-  the trophy give way and forbade scrolling on the 915 dp phone only.
+- The sideways summary with ten notes asked takes 10 dp gaps and a shrinking headline (above).
+- The summary's trophy is at most 90 sp, not 120 dp, and on a shorter stage it shrinks to fit, down to 36 sp; only
+  below that does its column scroll (`fitOrScroll`). The spec had the trophy give way and forbade scrolling on the
+  915 dp phone only. The spec's tiles and stars left the summary on 2026-11-10 ("The summary is one message").
 - Tapping the chosen pill does nothing; the spec only said choosing the other game resets.
 - `stopSound()` advances an answered phrase or forgets a heard one, as above; the spec only said "cancel".
 - The key's label is the theme's text colour on the dark tint, ink on the fill, drawn in two clipped halves where they
@@ -459,7 +469,7 @@ Recorded so nobody "fixes" them blindly; each was seen and left.
 ## Tests
 
 JVM: `PhrasesTest`, `NoteProgressTest`, `NoteStaffColumnsTest`, `LetterDotsTest`, `RoundSummaryFitTest` (the trophy
-and tiles giving way), and the Hear and progress cases in `NotesViewModelTest` (staircase, last phrase cut, game
+giving way, the keys' size and rows), and the Hear and progress cases in `NotesViewModelTest` (staircase, last phrase cut, game
 switch, playback gate, progress and its saving, the phrase log's id). Instrumented: `NotesScreenTest` (pills and their
 words at twice the text, speaker bubble, when a phrase is asked for, the feedback line's order, the place let go when
 the question goes or the staff locks, a cancelled touch answering nothing, picker keys and their name in both themes,

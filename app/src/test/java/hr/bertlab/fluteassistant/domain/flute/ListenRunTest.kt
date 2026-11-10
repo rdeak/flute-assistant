@@ -21,7 +21,8 @@ import org.junit.Test
 class ListenRunTest {
 
     private fun q(midi: Int) = TuneNote(midi, QUARTER)
-    private fun pitched(midi: Int) = PitchFrame(NoteMath.midiToFrequency(midi), 0.97, level = 0.4f)
+    /** A frame of a note at a real flute's level at the phone (the recorded sessions: 0.67 and over), clear of the tracker's floor. */
+    private fun pitched(midi: Int) = PitchFrame(NoteMath.midiToFrequency(midi), 0.97, level = 0.7f)
     private val silent = PitchFrame(null, 0.0, level = 0f)
 
     /** Enough agreeing frames for [midi] to lock: the note begins on the last. */
@@ -125,5 +126,49 @@ class ListenRunTest {
         first.onFrame(PitchFrame(null, 0.0, level = 0.2f))
         assertEquals(0.2f, first.floor)
         assertEquals(0.2f, ListenRun(listOf(q(60)), floor = first.floor).floor)
+    }
+
+    /**
+     * A clear note far too faint to be the flute at the phone (the child across the room, or the room itself) is
+     * not judged, so it can earn no wrong mark, and the screen does not stay silent about it: no heard bubble, the
+     * listening dots, and after about a second of it "Come closer to the phone". The phone of before 2026-11-10,
+     * with no floor, judged it: a wrong mark for a sound nobody played at the phone.
+     */
+    @Test
+    fun `a clear note too faint for the phone is not judged and asks to come closer`() {
+        val faint = PitchFrame(NoteMath.midiToFrequency(64), 0.97, level = 0.36f)
+        val run = ListenRun(listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER)))
+        repeat(HearingTracker.UNCLEAR_FRAMES) { run.onFrame(faint) }
+        assertEquals(emptyMap<Int, StepMark>(), run.marks)
+        assertNull(run.listening.wrong)
+        assertNull(run.listening.heardNow)
+        assertEquals(0, run.listening.index)
+        assertEquals(TunerAdvice.COME_CLOSER, run.listening.advice)
+
+        val before = ListenRun(listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER)), NoteOnsetTracker.Rules(minLevel = 0f))
+        repeat(HearingTracker.UNCLEAR_FRAMES) { before.onFrame(faint) }
+        assertEquals(WrongNote(0, 64), before.listening.wrong)
+    }
+
+    /**
+     * After a wrong note the advice is to check the fingers, and it stays, as the heard note stays under its step,
+     * until the right note is played (since 2026-11-10: the heard note said what came out, nothing said what to do
+     * about it). What the microphone itself has to say, and a repeat held on, come first.
+     */
+    @Test
+    fun `a wrong note asks to check the fingers until the right note`() {
+        val run = ListenRun(listOf(q(60), q(62)))
+        assertEquals(TunerAdvice.NONE, run.listening.advice)
+        run.begin(64)
+        assertEquals(TunerAdvice.CHECK_FINGERS, run.listening.advice)
+        run.stop()
+        assertEquals("it stays through the silence, as the heard note does", TunerAdvice.CHECK_FINGERS, run.listening.advice)
+        run.begin(60)
+        assertEquals(TunerAdvice.NONE, run.listening.advice)
+
+        val wrong = WrongNote(0, 64)
+        assertEquals(TunerAdvice.COME_CLOSER, Listening(index = 0, wrong = wrong, hearing = Hearing.QUIET_UNCLEAR).advice)
+        assertEquals(TunerAdvice.CLEAR_NOTE, Listening(index = 0, wrong = wrong, hearing = Hearing.LOUD_UNCLEAR).advice)
+        assertEquals(TunerAdvice.PLAY_AGAIN, Listening(index = 0, wrong = wrong, repeatHeld = true).advice)
     }
 }

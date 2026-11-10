@@ -52,8 +52,19 @@ tools/pull-sessions.sh                                   # the phone's sessions 
                                                          # work on them here; some: timing on the phone, the first frame says where)
 ./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=stopDrop:0.08,0.12,0.2
                                                          # also <folder>/sweep.txt: what each value would have heard
+./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=minLevel:0,0.3,0.4,0.45
+                                                         # the loudness floor: did it leave a child's soft notes out, or let the room in?
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
 ```
+
+The replay that is compared with the phone runs under the rules the session was recorded with (its
+`session.rules` line; a rule younger than the recording, `minLevel` for sessions before 2026-11-10,
+is switched off: `Replay.recordedRules`), so a rule added since does not show up as a difference. Where
+today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
+hear in the same sound. A sweep changes one of today's rules. The detector is not part of the rules:
+sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a
+frame or two whatever the rules. A frame's decision can be `FAINT` since 2026-11-10: a clear pitch
+under the loudness floor (`ui/flute/DESIGN.md`, "The room is not judged").
 
 `ListenPath` (test source set) frames the audio as the engine does and feeds it to `ListenRun`
 (`domain/flute`), the same class the app's view model feeds the microphone to, so the synthetic

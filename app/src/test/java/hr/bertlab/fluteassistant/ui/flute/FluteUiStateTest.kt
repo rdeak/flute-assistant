@@ -126,4 +126,31 @@ class FluteUiStateTest {
         assertEquals(0, state.openBook)
         assertEquals(List(Songbook.SIZE) { Book() }, state.books)
     }
+
+    // ---- The room under the stage while the flute listens (the user's "3C" of 2026-11-10) ----
+
+    private val lamb = listOf(TuneRest(NoteLength.QUARTER), TuneNote(71, NoteLength.QUARTER), TuneNote(69, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+
+    /** Until the first note of a run is judged, the room says which note to play: a waiting screen says what it waits for. */
+    @Test
+    fun `the note to start with is asked for until a note is judged`() {
+        val waiting = FluteUiState(tune = lamb, listening = Listening(index = 1))
+        assertEquals(71, waiting.promptMidi)
+        assertNull("a star was earned: the child has the idea", waiting.copy(listening = Listening(index = 2), marks = mapOf(1 to hr.bertlab.fluteassistant.domain.flute.StepMark.FIRST_TRY)).promptMidi)
+        assertNull("a wrong note has its own line", waiting.copy(listening = Listening(index = 1, wrong = hr.bertlab.fluteassistant.domain.flute.WrongNote(1, 62))).promptMidi)
+        assertNull("advice has the line", waiting.copy(listening = Listening(index = 1, hearing = Hearing.QUIET_UNCLEAR)).promptMidi)
+        assertNull("playing back asks for nothing", FluteUiState(tune = lamb, playing = Playing(1)).promptMidi)
+        assertNull(FluteUiState(tune = lamb).promptMidi)
+    }
+
+    /** While a wrong note stands, the room shows how the note that was wanted is fingered. */
+    @Test
+    fun `a wrong note brings the fingering of the note that was wanted`() {
+        val missed = FluteUiState(tune = lamb, listening = Listening(index = 2, wrong = hr.bertlab.fluteassistant.domain.flute.WrongNote(2, 62)))
+        assertEquals(69, missed.fingeringMidi)
+        assertEquals(TunerAdvice.CHECK_FINGERS, missed.advice)
+        assertNull(FluteUiState(tune = lamb, listening = Listening(index = 2)).fingeringMidi)
+        assertNull(FluteUiState(tune = lamb, playing = Playing(1)).fingeringMidi)
+        assertNull(FluteUiState(tune = lamb).fingeringMidi)
+    }
 }
