@@ -1,0 +1,39 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// A Play screenshot in a drawn phone, as AVIF or WebP at the size the screen needs.
+import type { ImageMetadata } from 'astro';
+import { Picture } from 'astro:assets';
+
+interface Props {
+  src: ImageMetadata;
+  alt: string;
+  /** The hero's phone: loaded first, at once. */
+  eager?: boolean;
+  /** The image's width on screen, for the browser to pick a file; the default fits a feature. */
+  sizes?: string;
+  class?: string;
+}
+
+const {
+  src,
+  alt,
+  eager = false,
+  sizes = '(min-width: 960px) 300px, (min-width: 600px) 280px, 72vw',
+  class: className,
+} = Astro.props;
+---
+
+<figure class:list={['phone', className]}>
+  <Picture
+    src={src}
+    alt={alt}
+    formats={['avif', 'webp']}
+    widths={[280, 420, 560, 840]}
+    sizes={sizes}
+    loading={eager ? 'eager' : 'lazy'}
+    fetchpriority={eager ? 'high' : 'auto'}
+    decoding="async"
+  />
+</figure>

@@ -1,6 +1,6 @@
 # Privacy Policy for Flute Assistant
 
-Last updated: 4 November 2026
+Last updated: 11 November 2026
 
 Flute Assistant (the "app") is a metronome, tuner, note reading game and digital flute for
 Android made for children learning the flute, published by bertlab. This policy explains what
@@ -43,6 +43,18 @@ later. No notification content is shared with anyone.
 The app is designed for children of primary-school age and is suitable for all ages. It does
 not collect any information from anyone, including children under 13, and has no ads, no
 in-app purchases, no accounts and no way to contact other people.
+
+## This website
+
+The app's website, flute-assistant.bertlab.hr, where this policy is published, uses no cookies, no
+analytics and no advertising, and loads nothing from other companies: its fonts and pictures come
+from the site itself. It is hosted on GitHub Pages, and GitHub may keep technical records of visits,
+such as IP addresses, to run and protect its service, under the
+[GitHub General Privacy Statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement).
+If you pick a language on the site, or close the line that offers another language, your browser
+remembers that on your device; it is never sent to us. The links to Google Play are tagged with
+which part of the website they are on, so that Google Play can count, without telling us who you
+are, how many visits came from the website.
 
 ## Changes
 

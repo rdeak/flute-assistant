@@ -1,0 +1,25 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// The privacy policy page body: the language's Markdown from docs/release (src/content.config.ts),
+// or the English one while a new language has no translation yet.
+import { getEntry, render } from 'astro:content';
+import { defaultLang, language, pagePath, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = language(lang).strings;
+const entry = (await getEntry('privacy', lang)) ?? (await getEntry('privacy', defaultLang));
+if (!entry) throw new Error('docs/release/privacy-policy.md is missing');
+const { Content } = await render(entry);
+const policyLang = entry.id;
+---
+
+<article class="wrap wrap--narrow prose" lang={policyLang}>
+  <Content />
+  <p class="prose__back"><a href={pagePath(lang, 'home')}>← {t.privacy.back}</a></p>
+</article>

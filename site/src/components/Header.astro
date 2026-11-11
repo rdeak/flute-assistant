@@ -1,0 +1,84 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// The logo (home), a small Play button and the language menu. The menu names each language in
+// itself and links to the same page in it; with JavaScript off it still opens and works.
+import { Image } from 'astro:assets';
+import { languages, language, pagePath, playUrl, APP_NAME, type Lang, type Page } from '../i18n';
+import { icon } from '../i18n/media';
+
+interface Props {
+  lang: Lang;
+  page?: Page;
+}
+
+const { lang, page } = Astro.props;
+const t = language(lang).strings;
+const current = language(lang);
+---
+
+<header class="site-header">
+  <div class="wrap site-header__row">
+    <a class="brand" href={pagePath(lang, 'home')}>
+      <Image src={icon} alt="" width={44} height={44} densities={[1, 2]} loading="eager" class="brand__icon" />
+      <span class="brand__name">{APP_NAME}</span>
+    </a>
+    <div class="site-header__actions">
+      <a class="btn btn--small btn--sun header-play" href={playUrl(lang, 'header')} rel="noopener">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="16" height="16"><path d="M7 4.5v15l12-7.5z" fill="currentColor"></path></svg>
+        {t.getApp}
+      </a>
+      <details class="lang-menu" data-lang-menu>
+        <summary>
+          <span class="sr-only">{t.languageMenu}: </span>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"></circle><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z" fill="none" stroke="currentColor" stroke-width="2"></path></svg>
+          <span>{current.code.toUpperCase()}</span>
+        </summary>
+        <ul>
+          {
+            languages.map((l) => (
+              <li>
+                <a
+                  href={pagePath(l.code, page ?? 'home')}
+                  hreflang={l.code}
+                  lang={l.code}
+                  aria-current={l.code === lang ? 'page' : undefined}
+                  data-lang-choice={l.code}
+                >
+                  {l.name}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </details>
+    </div>
+  </div>
+</header>
+
+<script>
+  // Close the language menu on a click outside it or on Escape; remember a language picked here,
+  // so the banner offering another one stays away.
+  const menu = document.querySelector<HTMLDetailsElement>('[data-lang-menu]');
+  if (menu) {
+    document.addEventListener('click', (e) => {
+      if (menu.open && !menu.contains(e.target as Node)) menu.open = false;
+    });
+    menu.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && menu.open) {
+        menu.open = false;
+        menu.querySelector('summary')?.focus();
+      }
+    });
+    menu.querySelectorAll<HTMLAnchorElement>('[data-lang-choice]').forEach((a) =>
+      a.addEventListener('click', () => {
+        try {
+          localStorage.setItem('fa-lang-chosen', a.dataset.langChoice ?? '');
+        } catch {
+          /* storage off: the banner may come back, nothing else changes */
+        }
+      }),
+    );
+  }
+</script>

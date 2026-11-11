@@ -69,6 +69,15 @@ The release process (version bump in `gradle.properties`, the release workflow,
 signing, Play upload, store graphics and screenshots) is in the `release` skill
 (`.claude/skills/release/SKILL.md`) and `docs/release/`. Never read or print the keystore password.
 
+## Website
+
+`site/` is the app's website, flute-assistant.bertlab.hr (Astro, English and Croatian, a landing page
+and the privacy policy), built and published to GitHub Pages by `.github/workflows/site.yml`. It
+reads the privacy policy (`docs/release/privacy-policy*.md`) and the Play screenshots
+(`docs/release/play-listing/`) where they are. `site/README.md` holds the commands, how to add a
+language, what must not break (the old `/release/privacy-policy.html` address the app and the Play
+Console link to) and how it went live. Check a change with `cd site && npm run build`.
+
 ## Build wiring
 
 AGP 9 with built-in Kotlin, the version constraints, the debug and release source sets and the

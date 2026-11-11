@@ -19,3 +19,11 @@ superpowers
 
 # "Your turn" sessions pulled from a debug phone (tools/pull-sessions.sh): a child's audio, never in git
 /sessions/
+
+/site/node_modules
+/site/dist
+/site/.astro
+# The website (site/): dependencies, the build and Astro's generated types
+/site/node_modules/
+/site/dist/
+/site/.astro/

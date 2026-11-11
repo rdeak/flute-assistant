@@ -1,0 +1,100 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// What the home page is about, for search engines and AI tools (schema.org JSON-LD): the publisher,
+// the site, the app and the page with its questions. Only facts: no rating or download count until
+// there are real ones to give.
+import { getImage } from 'astro:assets';
+import {
+  languages,
+  language,
+  pagePath,
+  PACKAGE_ID,
+  APP_NAME,
+  APP_ALTERNATE_NAMES,
+  PUBLISHER,
+  CONTACT_EMAIL,
+  type Lang,
+} from '../i18n';
+import { icon, screenshot } from '../i18n/media';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = language(lang).strings;
+const site = Astro.site!;
+const abs = (path: string) => new URL(path, site).href;
+const pageUrl = abs(pagePath(lang, 'home'));
+const listing = `https://play.google.com/store/apps/details?id=${PACKAGE_ID}`;
+
+const logo = await getImage({ src: icon, width: 512, height: 512, format: 'png' });
+const shots = await Promise.all(
+  t.features.items.map((f) => getImage({ src: screenshot(lang, f.id), width: 540, format: 'jpg' })),
+);
+
+const graph = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Organization',
+      '@id': `${abs('/')}#publisher`,
+      name: PUBLISHER,
+      url: abs('/'),
+      email: CONTACT_EMAIL,
+      logo: abs(logo.src),
+      address: { '@type': 'PostalAddress', addressCountry: 'HR' },
+    },
+    {
+      '@type': 'WebSite',
+      '@id': `${abs('/')}#website`,
+      url: abs('/'),
+      name: APP_NAME,
+      inLanguage: languages.map((l) => l.code),
+      publisher: { '@id': `${abs('/')}#publisher` },
+    },
+    {
+      '@type': 'MobileApplication',
+      '@id': `${abs('/')}#app`,
+      name: APP_NAME,
+      alternateName: APP_ALTERNATE_NAMES,
+      description: t.app.description,
+      url: pageUrl,
+      sameAs: [listing],
+      installUrl: listing,
+      operatingSystem: 'Android 7.0 or later',
+      applicationCategory: 'EducationalApplication',
+      applicationSubCategory: 'Music',
+      image: abs(logo.src),
+      screenshot: shots.map((s) => abs(s.src)),
+      featureList: t.app.features,
+      inLanguage: languages.map((l) => l.code),
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+      contentRating: 'PEGI 3',
+      audience: { '@type': 'PeopleAudience', suggestedMinAge: 6, suggestedMaxAge: 12 },
+      publisher: { '@id': `${abs('/')}#publisher` },
+      author: { '@id': `${abs('/')}#publisher` },
+    },
+    {
+      '@type': ['WebPage', 'FAQPage'],
+      '@id': `${pageUrl}#page`,
+      url: pageUrl,
+      name: t.meta.title,
+      description: t.meta.description,
+      inLanguage: lang,
+      isPartOf: { '@id': `${abs('/')}#website` },
+      about: { '@id': `${abs('/')}#app` },
+      mainEntity: t.faq.items.map((item) => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: { '@type': 'Answer', text: item.a },
+      })),
+    },
+  ],
+};
+---
+
+<script is:inline type="application/ld+json" set:html={JSON.stringify(graph).replace(/</g, '\\u003c')} />

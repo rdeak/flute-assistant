@@ -1,0 +1,30 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// GitHub Pages serves this for any address the site does not have. One page for every language,
+// so it says it in each.
+import Base from '../layouts/Base.astro';
+import { languages, language, pagePath, defaultLang } from '../i18n';
+
+const t = language(defaultLang).strings;
+---
+
+<Base lang={defaultLang} title={`${t.notFound.title} – Flute Assistant`} description={t.notFound.text} noindex>
+  <section class="wrap wrap--narrow not-found">
+    <p class="not-found__note" aria-hidden="true">♪</p>
+    {
+      languages.map((l) => (
+        <div lang={l.code}>
+          <h1>{l.strings.notFound.title}</h1>
+          <p>{l.strings.notFound.text}</p>
+          <p>
+            <a class="btn btn--sun" href={pagePath(l.code, 'home')}>
+              {l.strings.notFound.home}
+            </a>
+          </p>
+        </div>
+      ))
+    }
+  </section>
+</Base>

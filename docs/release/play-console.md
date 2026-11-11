@@ -22,7 +22,7 @@ Settings and the child's tunes are stored locally on the device.
 | Category | Music & Audio |
 | Languages | English (default) and Croatian; the UI follows the system language and Android 13+ per-app language settings. Add a Croatian listing translation (draft below) with the `hr/` screenshots so Croatian users see the listing in their language. |
 | Contact email | Required; shown publicly |
-| Privacy policy URL | Required; host `privacy-policy.md` (for example on GitHub Pages) |
+| Privacy policy URL | Required. `https://flute-assistant.bertlab.hr/privacy/` once the website is live (`site/README.md`); until then the old `https://rdeak.github.io/flute-assistant/release/privacy-policy.html`, which keeps working |
 
 Full description, English:
 
@@ -84,7 +84,7 @@ Full description, Croatian (short description: "Digitalna flauta, metronom, šti
 ## App content
 
 ### Privacy policy
-Required. Link to the hosted copy of `privacy-policy.md`.
+Required. Link to the hosted copy of `privacy-policy.md`: the website's `/privacy/` page.
 
 ### Ads
 Does the app contain ads? **No.**

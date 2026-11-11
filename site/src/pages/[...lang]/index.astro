@@ -1,0 +1,164 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// The landing page, one per language (/ and /hr/). Its one job: a family that searched for a
+// metronome, a tuner or the flute for beginners installs the app. The child looks at the pictures,
+// the parent reads the trust points; every section ends near a way to Google Play.
+import Base from '../../layouts/Base.astro';
+import PhoneShot from '../../components/PhoneShot.astro';
+import PlayBadge from '../../components/PlayBadge.astro';
+import QrCode from '../../components/QrCode.astro';
+import ShareButton from '../../components/ShareButton.astro';
+import StructuredData from '../../components/StructuredData.astro';
+import { Picture } from 'astro:assets';
+import { language, langPaths, pagePath, type Lang } from '../../i18n';
+import { screenshot, tabletScreenshot } from '../../i18n/media';
+
+export function getStaticPaths() {
+  return langPaths();
+}
+
+const { lang } = Astro.props as { lang: Lang };
+const t = language(lang).strings;
+const pageUrl = new URL(pagePath(lang, 'home'), Astro.site).href;
+const featureEmoji = { flute: '🎵', metronome: '🥁', tuner: '👂', notes: '🎼' } as const;
+---
+
+<Base lang={lang} page="home" title={t.meta.title} description={t.meta.description}>
+  <StructuredData slot="head" lang={lang} />
+
+  <section class="hero">
+    <div class="hero__notes" aria-hidden="true">
+      <span>♪</span><span>♫</span><span>♩</span><span>♬</span><span>♪</span>
+    </div>
+    <div class="wrap hero__grid">
+      <div class="hero__text">
+        <p class="eyebrow"><span class="eyebrow__dot"></span>{t.hero.eyebrow}</p>
+        <h1>{t.hero.title}</h1>
+        <p class="lead">{t.hero.lead}</p>
+        <div class="hero__cta">
+          <PlayBadge lang={lang} placement="hero" eager />
+          <p class="platform">{t.hero.platform}</p>
+        </div>
+        <ul class="chips">
+          {t.hero.chips.map((chip) => <li>{chip}</li>)}
+        </ul>
+      </div>
+      <div class="hero__visual" role="img" aria-label={t.hero.shotAlt}>
+        <figure class="tablet">
+          <Picture
+            src={tabletScreenshot(lang, 'flute')}
+            alt=""
+            formats={['avif', 'webp']}
+            widths={[480, 720, 960, 1440]}
+            sizes="(min-width: 900px) 520px, 88vw"
+            loading="eager"
+            fetchpriority="high"
+          />
+        </figure>
+        <PhoneShot
+          src={screenshot(lang, 'metronome')}
+          alt=""
+          eager
+          sizes="(min-width: 900px) 170px, 30vw"
+          class="phone--hero"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="features" aria-labelledby="features-title">
+    <div class="wrap">
+      <header class="section-head">
+        <h2 id="features-title">{t.features.title}</h2>
+        <p>{t.features.lead}</p>
+      </header>
+      <ol class="feature-list">
+        {
+          t.features.items.map((f) => (
+            <li class={`feature feature--${f.id}`} id={f.id}>
+              <div class="feature__text">
+                <p class="tag">
+                  <span aria-hidden="true">{featureEmoji[f.id]}</span> {f.name}
+                </p>
+                <h3>{f.title}</h3>
+                <p>{f.text}</p>
+                <ul class="ticks">
+                  {f.points.map((p) => <li>{p}</li>)}
+                </ul>
+              </div>
+              <PhoneShot src={screenshot(lang, f.id)} alt={f.shotAlt} />
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </section>
+
+  <section class="parents" aria-labelledby="parents-title">
+    <div class="wrap">
+      <header class="section-head">
+        <h2 id="parents-title">{t.parents.title}</h2>
+        <p>{t.parents.lead}</p>
+      </header>
+      <ul class="trust">
+        {
+          t.parents.items.map((item) => (
+            <li>
+              <span class="trust__icon" aria-hidden="true">{item.icon}</span>
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="parents__more"><a href={pagePath(lang, 'privacy')}>{t.parents.privacyLink} →</a></p>
+    </div>
+  </section>
+
+  <section class="teachers" aria-labelledby="teachers-title">
+    <div class="wrap">
+      <div class="band">
+        <div>
+          <h2 id="teachers-title">{t.teachers.title}</h2>
+          <p>{t.teachers.text}</p>
+        </div>
+        <ShareButton label={t.teachers.share} text={t.teachers.shareText} copied={t.teachers.copied} url={pageUrl} />
+      </div>
+    </div>
+  </section>
+
+  <section class="faq" aria-labelledby="faq-title">
+    <div class="wrap wrap--narrow">
+      <h2 id="faq-title">{t.faq.title}</h2>
+      <div class="faq__list">
+        {
+          t.faq.items.map((item, i) => (
+            <details open={i === 0}>
+              <summary>{item.q}</summary>
+              <p>{item.a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="cta" aria-labelledby="cta-title">
+    <div class="wrap">
+      <div class="cta__card">
+        <div class="cta__text">
+          <h2 id="cta-title">{t.cta.title}</h2>
+          <p>{t.cta.text}</p>
+          <PlayBadge lang={lang} placement="cta" />
+          <p class="platform">{t.hero.platform}</p>
+        </div>
+        <div class="cta__qr">
+          <QrCode lang={lang} alt={t.cta.qrAlt} />
+          <p>{t.cta.qr}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</Base>

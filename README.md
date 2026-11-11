@@ -29,6 +29,10 @@ only while the tuner tab is on screen or the flute listens after "Listen to me" 
 audio is analysed in memory and discarded. Settings and the child's tunes stay on the device. The
 [privacy policy](docs/release/privacy-policy.md) says the same in full.
 
+The app's website, [flute-assistant.bertlab.hr](https://flute-assistant.bertlab.hr), is in `site/`
+(Astro, in English and Croatian, published to GitHub Pages by `.github/workflows/site.yml`); how it
+is built and how to add a language is in `site/README.md`.
+
 ## At a glance
 
 |                 |                                                                                                                    |
