@@ -40,9 +40,7 @@ class CreditsTest {
 
     private fun holder() = compose.onNodeWithText("Bertlab d.o.o.", substring = true)
 
-    private fun privacyLink() = compose.onNodeWithText("/release/privacy-policy", substring = true)
-
-    private fun licenceLink() = compose.onNodeWithText("gnu.org/licenses/gpl-3.0", substring = true)
+    private fun website() = compose.onNodeWithText("flute-assistant.bertlab.hr")
 
     @Test
     fun a_tap_on_the_logo_opens_nothing() {
@@ -75,63 +73,48 @@ class CreditsTest {
     }
 
     @Test
-    fun a_long_press_shows_where_the_privacy_policy_is() {
+    fun a_long_press_shows_the_website_address() {
         show()
         logo().performTouchInput { longClick() }
-        privacyLink().assertIsDisplayed()
+        website().assertIsDisplayed()
     }
 
     @Test
-    fun the_privacy_address_is_plain_text_so_a_child_cannot_leave_the_app() {
+    fun the_website_address_is_plain_text_so_a_child_cannot_leave_the_app() {
         show()
         logo().performTouchInput { longClick() }
-        privacyLink().assertHasNoClickAction()
+        website().assertHasNoClickAction()
     }
 
     @Test
-    fun the_version_and_privacy_lines_are_in_croatian_on_a_croatian_phone() {
+    fun the_website_comes_above_the_copyright() {
+        show()
+        logo().performTouchInput { longClick() }
+        val site = website().fetchSemanticsNode().boundsInRoot.top
+        val copyright = holder().fetchSemanticsNode().boundsInRoot.top
+        assertTrue(site < copyright)
+    }
+
+    @Test
+    fun the_credits_leave_out_the_privacy_policy() {
+        show()
+        logo().performTouchInput { longClick() }
+        compose.onNodeWithText("Privacy", substring = true, ignoreCase = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun the_credits_leave_out_the_licence() {
+        show()
+        logo().performTouchInput { longClick() }
+        compose.onNodeWithText("General Public License", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("gnu.org", substring = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun the_version_is_in_croatian_on_a_croatian_phone() {
         show(Locale("hr"))
         logo().performTouchInput { longClick() }
         compose.onNodeWithText("Verzija", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Pravila privatnosti", substring = true).assertIsDisplayed()
-    }
-
-    @Test
-    fun the_privacy_policy_comes_above_the_copyright() {
-        show()
-        logo().performTouchInput { longClick() }
-        val privacy = privacyLink().fetchSemanticsNode().boundsInRoot.top
-        val copyright = holder().fetchSemanticsNode().boundsInRoot.top
-        assertTrue(privacy < copyright)
-    }
-
-    @Test
-    fun the_licence_says_the_app_may_be_shared_and_changed() {
-        show()
-        logo().performTouchInput { longClick() }
-        compose.onNodeWithText("share and change", substring = true).assertIsDisplayed()
-    }
-
-    @Test
-    fun a_long_press_shows_where_to_read_the_licence() {
-        show()
-        logo().performTouchInput { longClick() }
-        licenceLink().assertIsDisplayed()
-    }
-
-    @Test
-    fun the_licence_address_is_plain_text_so_a_child_cannot_leave_the_app() {
-        show()
-        logo().performTouchInput { longClick() }
-        licenceLink().assertHasNoClickAction()
-    }
-
-    @Test
-    fun the_licence_lines_are_in_croatian_on_a_croatian_phone() {
-        show(Locale("hr"))
-        logo().performTouchInput { longClick() }
-        compose.onNodeWithText("dijeliti i mijenjati", substring = true).assertIsDisplayed()
-        compose.onNodeWithText("Tekst licencije", substring = true).assertIsDisplayed()
     }
 
     @Test

@@ -210,7 +210,7 @@ Before uploading, run the full check: `./gradlew testDebugUnitTest lintRelease b
 See `play-console.md` for the store listing, data safety, permission and content rating
 answers, and `privacy-policy.md` for the policy text (`privacy-policy.hr.md` is its Croatian
 translation). The website in `site/` publishes both, at `/privacy/` and `/hr/privacy/`, and keeps
-the old address `/release/privacy-policy.html` that the app and the Play Console link to
+the old address `/release/privacy-policy.html` that older app versions and the Play Console link to
 (`site/README.md`).
 
 ## 6. Launcher icon, store graphics and screenshots

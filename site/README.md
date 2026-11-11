@@ -50,11 +50,11 @@ The pages need no change.
 
 ## What not to break
 
-- **`/release/privacy-policy.html` must keep working.** The shipped app (`credits_privacy_url`) and
-  the Play Console link to `rdeak.github.io/flute-assistant/release/privacy-policy.html`, which
-  GitHub redirects to the custom domain. `src/pages/release/privacy-policy.astro` renders the whole
+- **`/release/privacy-policy.html` must keep working.** The app's credits up to 1.0.x and the Play
+  Console link to `rdeak.github.io/flute-assistant/release/privacy-policy.html`, which GitHub
+  redirects to the custom domain (later versions show only `flute-assistant.bertlab.hr`). `src/pages/release/privacy-policy.astro` renders the whole
   English policy there (not a redirect), with its canonical on `/privacy/`. Remove it only after the
-  app and the Play Console both point at `/privacy/` and the old app versions are gone.
+  Play Console points at `/privacy/` and the old app versions are gone.
 - **Only true facts in the structured data and FAQ.** No rating, review or download count until
   there are real ones. The words describe the app as the screenshots show it: after
   `tools/play-screenshots.sh` (and its `tablet` run) renews them, read the four features in
@@ -98,6 +98,7 @@ and the privacy address lives there. In this order, the address never goes dark:
 9. **Search engines.** Add the domain to Google Search Console (a DNS TXT record) and submit
    `https://flute-assistant.bertlab.hr/sitemap-index.xml`; do the same in Bing Webmaster Tools,
    which also feeds Copilot and ChatGPT search.
-10. **Later, with a release:** set the Play Console's privacy policy URL and the app's
-    `credits_privacy_url` to `https://flute-assistant.bertlab.hr/privacy/`, and add the website to
-    the Play listing's contact details.
+10. **Later, with a release:** set the Play Console's privacy policy URL to
+    `https://flute-assistant.bertlab.hr/privacy/`, and add the website to the Play listing's
+    contact details. Since 2026-11-11 the app's credits show `flute-assistant.bertlab.hr`, so the
+    site must be live before a release with them ships.

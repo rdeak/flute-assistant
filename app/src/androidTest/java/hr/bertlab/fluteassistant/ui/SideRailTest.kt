@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.ui
 
 import android.app.UiAutomation
 import android.content.res.Configuration
+import android.os.ParcelFileDescriptor
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.getValue
@@ -42,6 +43,7 @@ import hr.bertlab.fluteassistant.ui.common.AppLanguage
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -347,31 +349,56 @@ class SideRailTest {
     }
 
     /**
-     * The dialog has a window of its own, which the forced size does not reach, so this turns the
-     * real window: on an upright emulator the credits would fit and prove nothing.
+     * The dialog has a window of its own, which neither the forced size nor the forced font scale
+     * reaches, so this turns the real window and sets the phone's own text size: on an upright
+     * emulator the credits would fit and prove nothing, and since the licence and privacy lines
+     * left them (2026-11-11) they fit a short window at normal text too. The largest text on a
+     * phone on its side is the case the scroll is there for. Only a device has that setting.
      */
     @Test
     fun the_credits_scroll_on_a_short_window() {
+        needsDevice()
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val ownTextSize = shell(automation, "settings get system font_scale")
+        shell(automation, "settings put system font_scale $LARGEST_TEXT")
         automation.setRotation(UiAutomation.ROTATION_FREEZE_90)
         try {
             compose.waitUntil(ROTATION_TIMEOUT_MS) {
-                compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val now = compose.activity.resources.configuration
+                now.orientation == Configuration.ORIENTATION_LANDSCAPE && now.fontScale == LARGEST_TEXT
             }
-            show(height = 360)
+            show(height = 360, fontScale = LARGEST_TEXT)
             logo().performTouchInput { longClick() }
             val lastLine = compose.onNodeWithText("OK")
             lastLine.assertIsNotDisplayed()
             lastLine.performScrollTo().assertIsDisplayed()
         } finally {
+            // Back to what the phone had: a run without ANDROID_SERIAL also reaches a real phone.
+            shell(
+                automation,
+                if (ownTextSize == "null" || ownTextSize.isEmpty()) {
+                    "settings delete system font_scale"
+                } else {
+                    "settings put system font_scale $ownTextSize"
+                },
+            )
             automation.setRotation(UiAutomation.ROTATION_FREEZE_0)
             automation.setRotation(UiAutomation.ROTATION_UNFREEZE)
         }
     }
 
+    /** Runs [command] on the device, waits for it to finish and gives back what it printed. */
+    private fun shell(automation: UiAutomation, command: String): String =
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use {
+            it.readBytes().decodeToString().trim()
+        }
+
     private companion object {
         const val RAIL = "rail"
         const val ROTATION_TIMEOUT_MS = 10_000L
+
+        /** The largest text size Android's settings offer. */
+        const val LARGEST_TEXT = 2f
 
         /** `ChunkyButton`'s default depth. */
         val FLAG_SHADOW = 4.dp

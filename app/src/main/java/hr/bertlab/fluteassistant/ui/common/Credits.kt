@@ -67,13 +67,12 @@ fun CreditsLogo(
 }
 
 /**
- * The version, where the privacy policy is (Play asks for it inside the app as well as on the
- * listing), who holds the copyright, the licence and where to read it, and the Android robot's
- * attribution line (the icon modifies Google's robot, which its brand guidelines allow with this
- * line, CC BY 3.0). The addresses are plain text,
- * never links, so a child cannot leave the app from here. It scrolls for large text on a short
- * screen. The strings are read before the [Dialog]: its window has a context of its own, which the
- * UI tests' LocaleProvider does not reach.
+ * The version, the website's address, who holds the copyright, and the Android robot's attribution
+ * line (the icon modifies Google's robot, which its brand guidelines allow with this line, CC BY
+ * 3.0). No privacy line and no licence (the user's call on 2026-11-11): the website's footer leads
+ * to the policy. The address is plain text, never a link, so a child cannot leave the app from
+ * here. It scrolls for large text on a short screen. The strings are read before the [Dialog]: its
+ * window has a context of its own, which the UI tests' LocaleProvider does not reach.
  */
 @Composable
 private fun Credits(onClose: () -> Unit) {
@@ -83,12 +82,8 @@ private fun Credits(onClose: () -> Unit) {
     }
     val name = stringResource(R.string.app_name)
     val version = stringResource(R.string.credits_version, installed)
-    val privacy = stringResource(R.string.credits_privacy)
-    val privacyAddress = stringResource(R.string.credits_privacy_url)
+    val website = stringResource(R.string.credits_website_url)
     val copyright = stringResource(R.string.credits_copyright)
-    val licence = stringResource(R.string.credits_licence)
-    val licenceText = stringResource(R.string.credits_licence_text)
-    val licenceAddress = stringResource(R.string.credits_licence_url)
     val robot = stringResource(R.string.credits_android_robot)
     val done = stringResource(R.string.credits_done)
     Dialog(onDismissRequest = onClose) {
@@ -101,10 +96,8 @@ private fun Credits(onClose: () -> Unit) {
                 Line(name, MaterialTheme.typography.titleLarge)
                 Line(version)
             }
-            Address(privacy, privacyAddress)
+            Line(website, MaterialTheme.typography.labelLarge)
             Line(copyright)
-            Line(licence)
-            Address(licenceText, licenceAddress)
             Line(robot)
             BigActionButton(
                 icon = AppIcons.Done,
@@ -114,15 +107,6 @@ private fun Credits(onClose: () -> Unit) {
                 modifier = Modifier.padding(bottom = 8.dp),
             )
         }
-    }
-}
-
-/** A label with its address under it, in bolder type. */
-@Composable
-private fun Address(label: String, address: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Line(label)
-        Line(address, MaterialTheme.typography.labelLarge)
     }
 }
 

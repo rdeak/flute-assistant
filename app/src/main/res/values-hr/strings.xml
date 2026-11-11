@@ -21,13 +21,10 @@
 
     <string name="theme_dark">Tamna tema</string>
 
-    <!-- Credits: a long press on the app icon opens them. The addresses stay plain text, never links. -->
+    <!-- Credits: a long press on the app icon opens them. The address stays plain text, never a link. -->
     <string name="credits_open">Prikaži zasluge</string>
     <string name="credits_version">Verzija %1$s</string>
     <string name="credits_copyright">Autorska prava © 2026 Bertlab d.o.o.</string>
-    <string name="credits_licence">Slobodan softver: smiješ ga dijeliti i mijenjati pod licencijom GNU General Public License, verzija 3 ili novija. Dolazi bez ikakvog jamstva.</string>
-    <string name="credits_licence_text">Tekst licencije:</string>
-    <string name="credits_privacy">Pravila privatnosti:</string>
     <string name="credits_android_robot">Android robot preuzet je ili izmijenjen iz djela koje je stvorio i podijelio Google te se koristi u skladu s uvjetima licencije Creative Commons 3.0 Attribution.</string>
     <string name="credits_done">U redu</string>
 

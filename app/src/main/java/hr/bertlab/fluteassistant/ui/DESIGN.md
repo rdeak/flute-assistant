@@ -89,14 +89,18 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   scrolls below its own `FitsHeight` as before (its speed panel, like the metronome tab, only
   below `MetronomeMinHeight`).
 - The credits (`ui/common/Credits.kt`, the user's call on 2026-11-05): a long press on the app icon
-  (`CreditsLogo`, in the top bar or at the top of the rail) opens a `Dialog` with the version, the privacy policy's address, the copyright,
-  the licence and where to read it, and no repository address (the user's call: users do not need
-  it). A visible entry was drawn and turned down the same day as more load than it is worth. Nothing on
-  screen shows it can, and a tap does nothing, so the main screens stay as sparse as ever; a screen
-  reader is offered the long press as an action. Keep it: section 7(b) of `NOTICE` has forks keep this
-  credit, and it is the only place the app shows the credit or the policy, which Play asks to find
-  inside the app. The addresses stay plain text, never links, so a child cannot leave the app. It is
-  not a main screen, so its numbers are fine.
+  (`CreditsLogo`, in the top bar or at the top of the rail) opens a `Dialog` with the version, the
+  website's address (`credits_website_url`, flute-assistant.bertlab.hr), the copyright and the
+  Android robot's line, and no repository address (the user's call: users do not need it). On
+  2026-11-11 the user dropped the privacy policy's address and the whole licence part (the GPL line
+  and its address): the website's footer leads to the policy. Play asks to find the policy inside
+  the app; the user chose the website's address over it, so if a Play review flags the policy,
+  look here first. A visible entry was drawn and turned
+  down the same day as more load than it is worth. Nothing on screen shows it can, and a tap does
+  nothing, so the main screens stay as sparse as ever; a screen reader is offered the long press as
+  an action. Keep it: section 7(b) of `NOTICE` has forks keep this credit, the robot's CC BY line
+  must be shown, and it is the only place the app names the website. The address stays plain text,
+  never a link, so a child cannot leave the app. It is not a main screen, so its numbers are fine.
   Its strings are read before the `Dialog`, whose own window `LocaleProvider` does not reach. It stays
   open across a turn (the open state lives in `MainScreen`, see below), and it scrolls on a short window.
 - `ui/common/ValueWheel` is the snapping three-row drum behind the metronome's `TempoWheel`. Its

@@ -37,8 +37,10 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   is a `ChunkyButton` / `Modifier.chunky`; a faded one goes through `fadedUnless` (`Modifier.alpha`
   cuts the shadow off flat). Emoji that are pictures are sized in dp, so large text does not grow
   them out of their room.
-- The credits stay behind a long press on the logo, with plain-text addresses (never links, so a
-  child cannot leave the app). Keep them: `NOTICE` section 7(b) and Play both need them in the app.
+- The credits stay behind a long press on the logo, with the website's address as plain text (never
+  a link, so a child cannot leave the app), and since 2026-11-11 no privacy or licence lines (the
+  user's call; Play asks for the policy in the app, so a review that flags it starts here, see
+  `DESIGN.md`). Keep them: `NOTICE` section 7(b) needs the author credit and CC BY the robot's line.
   The one button that does leave the app, the microphone card's Settings, shows only once the phone
   will not ask again (`tuner/CLAUDE.md`, "Asking for the microphone").
 - **The phone's Back** is the way back the screen itself shows, wherever one is open: OK on the

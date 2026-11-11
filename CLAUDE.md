@@ -28,8 +28,9 @@ Kotlin, Java, Python or shell source file starts with the two-line header (after
 
 Section 7 is why the header is there: the terms, or a pointer to them, must be in the source files.
 The source address is written in `NOTICE` only: the app does not show it (the user dropped it on
-2026-11-05, users do not need it). The privacy policy's address is `credits_privacy_url` and the
-Play Console field, which only changes after a review.
+2026-11-05, users do not need it). Since 2026-11-11 the credits show neither the licence nor the
+privacy policy, only the website's address (`credits_website_url`), whose footer leads to the
+policy. The policy's address is the Play Console field, which only changes after a review.
 
 ## Commands
 
@@ -75,8 +76,8 @@ signing, Play upload, store graphics and screenshots) is in the `release` skill
 and the privacy policy), built and published to GitHub Pages by `.github/workflows/site.yml`. It
 reads the privacy policy (`docs/release/privacy-policy*.md`) and the Play screenshots
 (`docs/release/play-listing/`) where they are. `site/README.md` holds the commands, how to add a
-language, what must not break (the old `/release/privacy-policy.html` address the app and the Play
-Console link to) and how it went live. Check a change with `cd site && npm run build`.
+language, what must not break (the old `/release/privacy-policy.html` address that older app
+versions and the Play Console link to) and how it went live. Check a change with `cd site && npm run build`.
 
 ## Build wiring
 
