@@ -63,6 +63,14 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   green: Play, OK, Again, Yes), `ActionStop` (deep red: Stop) or `ActionListen` (deep blue: the
   flute's Your turn), for contrast (canvas, 2026-10-24); the flute's Play and Your turn stack the
   icon over the word (`stacked`), since two pills with the word beside the icon do not fit a phone.
+  Contrast audit of the light theme (2026-11-11, WCAG 2.x on the tokens): the palette passes except two things,
+  fixed and pinned by `ThemeContrastTest`. Material's `error` (the tuner's "microphone failed" text) is the coral
+  `Stop` in dark but `ActionStop` with `OnAction` on it in light, as the coral is 2:1 on white; the tempo wheel's
+  neighbours keep `NEIGHBOUR_ALPHA` (0.75) of the muted text, as 0.45 was 2:1. Left as the canvas drew them, on
+  purpose: the pale `border` (1.3 to 1.5:1, only on things that cannot be pressed, bar the microphone card's quiet
+  pill), the `track` and `staffSpace` fills, the tempo bands, the ghosted clef and the note-coloured ring (the
+  note's name is inside it). Open: a chosen `ModeChoice` / sideways pill / open book is `Sun` against white
+  (1.38:1) with the same outline, so the state is carried by the fill alone.
   The font is Nunito (three static weights in `res/font`, licence in `docs/licenses/`); the canvas
   used Fredoka, which has no č, ć or đ. Icons are emoji (`Emoji`, hidden from accessibility), plus
   the chevrons, arrows and tick of the tuner and the big buttons' play, stop, done, again and
