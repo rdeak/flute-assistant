@@ -68,8 +68,12 @@ The pages need no change.
 
 ## Going live (once)
 
-Today GitHub Pages publishes the repository's `docs/` folder from `main` (the old Jekyll build),
-and the privacy address lives there. In this order, the address never goes dark:
+Done on 2026-11-11 up to step 8: Pages now builds from GitHub Actions (`build_type: workflow`), the Site
+run deployed, and every check below passed; the website is in the Play listing's contact details.
+Steps 9 (search engines) and 10's privacy URL are still open. The list stays as the record, and for
+a move to another host. Before the switch, GitHub Pages published the repository's `docs/` folder
+from `main` (the old Jekyll build), and the privacy address lived there. In this order, the address
+never goes dark:
 
 1. **DNS.** At the DNS host of `bertlab.hr`, add a CNAME record: `flute-assistant` pointing to
    `rdeak.github.io`.

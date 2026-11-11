@@ -13,73 +13,26 @@ Settings and the child's tunes are stored locally on the device.
 | Field | Value |
 |---|---|
 | App name | Flute Assistant |
-| Short description | A digital flute, metronome, tuner and note game for young flute players. |
-| Full description | See below |
+| Short description | `play-listing/text/<lang>/short-description.txt` |
+| Full description | `play-listing/text/<lang>/full-description.txt` |
 | App icon | `play-listing/icon-512.png` (512x512) |
 | Feature graphic | `play-listing/feature-graphic-1024x500.png` (subtitle "Flute, metronome, tuner and notes", text in `tools/IconGen.java`) |
 | Screenshots | `play-listing/screenshots/en/` and `hr/`: one per tab, 1080x1920 JPEG (9:16, the ratio Play asks for), made by `tools/play-screenshots.sh` on the emulator |
 | Tablet screenshots | `play-listing/screenshots-tablet/7-inch/<lang>/` (1296x2304) for the 7-inch tablet slot and `10-inch/<lang>/` (2880x1620) for the 10-inch slot: one per tab, made by `tools/play-screenshots.sh tablet`, uploaded by hand |
-| Category | Music & Audio |
-| Languages | English (default) and Croatian; the UI follows the system language and Android 13+ per-app language settings. Add a Croatian listing translation (draft below) with the `hr/` screenshots so Croatian users see the listing in their language. |
+| Category | App, **Education** (Store settings; this table said Music & Audio until 2026-11-11, the console never did). Tags: Education, Music & audio, Music instrument, Primary education ("Audio recorder" removed on 2026-11-11: a release build records nothing) |
+| Languages | English (default) and Croatian; the UI follows the system language and Android 13+ per-app language settings. The Croatian listing translation takes the `text/hr/` words and the `hr/` screenshots so Croatian users see the listing in their language. |
 | Contact email | Required; shown publicly |
+| Website | `https://flute-assistant.bertlab.hr` (Store settings > Store listing contact details; set 2026-11-11, published at once, no review) |
 | Privacy policy URL | Required. `https://flute-assistant.bertlab.hr/privacy/` once the website is live (`site/README.md`); until then the old `https://rdeak.github.io/flute-assistant/release/privacy-policy.html`, which keeps working |
 
-Full description, English:
-
-> Made for children in primary school who are learning the flute. Four big, friendly screens
-> and nothing to read.
->
-> FLUTE. Fifteen colourful note keys in three octave rows. Hold a key to hear the note: the longer
-> you hold it, the longer the note, and your tune is written on a real staff with the note names
-> under it. Hear it played back, or press "Listen to me" and play it on your own flute for a star
-> under every note you get right. Six little books keep six tunes.
->
-> METRONOME. A tempo ring with five animals, from a snail to a cheetah: drag the animal round or
-> tap one to jump to its speed. Two to six beats in a bar, shown as bubbles with the animal
-> hopping on the beat you hear, and one play button. The click keeps going while you read sheet
-> music in another app, with a notification to stop it.
->
-> TUNER. Play a note and see it float above or below its home ring, with "Too high" or "Too low"
-> and a tip on what to change; bring it home for "Perfect!". Or pick the note you want to play:
-> hear it, see its fingering and tune to it.
->
-> NOTES. A note reading game. A note name appears; slide your finger to its place on the staff
-> and let go. Ten notes a round, flames for hits in a row and stars at the end. Choose which
-> notes to practise.
->
-> In English and Croatian. No account, no ads, no data leaves your device.
->
-> The Android robot is reproduced or modified from work created and shared by Google and used
-> according to terms described in the Creative Commons 3.0 Attribution License.
-
-Full description, Croatian (short description: "Digitalna flauta, metronom, štimer i igra
-čitanja nota za male flautiste."):
-
-> Napravljeno za djecu u osnovnoj školi koja uče svirati flautu. Četiri velika, vesela ekrana i
-> ništa za čitanje.
->
-> FLAUTA. Petnaest šarenih tipki u tri reda. Drži tipku da čuješ ton: što je dulje držiš, to je
-> nota dulja, a tvoja se pjesmica zapisuje na pravo crtovlje s imenima nota ispod. Poslušaj je ili
-> pritisni „Poslušaj me“ i odsviraj je na svojoj flauti, za zvjezdicu ispod svake pogođene note.
-> Šest knjižica čuva šest pjesmica.
->
-> METRONOM. Krug za tempo s pet životinja, od puža do geparda: povuci životinju po krugu ili
-> dodirni jednu da skočiš na njezinu brzinu. Od dvije do šest doba u taktu, kao mjehurići na
-> kojima skakuće životinja dok kuca, i jedna tipka za sviranje. Metronom kuca i dok u drugoj
-> aplikaciji gledaš note, a obavijest ga zaustavlja.
->
-> ŠTIMER. Odsviraj ton i vidi kako lebdi iznad ili ispod svoje kućice, uz „Previsoko“ ili
-> „Prenisko“ i savjet što promijeniti; vrati ga kući za „Savršeno!“. Ili odaberi ton koji želiš
-> svirati: poslušaj ga, pogledaj prstomet i ugodi flautu prema njemu.
->
-> NOTE. Igra čitanja nota. Pojavi se ime note, a ti povuci prst do njezina mjesta na crtovlju i
-> pusti. Deset nota po krugu, plamičci za pogotke zaredom i zvjezdice na kraju. Sam biraš koje
-> note vježbaš.
->
-> Na hrvatskom i engleskom. Bez računa, bez oglasa, nikakvi podaci ne napuštaju uređaj.
->
-> Android robot preuzet je ili izmijenjen iz djela koje je stvorio i podijelio Google te se
-> koristi u skladu s uvjetima licencije Creative Commons 3.0 Attribution.
+The listing's words live in `play-listing/text/<lang>/` (`en`, `hr`), one file per Play field:
+`short-description.txt` (80 characters at most), `full-description.txt` (4000) and
+`whats-new-<version>.txt`, the release notes (500). Paste them from there; the files are the record of
+what the store shows. Since 2.0.0 (2026-11-11) the copy is written for parents and children choosing
+an app: playful, short sentences, one emoji per section, the app's own words ("Listen to me", "Hear",
+the animals and the sweets). Keep it true to the build (every feature named must be in it), keep the
+Android robot attribution as the description's last paragraph, and avoid emoji newer than 2021
+(🪈 shows as an empty box on older phones).
 
 ## App content
 
@@ -102,8 +55,16 @@ Target age groups: **6-8 and 9-12** (add 13-15 and 16-17 if you also want to rea
 students; adding 18+ makes it a "mixed audience" app). The app is designed for children, so
 the **Families policy applies**: it already has no ads, no data collection, no social features
 and no links out of the app, which is what the policy checks. Complete the Families
-self-certification in the Target audience section and keep the privacy policy linked. The
-optional "Teacher Approved" badge can be applied for after launch.
+self-certification in the Target audience section and keep the privacy policy linked.
+
+The Kids tab on Google Play shows only **Teacher Approved** apps. There is no form and no category
+for it: teachers and children's media specialists rate apps that follow the Families policy and
+target children (design, appeal, enrichment, age-appropriateness, ads and purchases), and Google
+picks which apps they rate and when. The status is under Policy and programs > Programs > Teacher
+Approved (`.../app/<id>/teacher-approved`): on 2026-11-11 it read "Awaiting review", with 6-8 and
+9-12 declared. A listing that shows the app well (playful text, current screenshots) is what helps
+with "appeal"; the category does not decide it. Store listing graphics with young characters on an
+app not declared for under-13s are a rejection reason, so keep the audience and the art matched.
 
 ### News app
 **No.**
