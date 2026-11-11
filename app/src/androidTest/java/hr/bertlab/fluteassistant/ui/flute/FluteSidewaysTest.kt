@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -351,6 +352,7 @@ class FluteSidewaysTest {
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)) to "🎵 Odsviraj jedan dug, čist ton",
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)) to "📱 Dođi bliže mobitelu",
             state.value.copy(listening = Listening(index = 0, repeatHeld = true)) to "🔁 Stani, pa odsviraj opet",
+            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))) to "🌬️ Drži notu dulje",
         ).forEach { (next, advice) ->
             compose.runOnIdle { state.value = next }
             compose.waitForIdle()

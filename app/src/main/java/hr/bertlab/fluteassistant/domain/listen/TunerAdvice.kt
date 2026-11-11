@@ -13,4 +13,6 @@ enum class TunerAdvice {
     NONE, COME_CLOSER, CLEAR_NOTE, ROLL_OUT, ROLL_IN, FASTER_AIR, GENTLER_AIR, CHECK_FINGERS,
     /** The flute's only: a written repeat held on instead of started again. */
     PLAY_AGAIN,
+    /** The flute's only: a note stopped before it was long enough, to be played again (since 2026-11-11). */
+    HOLD_LONGER,
 }

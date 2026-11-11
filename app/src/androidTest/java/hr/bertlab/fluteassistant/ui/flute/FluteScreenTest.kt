@@ -56,6 +56,7 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
@@ -1131,6 +1132,17 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
     }
 
+    /** A note cut short: the line asks to hold it longer, and no fingering shows, the fingers were right (2026-11-11). */
+    @Test
+    fun a_note_cut_short_asks_to_hold_it_longer_with_no_fingering() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))))
+        compose.onNodeWithText("🌬️ Hold it longer").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SOUNDING)))
+        compose.onNodeWithText("🌬️ Hold it longer").assertDoesNotExist()
+    }
+
     @Test
     fun the_listening_room_speaks_croatian() {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"))
@@ -1138,5 +1150,7 @@ class FluteScreenTest {
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64)))
         compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
         compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT)))
+        compose.onNodeWithText("🌬️ Drži notu dulje").assertIsDisplayed()
     }
 }

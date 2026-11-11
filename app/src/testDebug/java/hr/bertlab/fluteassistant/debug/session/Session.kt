@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogLine
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
@@ -14,6 +15,7 @@ import hr.bertlab.fluteassistant.domain.flute.Verdict
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
 import java.io.File
 import java.util.Locale
@@ -22,8 +24,9 @@ import java.util.Locale
  * A recorded "Your turn" session read back from its folder ([FileSessionRecorder] wrote it): the
  * [tune] it checked, the [audio] the engine analysed, the room [floor] it started with, the
  * [rows] of `frames.csv` as [ListenPath.Step]s (what the phone did), the stamped [events] of its
- * log, the [rules] in force, the [facts] of the start line, and the [pin], the marks a pinned
- * session must earn (`pin marks=0:FIRST_TRY,...`, a line added by hand), or null.
+ * log, the [rules] in force, the [facts] of the start line, the [pin], the marks a pinned
+ * session must earn (`pin marks=0:FIRST_TRY,...`, a line added by hand), or null, and the [pulse]
+ * the tune was checked at.
  */
 class Session(
     val dir: File,
@@ -35,6 +38,8 @@ class Session(
     val rules: Map<String, String>,
     val facts: Map<String, String>,
     val pin: Map<Int, StepMark>?,
+    /** The metronome's pulse the tune was checked at (`session.pulse`); 60 in 4/4 when the log has none. */
+    val pulse: Pulse = Pulse(60),
 ) {
     companion object {
         private val HEADER_EVENTS = setOf("session.start", "session.rules", "session.pulse", "session.tune", "pin")
@@ -46,6 +51,7 @@ class Session(
             var rules = emptyMap<String, String>()
             var facts = emptyMap<String, String>()
             var pin: Map<Int, StepMark>? = null
+            var pulse = Pulse(60)
             val events = mutableListOf<String>()
             for (line in lines) {
                 val (event, f) = LogLine.parse(line)
@@ -55,6 +61,10 @@ class Session(
                         floor = f["floor"]?.takeUnless { it == "none" }?.toFloat()
                     }
                     "session.rules" -> rules = f
+                    "session.pulse" -> pulse = Pulse(
+                        f.getValue("bpm").toInt(),
+                        TimeSignature.entries.first { it.label == f.getValue("time") },
+                    )
                     "session.tune" -> tune[f.getValue("index").toInt()] = when {
                         f["note"] != null -> TuneNote(f.getValue("note").toInt(), NoteLength.valueOf(f.getValue("length")))
                         f["rest"] != null -> TuneRest(NoteLength.valueOf(f.getValue("rest")))
@@ -66,7 +76,7 @@ class Session(
             }
             return Session(
                 dir, tune.values.toList(), WavFile.read(File(dir, FileSessionRecorder.AUDIO)), floor,
-                rows(File(dir, FileSessionRecorder.FRAMES)), events, rules, facts, pin,
+                rows(File(dir, FileSessionRecorder.FRAMES)), events, rules, facts, pin, pulse,
             )
         }
 

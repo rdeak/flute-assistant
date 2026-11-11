@@ -34,7 +34,7 @@ class PinnedSessionTest {
     private fun session(name: String, pin: String?): File {
         val samples = FluteSound.render(FluteSound.sound(gapsMs = 50))
         val hop = AudioRecordTunerEngine.HOP_SIZE
-        val run = ListenPath.run(samples, FluteSound.RATE, tune)
+        val run = ListenPath.run(samples, FluteSound.RATE, tune, Pulse(90))
         val root = folder.newFolder(name)
         val r = FileSessionRecorder(root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
         r.start(tune, Pulse(90), floor = null)

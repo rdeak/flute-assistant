@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
@@ -55,12 +56,27 @@ object Replay {
     }
 
     /**
-     * The replay under [rules], by default the ones the session was recorded with, which is what the diff against
-     * the phone's rows must be made with; where today's rules are others, what they make of the same sound follows.
+     * The length slack the phone ran [session] under: the `lengthSlack` of its `session.rules` line, or, for a
+     * session recorded before 2026-11-11, when the phone checked pitch only, [ListenRun.LENGTH_OFF].
      */
-    fun report(session: Session, rules: NoteOnsetTracker.Rules = recordedRules(session)): String {
+    fun recordedLengthSlack(session: Session): Double = session.rules["lengthSlack"]?.toDouble() ?: ListenRun.LENGTH_OFF
+
+    /** The longest need the phone ran [session] under: its `maxNeedMs`, or none (no cap) for a session recorded before it. */
+    fun recordedMaxNeedMs(session: Session): Double = session.rules["maxNeedMs"]?.toDouble() ?: Double.POSITIVE_INFINITY
+
+    /**
+     * The replay under [rules] and [lengthSlack], by default the ones the session was recorded with, which is what
+     * the diff against the phone's rows must be made with; where today's are others, what they make of the same
+     * sound follows.
+     */
+    fun report(
+        session: Session,
+        rules: NoteOnsetTracker.Rules = recordedRules(session),
+        lengthSlack: Double = recordedLengthSlack(session),
+        maxNeedMs: Double = recordedMaxNeedMs(session),
+    ): String {
         val rate = session.audio.sampleRate
-        val run = ListenPath.run(session.audio.samples, rate, session.tune, rules, session.floor)
+        val run = ListenPath.run(session.audio.samples, rate, session.tune, session.pulse, rules, session.floor, lengthSlack, maxNeedMs)
         val out = StringBuilder()
         out.appendLine(
             "session ${session.dir.name}: ${session.rows.size} rows on the phone, ${run.steps.size} hops in the audio at $rate Hz, " +
@@ -68,7 +84,8 @@ object Replay {
         )
         out.appendLine("facts: " + session.facts.entries.joinToString(" ") { "${it.key}=${it.value}" })
         out.appendLine("tune: " + session.tune.withIndex().joinToString(" ") { (i, item) -> "$i:${spell(item)}" })
-        out.appendLine("rules: " + rules.fields().joinToString(" ") { "${it.first}=${it.second}" })
+        out.appendLine("rules: " + rules.fields().joinToString(" ") { "${it.first}=${it.second}" } + " lengthSlack=$lengthSlack maxNeedMs=$maxNeedMs")
+        out.appendLine("pulse: bpm=${session.pulse.bpm} time=${session.pulse.timeSignature.label}")
         out.appendLine("replay:")
         for (step in run.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
         out.appendLine("  marks=" + Session.spell(run.marks))
@@ -88,10 +105,14 @@ object Replay {
             }
         }
         val today = NoteOnsetTracker.Rules()
-        if (today != rules) {
-            val changed = today.fields().zip(rules.fields()).filter { (now, then) -> now.second != then.second }
+        if (today != rules || lengthSlack != ListenRun.LENGTH_SLACK || maxNeedMs != ListenRun.MAX_NEED_MS) {
+            val length = listOf("lengthSlack" to ListenRun.LENGTH_SLACK.toString(), "maxNeedMs" to ListenRun.MAX_NEED_MS.toString())
+            val recorded = listOf("lengthSlack" to lengthSlack.toString(), "maxNeedMs" to maxNeedMs.toString())
+            val changed = (today.fields() + length)
+                .zip(rules.fields() + recorded)
+                .filter { (now, then) -> now.second != then.second }
             out.appendLine("today's rules differ: " + changed.joinToString(" ") { (now, then) -> "${now.first}=${now.second} (recorded ${then.second})" })
-            val now = ListenPath.run(session.audio.samples, rate, session.tune, today, session.floor)
+            val now = ListenPath.run(session.audio.samples, rate, session.tune, session.pulse, today, session.floor)
             for (step in now.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
             out.appendLine("  marks=" + Session.spell(now.marks))
         }
@@ -102,7 +123,10 @@ object Replay {
         return out.toString()
     }
 
-    /** One line per value of the rule named in [spec] (`stopDrop:0.08,0.12,0.5`): what was heard and the marks earned. */
+    /**
+     * One line per value of the rule named in [spec] (`stopDrop:0.08,0.12,0.5`, `lengthSlack:0.5,1,2` in half
+     * beats, or `maxNeedMs:2000,3000,4000`): what was heard and the marks earned, at the session's pulse.
+     */
     fun sweep(session: Session, spec: String): String {
         require(':' in spec) { "a sweep is <rule>:<value>,<value>,...: $spec" }
         val name = spec.substringBefore(':').trim()
@@ -110,8 +134,14 @@ object Replay {
         val out = StringBuilder()
         out.appendLine("sweep of $name over ${session.dir.name}:")
         for (value in values) {
-            val rules = NoteOnsetTracker.Rules().with(name, value)
-            val run = ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, rules, session.floor)
+            val run = if (name == "lengthSlack") {
+                ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, session.pulse, floor = session.floor, lengthSlack = value)
+            } else if (name == "maxNeedMs") {
+                ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, session.pulse, floor = session.floor, maxNeedMs = value)
+            } else {
+                val rules = NoteOnsetTracker.Rules().with(name, value)
+                ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, session.pulse, rules, session.floor)
+            }
             out.appendLine("$name=${number(value)} heard=${run.heard.joinToString(",") { it.onset.midi.toString() }} marks=${Session.spell(run.marks)}")
         }
         return out.toString()

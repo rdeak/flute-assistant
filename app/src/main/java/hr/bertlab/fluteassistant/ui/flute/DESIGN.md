@@ -236,7 +236,8 @@ with `FluteContent`, as the notes picker's does): the child comes back to the tu
 
 "Your turn" (since 2026-11-04, spec `docs/superpowers/specs/2026-11-04-flute-your-turn-design.md`,
 the first right-or-wrong outside the notes game, kept the child's by being opt-in, child-paced and
-score-free): the second big button beside Play (`flute_your_turn`, labelled "Listen to me" / "Poslušaj me" and
+score-free; child-paced it still is in when a note starts, but since 2026-11-11 a note must also last its
+length, "Each note held for its length" below): the second big button beside Play (`flute_your_turn`, labelled "Listen to me" / "Poslušaj me" and
 Play "Odsviraj" in Croatian since 2026-11-04: the child speaking to the phone, not "Sviraj" / "Ti
 sviraj", the app telling the child; not "Prati me", which in music also means to accompany; a drawn `AppIcons.Microphone`
 on `ActionListen` blue; the two buttons stack their icon over their word, `BigActionButton(stacked
@@ -302,8 +303,9 @@ live part. When the step waited on is a written repeat and the note just counted
 line says "Stop, then play it again" (`advice_play_again`, `TunerAdvice.PLAY_AGAIN`, the flute's
 only advice of its own, over the hearing ones), the one case the phone cannot hear turned into a
 tonguing lesson; it goes when the sound stops or a note begins. The check waits for the right
-note, which is what keeps every mark under its own note. Pitch only; nothing is timed. The last note
-judged logs `flute.listen_done` at once but does not end the run at once: `FluteUiState.finishing`
+note, which is what keeps every mark under its own note. All of this is the pitch, judged at a note's
+onset; a right one is then walked and earned once long enough (the next paragraph). The last note
+earned logs `flute.listen_done` at once but does not end the run at once: `FluteUiState.finishing`
 keeps the microphone open and the animal over the last note with its star (`litIndex` and
 `waiting` drop it, so nothing is ringed or "play this one") until that note's sound ends or
 `FINISH_FRAMES` (about 1.5 s) pass, so the keys do not snap back while the child is still blowing
@@ -316,6 +318,60 @@ sound stays unclear). Play is refused while listening; the keys are off screen a
 frames are buffered, never conflated (`ui/tuner/CLAUDE.md`): the tracker counts frames, and the
 main thread is busiest right after a judged note, when the staff scrolls and the animal hops, which
 is just when the next note's gap frames arrive.
+
+Each note held for its length (since 2026-11-11, spec
+`docs/superpowers/specs/2026-11-11-flute-your-turn-note-length-design.md`; the user, after watching a run: "app just
+check if the tone is correct but does not check is it long enough played, on listen turtle should follow candence of
+metronom, in case player stop playing stop the turtle"). Until then a half note played as a tap earned a full star, and
+the recordings of 2026-11-05 showed it was the rule, not a slip: every half note was played for 0.8 to 1.0 s of its
+2 s, the whole tune 1.6 to 1.8 times faster than the knob's 60. Now the child decides when each note starts and the
+metronome how long it lasts: `ListenRun` takes the `Pulse` the knob had when the run started (the knob ends a run) and
+walks each right note (`Walk`, on `Listening.walk`): from the moment its sound began, inside the first frame that
+heard it, whose hop counts in full, with the frames that locked it before the onset (`NoteOnsetTracker.Result.leadFrames`:
+two frames as a rule, after silence and after another note alike; none for a tongued restart of the same note), the
+animal steps to each click inside the note at the half beats Play puts them on
+(`Tune.playSteps`), with a hop, and the note is earned once it has sounded its written length less
+`ListenRun.LENGTH_SLACK` (one half beat: a quarter needs half a beat, a half note one and a half, a whole note three
+and a half; an eighth needs nothing past being heard), and never more than `ListenRun.MAX_NEED_MS`, 3 s: a whole note
+at 40 a minute would need 5.25 s in 4/4 and 10.5 s in 6/8, beyond a child's breath, and the run would wait on it until
+Stop (the final review found it; the user's "ok" to a recommended 3 s; swept as `maxNeedMs`). The animal still walks
+such a note's written time, and the next note takes it there at once. Time is the frames' own lengths added up (`PitchFrame.hopMs`,
+42.7 ms at 48 kHz and 46.4 at 44.1), never a clock, so the replay of a session hears it the same. The slack is the
+user's "ok" to a recommendation, checked on the three children's runs of 2026-11-05: replayed, the two that reached a
+half note earn every quarter before it and stop on it (played about 1 s of its 1.5 needed), and a slack of a whole
+beat earns the same; the final review's two measuring fixes (the lead after another note, the first frame in full)
+are what made the quarters pass, each a frame or two from the line. Those children followed no beat, so the number is
+to be swept again (`-Psweep=lengthSlack:...`) on the first sessions recorded with the walk, and changed only from them.
+A note stops (silence, an onset of another letter, or its own letter started again after a stop; an octave pop by a
+step and a slow sag into the next letter, the tracker's drift, are the same note going on, so a child blowing a long
+note out is never told it stopped) before it is long enough: it is cut short (`Walk.Phase.SHORT`, `flute.short`), the
+animal stays on the click it reached, so the child sees how far the note got, the line says "🌬️ Hold it longer" /
+"🌬️ Drži notu dulje" (`advice_hold_longer`, `TunerAdvice.HOLD_LONGER`, under the microphone's advices and a held
+repeat, over "Check your fingers"; no fingering, the fingers were right; "drži notu" is the keys' own hint), and the
+run waits on that note until it is played again, from its head, and long enough, when it earns the faint star. The
+user chose this, "wait", over "mark and move on" (the short note gets the faint star and the next note moves the run
+on) after seeing what the recordings would have done: every child there went on through the tune after a short note,
+so the run will often stop at the first long note until the child slows to the animal's pace, which is the lesson.
+Any other note heard while a note cut short waits shows in the live bubble but is no wrong note: the child went on,
+and "Check your fingers" would be false; nor does the note written after a repeat that was heard and cut short forgive
+that repeat (`TuneCheck.forgiven` is for a repeat the phone never heard; forgiving this one would be "mark and move
+on"). While a note is walked its step is still the one waited on (`waiting`), so the live bubble under it shows the
+note being played, the phone saying it hears it, and a screen reader still hears "play this one": keep playing it. An earned note's written time is finished on the clicks, sound or not
+(`Walk.Phase.DONE`; its star shows, the ring stays with the animal, `waiting` is false), and then the animal hops to
+the next note and stands still there; a note begun in that last half beat is judged for the next step and takes the
+animal there at once. The one move the animal makes in silence is that one (Claude's call in the spec, which the user let stand): a child lets go a little early to
+breathe or to tongue the next note, and a still animal must keep meaning one of two things, "hold it longer" or "your
+turn to start the next note". A written repeat's "Stop, then play it again" counts its second from the end of the
+note's written length, when holding it stops being right. Rests and breaths are passed over, holding a note too long
+is fine, and the time between notes is not judged. A metronome left running on its own tab keeps clicking, and its
+clicks will not line up with the animal's hops, which are timed from the child's note; the two tabs' view models never
+reference each other, so that stays. The pinned sessions of 2026-11-05 and 2026-11-10 earn other marks under the walk and
+were pinned again at the user's "ok" the same day: `17-01-39` and `17-04-38` steps 0 to 5 (they stop on the first half
+note), `19-02-37` (the laptop's speaker) step 0, `17-03-03` unchanged. Tests: `ListenRunTest` (the walk, from "Each note held for its length"), `TuneCheckTest`
+(`earn`, `stumble`), `NoteOnsetTrackerTest` (the lead), `ListenPathTest` (on sound, at 120 and at 40 a minute),
+`FluteViewModelTest` (the hops, `flute.held`, `flute.short`, the tempo read at the start), `FluteUiStateTest`,
+`FluteScreenTest` and `FluteSidewaysTest` (the line in both languages); `ReplayTest` (a session recorded before the
+walk replays pitch only, `ListenRun.LENGTH_OFF`, and the sweep).
 
 The room under the stage (since 2026-11-10, the user's "3C" of four drawn options: A as it was, B a line to start,
 C this, D the fingering under every note; the page is https://claude.ai/artifact/PbsKoRyeJvf17VzucDwKDz). While the tune
@@ -373,16 +429,17 @@ phase; when a note has longer duration the animal should not jump more than once
 their pick "A" of three moving true-size mockups, `.superpowers/brainstorm/*/content/animal-walk.html`:
 B glided steadily with the music, C also let the staff stand still and turn a page at the right
 edge; before, it bounced in place in the marks row under the names). `StaffAnimal` carries
-`FluteUiState.animalIndex`, `animalHalfBeat` (the last click's `playingHalfBeat` in Play, 0 in Your
-turn), the speed's emoji, the one `rememberBeatFlash` of the tab and `waiting` in Your turn. The
+`FluteUiState.animalIndex`, `animalHalfBeat` (the last click's `playingHalfBeat` in Play, the walk's
+`halfBeat` in Your turn, 0 while it waits at a head), the speed's emoji, the one `rememberBeatFlash` of the tab and `waiting` in Your turn. The
 animal stands over its step's head when the step begins and, on each click inside it, over that
 beat's place (`StaffGeometry.beatX`: the head plus half a beat's room, 14.5 dp, per half beat,
 past a bar line inside a tied note), like the metronome's beat bubbles: a half note is two places
 29 dp apart in 4/4, a whole note four, a quarter in 6/8 two places 14.5 apart, an eighth only its
 head; it slides to each new place in `FLASH_DURATION_MS` with `FastOutSlowInEasing` while it hops,
-so it lands as the hop ends, across bar lines and breaths too, and in Your turn from the note just
-played to the next, which it reaches with a hop (`beatPulse` goes up on every advance and at the
-start). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
+so it lands as the hop ends, across bar lines and breaths too. In Your turn it walks the note the child
+plays the same way and then goes on to the next, and `ListenRun` says when it hops (`ListenRun.Step.hop`: a note's
+sound beginning, a click inside the note walked, the move to the next note; `beatPulse` goes up on each and at the
+start; "Each note held for its length" above). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
 `StaffGeometry.ANIMAL_Y` (27 dp, unscaled like the knob: the knob's middle until the knob was lifted
 8 dp on 2026-11-10, the animal's line staying where its hop keeps inside the box) from the box's top,
 `ANIMAL_SIZE` (24 dp) times the scale tall, placed in `Modifier.offset {}` from the row's
@@ -439,14 +496,16 @@ book left it alone) and `flute.shelf_close` (book, when the open book was picked
 changed), so every `flute.shelf_open` has a closing line but for a tab left with the shelf open;
 for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard` (index, expected,
 heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
-retry, ignored or wrong, per new note the tracker reports), `flute.repeat_forgiven` (index: a
+retry, ignored or wrong, per new note the tracker reports: the pitch, at the onset), `flute.held` (index, heldMs:
+the note sounded long enough and earned its mark; since 2026-11-11), `flute.short` (index, heldMs, needMs: it
+stopped before that, "Hold it longer"), `flute.repeat_forgiven` (index: a
 written repeat of the note just judged passed over with a faint star because the note after it
 was heard, once per such step),
 `flute.listen_summary` every `ListenRules.SUMMARY_FRAMES` frames and once more at the end (the
 tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
 passed the gate at all, and since 2026-11-10, in `faint`, how many frames had a clear pitch but were under the
 level of a flute at the phone), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
-(stars, retries, when the last note is judged), `flute.listen_stop` (reason: pill, key, erase,
+(stars, retries, when the last note is earned), `flute.listen_stop` (reason: pill, key, erase,
 leave, speed or book, so every `flute.listen` has a closing line), `flute.listen_error` (message, when
 the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the
 microphone on this tab). The engine's `mic.open` / `mic.close` stay under `FA.Tuner`. A debug

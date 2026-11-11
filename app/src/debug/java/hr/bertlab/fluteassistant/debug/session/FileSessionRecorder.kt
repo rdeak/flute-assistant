@@ -78,7 +78,10 @@ class FileSessionRecorder(
             "sdk" to facts.sdk, "floor" to floor?.let { level(it) },
         )
         val rules = NoteOnsetTracker.Rules().fields() +
-            listOf("repeatAdviceFrames" to ListenRun.REPEAT_ADVICE_FRAMES.toString(), "finishFrames" to ListenRun.FINISH_FRAMES.toString())
+            listOf(
+                "repeatAdviceFrames" to ListenRun.REPEAT_ADVICE_FRAMES.toString(), "finishFrames" to ListenRun.FINISH_FRAMES.toString(),
+                "lengthSlack" to ListenRun.LENGTH_SLACK.toString(), "maxNeedMs" to ListenRun.MAX_NEED_MS.toString(),
+            )
         line(s, "session.rules", *rules.toTypedArray())
         line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
         tune.forEachIndexed { index, item ->
@@ -129,6 +132,7 @@ class FileSessionRecorder(
             frame.waited?.toString().orEmpty(), frame.expected?.toString().orEmpty(), frame.heardNow?.toString().orEmpty(),
             frame.advice.takeUnless { it == TunerAdvice.NONE }?.name.orEmpty(), frame.repeatHeld.toString(), frame.finishing.toString(),
             frame.hearing.name, frame.floor?.let(::level).orEmpty(),
+            frame.walk?.index?.toString().orEmpty(), frame.walk?.halfBeat?.toString().orEmpty(), frame.walk?.phase?.name.orEmpty(),
         )
         s.csv.write(cells.joinToString(","))
         s.csv.newLine()
@@ -219,7 +223,8 @@ class FileSessionRecorder(
         const val AUDIO = "audio.wav"
         const val FRAMES = "frames.csv"
         const val LOG = "session.log"
-        const val HEADER = "frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor"
+        /** The frame table's columns; `walk,halfBeat,phase` since 2026-11-11 (older tables end at `floor`). */
+        const val HEADER = "frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase"
         /** The rate of an empty `audio.wav` when the microphone never opened. */
         const val DEFAULT_RATE = 48_000
     }

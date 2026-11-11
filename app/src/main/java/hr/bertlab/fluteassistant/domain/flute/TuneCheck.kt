@@ -13,25 +13,29 @@ enum class Verdict { RIGHT, RETRY, IGNORED, WRONG }
  * Checks the child's tune note by note as the flute hears them. It waits on one [TuneNote] of
  * [tune] at a time ([index]; rests and breaths are passed over) and judges each note heard
  * against it, pitch only and in any octave (the same letter: a beginner overblows into the
- * octave above, and the detector itself speaks the lower octave at an onset):
+ * octave above, and the detector itself speaks the lower octave at an onset). A right pitch
+ * does not earn the step by itself: [ListenRun] times how long it sounds and calls [earn] once
+ * it is long enough, or [stumble] when it was cut short (since 2026-11-11):
  *
- * - **right**: the step earns [StepMark.FIRST_TRY], or [StepMark.RETRY] when a wrong note was
- *   heard for it first, and the check moves to the next note; the last note ends it ([isDone]);
+ * - **right**: the waited note began, [Verdict.RETRY] when a wrong note or a note cut short came
+ *   for it first; [earn] then gives it [StepMark.FIRST_TRY] or [StepMark.RETRY] and moves to the
+ *   next note, and the last note ends the check ([isDone]);
  * - **ignored**: the heard note is the letter of the step just judged, in any octave (the child
  *   is still holding it, a glitch split it, or its lower octave locked first and then popped up),
  *   unless that letter is also the one waited on, a written repeat, *and* the note was a fresh
  *   start after a gap: a repeat can only be played by stopping and starting again, so a step
  *   without a gap (the octave pop of the note just counted) never counts a repeat as played;
  * - **wrong**: anything else; the place is kept, and the step is remembered as stumbled. One
- *   exception, [forgiven]: when the step waited on repeats the note just judged and the heard
- *   note is the one written after it, the repeat was slurred on to or skipped, which the phone
- *   cannot tell apart, so it gets [StepMark.RETRY] and the heard note is judged for the step
- *   after it (several repeats in a row the same way), rather than the run stopping on a note the
- *   phone may not be able to hear.
+ *   exception, [forgiven]: when the step waited on repeats the note just judged, was not heard
+ *   itself, and the heard note is the one written after it, the repeat was slurred on to or
+ *   skipped, which the phone cannot tell apart, so it gets [StepMark.RETRY] and the heard note is
+ *   judged for the step after it (several repeats in a row the same way), rather than the run
+ *   stopping on a note the phone may not be able to hear. A repeat heard and then cut short is
+ *   waited on like any note cut short.
  *
  * Waiting for the right note is what keeps every mark under the note it is about: a skipped or
- * extra note cannot shift the ones after it. Nothing here is timed; the child sets the pace.
- * Pure Kotlin; the view model feeds it heard notes and reads [marks].
+ * extra note cannot shift the ones after it. Nothing here is timed: [ListenRun] is.
+ * Pure Kotlin; [ListenRun] feeds it heard notes and reads [marks].
  */
 class TuneCheck(private val tune: List<TuneItem>) {
 
@@ -46,9 +50,11 @@ class TuneCheck(private val tune: List<TuneItem>) {
 
     val isDone: Boolean get() = index == null
 
-    /** Whether a wrong note has been heard for the step waited on. */
+    /** Whether a wrong note, or a note cut short, has been heard for the step waited on. */
     private var stumbled = false
-    /** The written note of the step judged right last; null before the first. */
+    /** Whether the step waited on was heard at its right pitch (and is being walked, or was cut short): no repeat to forgive. */
+    private var heardRight = false
+    /** The written note of the step earned last; null before the first. */
     var previous: Int? = null
         private set
     /** The steps the last [judge] passed over as repeats the phone could not hear; empty when none. */
@@ -57,7 +63,8 @@ class TuneCheck(private val tune: List<TuneItem>) {
 
     /**
      * Judges the note [heard] (MIDI) against the step waited on; [fresh] says it began after a
-     * gap rather than by a step from the note sounding before it.
+     * gap rather than by a step from the note sounding before it. A right one is not yet earned
+     * ([earn]); repeats it forgives are, at once.
      */
     fun judge(heard: Int, fresh: Boolean): Verdict {
         forgiven = emptyList()
@@ -67,8 +74,9 @@ class TuneCheck(private val tune: List<TuneItem>) {
         if (last != null && sameLetter(heard, last) && !(fresh && sameLetter(heard, expected))) {
             return Verdict.IGNORED
         }
-        // Repeats of the note just judged that were not heard before the note after them: forgiven.
-        if (!sameLetter(heard, expected) && last != null && sameLetter(expected, last)) {
+        // Repeats of the note just judged that were not heard before the note after them: forgiven. One that was
+        // heard and then cut short is no such repeat: the run waits for it (the user's "wait", 2026-11-11).
+        if (!sameLetter(heard, expected) && last != null && sameLetter(expected, last) && !heardRight) {
             val repeats = mutableListOf<Int>()
             var after: Int? = current
             while (after != null && sameLetter((tune[after] as TuneNote).midi, last)) {
@@ -88,12 +96,28 @@ class TuneCheck(private val tune: List<TuneItem>) {
             stumbled = true
             return Verdict.WRONG
         }
+        heardRight = true
+        return if (stumbled) Verdict.RETRY else Verdict.RIGHT
+    }
+
+    /**
+     * The step waited on was played long enough: it earns [StepMark.FIRST_TRY], or
+     * [StepMark.RETRY] after a stumble, and the check moves to the next note.
+     */
+    fun earn(): StepMark {
+        val current = checkNotNull(index) { "no step is waited on" }
         val mark = if (stumbled) StepMark.RETRY else StepMark.FIRST_TRY
         earned[current] = mark
-        previous = expected
+        previous = (tune[current] as TuneNote).midi
         stumbled = false
+        heardRight = false
         index = nextNoteFrom(current + 1)
-        return if (mark == StepMark.RETRY) Verdict.RETRY else Verdict.RIGHT
+        return mark
+    }
+
+    /** The step waited on was cut short: once it is played long enough it earns [StepMark.RETRY]. */
+    fun stumble() {
+        stumbled = true
     }
 
     private fun nextNoteFrom(start: Int): Int? =

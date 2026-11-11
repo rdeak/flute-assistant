@@ -13,6 +13,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
@@ -45,7 +46,8 @@ class FileSessionRecorderTest {
         decision: FrameDecision = FrameDecision.SHOWN, sounding: Int? = 71, onset: NoteOnsetTracker.Onset? = NoteOnsetTracker.Onset(71, fresh = true),
         floor: Float? = null, verdict: Verdict? = Verdict.RIGHT, waited: Int? = 0, expected: Int? = 71, heardNow: Int? = null,
         advice: TunerAdvice = TunerAdvice.NONE, repeatHeld: Boolean = false, finishing: Boolean = false, hearing: Hearing = Hearing.CLEAR,
-    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing)
+        walk: Walk? = null,
+    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing, walk)
 
     private fun sessions(root: File = folder.root) = File(root, "sessions").listFiles().orEmpty().sortedBy { it.name }
 
@@ -78,7 +80,9 @@ class FileSessionRecorderTest {
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(19, rules.size)
+        assertEquals(21, rules.size)
+        assertEquals("1.0", rules["lengthSlack"])
+        assertEquals("3000.0", rules["maxNeedMs"])
         assertEquals("0.85", rules["gate"])
         assertEquals("0.002", rules["floorRise"])
         assertEquals("0.12", rules["stopDrop"])
@@ -101,10 +105,22 @@ class FileSessionRecorderTest {
         r.frame(frame(f = null, p = 0.0, level = 0.05f, minLevel = 0.04f, decision = FrameDecision.SILENT, sounding = null, onset = null, floor = 0.05f, verdict = null, waited = 3, expected = 72, heardNow = 60, advice = TunerAdvice.COME_CLOSER, repeatHeld = true, finishing = true, hearing = Hearing.QUIET_UNCLEAR))
         r.end(emptyMap())
         val csv = File(sessions().single(), "frames.csv").readLines()
-        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor", csv[0])
-        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,", csv[1])
-        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500", csv[2])
+        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase", csv[0])
+        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,,,,", csv[1])
+        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500,,,", csv[2])
         assertEquals(3, csv.size)
+    }
+
+    @Test
+    fun `a walking frame says where the animal is`() {
+        val r = recorder()
+        r.start(tune, pulse, floor = null)
+        r.opened(48_000, "MIC")
+        r.frame(frame(walk = Walk(3, 2, Walk.Phase.SHORT), advice = TunerAdvice.HOLD_LONGER))
+        r.end(emptyMap())
+        val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
+        assertEquals(listOf("HOLD_LONGER"), row.filter { it == "HOLD_LONGER" })
+        assertEquals(listOf("3", "2", "SHORT"), row.takeLast(3))
     }
 
     @Test

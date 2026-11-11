@@ -108,8 +108,15 @@ class NoteOnsetTracker(
         }
     }
 
-    /** What became of one frame, and the note that began on it, if one did. */
-    data class Result(val decision: FrameDecision, val onset: Onset?)
+    /**
+     * What became of one frame, and the note that began on it, if one did. [leadFrames] are the
+     * frames before this one that belong to that note, which began that many frames before the
+     * phone was sure of it: for a note begun with nothing sounding, the frames that locked it; for
+     * one begun while another sounded (a step, an octave pop), the counted frames of its pitch in a
+     * row before it; none past a stop or a frame that did not count, so a tongued restart starts at
+     * its onset. 0 when no note began.
+     */
+    data class Result(val decision: FrameDecision, val onset: Onset?, val leadFrames: Int = 0)
 
     /**
      * A note that began: its MIDI, and whether it was a [fresh] start after a gap (nothing was
@@ -148,6 +155,14 @@ class NoteOnsetTracker(
     /** Counted frames since the sounding note began (0 between notes); a stop in its first ones is its attack. */
     var framesSinceOnset = 0
         private set
+    /**
+     * Frames while nothing sounds, from the first counted one since the window was last emptied: the frames
+     * locking the next note, a frame the gate missed among them included (a breathy blink is still the note).
+     */
+    private var lockingFrames = 0
+    /** Counted frames in a row whose nearest note is [runMidi], none across a stop or a frame that did not count. */
+    private var pitchRun = 0
+    private var runMidi: Int? = null
     /** Frames since a stop was heard inside the sounding note, or -1 when none is pending. */
     private var stopAge = -1
     /** The quietest stretch of the stop pending, which the tone must rise [RESTART_RISE] over. */
@@ -164,7 +179,10 @@ class NoteOnsetTracker(
         levelCount++
         recentLevels.addLast(frame.level)
         while (recentLevels.size > rules.recentFrames) recentLevels.removeFirst()
-        if (sounding != null) framesSinceOnset++
+        if (sounding != null) framesSinceOnset++ else lockingFrames++
+        val nearest = NoteMath.frequencyToNote(frequency).midi
+        pitchRun = if (stopAge == 0) 0 else if (nearest == runMidi) pitchRun + 1 else 1 // a stop's frame is the old note's
+        runMidi = nearest
         recent.addLast(frequency)
         while (recent.size > rules.smoothing) recent.removeFirst()
         if (!isSteady()) return Result(FrameDecision.UNSTEADY, onset = null).also { ageStop() }
@@ -178,7 +196,14 @@ class NoteOnsetTracker(
             identified == before && restarted -> Onset(identified, fresh = true)
             else -> null
         }
+        val lead = when {
+            onset == null -> 0
+            before == null -> lockingFrames - 1
+            identified == runMidi -> maxOf(0, pitchRun - 1)
+            else -> 0
+        }
         if (onset != null) {
+            lockingFrames = 0
             // The new note's loudness is its own; the frames that locked it are its first.
             levelSum = frame.level.toDouble()
             levelCount = 1
@@ -189,7 +214,7 @@ class NoteOnsetTracker(
         }
         sounding = identified
         ageStop()
-        return Result(FrameDecision.SHOWN, onset)
+        return Result(FrameDecision.SHOWN, onset, lead)
     }
 
     /** Back to silence: no note sounding, nothing remembered of it (the room's floor is kept). */
@@ -204,6 +229,9 @@ class NoteOnsetTracker(
         levelCount = 0
         recentLevels.clear()
         framesSinceOnset = 0
+        lockingFrames = 0
+        pitchRun = 0
+        runMidi = null
         stopAge = -1
     }
 
@@ -235,6 +263,9 @@ class NoteOnsetTracker(
      */
     private fun uncounted(decision: FrameDecision, level: Float): Result {
         val note = sounding
+        if (note == null && lockingFrames > 0) lockingFrames++
+        pitchRun = 0
+        runMidi = null
         if (note == null) {
             floor = floor?.let { minOf(level, it + rules.floorRise) } ?: level
         }

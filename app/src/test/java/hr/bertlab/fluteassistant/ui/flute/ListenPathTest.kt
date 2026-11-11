@@ -4,6 +4,8 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
+import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
@@ -122,7 +124,26 @@ class ListenPathTest {
         assertTrue("without the floor the room's sound is judged: ${before.heard}", before.heard.any { it.index != null && it.atMs < roomMs })
     }
 
-    /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules]. */
+    // ---- The length rule on sound (2026-11-11): the notes are 400, 400 and 1500 ms ----
+
+    @Test
+    fun `notes long enough at their tempo earn their stars`() {
+        // At 120 a minute a quarter needs 250 ms and the half note 750.
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `notes too short for a slow tempo are played again for the first step`() {
+        // At 40 a minute a quarter needs 750 ms: both 400 ms notes are cut short for the first step, and the
+        // 1500 ms one, played for it a third time, earns it a faint star.
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(40))
+        assertEquals(mapOf(0 to StepMark.RETRY), run.marks)
+        assertEquals(run.heard.toString(), 3, run.heard.size)
+        assertTrue(run.heard.toString(), run.heard.all { it.index == 0 })
+    }
+
+    /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules], pitch only. */
     private fun listen(samples: DoubleArray, rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules()): ListenPath.Run =
-        ListenPath.run(FluteSound.render(samples), rate, tune, rules)
+        ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(60), rules, lengthSlack = ListenRun.LENGTH_OFF)
 }

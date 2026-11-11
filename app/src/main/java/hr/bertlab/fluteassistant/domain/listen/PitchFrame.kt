@@ -11,5 +11,19 @@ package hr.bertlab.fluteassistant.domain.listen
  * @property minLevel the quietest short stretch inside the newest hop (`FrameLevels.minLevel`),
  * which a tongued stop between two notes of one pitch drops where [level] barely moves; the
  * window's [level] when nothing finer is known.
+ * @property hopMs how far the window advanced to this frame, in ms: `AudioRecordTunerEngine`'s hop at
+ * the rate the microphone opened at (42.7 ms at 48 kHz, 46.4 ms at 44.1 kHz). "Your turn" times a
+ * note's length by adding these up, so a replay of the same frames times it the same way.
  */
-data class PitchFrame(val frequency: Double?, val probability: Double, val level: Float, val minLevel: Float = level)
+data class PitchFrame(
+    val frequency: Double?,
+    val probability: Double,
+    val level: Float,
+    val minLevel: Float = level,
+    val hopMs: Double = DEFAULT_HOP_MS,
+) {
+    companion object {
+        /** The hop of 2048 samples at 48 kHz, the rate the engine asks for first. */
+        const val DEFAULT_HOP_MS = 2048 * 1000.0 / 48_000
+    }
+}

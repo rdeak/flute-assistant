@@ -92,6 +92,7 @@ class AudioRecordTunerEngine @Inject constructor(
                         probability = estimate?.probability ?: 0.0,
                         level = FrameLevels.level(window),
                         minLevel = FrameLevels.minLevel(window, HOP_SIZE),
+                        hopMs = HOP_SIZE * 1000.0 / record.sampleRate,
                     ),
                 )
             }

@@ -11,6 +11,7 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 
@@ -64,7 +65,7 @@ data class FluteUiState(
     val promptMidi: Int?
         get() {
             val run = listening ?: return null
-            if (marks.isNotEmpty() || run.wrong != null || run.finishing || run.advice != TunerAdvice.NONE) return null
+            if (marks.isNotEmpty() || run.wrong != null || run.walk != null || run.finishing || run.advice != TunerAdvice.NONE) return null
             return run.index?.let(::noteAt)
         }
 
@@ -95,17 +96,27 @@ data class FluteUiState(
     /** Where the held key's note or rest sits in [tune]: the step with the yellow band; null at the cap, where a press is not added. */
     val heldIndex: Int? get() = held?.index
 
-    /** The step of the staff ringed in yellow: the playing step, else the one waited for (none once the last is counted), else the held key's. */
-    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing }?.index ?: heldIndex
+    /**
+     * The step of the staff ringed in yellow: the playing step, else the one the animal is on while listening (the
+     * one waited for, or an earned note finishing its time; none once the last is counted), else the held key's.
+     */
+    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing }?.let { it.walk?.index ?: it.index } ?: heldIndex
 
-    /** The step the knob's animal stands over while the tune runs: the playing step, else the one waited for, or the last counted while its sound ends; null at rest. */
-    val animalIndex: Int? get() = playing?.index ?: listening?.index
+    /**
+     * The step the knob's animal stands over while the tune runs: the playing step, else, listening, the note it
+     * walks, stopped on or finishes ([Listening.walk]) or the one waited for, or the last counted while its sound
+     * ends; null at rest.
+     */
+    val animalIndex: Int? get() = playing?.index ?: listening?.let { it.walk?.index ?: it.index }
 
-    /** Whether the animal waits for the child to play the step it stands over: listening, and not finishing. */
-    val waiting: Boolean get() = listening?.let { !it.finishing && it.index != null } == true
+    /**
+     * Whether the animal waits for the child to play the step it stands over: listening, not finishing, and not
+     * on an earned note finishing its time (its star shows there).
+     */
+    val waiting: Boolean get() = listening?.let { !it.finishing && it.index != null && it.walk?.phase != Walk.Phase.DONE } == true
 
-    /** How many half beats into [animalIndex]'s step the animal stands: the last click's in Play, the step's start while listening. */
-    val animalHalfBeat: Int get() = playing?.halfBeat ?: 0
+    /** How many half beats into [animalIndex]'s step the animal stands: the last click's, in Play and in Your turn's walk; else the step's start. */
+    val animalHalfBeat: Int get() = playing?.halfBeat ?: listening?.walk?.halfBeat ?: 0
 
     /** The wrong note last heard for the step waited on, a bubble under that step ([Listening.wrong]). */
     val wrong: WrongNote? get() = listening?.wrong

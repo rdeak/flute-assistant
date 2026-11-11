@@ -54,6 +54,10 @@ tools/pull-sessions.sh                                   # the phone's sessions 
                                                          # also <folder>/sweep.txt: what each value would have heard
 ./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=minLevel:0,0.3,0.4,0.45
                                                          # the loudness floor: did it leave a child's soft notes out, or let the room in?
+./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=lengthSlack:0.5,1,2
+                                                         # the length rule (half beats a note may stop short of its written
+                                                         # length, 2026-11-11): did it catch long notes and keep the quarters?
+                                                         # also -Psweep=maxNeedMs:2000,3000,4000, the longest any note needs
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
 ```
 

@@ -24,6 +24,7 @@ class TuneCheckTest {
     fun `the right note, in any octave, earns a star and moves on`() {
         val check = TuneCheck(listOf(q(60), q(62)))
         assertEquals(Verdict.RIGHT, check.judge(72, fresh = true))
+        assertEquals(StepMark.FIRST_TRY, check.earn())
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), check.marks)
         assertEquals(1, check.index)
     }
@@ -35,6 +36,7 @@ class TuneCheckTest {
         assertEquals(0, check.index)
         assertTrue(check.marks.isEmpty())
         assertEquals(Verdict.RETRY, check.judge(60, fresh = true))
+        assertEquals(StepMark.RETRY, check.earn())
         assertEquals(mapOf(0 to StepMark.RETRY), check.marks)
         assertEquals(1, check.index)
     }
@@ -43,6 +45,7 @@ class TuneCheckTest {
     fun `the previous note heard again is ignored, in its own or another octave, started again or by a step`() {
         val check = TuneCheck(listOf(q(60), q(62)))
         assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        check.earn()
         assertEquals(Verdict.IGNORED, check.judge(60, fresh = true))
         assertEquals(Verdict.IGNORED, check.judge(72, fresh = false))
         assertEquals(1, check.index)
@@ -53,10 +56,12 @@ class TuneCheckTest {
         // The octave pop of the note just counted is a step inside one note: not the repeat.
         val check = TuneCheck(listOf(q(60), q(60)))
         assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        check.earn()
         assertEquals(Verdict.IGNORED, check.judge(72, fresh = false))
         assertEquals(1, check.index)
         // Let go of and started again, in whichever octave: the repeat, played.
         assertEquals(Verdict.RIGHT, check.judge(72, fresh = true))
+        check.earn()
         assertTrue(check.isDone)
     }
 
@@ -66,9 +71,13 @@ class TuneCheckTest {
         // phone cannot tell apart; it gets a faint star rather than stopping everything.
         val check = TuneCheck(listOf(q(60), q(60), q(62)))
         assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        check.earn()
         assertTrue(check.forgiven.isEmpty())
         assertEquals(Verdict.RIGHT, check.judge(62, fresh = false))
         assertEquals(listOf(1), check.forgiven)
+        assertEquals("the forgiven repeat is earned at once", mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY), check.marks)
+        assertEquals(2, check.index)
+        check.earn()
         assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY, 2 to StepMark.FIRST_TRY), check.marks)
         assertTrue(check.isDone)
     }
@@ -77,8 +86,11 @@ class TuneCheckTest {
     fun `several repeats in a row are forgiven together`() {
         val check = TuneCheck(listOf(q(60), q(60), q(60), q(62), q(64)))
         check.judge(60, fresh = true)
+        check.earn()
         assertEquals(Verdict.RIGHT, check.judge(62, fresh = true))
         assertEquals(listOf(1, 2), check.forgiven)
+        assertEquals(3, check.index)
+        check.earn()
         assertEquals(4, check.index)
         assertEquals(Verdict.RIGHT, check.judge(64, fresh = true))
         assertTrue("the last judgement forgave nothing", check.forgiven.isEmpty())
@@ -88,6 +100,7 @@ class TuneCheckTest {
     fun `a skipped note that repeats nothing is not forgiven`() {
         val check = TuneCheck(listOf(q(60), q(64), q(62)))
         check.judge(60, fresh = true)
+        check.earn()
         assertEquals(Verdict.WRONG, check.judge(62, fresh = true))
         assertTrue(check.forgiven.isEmpty())
         assertEquals(1, check.index)
@@ -98,6 +111,8 @@ class TuneCheckTest {
         val check = TuneCheck(listOf(q(60), q(62)))
         assertNull(check.previous)
         check.judge(72, fresh = true)
+        assertNull("a right pitch is not yet the note just counted", check.previous)
+        check.earn()
         assertEquals(60, check.previous)
     }
 
@@ -105,8 +120,10 @@ class TuneCheckTest {
     fun `the last note judged right finishes the check and skips trailing rests`() {
         val check = TuneCheck(listOf(q(60), TuneRest(NoteLength.QUARTER), q(62), TuneBreath))
         check.judge(60, fresh = true)
+        check.earn()
         assertEquals(2, check.index)
         assertEquals(Verdict.RIGHT, check.judge(62, fresh = true))
+        check.earn()
         assertNull(check.index)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), check.marks)
     }
@@ -115,6 +132,61 @@ class TuneCheckTest {
     fun `judging after the end is ignored`() {
         val check = TuneCheck(listOf(q(60)))
         check.judge(60, fresh = true)
+        check.earn()
         assertEquals(Verdict.IGNORED, check.judge(60, fresh = true))
+    }
+
+    // ---- A right pitch is heard at its onset and earned once it is long enough (2026-11-11) ----
+
+    @Test
+    fun `a right pitch does not move on until earned`() {
+        val check = TuneCheck(listOf(q(60), q(62)))
+        assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        assertEquals(0, check.index)
+        assertTrue(check.marks.isEmpty())
+        assertEquals(StepMark.FIRST_TRY, check.earn())
+        assertEquals(1, check.index)
+    }
+
+    @Test
+    fun `a stumble makes the step a retry`() {
+        val check = TuneCheck(listOf(q(60), q(62)))
+        check.stumble()
+        assertEquals(Verdict.RETRY, check.judge(60, fresh = true))
+        assertEquals(StepMark.RETRY, check.earn())
+        assertEquals(mapOf(0 to StepMark.RETRY), check.marks)
+    }
+
+    @Test
+    fun `the same note played again before it is earned is judged again`() {
+        val check = TuneCheck(listOf(q(62), q(60), q(64)))
+        check.judge(62, fresh = true)
+        check.earn()
+        assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        assertEquals("cut short, and started again", Verdict.RIGHT, check.judge(60, fresh = true))
+        assertEquals(1, check.index)
+    }
+
+    @Test(expected = IllegalStateException::class)
+    fun `nothing to earn after the end`() {
+        val check = TuneCheck(listOf(q(60)))
+        check.judge(60, fresh = true)
+        check.earn()
+        check.earn()
+    }
+
+    @Test
+    fun `a written repeat heard and not yet earned is not forgiven by the note after it`() {
+        // Written c c d: the second c was heard (its pitch judged right) and then cut short. The note after it is
+        // no sign of a repeat the phone could not hear: the run waits for the c (the user's "wait", 2026-11-11).
+        val check = TuneCheck(listOf(q(60), q(60), q(62)))
+        check.judge(60, fresh = true)
+        check.earn()
+        assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        check.stumble()
+        assertEquals(Verdict.WRONG, check.judge(62, fresh = false))
+        assertTrue(check.forgiven.isEmpty())
+        assertEquals(1, check.index)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), check.marks)
     }
 }

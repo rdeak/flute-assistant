@@ -32,9 +32,13 @@ change that part). The songbook is in `SONGBOOK.md`.
 - A note's length comes only from how long its key is held, in beats of the metronome's `Pulse`.
   The time between presses is never recorded. No record button, clear-all or length control (root
   CLAUDE.md, "Turned down").
-- "Your turn" is opt-in, child-paced and score-free: pitch only, nothing timed, no number, marks
-  not saved. A miss never shows silence: the heard note, or the listening dots, stands under the
-  step waited on.
+- "Your turn" is opt-in and score-free, no number, marks not saved. The child decides when each
+  note starts; the metronome decides how long it lasts: a note counts once it has sounded its
+  written length less half a beat (`ListenRun.LENGTH_SLACK`) and at most 3 s (`MAX_NEED_MS`), both
+  changed only from recorded sessions (sweeps of `lengthSlack`, `maxNeedMs`), and one cut short is
+  played again. The animal never moves on to a
+  note the child has not played: `DESIGN.md`, "Each note held for its length". A miss never shows
+  silence: the heard note, or the listening dots, stands under the step waited on.
 - The room under the stage while it listens adds nothing while things go right: "Play B4" until the
   first note is judged, then silence; after a wrong note the wanted note's fingering over "Check
   your fingers" until the right one (the user's pick of 2026-11-10). Not the fingering under every
@@ -59,7 +63,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 | The staff's drawing, the names row, its sizes | the second paragraph ("The stage") |
 | Key presses, the rejoin window, the rest key, Play | the same paragraph, from "`FluteViewModel` (Activity-scoped" |
 | The keys; the speed knob and its panel | "The keys", "The speed knob and its panel" |
-| Your turn: the listening rules, the loudness floor, the heard-note bubble, the advice, the room under the stage | "Your turn" |
+| Your turn: the listening rules, the length rule and the walk, the loudness floor, the heard-note bubble, the advice, the room under the stage | "Your turn" |
 | The running staff, the walking animal, the marks row | "While the tune runs" |
 | A phone on its side; a tablet | "Sideways", "Tablets" |
 | Books and the shelf | `SONGBOOK.md` |

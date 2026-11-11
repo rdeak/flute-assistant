@@ -5,6 +5,8 @@ package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
+import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
@@ -22,10 +24,12 @@ class ListenPathRunTest {
 
     private val rate = 48_000
     private val hop = AudioRecordTunerEngine.HOP_SIZE
+    /** These cases are about the path, not the length rule: they run at 60 a minute, most of them pitch only. */
+    private val pitchOnly = Pulse(60)
 
     @Test
     fun `the run lists one step per hop with the waited index, a partial hop left over`() {
-        val run = ListenPath.run(FloatArray(10 * hop + 100), rate, listOf(TuneRest(QUARTER), TuneNote(71, QUARTER)))
+        val run = ListenPath.run(FloatArray(10 * hop + 100), rate, listOf(TuneRest(QUARTER), TuneNote(71, QUARTER)), pitchOnly)
         assertEquals(10, run.steps.size)
         assertEquals((1..10).toList(), run.steps.map { it.frame })
         assertTrue(run.steps.all { it.decision == FrameDecision.SILENT && it.sounding == null && it.onset == null && it.verdict == null })
@@ -37,7 +41,7 @@ class ListenPathRunTest {
     @Test
     fun `a note is judged while one is waited on and only reported after the tune is done`() {
         val tune = listOf(TuneNote(71, QUARTER))
-        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, tune)
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, tune, pitchOnly, lengthSlack = ListenRun.LENGTH_OFF)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), run.marks)
         val judged = run.steps.filter { it.verdict != null }
         assertEquals(1, judged.size)
@@ -54,14 +58,14 @@ class ListenPathRunTest {
     fun `a seeded floor and other rules reach the tracker`() {
         val samples = FluteSound.render(FluteSound.sound(gapsMs = 50))
         val tune = List(3) { TuneNote(71, QUARTER) }
-        val heard = ListenPath.run(samples, rate, tune).heard.size
-        val deaf = ListenPath.run(samples, rate, tune, rules = NoteOnsetTracker.Rules(stopDrop = 0.5f)).heard.size
+        val heard = ListenPath.run(samples, rate, tune, pitchOnly, lengthSlack = ListenRun.LENGTH_OFF).heard.size
+        val deaf = ListenPath.run(samples, rate, tune, pitchOnly, rules = NoteOnsetTracker.Rules(stopDrop = 0.5f), lengthSlack = ListenRun.LENGTH_OFF).heard.size
         assertTrue("stopDrop 0.5 hears no tongued stop: $deaf of $heard", deaf < heard)
         // One hop of noise louder than the seeded floor: the floor rises by one FLOOR_RISE from the seed, not from nothing.
         // Random, not a +/- pattern: that is a tone at half the rate, and the detector reads the newest hop.
         val random = Random(3)
         val noise = FloatArray(hop) { (random.nextFloat() - 0.5f) * 0.2f }
-        val step = ListenPath.run(noise, rate, tune, floor = 0.3f).steps.single()
+        val step = ListenPath.run(noise, rate, tune, pitchOnly, floor = 0.3f).steps.single()
         assertEquals(step.toString(), 0.3f + NoteOnsetTracker.FLOOR_RISE, step.floor!!, 1e-6f)
     }
 }

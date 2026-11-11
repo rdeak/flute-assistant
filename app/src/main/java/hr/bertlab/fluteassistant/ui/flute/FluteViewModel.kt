@@ -59,7 +59,10 @@ import javax.inject.Inject
  *   [FluteUiState.beatPulse] counts them for the animal's hop and
  *   [FluteUiState.playingHalfBeat] says how far into the playing step the last one fell.
  * - **Your turn.** [startListening] opens the tuner's microphone ([TunerEngine]) and feeds a
- *   [ListenRun], which judges the child's playing note by note. The last note judged ends it by
+ *   [ListenRun], which judges the child's playing note by note, each note's pitch and, at the
+ *   metronome's pulse as it was at the start, its length (the knob ends a run, so the pulse
+ *   cannot change during one); the run says when the animal hops, and this counts the hops on
+ *   [FluteUiState.beatPulse] with no timer of its own. The last note earned ends it by
  *   itself; Stop ([stopRun]), erase, the speed knob, the book button, a key and leaving the tab
  *   end it early and keep the marks so far; any change to the tune clears them. [onMicResult]
  *   receives the phone's answer about the microphone; a no shows the microphone card
@@ -86,7 +89,9 @@ import javax.inject.Inject
  * what the metronome must be set to, none for an empty book, which leaves it alone) and
  * `flute.shelf_close` (book, when the open book was picked again and nothing changed); while
  * listening, `flute.listen` (notes), `flute.heard` (index, expected, heard, fresh, verdict:
- * right, retry, ignored or wrong), `flute.repeat_forgiven` (index), `flute.listen_summary` every
+ * right, retry, ignored or wrong: the pitch, at the note's onset), `flute.held` (index, heldMs:
+ * the note became long enough and earned its mark), `flute.short` (index, heldMs, needMs: it
+ * stopped before that; since 2026-11-11), `flute.repeat_forgiven` (index), `flute.listen_summary` every
  * [ListenRules.SUMMARY_FRAMES] frames (the tuner's summary fields, gate, expected, hearing),
  * `flute.hearing` (hearing, levelMean) when it changes, `flute.listen_done` (stars, retries),
  * `flute.listen_stop` (reason: pill, key, erase, leave, speed or book), `flute.listen_error`
@@ -257,8 +262,8 @@ class FluteViewModel @Inject constructor(
 
     /**
      * "Your turn": opens the microphone and waits for the child to play the tune, from its first
-     * note (rests and breaths before it are passed over), marking each note as it comes; the last
-     * note judged ends it. Nothing is played. Nothing happens while the tune plays back, while it
+     * note (rests and breaths before it are passed over), marking each note once it is long
+     * enough; the last note earned ends it. Nothing is played. Nothing happens while the tune plays back, while it
      * is listening already, or when the tune holds no note.
      */
     fun startListening() {
@@ -266,7 +271,7 @@ class FluteViewModel @Inject constructor(
         if (current.isPlaying || current.isListening || !current.canListen) return
         endHeld()
         activationJob?.cancel()
-        val run = ListenRun(writer.tune, floor = roomFloor).also { this.run = it }
+        val run = ListenRun(writer.tune, pulse(), floor = roomFloor).also { this.run = it }
         listenSummary.reset()
         // The animal lands on the first note with a hop.
         _state.update { it.copy(listening = run.listening, marks = emptyMap(), beatPulse = it.beatPulse + 1) }
@@ -452,13 +457,13 @@ class FluteViewModel @Inject constructor(
             )
         }
         for (forgiven in step.forgiven) logger.d(LogTags.FLUTE, "flute.repeat_forgiven", "index" to forgiven)
+        step.short?.let { logger.d(LogTags.FLUTE, "flute.short", "index" to it.index, "heldMs" to it.heldMs, "needMs" to it.needMs) }
+        step.held?.let { logger.d(LogTags.FLUTE, "flute.held", "index" to it.index, "heldMs" to it.heldMs) }
         _state.update {
-            // A step earned: its mark shows and the animal hops on.
-            if (step.advanced) {
-                it.copy(listening = listening, marks = run.marks.toMap(), beatPulse = it.beatPulse + 1)
-            } else {
-                it.copy(listening = listening)
-            }
+            // A step earned (or a repeat forgiven): its mark shows. The animal hops when the run says: a note began, a
+            // click inside the note it walks, or it went on to the next note.
+            val marks = if (step.advanced || step.forgiven.isNotEmpty()) run.marks.toMap() else it.marks
+            it.copy(listening = listening, marks = marks, beatPulse = if (step.hop) it.beatPulse + 1 else it.beatPulse)
         }
         if (step.done) {
             logger.d(

@@ -299,4 +299,78 @@ class NoteOnsetTrackerTest {
         assertEquals(0.23f, NoteOnsetTracker(floor = 0.23f).floor)
         assertNull(NoteOnsetTracker().floor)
     }
+
+    // ---- Where a note began: the frames that locked it count (the length check, 2026-11-11) ----
+
+    @Test
+    fun `a note after silence starts with the frames that locked it`() {
+        val tracker = NoteOnsetTracker()
+        val onset = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(60) }).last()
+        assertEquals(60, onset.onset?.midi)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, onset.leadFrames)
+    }
+
+    @Test
+    fun `unsteady frames before the lock count as the note's start`() {
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, List(2) { pitched(61) } + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals(ListenRules.LOCK_FRAMES + 1, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a step and a pop start with the frames of the new pitch before the lock`() {
+        // A tongued change to another note while the last one is still held: the recorded sessions of 2026-11-05
+        // show two frames of the new pitch before every such onset, the frames that locked it.
+        val step = NoteOnsetTracker()
+        feed(step, List(3) { pitched(60) })
+        val slurred = feed(step, List(ListenRules.LOCK_FRAMES) { pitched(62) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = false), slurred.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, slurred.leadFrames)
+
+        val pop = NoteOnsetTracker()
+        feed(pop, List(3) { pitched(60) })
+        val popped = feed(pop, List(ListenRules.LOCK_FRAMES) { pitched(72) }).last()
+        assertEquals(NoteOnsetTracker.Onset(72, fresh = false), popped.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, popped.leadFrames)
+    }
+
+    @Test
+    fun `a tongued restart starts at its onset`() {
+        val restart = NoteOnsetTracker()
+        feed(restart, List(4) { note(60, 0.6f) })
+        feed(restart, listOf(note(60, 0.55f, minLevel = 0.2f)))
+        val again = feed(restart, listOf(note(60, 0.6f))).single()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), again.onset)
+        assertEquals("the stop's frame is not the new note's", 0, again.leadFrames)
+    }
+
+    @Test
+    fun `a restart after a frame that did not count starts after it`() {
+        // The same note again after one silent frame: the frames before it were the old note's.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(4) { pitched(60) })
+        val again = feed(tracker, listOf(silent, pitched(60))).last()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), again.onset)
+        assertEquals(0, again.leadFrames)
+    }
+
+    @Test
+    fun `the lead starts again after a gap`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(3) { pitched(60) })
+        feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { silent })
+        val again = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(60) }).last()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), again.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, again.leadFrames)
+    }
+
+    @Test
+    fun `a gate blink among the locking frames is part of the note's start`() {
+        // The note began on its first counted frame; a breathy frame under the gate in between is still the note.
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, listOf(pitched(60), pitched(60, probability = 0.5), pitched(60), pitched(60)))
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals(3, results.last().leadFrames)
+    }
 }

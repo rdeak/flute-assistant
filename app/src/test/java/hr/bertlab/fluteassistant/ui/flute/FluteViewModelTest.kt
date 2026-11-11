@@ -981,7 +981,11 @@ class FluteViewModelTest {
 
     // ---- Your turn: the flute listens ----
 
-    private fun q(midi: Int) = TuneNote(midi, QUARTER)
+    /**
+     * An eighth: long enough the moment it is heard (its length less half a beat is nothing), so the tests of the
+     * pitch wiring play their notes as before the length rule of 2026-11-11.
+     */
+    private fun q(midi: Int) = TuneNote(midi, EIGHTH)
 
     /** A frame of a note at a real flute's level at the phone (the recorded sessions: 0.67 and over), clear of the tracker's floor. */
     private fun pitched(midi: Int) = PitchFrame(freq(midi), 0.97, level = 0.7f)
@@ -1027,7 +1031,10 @@ class FluteViewModelTest {
         play(72)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), vm.current.marks)
         assertEquals(1, vm.current.listening?.index)
-        assertEquals(pulse + 1, vm.current.beatPulse)
+        assertEquals("a hop as the note began", pulse + 1, vm.current.beatPulse)
+        repeat(4) { emit(silentFrame) } // the eighth's written time is over: the animal goes to the next note
+        assertEquals(pulse + 2, vm.current.beatPulse)
+        assertEquals(1, vm.current.animalIndex)
         val heard = logger.events("flute.heard").single()
         assertEquals(0, heard["index"])
         assertEquals(60, heard["expected"])
@@ -1122,6 +1129,8 @@ class FluteViewModelTest {
         val vm = listeningViewModel(q(60), q(60))
         repeat(ListenRules.LOCK_FRAMES) { emit(pitched(60)) }
         assertEquals(TunerAdvice.NONE, vm.current.advice)
+        // Counted from the end of the first note's written length: until then holding it is right.
+        while (vm.current.listening?.walk != null) emit(pitched(60))
         repeat(ListenRun.REPEAT_ADVICE_FRAMES - 1) { emit(pitched(60)) }
         assertEquals(TunerAdvice.NONE, vm.current.advice)
         emit(pitched(60))
@@ -1583,5 +1592,56 @@ class FluteViewModelTest {
         vm.stopRun()
         assertEquals(1, stopLinesAtEnd)
         assertEquals(1, summaryLinesAtEnd)
+    }
+
+    // ---- Each note held for its length (2026-11-11) ----
+
+    @Test
+    fun `your turn walks a note on the clicks and earns it when long enough`() = runTest(dispatcher) {
+        // At the default 120 a minute a half note lasts 1000 ms, its second beat clicks at 500 and it is earned at 750.
+        val vm = listeningViewModel(TuneNote(60, HALF), q(62))
+        val start = vm.current.beatPulse
+        repeat(ListenRules.LOCK_FRAMES) { emit(pitched(60)) } // three frames, 128 ms: the phone is sure on the third
+        assertEquals("a hop as the note began", start + 1, vm.current.beatPulse)
+        assertEquals(0, vm.current.animalHalfBeat)
+        repeat(8) { emit(pitched(60)) } // 469 ms
+        assertEquals(start + 1, vm.current.beatPulse)
+        emit(pitched(60)) // 512 ms: the click of its second beat
+        assertEquals(start + 2, vm.current.beatPulse)
+        assertEquals(2, vm.current.animalHalfBeat)
+        assertTrue(vm.current.marks.isEmpty())
+        repeat(5) { emit(pitched(60)) } // 725 ms
+        assertTrue(vm.current.marks.isEmpty())
+        emit(pitched(60)) // 768 ms: long enough
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), vm.current.marks)
+        val held = logger.events("flute.held").single()
+        assertEquals(0, held["index"])
+        assertTrue("$held", (held["heldMs"] as Long) >= 750)
+        assertEquals(start + 2, vm.current.beatPulse)
+        assertTrue(logger.events("flute.short").isEmpty())
+    }
+
+    @Test
+    fun `a note cut short logs flute short and keeps the marks empty`() = runTest(dispatcher) {
+        val vm = listeningViewModel(TuneNote(60, HALF), q(62))
+        play(60)
+        val short = logger.events("flute.short").single()
+        assertEquals(0, short["index"])
+        assertEquals(750L, short["needMs"])
+        assertTrue("$short", (short["heldMs"] as Long) < 750)
+        assertTrue(vm.current.marks.isEmpty())
+        assertEquals(TunerAdvice.HOLD_LONGER, vm.current.advice)
+        assertEquals(0, vm.current.animalIndex)
+        assertNull(vm.current.fingeringMidi)
+    }
+
+    @Test
+    fun `the run hears the tempo the knob had when it started`() = runTest(dispatcher) {
+        metronome.update { MetronomeConfig(bpm = 60) } // a quarter lasts 1000 ms and is long enough at 500
+        val vm = listeningViewModel(TuneNote(60, QUARTER), q(62))
+        repeat(ListenRules.LOCK_FRAMES + 6) { emit(pitched(60)) } // 384 ms: enough at 120 a minute, not at 60
+        assertTrue(vm.current.marks.isEmpty())
+        repeat(4) { emit(pitched(60)) } // 512 ms
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), vm.current.marks)
     }
 }

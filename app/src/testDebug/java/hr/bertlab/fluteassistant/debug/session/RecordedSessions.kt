@@ -20,7 +20,7 @@ object RecordedSessions {
             try {
                 val session = Session.load(folder)
                 val pin = session.pin ?: return@mapNotNull "${folder.name}: no pin line in session.log (pin marks=0:FIRST_TRY,...)"
-                val run = ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, floor = session.floor)
+                val run = ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, session.pulse, floor = session.floor)
                 if (run.marks == pin) null
                 else "${folder.name}: pin ${Session.spell(pin)} but replay ${Session.spell(run.marks)}"
             } catch (e: Exception) {

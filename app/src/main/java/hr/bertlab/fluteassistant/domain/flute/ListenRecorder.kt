@@ -14,7 +14,7 @@ import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
  * the tracker made of it ([decision], [sounding], [onset], its room [floor] after the frame),
  * the [verdict] if a note was judged on it, the step waited on before that judgement ([waited],
  * its note [expected]) and what the child saw after it ([heardNow], [advice], [repeatHeld],
- * [finishing], [hearing]).
+ * [finishing], [hearing], [walk]).
  */
 data class ListenFrame(
     val frame: PitchFrame,
@@ -30,6 +30,8 @@ data class ListenFrame(
     val repeatHeld: Boolean,
     val finishing: Boolean,
     val hearing: Hearing,
+    /** Where the animal was after the frame when it was not simply waiting ([Listening.walk]). */
+    val walk: Walk? = null,
 )
 
 /**
