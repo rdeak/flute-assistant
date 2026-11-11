@@ -68,9 +68,14 @@ The pages need no change.
 
 ## Going live (once)
 
-Done on 2026-11-11 up to step 8: Pages now builds from GitHub Actions (`build_type: workflow`), the Site
+Done on 2026-11-11, every step: Pages now builds from GitHub Actions (`build_type: workflow`), the Site
 run deployed, and every check below passed; the website is in the Play listing's contact details.
-Steps 9 (search engines) and 10's privacy URL are still open. The list stays as the record, and for
+Step 9, Google: the domain property `bertlab.hr` was already verified (its TXT record is at the
+apex; a TXT record cannot sit beside the subdomain's CNAME), so the sitemap went in there and both
+home pages were sent to Request indexing. Bing: the user's account already had the site `bertlab.hr`,
+which takes subdomains, so the sitemap was submitted there (Sitemaps > Submit sitemap) and the four pages
+through URL Submission; no import from Google and no DNS record was needed. Step 10: the privacy URL was sent
+for review with 2.0.0 on 2026-11-11 (sending it restarted the review that had begun that afternoon). The list stays as the record, and for
 a move to another host. Before the switch, GitHub Pages published the repository's `docs/` folder
 from `main` (the old Jekyll build), and the privacy address lived there. In this order, the address
 never goes dark:

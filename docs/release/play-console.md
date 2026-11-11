@@ -23,7 +23,7 @@ Settings and the child's tunes are stored locally on the device.
 | Languages | English (default) and Croatian; the UI follows the system language and Android 13+ per-app language settings. The Croatian listing translation takes the `text/hr/` words and the `hr/` screenshots so Croatian users see the listing in their language. |
 | Contact email | Required; shown publicly |
 | Website | `https://flute-assistant.bertlab.hr` (Store settings > Store listing contact details; set 2026-11-11, published at once, no review) |
-| Privacy policy URL | Required. `https://flute-assistant.bertlab.hr/privacy/` once the website is live (`site/README.md`); until then the old `https://rdeak.github.io/flute-assistant/release/privacy-policy.html`, which keeps working |
+| Privacy policy URL | Required. `https://flute-assistant.bertlab.hr/privacy/`: sent for review with 2.0.0 on 2026-11-11 (a change sent while a review runs restarts that review). The old `https://rdeak.github.io/flute-assistant/release/privacy-policy.html` redirects to the same policy on the new domain and must keep working for older app versions |
 
 The listing's words live in `play-listing/text/<lang>/` (`en`, `hr`), one file per Play field:
 `short-description.txt` (80 characters at most), `full-description.txt` (4000) and
