@@ -1,0 +1,53 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// Word of mouth is how most families hear of the app: the phone's own share sheet where there is
+// one, otherwise the address copied to the clipboard. Without JavaScript the button stays hidden.
+interface Props {
+  label: string;
+  text: string;
+  copied: string;
+  url: string;
+}
+
+const { label, text, copied, url } = Astro.props;
+---
+
+<div class="share" data-share data-url={url} data-text={text} data-copied={copied} hidden>
+  <button class="btn btn--listen" type="button">
+    <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    {label}
+  </button>
+  <span class="share__status" role="status" aria-live="polite"></span>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-share]').forEach((box) => {
+    const button = box.querySelector('button')!;
+    const status = box.querySelector<HTMLElement>('.share__status')!;
+    const url = box.dataset.url ?? location.href;
+    const text = box.dataset.text ?? '';
+    const canShare = typeof navigator.share === 'function';
+    const canCopy = !!navigator.clipboard?.writeText;
+    if (!canShare && !canCopy) return;
+    box.hidden = false;
+    button.addEventListener('click', async () => {
+      if (canShare) {
+        try {
+          await navigator.share({ title: document.title, text, url });
+          return;
+        } catch (e) {
+          if ((e as DOMException).name === 'AbortError') return;
+        }
+      }
+      try {
+        await navigator.clipboard.writeText(url);
+        status.textContent = box.dataset.copied ?? '';
+        setTimeout(() => (status.textContent = ''), 2500);
+      } catch {
+        /* nothing to fall back on: the address bar still has it */
+      }
+    });
+  });
+</script>

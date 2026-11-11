@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.core.log
 
 /**
@@ -25,4 +28,5 @@ object LogTags {
     const val METRONOME = "FA.Metronome"
     const val PLAYBACK = "FA.Playback"
     const val FLUTE = "FA.Flute"
+    const val NOTES = "FA.Notes"
 }

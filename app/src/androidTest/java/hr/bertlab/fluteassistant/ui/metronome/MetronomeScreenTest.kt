@@ -1,7 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.metronome
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -10,6 +14,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -19,10 +24,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.TimeSignature
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.needsDevice
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,10 +49,13 @@ class MetronomeScreenTest {
     private var chosenBpm: Int? = null
     private var chosenSignature: TimeSignature? = null
 
+    private val back = BackKey()
+
     private fun show(initial: MetronomeUiState, locale: Locale = Locale.ENGLISH) {
         state = mutableStateOf(initial)
         compose.setContent {
             LocaleProvider(locale) {
+                back.Watch()
                 MetronomeContent(
                     state = state.value,
                     onTogglePlayback = { toggles++ },
@@ -108,6 +120,18 @@ class MetronomeScreenTest {
     }
 
     @Test
+    fun back_closes_the_open_wheel_and_nothing_else() {
+        show(MetronomeUiState(config = MetronomeConfig(bpm = 120)))
+        assertFalse("with the wheel closed Back is the phone's", back.taken(compose))
+        compose.onNodeWithText("120").performClick()
+        compose.onNodeWithText("119").assertIsDisplayed()
+        back.press(compose)
+        compose.onNodeWithText("119").assertDoesNotExist()
+        compose.onNodeWithText("120").assertIsDisplayed()
+        assertFalse(back.taken(compose))
+    }
+
+    @Test
     fun scrolling_the_wheel_changes_the_tempo_one_beat_per_notch() {
         show(MetronomeUiState(config = MetronomeConfig(bpm = 120)))
         compose.onNodeWithText("120").performClick()
@@ -158,6 +182,26 @@ class MetronomeScreenTest {
         assertEquals(TimeSignature.FIVE_FOUR, chosenSignature)
         compose.onNodeWithContentDescription("Fewer beats").performClick()
         assertEquals(TimeSignature.THREE_FOUR, chosenSignature)
+    }
+
+    /**
+     * 6/8's fourth bubble is a medium accent, a little bigger than a plain one, so a row that counts
+     * only the first as bigger comes out too wide and squeezes the last bubble into an oval. The
+     * bubbles have no nodes of their own, so the last one is measured from what is drawn.
+     */
+    @Test
+    fun six_beats_stay_round() {
+        needsDevice()
+        show(MetronomeUiState(config = MetronomeConfig(timeSignature = TimeSignature.SIX_EIGHT)))
+        val image = compose.onNodeWithContentDescription("Beats in a bar: 6").captureToImage().toPixelMap()
+        val background = image[0, 0]
+        fun drawn(x: Int) = (0 until image.height).any { y -> image[x, y] != background }
+        val right = (image.width - 1 downTo 0).first { drawn(it) }
+        val left = (right downTo 0).first { !drawn(it) } + 1
+        val rows = (0 until image.height).filter { y -> (left..right).any { x -> image[x, y] != background } }
+        val width = right - left + 1
+        val height = rows.last() - rows.first() + 1
+        assertTrue("the last bubble is $width px wide and $height px tall", kotlin.math.abs(width - height) <= 2)
     }
 
     @Test

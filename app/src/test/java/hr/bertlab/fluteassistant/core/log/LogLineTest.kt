@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.core.log
 
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
@@ -9,6 +12,14 @@ class LogLineTest {
     @Test
     fun `an event with no fields is just its name`() {
         assertEquals("mic.close", LogLine.format("mic.close"))
+    }
+
+    @Test
+    fun `parse splits an event and its fields, unquoting text`() {
+        val (event, fields) = LogLine.parse("session.start at=2026-11-05T18:32:10+01:00 device=\"Google Pixel 7\" floor=none n=2")
+        assertEquals("session.start", event)
+        assertEquals(mapOf("at" to "2026-11-05T18:32:10+01:00", "device" to "Google Pixel 7", "floor" to "none", "n" to "2"), fields)
+        assertEquals("mic.close" to emptyMap<String, String>(), LogLine.parse("mic.close"))
     }
 
     @Test

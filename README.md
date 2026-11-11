@@ -1,35 +1,37 @@
 # Flute Assistant
 
-An Android app for primary-school children learning the flute. It has a metronome, a chromatic
-tuner, a note reading game and a digital flute, in English and Croatian.
+An Android app for primary-school children learning the flute. It has a digital flute, a
+metronome, a chromatic tuner and a note reading game, in English and Croatian.
 
 <p align="center">
-  <img src="docs/release/play-listing/screenshots/en/1-metronome.jpg" width="200" alt="Metronome tab">
-  <img src="docs/release/play-listing/screenshots/en/2-tuner.jpg" width="200" alt="Tuner tab">
-  <img src="docs/release/play-listing/screenshots/en/3-notes.jpg" width="200" alt="Notes tab">
-  <img src="docs/release/play-listing/screenshots/en/4-flute.jpg" width="200" alt="Flute tab">
+  <img src="docs/release/play-listing/screenshots/en/1-flute.jpg" width="200" alt="Flute tab">
+  <img src="docs/release/play-listing/screenshots/en/2-metronome.jpg" width="200" alt="Metronome tab">
+  <img src="docs/release/play-listing/screenshots/en/3-tuner.jpg" width="200" alt="Tuner tab">
+  <img src="docs/release/play-listing/screenshots/en/4-notes.jpg" width="200" alt="Notes tab">
 </p>
 
 ## What it does
 
-| Tab       | What the child does                                                                                                                                                                                                                                                            |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Metronome | Drags an animal round the tempo ring (snail to cheetah) or taps one to jump to its speed, sets two to six beats in a bar and watches the animal hop on the beats. The click keeps going while the phone is in a pocket or another app is open, with a notification to stop it. |
-| Tuner     | Plays a note and sees it float above or below its home ring, with "Too high" or "Too low" and one tip on what to change, until it settles in the ring for "Perfect!". Or picks the note to play, hears it, sees the fingering and tunes to it.                                 |
-| Notes     | Reads a note name, slides a finger to its place on the treble staff and lets go. Ten notes a round, flames for hits in a row, stars and an animal for speed at the end. The child chooses which notes to practise.                                                             |
-| Flute     | Holds down any of fifteen keys, from middle C up two octaves, to sound a note. The fingering is drawn, the notes played are collected in a line, and the tune plays back.                                                                                                      |
+| Tab       | What the child does                                                                                                                                                                                                                                                                                                                                                         |
+|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Flute     | Holds any of fifteen keys, from middle C up two octaves, to sound a note: the longer the hold, the longer the note. The tune is written on a five-line staff with the note names under it and plays back at the metronome's speed; with "Listen to me" the phone hears the child's own flute and puts a star under each note played right. Six little books keep six tunes. |
+| Metronome | Drags an animal round the tempo ring (snail to cheetah) or taps one to jump to its speed, sets two to six beats in a bar and watches the animal hop on the beats. The click keeps going while the phone is in a pocket or another app is open, with a notification to stop it.                                                                                              |
+| Tuner     | Plays a note and sees it float above or below its home ring, with "A little lower" or "A little higher" and one tip on what to change, until it settles in the ring for "Perfect!". Or picks the note to play, hears it, sees the fingering and tunes to it.                                                                                                                              |
+| Notes     | Reads a note name, slides a finger to its place on the treble staff and lets go. Ten notes a round, flames for hits in a row, a star for each note found first time, and at the end a trophy over the notes asked, each filling with its colour as it is learned. The child chooses which notes to practise.                                                                                                                                                          |
 
 The screens show no jargon and almost no numbers: no BPM, hertz or cents (the only figures are the
 tempo in the middle of the ring and the small octave on note names). Tempo is an animal on the ring,
 tuning is a bubble floating up or down to its ring, and the game's score is stars, flames and an
-animal, even in the round summary. The
-metronome engine already supports tap tempo, subdivisions, click sounds and presets, and the tuner
-supports other A4 references. None of that is exposed, and it is kept for a later advanced mode.
+animal, even in the round summary.
 
 The app asks for no account and has no network permission, analytics or ads. The microphone is open
-only while the tuner tab is on screen, and the audio is analysed in memory and discarded. Settings
-and the child's tune stay on the device. The [privacy policy](docs/release/privacy-policy.md) says
-the same in full.
+only while the tuner tab is on screen or the flute listens after "Listen to me" is pressed, and the
+audio is analysed in memory and discarded. Settings and the child's tunes stay on the device. The
+[privacy policy](docs/release/privacy-policy.md) says the same in full.
+
+The app's website, [flute-assistant.bertlab.hr](https://flute-assistant.bertlab.hr), is in `site/`
+(Astro, in English and Croatian, published to GitHub Pages by `.github/workflows/site.yml`); how it
+is built and how to add a language is in `site/README.md`.
 
 ## At a glance
 
@@ -37,10 +39,10 @@ the same in full.
 |-----------------|--------------------------------------------------------------------------------------------------------------------|
 | Platform        | Android, minSdk 24, targetSdk 37                                                                                   |
 | Language and UI | Kotlin, Jetpack Compose, Material 3                                                                                |
-| Architecture    | MVVM with `StateFlow`, Hilt, Room, coroutines and Flow                                                             |
+| Architecture    | MVVM with `StateFlow`, Hilt, coroutines and Flow                                                                   |
 | Audio           | Own DSP on `AudioTrack` and `AudioRecord`: click synthesis, YIN pitch detection, a sustained-tone synth            |
 | Dependencies    | AndroidX, plus Hilt and kotlinx.coroutines. No audio, networking or image libraries                                |
-| Size            | About 7,400 lines of app code and 4,300 lines of tests (about 220 JVM unit tests, about 70 instrumented)           |
+| Size            | About 17,000 lines of app code and 17,500 lines of tests (about 580 rule and view-model tests, about 430 screen tests) |
 | Languages       | English and Croatian, switchable in the app                                                                        |
 | Status          | 1.0.1 is on the Play internal testing track and a GitHub Release. Store listing in both languages is ready         |
 
@@ -49,12 +51,15 @@ the same in full.
 The code is layered by package under `app/src/main/java/hr/bertlab/fluteassistant/`:
 
 ```
-domain/    pure Kotlin: models, note math, tap tempo, the note pool, repository interfaces, use cases
-data/      Room and SharedPreferences implementations of those interfaces
+domain/    the rules, pure Kotlin with no Android import, a package per feature: how a held key writes
+           the tune, how "Your turn" judges playing, the notes game's round, the listening thresholds,
+           note math, the settings interface
+data/      the SharedPreferences settings store
 audio/     metronome, tuner and flute-tone engines
 playback/  foreground service that keeps the metronome alive off screen
-ui/        Compose screens and ViewModels (StateFlow state, intent methods)
-di/        Hilt modules binding each interface to its Android implementation
+ui/        Compose screens, and one ViewModel per tab that gives the rules the clock, the sound,
+           the storage and the log (StateFlow state, intent methods)
+di/        the Hilt module binding each interface to its Android implementation
 core/      fake-able monotonic clock, logger
 ```
 
@@ -126,9 +131,12 @@ not wait for the old one. The render loop is plain Kotlin so this close path is 
 
 - Unit tests use hand-written fakes (`FakeMetronomePlayer`, `FakeTunerEngine`, `FakeSettingsStore`,
   `FakeClock`, `FakeFluteTonePlayer` and others) and no mocking library.
+- The rules are tested where they live, in `domain`, as plain JVM tests with no dispatcher.
 - ViewModel tests run under `StandardTestDispatcher` and drive time with `advanceTimeBy`.
-- Instrumented tests render each `Content` composable with the locale pinned, and a resource test
-  checks that labels and note names follow the locale.
+- Screen tests render each `Content` composable with the locale pinned, and a resource test
+  checks that labels and note names follow the locale. They run two ways: on the JVM under
+  Robolectric with the unit tests (seconds), and on the emulator as instrumented tests, which is
+  where the few that read the screen's pixels run.
 - Audio output cannot be judged in CI. The emulator runs with `-no-audio` because with host audio on
   it crashed about 30 s after the metronome started, so sound is checked on a phone.
 
@@ -198,7 +206,11 @@ description of the internals, kept in step with the code.
   Console.
 - Sound quality and the -60 dBFS silence gate can only be confirmed on a phone, and the tuner's
   confidence gate is waiting for such a capture.
-- Room is at schema version 1 with a destructive fallback migration. Presets are not exposed, so no
-  user data is stored there today, but a migration has to be written before they ship.
-- Tap tempo, subdivisions, click sounds, presets and the A4 reference are built but have no screen.
-  The advanced mode that would hold them is not started.
+
+## Licence
+
+Flute Assistant is free software under the [GNU General Public License, version 3 or later](LICENSE),
+with the additional terms in [NOTICE](NOTICE). Anyone who distributes a modified version must share
+its source under the same licence, keep the credit and the link to this repository, and mark it as
+changed. The Nunito font stays under the [SIL Open Font License](docs/licenses/Nunito-OFL.txt).
+Changes are welcome back here: see [CONTRIBUTING](CONTRIBUTING.md).

@@ -1,7 +1,14 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.tuner
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.core.log.LogTags
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.HearingTracker
+import hr.bertlab.fluteassistant.domain.listen.ListenRules
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeReferenceTonePlayer
@@ -46,7 +53,7 @@ class TunerViewModelLoggingTest {
         startListening()
     }
 
-    private fun steady(freq: Double) = repeat(TunerViewModel.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
+    private fun steady(freq: Double) = repeat(ListenRules.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
 
     @Test
     fun `a summary of frame decisions is logged about once a second`() = runTest(dispatcher) {
@@ -54,18 +61,18 @@ class TunerViewModelLoggingTest {
         advanceUntilIdle()
         val lowProbability = 20
         repeat(lowProbability) { engine.frames.tryEmit(pitched(440.0, probability = 0.82)) } // found, but under the gate
-        repeat(TunerViewModel.SUMMARY_FRAMES - lowProbability) { engine.frames.tryEmit(silence) }
+        repeat(ListenRules.SUMMARY_FRAMES - lowProbability) { engine.frames.tryEmit(silence) }
         advanceUntilIdle()
 
         val summary = logger.events("tuner.summary").single()
         assertEquals(LogTags.TUNER, summary.tag)
-        assertEquals(TunerViewModel.SUMMARY_FRAMES, summary["frames"])
+        assertEquals(ListenRules.SUMMARY_FRAMES, summary["frames"])
         assertEquals(lowProbability, summary["lowProb"])
-        assertEquals(TunerViewModel.SUMMARY_FRAMES - lowProbability, summary["silent"])
+        assertEquals(ListenRules.SUMMARY_FRAMES - lowProbability, summary["silent"])
         assertEquals(0, summary["shown"])
         assertEquals(0.82, summary["pMin"] as Double, 1e-9)
         assertEquals(0.82, summary["pMax"] as Double, 1e-9)
-        assertEquals(TunerViewModel.MIN_PROBABILITY, summary["gate"] as Double, 1e-9)
+        assertEquals(ListenRules.MIN_PROBABILITY, summary["gate"] as Double, 1e-9)
         assertNull(summary["reading"])
         assertEquals(settings.targetNote, summary["target"])
         assertEquals(TunerMode.IDENTIFY, summary["mode"])
@@ -81,7 +88,7 @@ class TunerViewModelLoggingTest {
         assertEquals(listOf(69), logger.events("tuner.reading").map { it["midi"] })
 
         steady(392.0)
-        repeat(TunerViewModel.HOLD_FRAMES) { engine.frames.tryEmit(silence) }
+        repeat(ListenRules.HOLD_FRAMES) { engine.frames.tryEmit(silence) }
         advanceUntilIdle()
         assertEquals(listOf(69, 67, null), logger.events("tuner.reading").map { it["midi"] })
         assertEquals(69, logger.events("tuner.reading")[1]["target"])

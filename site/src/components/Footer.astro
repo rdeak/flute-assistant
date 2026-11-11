@@ -1,0 +1,35 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// Who made it, the policy, and the two notices the artwork asks for: Google Play's trademark line
+// (the badge) and the Android robot's CC BY 3.0 attribution (the icon).
+import { language, pagePath, CONTACT_EMAIL, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = language(lang).strings;
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="notes-dots" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <nav class="site-footer__links" aria-label={t.footer.privacy}>
+      <a href={pagePath(lang, 'home')}>{t.footer.home}</a>
+      <a href={pagePath(lang, 'privacy')}>{t.footer.privacy}</a>
+      <a href={`mailto:${CONTACT_EMAIL}`}>{t.footer.contact}: {CONTACT_EMAIL}</a>
+    </nav>
+    <p class="site-footer__made">© {year} {t.footer.madeBy}</p>
+    <p class="site-footer__legal">
+      {t.footer.playTrademark}
+      {' '}
+      {t.footer.robot}
+      {' '}
+      <a href="https://creativecommons.org/licenses/by/3.0/" rel="license noopener">CC BY 3.0</a>
+    </p>
+  </div>
+</footer>

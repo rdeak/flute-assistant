@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -24,7 +27,7 @@ object FluteTheme {
  * Material's scheme is derived from the same tokens so the few Material pieces left (the
  * snackbar, ripples, the default text colour) match the hand-drawn ones.
  */
-private fun FluteColors.toColorScheme(dark: Boolean): ColorScheme {
+internal fun FluteColors.toColorScheme(dark: Boolean): ColorScheme {
     val base = if (dark) darkColorScheme() else lightColorScheme()
     return base.copy(
         primary = outline,
@@ -46,8 +49,10 @@ private fun FluteColors.toColorScheme(dark: Boolean): ColorScheme {
         surfaceContainerHighest = raised,
         outline = border,
         outlineVariant = border,
-        error = Stop,
-        onError = InkOnFill,
+        // Error text is small and sits on the card or the page: the light coral is only 2:1 there,
+        // so light takes the deep red of the Stop button (white on it, as on the button).
+        error = if (dark) Stop else ActionStop,
+        onError = if (dark) InkOnFill else OnAction,
         inverseSurface = text,
         inverseOnSurface = page,
     )
@@ -58,7 +63,8 @@ private val DarkColorScheme = DarkFluteColors.toColorScheme(dark = true)
 
 /**
  * Material 3 theme with a fixed playful palette (see [Color.kt]), extra-round shapes and
- * big, bold rounded type. Dark mode follows the system setting.
+ * big, bold rounded type. Dark mode follows the system setting unless the caller says otherwise
+ * (`MainScreen` passes the child's choice, [ThemeViewModel]).
  */
 @Composable
 fun FluteAssistantTheme(

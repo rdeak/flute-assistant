@@ -1,13 +1,17 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.tuner
 
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
@@ -60,10 +64,37 @@ class TunerScreenTest {
     private fun identifying(frequency: Double?) = listening(frequency, mode = TunerMode.IDENTIFY)
 
     @Test
+    fun the_card_asks_without_a_way_out_of_the_app() {
+        show(TunerUiState(permissionGranted = false))
+        compose.onNodeWithText("Can I listen?").assertIsDisplayed()
+        compose.onNodeWithText("Yes").assertIsDisplayed()
+        compose.onNodeWithText("Settings").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_card_offers_settings_once_the_phone_will_not_ask_again() {
+        show(TunerUiState(permissionGranted = false, micBlocked = true))
+        compose.onNodeWithText("Yes").assertIsDisplayed()
+        compose.onNodeWithText("Settings").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_microphone_failure_says_so_in_plain_words() {
+        show(listening(null).copy(isListening = false, micFailed = true))
+        compose.onNodeWithText("I can't listen right now.").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_microphone_failure_speaks_the_childs_language() {
+        show(listening(null).copy(isListening = false, micFailed = true), locale = Locale.forLanguageTag("hr"))
+        compose.onNodeWithText("Sada ne mogu slušati.").assertIsDisplayed()
+    }
+
+    @Test
     fun identify_mode_names_the_heard_note_without_the_wheel() {
         show(identifying(443.0)) // A4 played 12 cents sharp
         compose.onNodeWithContentDescription("Your sound is A4 but a little high. Go down").assertIsDisplayed()
-        compose.onNodeWithText("⬆️ Too high").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
         compose.onNodeWithText("Hear").assertDoesNotExist()
     }
 
@@ -72,7 +103,7 @@ class TunerScreenTest {
         // Sixty cents above A4: the nearest note is A♯4, but the ring has not moved yet.
         show(listening(455.4, mode = TunerMode.IDENTIFY).copy(identifiedMidi = 69))
         compose.onNodeWithContentDescription("Your sound is A4 but a little high. Go down").assertIsDisplayed()
-        compose.onNodeWithText("⬆️ Too high").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
         compose.onNodeWithContentDescription("Fingering for A4").assertExists()
     }
 
@@ -116,7 +147,7 @@ class TunerScreenTest {
     fun shows_the_target_note_alone_and_too_high() {
         show(listening(443.0)) // A4 chosen and played 12 cents sharp
         compose.onNodeWithContentDescription("Your sound is A4 but a little high. Go down").assertIsDisplayed()
-        compose.onNodeWithText("⬆️ Too high").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
         compose.onNodeWithText("+12 ¢").assertDoesNotExist()
     }
 
@@ -124,7 +155,7 @@ class TunerScreenTest {
     fun measures_against_the_chosen_note() {
         show(listening(440.0, targetMidi = 67)) // a perfect A4, but G4 was chosen
         compose.onNodeWithContentDescription("Your sound is A4, well above G4. Go down").assertIsDisplayed()
-        compose.onNodeWithText("⬆️ That's A4").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ That's A4").assertIsDisplayed()
         compose.onNodeWithText("👀 Check your fingers").assertIsDisplayed()
     }
 
@@ -138,7 +169,7 @@ class TunerScreenTest {
     @Test
     fun a_different_note_is_named_and_sent_to_the_fingers() {
         show(listening(329.63)) // E4 played, A4 chosen
-        compose.onNodeWithText("⬇️ That's E4").assertIsDisplayed()
+        compose.onNodeWithText("⬆️ That's E4").assertIsDisplayed()
         compose.onNodeWithContentDescription("Your sound is E4, well below A4. Go up").assertIsDisplayed()
         compose.onNodeWithText("👀 Check your fingers").assertIsDisplayed()
     }
@@ -146,7 +177,7 @@ class TunerScreenTest {
     @Test
     fun the_octave_above_the_chosen_note_asks_for_gentler_air() {
         show(listening(880.0)) // A5 played, A4 chosen: overblown
-        compose.onNodeWithText("⬆️ An octave too high").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ An octave lower").assertIsDisplayed()
         compose.onNodeWithContentDescription("Your sound is A5, well above A4. Go down").assertIsDisplayed()
         compose.onNodeWithText("🍃 Gentler air").assertIsDisplayed()
     }
@@ -154,37 +185,37 @@ class TunerScreenTest {
     @Test
     fun the_octave_below_the_chosen_note_asks_for_faster_air() {
         show(listening(261.63, targetMidi = 72)) // C4 played, C5 chosen: underblown
-        compose.onNodeWithText("⬇️ An octave too low").assertIsDisplayed()
+        compose.onNodeWithText("⬆️ An octave higher").assertIsDisplayed()
         compose.onNodeWithText("💨 Faster air").assertIsDisplayed()
     }
 
     @Test
     fun a_different_note_is_named_in_croatian_with_its_croatian_name() {
         show(listening(493.88), locale = Locale.forLanguageTag("hr")) // B4 is h1
-        compose.onNodeWithText("⬆️ To je h1").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ To je h1").assertIsDisplayed()
         compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
     }
 
     @Test
     fun too_low_advises_rolling_out() {
         show(listening(430.0)) // A4 about 40 cents flat
-        compose.onNodeWithText("⬇️ Too low").assertIsDisplayed()
+        compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
         compose.onNodeWithText("🔄 Roll the flute out a little").assertIsDisplayed()
     }
 
     @Test
     fun too_high_advises_rolling_in() {
         show(listening(443.0)) // A4 about 12 cents sharp
-        compose.onNodeWithText("⬆️ Too high").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
         compose.onNodeWithText("🔄 Roll the flute in a little").assertIsDisplayed()
     }
 
     @Test
     fun a_note_played_well_flat_is_still_the_chosen_note() {
         show(listening(425.0)) // A4 sixty cents flat: the nearest note is G♯4, the fingers are right
-        compose.onNodeWithText("⬇️ Too low").assertIsDisplayed()
+        compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
         compose.onNodeWithText("🔄 Roll the flute out a little").assertIsDisplayed()
-        compose.onNodeWithText("⬇️ That's G♯4").assertDoesNotExist()
+        compose.onNodeWithText("⬆️ That's G♯4").assertDoesNotExist()
         compose.onNodeWithContentDescription("Your sound is A4 but a little low. Go up").assertIsDisplayed()
     }
 
@@ -214,7 +245,7 @@ class TunerScreenTest {
     @Test
     fun croatian_advice_uses_the_informal_form() {
         show(listening(430.0), Locale("hr"))
-        compose.onNodeWithText("⬇️ Prenisko").assertIsDisplayed()
+        compose.onNodeWithText("⬆️ Malo više").assertIsDisplayed()
         compose.onNodeWithText("🔄 Zakreni flautu malo od sebe").assertIsDisplayed()
     }
 

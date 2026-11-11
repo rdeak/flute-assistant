@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Adaptive icon foreground: the app icon's picture inset so all of it, the flute's ends
+<!-- Adaptive icon foreground: the app icon's picture inset so all of it, the flute's ends and hands
      included, stays inside the 66dp safe circle of the 108dp canvas (23.3 % each side shrinks the
      512 box to 57.6dp). tools/IconGen.java renders the legacy PNGs with the same placement. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"

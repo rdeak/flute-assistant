@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.domain.tuner
 
 import org.junit.Assert.assertEquals
@@ -8,43 +11,35 @@ class NoteMathTest {
     @Test
     fun `440 Hz is A4 with zero cents`() {
         val reading = NoteMath.frequencyToNote(440.0)
-        assertEquals("A", reading.name)
-        assertEquals(4, reading.octave)
         assertEquals(69, reading.midi)
         assertEquals(0.0, reading.cents, 0.01)
-        assertEquals("A4", reading.label)
-        assertEquals(440.0, reading.targetFrequency, 1e-9)
+        assertEquals(440.0, reading.frequency, 0.0)
     }
 
     @Test
-    fun `middle C and octave numbering`() {
+    fun `middle C and the octaves around it`() {
         val c4 = NoteMath.frequencyToNote(261.6256)
-        assertEquals("C", c4.name)
-        assertEquals(4, c4.octave)
         assertEquals(60, c4.midi)
         assertEquals(0.0, c4.cents, 0.05)
 
-        val c6 = NoteMath.frequencyToNote(1046.502)
-        assertEquals("C6", c6.label)
-
-        val b3 = NoteMath.frequencyToNote(246.94)
-        assertEquals("B3", b3.label)
+        assertEquals(84, NoteMath.frequencyToNote(1046.502).midi) // C6
+        assertEquals(59, NoteMath.frequencyToNote(246.94).midi) // B3
     }
 
     @Test
-    fun `sharp names`() {
-        assertEquals("A♯4", NoteMath.frequencyToNote(466.16).label)
-        assertEquals("F♯5", NoteMath.frequencyToNote(739.99).label)
+    fun `sharps are notes of their own`() {
+        assertEquals(70, NoteMath.frequencyToNote(466.16).midi) // A sharp 4
+        assertEquals(78, NoteMath.frequencyToNote(739.99).midi) // F sharp 5
     }
 
     @Test
     fun `sharp and flat deviations in cents`() {
         val sharp = NoteMath.frequencyToNote(445.0)
-        assertEquals("A4", sharp.label)
+        assertEquals(69, sharp.midi)
         assertEquals(19.56, sharp.cents, 0.05)
 
         val flat = NoteMath.frequencyToNote(432.0)
-        assertEquals("A4", flat.label)
+        assertEquals(69, flat.midi)
         assertEquals(-31.77, flat.cents, 0.05)
     }
 
@@ -59,25 +54,9 @@ class NoteMathTest {
     }
 
     @Test
-    fun `reference pitch can be changed`() {
-        val reading = NoteMath.frequencyToNote(442.0, a4 = 442.0)
-        assertEquals("A4", reading.label)
-        assertEquals(0.0, reading.cents, 0.01)
-        assertEquals(442.0, reading.targetFrequency, 1e-9)
-    }
-
-    @Test
-    fun `label of a midi number`() {
-        assertEquals("A♯4", NoteMath.labelOf(70))
-        assertEquals("B3", NoteMath.labelOf(59))
-        assertEquals("C-1", NoteMath.labelOf(0))
-    }
-
-    @Test
     fun `midi to frequency`() {
         assertEquals(440.0, NoteMath.midiToFrequency(69), 1e-9)
         assertEquals(261.6256, NoteMath.midiToFrequency(60), 1e-3)
-        assertEquals(442.0, NoteMath.midiToFrequency(69, a4 = 442.0), 1e-9)
     }
 
     @Test
@@ -86,6 +65,5 @@ class NoteMathTest {
         assertEquals(100.0, NoteMath.centsBetween(466.16, 69), 0.05)
         assertEquals(-1200.0, NoteMath.centsBetween(220.0, 69), 0.01)
         assertEquals(900.0, NoteMath.centsBetween(440.0, 60), 0.01)
-        assertEquals(0.0, NoteMath.centsBetween(442.0, 69, a4 = 442.0), 0.01)
     }
 }

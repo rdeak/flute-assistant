@@ -1,22 +1,32 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.fakes
 
 import hr.bertlab.fluteassistant.audio.flute.FluteTonePlayer
 import hr.bertlab.fluteassistant.audio.metronome.BeatEvent
 import hr.bertlab.fluteassistant.audio.metronome.MetronomePlayer
 import hr.bertlab.fluteassistant.audio.metronome.PlaybackState
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
 import hr.bertlab.fluteassistant.audio.tuner.ReferenceTonePlayer
 import hr.bertlab.fluteassistant.audio.tuner.TunerEngine
 import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.Logger
-import hr.bertlab.fluteassistant.domain.flute.TuneNote
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.Preset
+import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
+import hr.bertlab.fluteassistant.domain.flute.Pulse
+import hr.bertlab.fluteassistant.domain.flute.Shelf
+import hr.bertlab.fluteassistant.domain.flute.Songbook
+import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.notes.NoteProgress
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.domain.repository.PresetRepository
-import hr.bertlab.fluteassistant.domain.repository.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.SettingsStore
+import hr.bertlab.fluteassistant.domain.settings.ThemeChoice
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
-import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.playback.BackgroundPlayback
 import kotlinx.coroutines.flow.Flow
@@ -37,30 +47,22 @@ class FakeMetronomePlayer : MetronomePlayer {
     var playing = false
 
     var started: MetronomeConfig? = null
-    var startVolume: Float? = null
     val updates = mutableListOf<MetronomeConfig>()
-    var volume: Float? = null
     var stopCount = 0
     var refuseStart = false
     var lastSession = 0L
 
-    override fun start(config: MetronomeConfig, volume: Float): Long {
+    override fun start(config: MetronomeConfig): Long {
         if (refuseStart) return MetronomePlayer.NO_SESSION
         started = config
-        startVolume = volume
         playing = true
-        _playback.value = PlaybackState(++lastSession, config, volume)
+        _playback.value = PlaybackState(++lastSession, config)
         return lastSession
     }
 
     override fun update(config: MetronomeConfig) {
         updates += config
         _playback.update { it?.copy(config = config) }
-    }
-
-    override fun setVolume(volume: Float) {
-        this.volume = volume
-        _playback.update { it?.copy(volume = volume) }
     }
 
     override fun stop() {
@@ -81,26 +83,6 @@ class FakeMetronomePlayer : MetronomePlayer {
 class FakeBackgroundPlayback : BackgroundPlayback {
     var startCount = 0
     override fun start() { startCount++ }
-}
-
-class FakePresetRepository : PresetRepository {
-    val presets = MutableStateFlow<List<Preset>>(emptyList())
-    var failWrites = false
-    private var nextId = 1L
-
-    override fun observePresets(): Flow<List<Preset>> = presets
-
-    override suspend fun save(name: String, config: MetronomeConfig): Long {
-        if (failWrites) throw IllegalStateException("disk full")
-        val id = nextId++
-        presets.update { listOf(Preset(id, name, config, createdAt = id)) + it }
-        return id
-    }
-
-    override suspend fun delete(id: Long) {
-        if (failWrites) throw IllegalStateException("disk full")
-        presets.update { list -> list.filterNot { it.id == id } }
-    }
 }
 
 class FakeTunerEngine : TunerEngine {
@@ -162,20 +144,23 @@ class FakeFluteTonePlayer : FluteTonePlayer {
 
 class FakeSettingsStore(
     var config: MetronomeConfig = MetronomeConfig(),
-    var volume: Float = 0.8f,
-    var referenceA4: Double = NoteMath.DEFAULT_A4,
     var targetNote: Int = FluteRange.DEFAULT_TARGET,
     var tunerMode: TunerMode = TunerMode.IDENTIFY,
     var practiceNotes: Set<Int> = StaffNotes.DEFAULT_PRACTICE,
     var noteSound: Boolean = true,
-    var tune: List<TuneNote> = emptyList(),
+    val books: MutableList<Book> = MutableList(Songbook.SIZE) { Book() },
+    var openBook: Int = 0,
+    var theme: ThemeChoice = ThemeChoice.SYSTEM,
+    var notesGame: NotesGame = NotesGame.FIND,
+    var noteProgress: NoteProgress = NoteProgress.EMPTY,
 ) : SettingsStore {
+    /** The tune of the open book, so a test can set or read it without going through the shelf. */
+    var tune: List<TuneItem>
+        get() = books[openBook].tune
+        set(value) { books[openBook] = books[openBook].copy(tune = value) }
+
     override fun loadMetronomeConfig() = config
     override fun saveMetronomeConfig(config: MetronomeConfig) { this.config = config }
-    override fun loadVolume() = volume
-    override fun saveVolume(volume: Float) { this.volume = volume }
-    override fun loadReferenceA4() = referenceA4
-    override fun saveReferenceA4(hz: Double) { referenceA4 = hz }
     override fun loadTargetNote() = targetNote
     override fun saveTargetNote(midi: Int) { targetNote = midi }
     override fun loadTunerMode() = tunerMode
@@ -184,8 +169,15 @@ class FakeSettingsStore(
     override fun savePracticeNotes(notes: Set<Int>) { practiceNotes = notes }
     override fun loadNoteSound() = noteSound
     override fun saveNoteSound(enabled: Boolean) { noteSound = enabled }
-    override fun loadTune() = tune
-    override fun saveTune(notes: List<TuneNote>) { tune = notes }
+    override fun loadNotesGame() = notesGame
+    override fun saveNotesGame(game: NotesGame) { notesGame = game }
+    override fun loadNoteProgress() = noteProgress
+    override fun saveNoteProgress(progress: NoteProgress) { noteProgress = progress }
+    override fun loadShelf() = Shelf(openBook, books.toList())
+    override fun saveBook(index: Int, book: Book) { books[index] = book }
+    override fun saveOpenBook(index: Int) { openBook = index }
+    override fun loadTheme() = theme
+    override fun saveTheme(choice: ThemeChoice) { theme = choice }
 }
 
 class FakeClock(var now: Long = 0L) : MonotonicClock {
@@ -213,5 +205,30 @@ class FakeLogger(var verbose: Boolean = false) : Logger {
     }
     override fun e(tag: String, event: String, vararg fields: Pair<String, Any?>, error: Throwable?) {
         events += Event('e', tag, event, mapOf(*fields), error)
+    }
+}
+
+/** Remembers every call of the flute's session recorder; [onStart] and [onEnd] run first, so a test can look around at that moment. */
+class FakeListenRecorder : ListenRecorder {
+    data class Start(val tune: List<TuneItem>, val pulse: Pulse, val floor: Float?)
+
+    val started = mutableListOf<Start>()
+    val frames = mutableListOf<ListenFrame>()
+    val ended = mutableListOf<Map<Int, StepMark>>()
+    var onStart: () -> Unit = {}
+    var onEnd: () -> Unit = {}
+
+    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) {
+        onStart()
+        started += Start(tune, pulse, floor)
+    }
+
+    override fun frame(frame: ListenFrame) {
+        frames += frame
+    }
+
+    override fun end(marks: Map<Int, StepMark>) {
+        onEnd()
+        ended += marks
     }
 }

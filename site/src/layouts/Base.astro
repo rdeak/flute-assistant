@@ -1,0 +1,100 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// Every page's frame: the <head> search engines and link previews read, the header, the footer and
+// the banner that offers the visitor's own language.
+import { Font, fontData, getImage } from 'astro:assets';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import LanguageSuggest from '../components/LanguageSuggest.astro';
+import { languages, defaultLang, language, pagePath, APP_NAME, type Lang, type Page } from '../i18n';
+import { icon, featureGraphic } from '../i18n/media';
+
+interface Props {
+  lang: Lang;
+  /** Which page this is, for the canonical and language links; none for a page in one language only. */
+  page?: Page;
+  /** The page the language menu offers in each language, when it is not `page` itself. */
+  menuPage?: Page;
+  title: string;
+  description: string;
+  /** Overrides the canonical address (the legacy privacy address points at /privacy/). */
+  canonicalPath?: string;
+  noindex?: boolean;
+}
+
+const { lang, page, menuPage = page, title, description, canonicalPath, noindex = false } = Astro.props;
+const t = language(lang).strings;
+const site = Astro.site!;
+const abs = (path: string) => new URL(path, site).href;
+
+const canonical = abs(canonicalPath ?? (page ? pagePath(lang, page) : Astro.url.pathname));
+const alternates = page
+  ? languages.map((l) => ({ hreflang: l.code, href: abs(pagePath(l.code, page)) }))
+  : [];
+
+// The font files in astro.config.mjs's order: latin, then latin-ext. Preload what the first screen
+// needs, so the text does not reflow when the font arrives.
+const fontFiles = (fontData['--font-nunito'] ?? []).map((face) => face.src[0]?.url).filter(Boolean);
+const preloadFonts = fontFiles.slice(0, language(lang).extendedLatin ? 2 : 1);
+
+const [favicon, appleTouch, ogImage] = await Promise.all([
+  getImage({ src: icon, width: 48, height: 48, format: 'png' }),
+  getImage({ src: icon, width: 180, height: 180, format: 'png' }),
+  getImage({ src: featureGraphic, format: 'png' }),
+]);
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content={noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large'} />
+    {!noindex && <link rel="canonical" href={canonical} />}
+    {alternates.map((a) => <link rel="alternate" hreflang={a.hreflang} href={a.href} />)}
+    {page && <link rel="alternate" hreflang="x-default" href={abs(pagePath(defaultLang, page))} />}
+
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#EAF4FF" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171A2E" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" sizes="48x48" href={favicon.src} />
+    <link rel="apple-touch-icon" href={appleTouch.src} />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={APP_NAME} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={abs(ogImage.src)} />
+    <meta property="og:image:width" content={String(featureGraphic.width)} />
+    <meta property="og:image:height" content={String(featureGraphic.height)} />
+    <meta property="og:image:alt" content={t.meta.ogImageAlt} />
+    <meta property="og:locale" content={language(lang).ogLocale} />
+    {
+      languages
+        .filter((l) => l.code !== lang)
+        .map((l) => <meta property="og:locale:alternate" content={l.ogLocale} />)
+    }
+    <meta name="twitter:card" content="summary_large_image" />
+
+    {preloadFonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
+    <Font cssVariable="--font-nunito" />
+    <slot name="head" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{t.skipLink}</a>
+    <Header lang={lang} page={menuPage} />
+    {page && <LanguageSuggest lang={lang} page={page} />}
+    <main id="main">
+      <slot />
+    </main>
+    <Footer lang={lang} />
+  </body>
+</html>

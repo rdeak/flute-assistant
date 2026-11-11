@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.foundation.clickable
@@ -34,6 +37,12 @@ import kotlin.math.abs
 
 /** Rows a [ValueWheel] shows at once: the chosen value and one neighbour on each side. */
 const val WHEEL_VISIBLE_ITEMS = 3
+
+/**
+ * How much of the muted text colour a neighbour keeps. The neighbours are 24 sp bold, so they
+ * need 3:1 against the ground they sit on (`ThemeContrastTest` pins it on every ground).
+ */
+internal const val NEIGHBOUR_ALPHA = 0.75f
 
 /**
  * A vertical drum of values, three visible: the one in the middle is the chosen one, the
@@ -76,7 +85,7 @@ fun ValueWheel(
         if (!listState.isScrollInProgress && centredIndex != selectedIndex) listState.scrollToItem(selectedIndex)
     }
 
-    val neighbourColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+    val neighbourColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = NEIGHBOUR_ALPHA)
 
     LazyColumn(
         state = listState,

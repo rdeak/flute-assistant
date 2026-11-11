@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.ui.graphics.Color
@@ -33,6 +36,14 @@ object AppIcons {
     val Done: ImageVector by lazy { stroked("done", "M5,12.5l4.5,4.5L19,7.5", 3f) }
     val Again: ImageVector by lazy {
         stroked("again", "M17,2l3,3 -3,3M4,11V9a4,4 0 0 1 4,-4h12M7,22l-3,-3 3,-3M20,13v2a4,4 0 0 1 -4,4H4", 3f)
+    }
+    /** The flute's "Your turn": a microphone, its capsule in a U-shaped stand on a base. */
+    val Microphone: ImageVector by lazy {
+        filled(
+            "microphone",
+            "M12,2.5a3.25,3.25 0 0 1 3.25,3.25v4.75a3.25,3.25 0 0 1 -6.5,0V5.75A3.25,3.25 0 0 1 12,2.5z" +
+                "M5.5,10.5a1,1 0 0 1 2,0a4.5,4.5 0 0 0 9,0a1,1 0 0 1 2,0a6.5,6.5 0 0 1 -5.5,6.42V19.5h2.5a1,1 0 0 1 0,2h-7a1,1 0 0 1 0,-2H11v-2.58A6.5,6.5 0 0 1 5.5,10.5z",
+        )
     }
 
     private fun nodes(pathData: String) = PathParser().parsePathString(pathData).toNodes()

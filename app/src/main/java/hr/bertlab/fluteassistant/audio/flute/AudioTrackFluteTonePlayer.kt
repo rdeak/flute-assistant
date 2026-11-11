@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.audio.flute
 
 import android.media.AudioAttributes
@@ -23,7 +26,8 @@ import kotlin.math.max
  *
  * On [close] the thread lets a sounding note release and plays the track buffer out before it
  * gives the track back ([ToneRenderLoop]), so leaving the tab fades rather than clicks; the
- * caller never waits for that, and a new [open] meanwhile (a rotation) starts its own track at
+ * caller never waits for that, and a new [open] meanwhile (the child leaves the tab and comes
+ * straight back; a turn of the phone does not close the player) starts its own track at
  * once rather than waiting for the fade, so the two overlap for a fraction of a second. Every
  * block is written in full ([writeFully]), even through a route rebuild.
  *

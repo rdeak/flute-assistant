@@ -1,0 +1,1 @@
+The rules of the note reading game. What must not be broken is in `../../ui/notes/CLAUDE.md`; how it works, with the reasons behind it, is in `../../ui/notes/DESIGN.md`. Read the part that covers what you change before changing it.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.theme
 
 import androidx.compose.runtime.Immutable
@@ -21,6 +24,8 @@ val InkOnFill = Color(0xFF1F2440)
 // text and icons on them pass contrast, unlike [InkOnFill] on the light [Go] and [Stop].
 val ActionGo = Color(0xFF0F7A3E)
 val ActionStop = Color(0xFFC62F2F)
+/** The flute's "Your turn", the button that makes the phone listen: a third deep action colour, blue. */
+val ActionListen = Color(0xFF1F5FBF)
 val OnAction = Color.White
 
 /** The tuner's tick when the note is in tune. */

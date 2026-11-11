@@ -1,0 +1,29 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// Google's official "Get it on Google Play" badge, unchanged, in the page's language, linking to
+// the listing (Google's badge rules). The footer carries the trademark line it asks for.
+import { Image } from 'astro:assets';
+import { language, playUrl, type Lang, type Placement } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  placement: Placement;
+  eager?: boolean;
+}
+
+const { lang, placement, eager = false } = Astro.props;
+const lng = language(lang);
+---
+
+<a class="play-badge" href={playUrl(lang, placement)} rel="noopener">
+  <Image
+    src={lng.badge}
+    alt={lng.strings.badgeAlt}
+    width={207}
+    height={80}
+    densities={[1, 2, 3]}
+    loading={eager ? 'eager' : 'lazy'}
+  />
+</a>

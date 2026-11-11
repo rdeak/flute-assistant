@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.foundation.background
@@ -19,6 +22,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -29,10 +33,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.LayerOutsets
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.translate
@@ -54,10 +58,25 @@ import hr.bertlab.fluteassistant.ui.theme.OnAction
 val OutlineWidth = 3.dp
 
 /** How far a pressed thing sinks onto its shadow. */
-private val PressDepth = 3.dp
+internal val PressDepth = 3.dp
 
 /** Opacity of something that cannot be pressed right now. */
 const val DISABLED_ALPHA = 0.45f
+
+/**
+ * Fades this to [DISABLED_ALPHA] unless [enabled], with the [chunky] shadow [depth] below it. A faded
+ * layer is drawn through an offscreen buffer that stops at its bounds, so the buffer is made that
+ * much taller; `Modifier.alpha` would cut the shadow off flat along the bottom edge.
+ */
+internal fun Modifier.fadedUnless(enabled: Boolean, depth: Dp): Modifier =
+    if (enabled) {
+        this
+    } else {
+        graphicsLayer {
+            alpha = DISABLED_ALPHA
+            outsets = LayerOutsets(bottom = depth)
+        }
+    }
 
 /**
  * The app's one pressable look: a [color] fill in [shape] with a thick [outline] and a solid
@@ -87,7 +106,9 @@ fun Modifier.chunky(
  * A [chunky] button. Plain by default; pass [selected] to make it one option of a group
  * (a radio button or a tab) or [checked] to make it an on/off choice, so assistive
  * technology hears the state. [color] fills it; text on a bright fill is ink, on the plain
- * raised colour it is the theme's text colour.
+ * raised colour it is the theme's text colour. A disabled button fades to [DISABLED_ALPHA] unless
+ * [fade] is false, for a button the caller fades together with what is drawn around it (the book
+ * button's page edges), so the whole fades once, as one layer.
  */
 @Composable
 fun ChunkyButton(
@@ -105,6 +126,7 @@ fun ChunkyButton(
         else -> Role.Button
     },
     interactionSource: MutableInteractionSource? = null,
+    fade: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val source = interactionSource ?: remember { MutableInteractionSource() }
@@ -119,7 +141,7 @@ fun ChunkyButton(
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
-            .alpha(if (enabled) 1f else DISABLED_ALPHA)
+            .fadedUnless(enabled || !fade, depth)
             .chunky(shape, color, colors.outline, depth, pressed && enabled)
             .then(gesture),
     ) {
@@ -130,7 +152,12 @@ fun ChunkyButton(
 /**
  * The big full-width action at the bottom of a screen: a drawn icon and one word, both white,
  * on a deep pill ([ActionGo] for Play, OK, Again and Yes, [ActionStop] for Stop), so the most
- * important button on each screen has the strongest contrast.
+ * important button on each screen has the strongest contrast. Two such pills do not fit side by
+ * side on a phone with the word beside the icon; [stacked] puts the icon over the word, as the
+ * tab bar's buttons stack an emoji over a word, at the same height, the word shrinking a step
+ * or two at a narrow width or large text rather than being cut short (the flute's Play and
+ * Your turn). Sideways the button is taller than [BigActionHeight] ([height]), and the icon and word
+ * grow with it, to read from a music stand.
  */
 @Composable
 fun BigActionButton(
@@ -140,29 +167,51 @@ fun BigActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    stacked: Boolean = false,
+    height: Dp = BigActionHeight,
+    shape: Shape = CircleShape,
 ) {
+    val tall = height > BigActionHeight
     ChunkyButton(
         onClick = onClick,
         color = color,
-        shape = CircleShape,
+        shape = shape,
         depth = 8.dp,
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
-            .height(84.dp),
+            .height(height),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(32.dp))
-            Text(
-                text,
-                style = MaterialTheme.typography.headlineMedium,
-                color = OnAction,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        if (stacked) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(if (tall) 34.dp else 28.dp))
+                val wordStyle = MaterialTheme.typography.titleMedium
+                Text(
+                    text,
+                    style = if (tall) wordStyle.copy(lineHeight = 30.sp) else wordStyle,
+                    color = OnAction,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = if (tall) 26.sp else 18.sp),
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Icon(icon, contentDescription = null, tint = OnAction, modifier = Modifier.size(32.dp))
+                Text(
+                    text,
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = OnAction,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
+
+/** The height of a [BigActionButton] upright; the round summary counts it in the room it needs, and its tests check it. */
+internal val BigActionHeight = 84.dp
 
 /**
  * The rounded white (navy in dark mode) card each tab draws its main content on, with a
@@ -172,6 +221,7 @@ fun BigActionButton(
 fun Stage(
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.SpaceBetween,
+    padding: Dp = 16.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = FluteTheme.colors
@@ -182,7 +232,7 @@ fun Stage(
             .clip(StageShape)
             .background(colors.card)
             .border(OutlineWidth, colors.border, StageShape)
-            .padding(16.dp),
+            .padding(padding),
         content = content,
     )
 }
@@ -202,9 +252,8 @@ fun Emoji(emoji: String, fontSize: Int, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * Turns an animal emoji round to face right, the way the metronome's ring goes faster; every
- * speed animal (the ring's and the notes summary's) does. The emoji sets seen so far (Google's on
- * Android, Apple's on the design canvas) draw all five facing left.
- */
-fun Modifier.facingRight(): Modifier = graphicsLayer(scaleX = -1f)
+/** The star a note earns, in the notes game's round and under a step of the flute's "Your turn". */
+const val STAR_EMOJI = "⭐" // star
+
+/** A star for a note that took more than one try: still earned, but faint. */
+const val RETRY_STAR_ALPHA = 0.35f

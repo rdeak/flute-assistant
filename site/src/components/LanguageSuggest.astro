@@ -1,0 +1,78 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// A visitor whose browser prefers another language the site has (a Croatian family landing on the
+// English home from a link) gets one line in that language offering the same page in it. No
+// automatic redirect: search engines and people who chose a language keep the page they asked for.
+// Once the visitor picks, opens or dismisses, the choice is kept in this browser only. It floats at
+// the bottom of the screen, so showing it moves nothing on the page.
+import { languages, pagePath, type Lang, type Page } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  page: Page;
+}
+
+const { lang, page } = Astro.props;
+const offers = Object.fromEntries(
+  languages
+    .filter((l) => l.code !== lang)
+    .map((l) => [l.code, { ...l.strings.suggest, href: pagePath(l.code, page) }]),
+);
+---
+
+<div class="lang-suggest" data-lang-suggest data-page-lang={lang} data-offers={JSON.stringify(offers)} hidden>
+  <p data-text></p>
+  <a class="btn btn--small btn--sun" data-open href="/"></a>
+  <button class="lang-suggest__close" type="button" data-dismiss></button>
+</div>
+
+<script>
+  type Offer = { text: string; open: string; dismiss: string; href: string };
+  const KEY = 'fa-lang-chosen';
+  const box = document.querySelector<HTMLElement>('[data-lang-suggest]');
+
+  function remember(code: string) {
+    try {
+      localStorage.setItem(KEY, code);
+    } catch {
+      /* storage off: the offer may come back on the next page */
+    }
+  }
+
+  if (box) {
+    let chosen: string | null = null;
+    try {
+      chosen = localStorage.getItem(KEY);
+    } catch {
+      /* storage off */
+    }
+    const pageLang = box.dataset.pageLang ?? '';
+    const offers: Record<string, Offer> = JSON.parse(box.dataset.offers ?? '{}');
+    const wanted = (navigator.languages ?? [navigator.language])
+      .map((l) => l.toLowerCase().split('-')[0])
+      .find((code) => code === pageLang || code in offers);
+    const offer = wanted && wanted !== pageLang ? offers[wanted] : undefined;
+
+    if (!chosen && wanted && offer) {
+      const text = box.querySelector<HTMLElement>('[data-text]')!;
+      const open = box.querySelector<HTMLAnchorElement>('[data-open]')!;
+      const dismiss = box.querySelector<HTMLButtonElement>('[data-dismiss]')!;
+      box.lang = wanted;
+      text.textContent = offer.text;
+      open.textContent = offer.open;
+      open.href = offer.href;
+      open.hreflang = wanted;
+      dismiss.textContent = '×';
+      dismiss.setAttribute('aria-label', offer.dismiss);
+      dismiss.title = offer.dismiss;
+      open.addEventListener('click', () => remember(wanted));
+      dismiss.addEventListener('click', () => {
+        remember(pageLang);
+        box.hidden = true;
+      });
+      box.hidden = false;
+    }
+  }
+</script>

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.audio.metronome
 
 import android.content.BroadcastReceiver
@@ -18,7 +21,7 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -81,9 +84,6 @@ class AudioTrackMetronomePlayer @Inject constructor(
 
     private val config = AtomicReference(MetronomeConfig())
 
-    @Volatile
-    private var volume = 1f
-
     // The fields below are guarded by synchronized(this).
     private var thread: RenderThread? = null
     private var sessionCounter = 0L
@@ -110,12 +110,11 @@ class AudioTrackMetronomePlayer @Inject constructor(
     }
 
     @Synchronized
-    override fun start(config: MetronomeConfig, volume: Float): Long {
+    override fun start(config: MetronomeConfig): Long {
         this.config.set(config)
-        this.volume = volume.coerceIn(0f, 1f)
         thread?.let {
             if (it.running) {
-                _playback.update { state -> state?.copy(config = config, volume = this.volume) }
+                _playback.update { state -> state?.copy(config = config) }
                 return it.sessionId
             }
         }
@@ -130,21 +129,15 @@ class AudioTrackMetronomePlayer @Inject constructor(
         logger.i(
             LogTags.METRONOME, "metronome.start",
             "session" to session, "bpm" to config.bpm, "signature" to config.timeSignature,
-            "subdivision" to config.subdivision, "sound" to config.sound, "volume" to this.volume,
         )
         thread = RenderThread(session, predecessor = thread).also { it.start() }
-        _playback.value = PlaybackState(session, config, this.volume)
+        _playback.value = PlaybackState(session, config)
         return session
     }
 
     override fun update(config: MetronomeConfig) {
         this.config.set(config)
         _playback.update { it?.copy(config = config) }
-    }
-
-    override fun setVolume(volume: Float) {
-        this.volume = volume.coerceIn(0f, 1f)
-        _playback.update { it?.copy(volume = this.volume) }
     }
 
     @Synchronized
@@ -251,16 +244,12 @@ class AudioTrackMetronomePlayer @Inject constructor(
                     "session" to sessionId, "rate" to sampleRate, "blockFrames" to blockFrames, "bufferFrames" to bufferFrames,
                 )
 
-                val renderer = MetronomeRenderer(sampleRate).apply {
-                    volume = this@AudioTrackMetronomePlayer.volume
-                    preload() // synthesise every click now, not on the first beat that needs it
-                }
+                val renderer = MetronomeRenderer(sampleRate) // synthesises its clicks now, not on the first beat
                 val block = FloatArray(blockFrames)
                 val timestamp = AudioTimestamp()
 
                 track.play()
                 while (running) {
-                    renderer.volume = volume
                     val events = renderer.render(block, config.get())
                     val written = track.write(block, 0, block.size, AudioTrack.WRITE_BLOCKING)
                     if (written < 0) {

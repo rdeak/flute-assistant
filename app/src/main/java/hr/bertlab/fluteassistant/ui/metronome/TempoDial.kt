@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.metronome
 
 import androidx.compose.foundation.Canvas
@@ -25,7 +28,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -35,16 +37,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.metronome.bpmAtDialFraction
+import hr.bertlab.fluteassistant.domain.metronome.dialFraction
+import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.facingRight
+import hr.bertlab.fluteassistant.ui.common.hopOnBeat
+import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 import kotlin.math.atan2
@@ -67,15 +75,13 @@ private const val KNOB_SIZE = 68f / DESIGN_SIZE
 /** Degrees left blank between two bands. */
 private const val BAND_GAP = 2.4f
 
-/** How far the knob's animal hops on a beat, in dp at the flash's peak. */
-private const val HOP_DP = 8f
-
 /**
  * A chunky tempo ring split into the five [TempoBand]s, each a fifth of the ring in its own
  * colour with its animal on it. A yellow knob carrying the current band's animal sits at the
  * tempo ([dialFraction]); dragging anywhere on the ring moves it with the finger, ticking at
  * every tempo, and tapping a band's animal jumps to that band ([TempoBand.jumpFrom]). The
- * middle shows the band's name over the tempo; while playing, the knob's animal hops with
+ * middle shows the tempo figure alone (the animal on the knob names the speed, and a screen reader
+ * hears the band as the ring's state); while playing, the knob's animal hops with
  * [flash] (read in the layer phase only) on every beat.
  *
  * Tapping the number swaps it for a [TempoWheel] in the same spot while [editing] is true;
@@ -99,7 +105,7 @@ fun TempoDial(
     val colors = FluteTheme.colors
     val dialDescription = stringResource(R.string.tempo_dial)
     val band = tempoBand(bpm)
-    val bandName = stringResource(band.labelRes)
+    val bandName = stringResource(band.labelRes())
     val minBpm = TempoBand.MIN_BPM
     val maxBpm = TempoBand.MAX_BPM
 
@@ -147,19 +153,21 @@ fun TempoDial(
         // The animals on the bands; the current band's rides on the knob instead.
         TempoBand.entries.forEach { each ->
             val centre = pointOnRing(side, START_ANGLE + SWEEP_ANGLE * (each.ordinal + 0.5f) / TempoBand.entries.size)
-            val label = stringResource(each.labelRes)
+            val label = stringResource(each.labelRes())
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .offset(centre.x, centre.y)
                     .size(48.dp)
-                    .clickable(role = Role.Button, onClickLabel = label) {
+                    // No ripple: it filled the square tap box as a see-through rectangle, and the
+                    // knob jumping to the band already shows the tap.
+                    .clickable(interactionSource = null, indication = null, role = Role.Button, onClickLabel = label) {
                         val target = each.jumpFrom(currentBpm)
                         if (target != currentBpm) currentOnBpmChange(target)
                     }
                     .semantics { contentDescription = label },
             ) {
-                if (each != band) Emoji(each.emoji, fontSize = 22, modifier = Modifier.alpha(0.75f).facingRight())
+                if (each != band) Emoji(each.emoji, fontSize = 22, modifier = Modifier.alpha(0.75f).facingRight(each.emoji))
             }
         }
 
@@ -187,8 +195,8 @@ fun TempoDial(
                 emoji = band.emoji,
                 fontSize = (knob.value * 0.55f).roundToInt(),
                 modifier = Modifier
-                    .facingRight()
-                    .graphicsLayer { translationY = -HOP_DP * density * flash() },
+                    .facingRight(band.emoji)
+                    .hopOnBeat(flash),
             )
         }
     }

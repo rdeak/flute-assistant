@@ -1,17 +1,20 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.playback
 
 import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.os.Build
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import hr.bertlab.fluteassistant.MainActivity
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.ui.common.summary
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 
 /** Builds the ongoing "metronome running" notification shown by [MetronomeService]. */
 internal class PlaybackNotifications(private val context: Context) {
@@ -62,3 +65,7 @@ internal class PlaybackNotifications(private val context: Context) {
         const val REQUEST_STOP = 1
     }
 }
+
+/** One line for the playback notification, e.g. "120 BPM · 4/4". */
+internal fun MetronomeConfig.summary(resources: Resources): String =
+    resources.getString(R.string.config_summary, bpm, timeSignature.label)

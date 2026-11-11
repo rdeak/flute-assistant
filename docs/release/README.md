@@ -145,7 +145,7 @@ One-time setup:
 
 ```sh
 PROJECT_ID=flute-assistent-ci
-REPO=rdeak/flaute-tempo
+REPO=rdeak/flute-assistant
 SA=github-play-upload@${PROJECT_ID}.iam.gserviceaccount.com
 
 gcloud services enable androidpublisher.googleapis.com --project="$PROJECT_ID"
@@ -208,13 +208,20 @@ Before uploading, run the full check: `./gradlew testDebugUnitTest lintRelease b
 ## 5. Play Console
 
 See `play-console.md` for the store listing, data safety, permission and content rating
-answers, and `privacy-policy.md` for the policy text to host.
+answers, and `privacy-policy.md` for the policy text (`privacy-policy.hr.md` is its Croatian
+translation). The website in `site/` publishes both, at `/privacy/` and `/hr/privacy/`, and keeps
+the old address `/release/privacy-policy.html` that older app versions and the Play Console link to
+(`site/README.md`).
 
 ## 6. Launcher icon, store graphics and screenshots
 
-The icon is the canvas's robot over a flute on gold: one vector picture (`res/drawable/ic_app_art.xml`,
-also shown in the app's top bar) inset into a vector adaptive icon (`res/drawable/ic_launcher_*.xml`,
-with a one-colour version for themed icons) plus legacy PNGs for Android 7 (`res/mipmap-*/`).
+The icon is the Android robot playing a flute, with one note in the air, on gold (chosen on
+2026-11-07 from three robot drafts: the head over a flute, this one, and a big head with the flute
+held across it like a grin): one vector picture (`res/drawable/ic_app_art.xml`, also shown in the app's top
+bar) inset into a vector adaptive icon (`res/drawable/ic_launcher_*.xml`, with a one-colour version
+for themed icons) plus legacy PNGs for Android 7 (`res/mipmap-*/`). The robot is Google's, modified
+under CC BY 3.0: the attribution line in `NOTICE` is shown in the app's credits and must stay in
+the Play listing's full description (`play-console.md`).
 `tools/IconGen.java` renders the PNGs, the 512 px Play icon and the 1024x500 feature graphic from
 the same geometry (run it from the repository root: the feature graphic uses the app's Nunito):
 
@@ -226,3 +233,11 @@ Phone screenshots come from the emulator: with the AVD running (`-no-audio`, see
 a debug APK built, `tools/play-screenshots.sh` drives the four tabs in English and Croatian and
 writes one 1080x1920 JPEG per tab (Play asks for 9:16) into `docs/release/play-listing/screenshots/`.
 Re-run it after any visible change before uploading.
+
+Tablet screenshots come from the same script: `tools/play-screenshots.sh tablet` fakes a tablet on the
+phone AVD at exactly Play's ratios, so nothing is padded, and writes four shots per language into
+`docs/release/play-listing/screenshots-tablet/`: `7-inch/<lang>/` (upright, 1296x2304) and `10-inch/<lang>/`
+(sideways, 2880x1620). Play asks for at least
+4 per tablet slot, 9:16 or 16:9, and no added text. Nothing uploads the listing: in Play Console open the
+store listing of each language, put `7-inch/` in the 7-inch tablet slot and `10-inch/` in the 10-inch slot,
+save, and send it for review. No Google page read on 2026-11-06 says tablet shots raise ranking.

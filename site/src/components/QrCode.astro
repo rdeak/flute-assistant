@@ -1,0 +1,24 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// The Play link as a QR code, drawn at build time, for a parent reading on a computer: the
+// stylesheet shows it only where there is a mouse and room.
+import QRCode from 'qrcode';
+import { playUrl, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  alt: string;
+}
+
+const { lang, alt } = Astro.props;
+const svg = await QRCode.toString(playUrl(lang, 'qr'), {
+  type: 'svg',
+  errorCorrectionLevel: 'M',
+  margin: 2,
+  color: { dark: '#1F2440', light: '#FFFFFF' },
+});
+---
+
+<div class="qr" role="img" aria-label={alt} set:html={svg} />

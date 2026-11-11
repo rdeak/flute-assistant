@@ -1,0 +1,20 @@
+---
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
+// The privacy policy, one per language (/privacy/ and /hr/privacy/).
+import Base from '../../../layouts/Base.astro';
+import PrivacyPolicy from '../../../components/PrivacyPolicy.astro';
+import { language, langPaths, type Lang } from '../../../i18n';
+
+export function getStaticPaths() {
+  return langPaths();
+}
+
+const { lang } = Astro.props as { lang: Lang };
+const t = language(lang).strings;
+---
+
+<Base lang={lang} page="privacy" title={t.privacy.title} description={t.privacy.description}>
+  <PrivacyPolicy lang={lang} />
+</Base>

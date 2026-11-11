@@ -1,9 +1,10 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.audio.metronome
 
-import hr.bertlab.fluteassistant.domain.model.BeatStrength
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
+import hr.bertlab.fluteassistant.domain.metronome.BeatStrength
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,7 +32,7 @@ class MetronomeRendererTest {
 
     @Test
     fun `one second at 120 bpm contains two clicks`() {
-        val (events, audio) = renderSeconds(MetronomeConfig(bpm = 120, subdivision = Subdivision.NONE), sampleRate)
+        val (events, audio) = renderSeconds(MetronomeConfig(bpm = 120), sampleRate)
         assertEquals(listOf(0L, 24_000L), events.map { it.frame })
         assertEquals(listOf(BeatStrength.STRONG, BeatStrength.WEAK), events.map { it.strength })
 
@@ -39,15 +40,6 @@ class MetronomeRendererTest {
         assertTrue("accent should be audible", energy(0, 2_000) > 1.0)
         assertTrue("second beat should be audible", energy(24_000, 26_000) > 1.0)
         assertTrue("gap before second beat should be silent", energy(20_000, 23_900) == 0.0)
-    }
-
-    @Test
-    fun `fast overlapping clicks are limited smoothly instead of clipped`() {
-        val config = MetronomeConfig(bpm = 300, subdivision = Subdivision.SIXTEENTH, sound = SoundProfile.BELL)
-        val (events, audio) = renderSeconds(config, sampleRate)
-        assertTrue(events.size >= 19) // 300 bpm * 4 = 20 clicks per second
-        assertTrue("stacked bells should exceed the knee", audio.any { abs(it) > SoftLimiter.KNEE })
-        assertTrue("limiter must never reach full scale", audio.none { abs(it) >= 1f })
     }
 
     @Test
@@ -79,16 +71,11 @@ class MetronomeRendererTest {
     }
 
     @Test
-    fun `volume scales the output`() {
-        val renderer = MetronomeRenderer(sampleRate)
-        val loud = FloatArray(4_096)
-        renderer.render(loud, MetronomeConfig())
-        renderer.reset()
-        renderer.volume = 0.5f
-        val quiet = FloatArray(4_096)
-        renderer.render(quiet, MetronomeConfig())
-        val ratio = quiet.maxOf { abs(it) } / loud.maxOf { abs(it) }
-        assertEquals(0.5f, ratio, 0.01f)
+    fun `the clicks keep the loudness the volume control left them at`() {
+        // The accent is synthesised to a 0.9 peak and played at the fixed 0.8 gain; a plain beat at 0.7 of that.
+        val (_, audio) = renderSeconds(MetronomeConfig(bpm = 120), sampleRate)
+        assertEquals(0.72f, audio.take(24_000).maxOf { abs(it) }, 0.001f)
+        assertEquals(0.504f, audio.drop(24_000).maxOf { abs(it) }, 0.001f)
     }
 
     @Test

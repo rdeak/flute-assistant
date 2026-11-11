@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.audio.metronome
 
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -15,7 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 data class BeatEvent(val click: ClickEvent, val audibleAtNanos: Long, val sessionId: Long)
 
 /** What the engine is playing right now. */
-data class PlaybackState(val sessionId: Long, val config: MetronomeConfig, val volume: Float)
+data class PlaybackState(val sessionId: Long, val config: MetronomeConfig)
 
 /** The metronome audio engine. All methods are safe to call from the main thread and never block. */
 interface MetronomePlayer {
@@ -41,13 +44,10 @@ interface MetronomePlayer {
      * @return the session id tagged on every [BeatEvent] of this run, or [NO_SESSION] if the
      * engine could not start (for example, audio focus was refused during a phone call).
      */
-    fun start(config: MetronomeConfig, volume: Float): Long
+    fun start(config: MetronomeConfig): Long
 
     /** Applies new settings without interrupting playback; the next click is re-timed if needed. */
     fun update(config: MetronomeConfig)
-
-    /** Master volume in [0, 1]. */
-    fun setVolume(volume: Float)
 
     fun stop()
 

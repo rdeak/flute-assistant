@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.common
 
 import android.content.res.Resources
@@ -5,6 +8,7 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -12,13 +16,14 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
+import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
-import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
 
 /*
  * Display names live in string resources so the app can be localised (English by default,
@@ -26,25 +31,26 @@ import hr.bertlab.fluteassistant.ui.tuner.TunerAdvice
  */
 
 @StringRes
-fun Subdivision.labelRes(): Int = when (this) {
-    Subdivision.NONE -> R.string.subdivision_quarter
-    Subdivision.EIGHTH -> R.string.subdivision_eighth
-    Subdivision.SIXTEENTH -> R.string.subdivision_sixteenth
-    Subdivision.TRIPLET -> R.string.subdivision_triplet
-    Subdivision.SHUFFLE -> R.string.subdivision_shuffle
-}
-
-@StringRes
-fun SoundProfile.labelRes(): Int = when (this) {
-    SoundProfile.WOODBLOCK -> R.string.sound_woodblock
-    SoundProfile.BEEP -> R.string.sound_beep
-    SoundProfile.BELL -> R.string.sound_bell
-}
-
-@StringRes
 fun TunerMode.labelRes(): Int = when (this) {
     TunerMode.IDENTIFY -> R.string.mode_identify
     TunerMode.TARGET -> R.string.mode_target
+}
+
+/** The pill's word; the emoji is in the string itself, so the pill draws none of its own. */
+@StringRes
+fun NotesGame.labelRes(): Int = when (this) {
+    NotesGame.FIND -> R.string.find_note
+    NotesGame.HEAR -> R.string.hear_game
+}
+
+/** The animal's name, for a screen reader: the speed is never read as a number. */
+@StringRes
+fun TempoBand.labelRes(): Int = when (this) {
+    TempoBand.SNAIL -> R.string.band_snail
+    TempoBand.TURTLE -> R.string.band_turtle
+    TempoBand.DUCK -> R.string.band_duck
+    TempoBand.RABBIT -> R.string.band_rabbit
+    TempoBand.CHEETAH -> R.string.band_cheetah
 }
 
 /** The advice line's words, or null when there is nothing to say. */
@@ -58,20 +64,8 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.FASTER_AIR -> R.string.advice_faster_air
     TunerAdvice.GENTLER_AIR -> R.string.advice_gentler_air
     TunerAdvice.CHECK_FINGERS -> R.string.advice_check_fingers
+    TunerAdvice.PLAY_AGAIN -> R.string.advice_play_again
 }
-
-/** One line for preset lists and the playback notification, e.g. "120 BPM · 4/4 · Quarter · Woodblock". */
-fun MetronomeConfig.summary(resources: Resources): String = resources.getString(
-    R.string.config_summary,
-    bpm,
-    timeSignature.label,
-    resources.getString(subdivision.labelRes()),
-    resources.getString(sound.labelRes()),
-)
-
-@Composable
-@ReadOnlyComposable
-fun MetronomeConfig.summary(): String = summary(LocalResources.current)
 
 /**
  * Note name with octave for a MIDI number in the user's language. English uses scientific
@@ -104,18 +98,34 @@ fun noteLabelParts(resources: Resources, midi: Int): Pair<String, String> {
     }
 }
 
-/** [noteLabelParts] as display text: the octave figure small and raised. */
+/**
+ * [noteLabelParts] as display text: the octave figure small and raised, as every canvas board
+ * draws it (`<sup style="font-size: 0.48em; margin-left: 1px">`): 0.48 of the letter's size,
+ * its baseline raised about a third of the letter's size as a browser raises a `sup` (so its top
+ * meets the top of the letter), and a hair of space before it. Matched to the canvas on
+ * 2026-11-02 at the user's request; before, it sat higher (0.55) and touched the letter.
+ */
 @Composable
 @ReadOnlyComposable
 fun noteText(midi: Int): AnnotatedString {
     val (name, octave) = noteLabelParts(LocalResources.current, midi)
     return buildAnnotatedString {
-        append(name)
-        if (octave.isNotEmpty()) {
-            withStyle(SpanStyle(fontSize = 0.5.em, baselineShift = BaselineShift(0.55f))) { append(octave) }
+        if (octave.isEmpty()) {
+            append(name)
+            return@buildAnnotatedString
         }
+        append(name.dropLast(1))
+        // Letter spacing is shared either side of a glyph, so this leaves 1 sp after the letter at any size: the sup's 1 px.
+        withStyle(SpanStyle(letterSpacing = OCTAVE_GAP)) { append(name.last()) }
+        withStyle(SpanStyle(fontSize = OCTAVE_SIZE, baselineShift = BaselineShift(OCTAVE_RISE))) { append(octave) }
     }
 }
+
+private val OCTAVE_SIZE = 0.48.em
+private val OCTAVE_GAP = 2.sp
+
+/** How far the octave figure's baseline rises, as a share of the letter's size: a browser's `sup`. */
+private const val OCTAVE_RISE = 0.36f
 
 /**
  * The colour of a note's letter ([NoteLetterColors]); a sharp takes the colour of the
@@ -123,13 +133,20 @@ fun noteText(midi: Int): AnnotatedString {
  */
 fun noteColor(midi: Int): Color = NoteLetterColors[LETTER_OF_PITCH_CLASS[Math.floorMod(midi, 12)]]
 
+/**
+ * The pale tint of a note's colour: [noteColor] at [TINT_SHARE] over the card, so it stays a quiet
+ * ground in the light theme and in the dark one. A key of the sticker book is this until the note is
+ * learned, and the Pick button's dot of a letter that is not yet.
+ */
+@Composable
+fun noteTint(midi: Int): Color = tintOf(noteColor(midi))
+
+/** [color] at [TINT_SHARE] over the card: [noteTint] for a colour that is already in hand. */
+@Composable
+fun tintOf(color: Color): Color = lerp(FluteTheme.colors.card, color, TINT_SHARE)
+
+private const val TINT_SHARE = 0.3f
+
 /** Index of the letter (C = 0 to B = 6) each pitch class is written on, sharps on the letter below. */
 private val LETTER_OF_PITCH_CLASS = intArrayOf(0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6)
 
-/** Note name without the octave, e.g. "A♯" (or "B" in Croatian), for the big tuner display. */
-fun noteName(resources: Resources, midi: Int): String =
-    resources.getStringArray(R.array.note_names)[Math.floorMod(midi, 12)]
-
-@Composable
-@ReadOnlyComposable
-fun noteName(midi: Int): String = noteName(LocalResources.current, midi)

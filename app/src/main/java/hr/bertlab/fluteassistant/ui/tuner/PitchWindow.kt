@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.tuner
 
 import androidx.compose.animation.core.Spring
@@ -92,7 +95,8 @@ const val PITCH_WINDOW_ASPECT_RATIO = WINDOW_WIDTH / WINDOW_HEIGHT
  * note's colour; in tune (within [TunerUiState.IN_TUNE_CENTS], the status line's "Perfect!")
  * it fills, grows into the ring and gets a green tick and sparkles. A screen reader reads
  * [description] instead of the drawing. The drawing keeps the canvas's proportions and
- * shrinks to fit its constraints.
+ * shrinks to fit its constraints; it never grows past [maxScale] times the canvas's size, which is
+ * 1 upright and what the card's height allows on a phone on its side.
  */
 @Composable
 fun PitchWindow(
@@ -101,6 +105,7 @@ fun PitchWindow(
     cents: Double?,
     description: String,
     modifier: Modifier = Modifier,
+    maxScale: Float = 1f,
 ) {
     val colors = FluteTheme.colors
     val inTune = cents != null && abs(cents) <= TunerUiState.IN_TUNE_CENTS
@@ -114,7 +119,7 @@ fun PitchWindow(
         contentAlignment = Alignment.Center,
         modifier = modifier.clearAndSetSemantics { contentDescription = description },
     ) {
-        val scale = minOf(1f, maxWidth / WINDOW_WIDTH.dp, maxHeight / WINDOW_HEIGHT.dp)
+        val scale = minOf(maxScale, maxWidth / WINDOW_WIDTH.dp, maxHeight / WINDOW_HEIGHT.dp)
         fun sized(value: Float): Dp = (value * scale).dp
         val travelRoom = sized((WINDOW_HEIGHT - BUBBLE) / 2)
         val bubbleSize by animateDpAsState(sized(if (inTune) HOME_BUBBLE else BUBBLE), label = "bubbleSize")

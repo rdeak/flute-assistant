@@ -1,34 +1,70 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.flute
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PixelMap
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.ViewRootForTest
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.Held
+import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.WrongNote
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.needsDevice
+import hr.bertlab.fluteassistant.ui.common.noteColor
+import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -38,6 +74,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @RunWith(AndroidJUnit4::class)
 class FluteScreenTest {
@@ -46,26 +83,85 @@ class FluteScreenTest {
     val compose = createComposeRule()
 
     private lateinit var state: MutableState<FluteUiState>
+    private lateinit var metronome: MutableState<MetronomeUiState>
     private val pressed = mutableListOf<Int>()
     private val released = mutableListOf<Int>()
     private val activated = mutableListOf<Int>()
     private var playToggles = 0
     private var erases = 0
+    private val restEvents = mutableListOf<String>()
+    private var breaths = 0
+    private var chosenBpm: Int? = null
+    private var chosenSignature: TimeSignature? = null
+    private var speedOpens = 0
+    private var speedDones = 0
+    private var shelfOpens = 0
+    private val chosenBooks = mutableListOf<Int>()
+    private var yourTurns = 0
+    private var stops = 0
+    private var micRequests = 0
+    private var settingsOpens = 0
+    private var micDismissals = 0
+    private val back = BackKey()
 
-    private fun show(initial: FluteUiState, locale: Locale = Locale.ENGLISH) {
+    /**
+     * Renders [FluteContent] in [locale]. A [height] puts it in a box that tall (a short screen);
+     * a [restoration] renders it through that tester, so a test can emulate the Activity's
+     * re-creation with `rememberSaveable` state saved and restored. The staff's [timeSignature] is
+     * the metronome's, as on the phone.
+     */
+    private fun show(
+        initial: FluteUiState,
+        locale: Locale = Locale.ENGLISH,
+        height: Dp? = null,
+        restoration: StateRestorationTester? = null,
+        timeSignature: TimeSignature = TimeSignature.FOUR_FOUR,
+    ) {
         state = mutableStateOf(initial)
-        compose.setContent {
+        metronome = mutableStateOf(MetronomeUiState(config = MetronomeConfig(bpm = 120, timeSignature = timeSignature)))
+        val content: @Composable () -> Unit = {
             LocaleProvider(locale) {
-                FluteContent(
-                    state = state.value,
-                    onKeyPressed = { pressed += it },
-                    onKeyReleased = { released += it },
-                    onKeyActivated = { activated += it },
-                    onTogglePlayback = { playToggles++ },
-                    onEraseLast = { erases++ },
-                )
+                back.Watch()
+                val flute: @Composable () -> Unit = {
+                    FluteContent(
+                        state = state.value,
+                        metronome = metronome.value,
+                        actions = FluteActions(
+                            onKeyPressed = { pressed += it },
+                            onKeyReleased = { released += it },
+                            onKeyActivated = { activated += it },
+                            onRestPressed = { restEvents += "press" },
+                            onRestReleased = { restEvents += "release" },
+                            onRestActivated = { restEvents += "activate" },
+                            onBreath = { breaths++ },
+                            onTogglePlayback = { playToggles++ },
+                            onEraseLast = { erases++ },
+                            onBpmChange = { bpm ->
+                            chosenBpm = bpm
+                            metronome.value = metronome.value.copy(config = metronome.value.config.withBpm(bpm))
+                        },
+                            onTimeSignatureChange = { chosenSignature = it },
+                            onSpeedOpen = { speedOpens++ },
+                            onSpeedDone = { speedDones++ },
+                            onShelfOpen = { shelfOpens++ },
+                            onBookChosen = { chosenBooks += it },
+                            onYourTurn = { yourTurns++ },
+                            onStop = { stops++ },
+                            onRequestMic = { micRequests++ },
+                            onOpenSettings = { settingsOpens++ },
+                            onMicDismiss = { micDismissals++ },
+                        ),
+                    )
+                }
+                if (height == null) flute() else Box(Modifier.height(height)) { flute() }
             }
         }
+        if (restoration != null) restoration.setContent(content) else compose.setContent(content)
+    }
+
+    /** The metronome takes [timeSignature], as its tab or the flute's speed panel sets it. */
+    private fun setTimeSignature(timeSignature: TimeSignature) {
+        metronome.value = metronome.value.copy(config = metronome.value.config.copy(timeSignature = timeSignature))
     }
 
     @Test
@@ -82,7 +178,8 @@ class FluteScreenTest {
         assertTrue("the octave rows should share a left edge: $c4 $c5 $c6", abs((c4.left - c5.left).value) <= 1f)
         assertTrue("the octave rows should share a left edge: $c4 $c5 $c6", abs((c5.left - c6.left).value) <= 1f)
         assertTrue("D4 $d4 should be right of C4 $c4", d4.left >= c4.right)
-        assertTrue("a key should be at least 58 dp tall, was ${c4.height}", c4.height >= 58.dp)
+        // 58 dp, as on the canvas; the layout rounds it to whole pixels (152 px, 57.9 dp, on a 2.625 screen).
+        assertTrue("a key should be 58 dp tall, was ${c4.height}", abs((c4.height - 58.dp).value) <= 0.5f)
     }
 
     @Test
@@ -96,21 +193,31 @@ class FluteScreenTest {
     }
 
     @Test
-    fun the_held_note_is_named_fingered_and_in_the_line() {
+    fun a_press_the_system_cancels_still_lets_go_of_the_key() {
+        // Palm rejection or a system gesture ends a touch with a cancel, not an up; the ViewModel
+        // must hear the release all the same, or the next piece of the hold could not go on with it.
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("G4").performTouchInput { down(center) }
+        compose.onNodeWithContentDescription("G4").performTouchInput { cancel() }
+        assertEquals(listOf(67), pressed)
+        assertEquals(listOf(67), released)
+        compose.onNodeWithContentDescription("Rest").performTouchInput { down(center) }
+        compose.onNodeWithContentDescription("Rest").performTouchInput { cancel() }
+        assertEquals(listOf("press", "release"), restEvents)
+    }
+
+    @Test
+    fun the_held_note_is_on_the_staff_and_named_in_the_line() {
         show(
             FluteUiState(
                 tune = listOf(TuneNote(67, NoteLength.QUARTER)),
-                heldMidi = 67,
-                heldIndex = 0,
-                shownMidi = 67,
-                heldLength = NoteLength.QUARTER,
+                held = Held(67, index = 0),
             ),
         )
-        compose.onAllNodesWithText("G4").assertCountEquals(2) // the name and the key
-        compose.onNodeWithContentDescription("Fingering for G4").assertExists()
+        compose.onAllNodesWithText("G4").assertCountEquals(1) // the key; the line's pill is read by its description, the staff is silent
+        compose.onNodeWithContentDescription("Fingering for G4").assertDoesNotExist() // the line took the flute drawing's place
         compose.onNodeWithContentDescription("Your tune, 1 note").assertExists()
         compose.onNode(hasContentDescription("G4, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 1 note"))).assertExists()
-        compose.onNodeWithContentDescription("Held for 1 beat").assertExists()
         compose.onNodeWithText("👆 Tap or hold a note").assertDoesNotExist()
     }
 
@@ -132,6 +239,7 @@ class FluteScreenTest {
 
     @Test
     fun the_erase_button_sinks_while_pressed() {
+        needsDevice()
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
         val erase = compose.onNodeWithContentDescription("Erase the last note")
         // A pixel on the button's top edge: its ink outline at rest, empty once it sinks.
@@ -148,7 +256,7 @@ class FluteScreenTest {
 
     @Test
     fun the_pill_reads_stop_while_playing() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playingIndex = 1, shownMidi = 67))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER)), playing = Playing(1)))
         compose.onNodeWithText("Stop").assertIsDisplayed()
         compose.onNodeWithText("Play").assertDoesNotExist()
     }
@@ -156,37 +264,39 @@ class FluteScreenTest {
     @Test
     fun the_line_scrolls_to_the_newest_note() {
         val tune = List(29) { TuneNote(if (it % 2 == 0) 60 else 62, NoteLength.QUARTER) } + TuneNote(84, NoteLength.QUARTER)
-        show(FluteUiState(tune = tune, heldMidi = 84, heldIndex = 29, shownMidi = 84))
+        show(FluteUiState(tune = tune, held = Held(84, index = 29)))
         compose.onNode(hasContentDescription("C6, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))).assertIsDisplayed()
     }
 
     @Test
-    fun the_play_label_fits_a_narrow_phone_in_croatian() {
+    fun the_two_button_labels_fit_a_narrow_phone_in_croatian() {
         state = mutableStateOf(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
         compose.setContent {
             LocaleProvider(Locale("hr")) {
-                Box(Modifier.width(360.dp)) {
-                    FluteContent(
-                        state = state.value,
-                        onKeyPressed = {},
-                        onKeyReleased = {},
-                        onKeyActivated = {},
-                        onTogglePlayback = {},
-                        onEraseLast = {},
-                    )
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {
+                    Box(Modifier.width(360.dp)) {
+                        FluteContent(
+                            state = state.value,
+                            metronome = MetronomeUiState(),
+                            actions = FluteActions(),
+                        )
+                    }
                 }
             }
         }
-        val layouts = mutableListOf<TextLayoutResult>()
-        val node = compose.onNodeWithText("Sviraj", useUnmergedTree = true).fetchSemanticsNode()
-        node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
-        assertFalse("the Play label should shrink to fit, not be cut short", layouts.single().isLineEllipsized(0))
+        for (label in listOf("Odsviraj", "Poslušaj me")) {
+            val layouts = mutableListOf<TextLayoutResult>()
+            val node = compose.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode()
+            node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            assertFalse("the $label label should shrink to fit, not be cut short", layouts.single().isLineEllipsized(0))
+        }
     }
 
     @Test
     fun croatian_copy() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER))), Locale("hr"))
-        compose.onNodeWithText("Sviraj").assertExists()
+        compose.onNodeWithText("Odsviraj").assertExists()
+        compose.onNodeWithText("Poslušaj me").assertExists()
         compose.onNodeWithContentDescription("Obriši zadnju notu").assertExists()
         compose.onNodeWithContentDescription("c1").assertExists()
         compose.onNodeWithContentDescription("Tvoja pjesmica, 3 note").assertExists()
@@ -210,12 +320,823 @@ class FluteScreenTest {
 
     @Test
     fun holding_a_key_does_not_move_the_keys() {
-        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), shownMidi = 60))
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
         val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
-        state.value = state.value.copy(heldMidi = 60, heldIndex = 0, heldLength = NoteLength.HALF)
-        compose.onNodeWithContentDescription("Held for 2 beats").assertExists()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.HALF)), held = Held(60, index = 0))
+        compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
         state.value = FluteUiState()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
+    }
+
+    @Test
+    fun the_rest_breath_and_erase_keys_stand_one_key_wide_at_the_top_row_end() {
+        show(FluteUiState())
+        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
+        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
+        val g5 = compose.onNodeWithContentDescription("G5").getBoundsInRoot()
+        val b5 = compose.onNodeWithContentDescription("B5").getBoundsInRoot()
+        val breath = compose.onNodeWithContentDescription("Breathe").getBoundsInRoot()
+        val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
+        val erase = compose.onNodeWithContentDescription("Erase the last note").getBoundsInRoot()
+        for (key in listOf(breath, rest, erase)) {
+            assertTrue("$key should sit in C6's row $c6", abs((key.top - c6.top).value) <= 1f && abs((key.bottom - c6.bottom).value) <= 1f)
+            assertTrue("$key should be one key wide, C5 is $c5", abs((key.width - c5.width).value) <= 1f)
+        }
+        assertTrue(
+            "C6 $c6, then Rest $rest, Breathe $breath and the sponge $erase, in that order",
+            c6.right < rest.left && rest.right < breath.left && breath.right < erase.left,
+        )
+        // The three stand apart from c3 by more than a key: a tool, not a note, and a slip off c3 reaches nothing.
+        assertTrue("Rest $rest should stand clear of C6 $c6 by more than a key", rest.left - c6.right > c5.width)
+        assertTrue("Rest $rest should start where G5 $g5 does", abs((rest.left - g5.left).value) <= 1f)
+        assertTrue("the sponge $erase should end where B5 $b5 does", abs((erase.right - b5.right).value) <= 1f)
+        assertTrue("C6 $c6 should be as wide as C5 $c5", abs((c6.width - c5.width).value) <= 1f)
+    }
+
+    @Test
+    fun the_rest_key_reports_press_and_release_and_the_breath_key_marks_on_touch() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Rest").performTouchInput { down(center) }
+        assertEquals(listOf("press"), restEvents)
+        compose.onNodeWithContentDescription("Rest").performTouchInput { up() }
+        assertEquals(listOf("press", "release"), restEvents)
+        compose.onNodeWithContentDescription("Rest").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals("activate", restEvents.last())
+        compose.onNodeWithContentDescription("Breathe").performTouchInput { down(center) }
+        assertEquals(1, breaths)
+        compose.onNodeWithContentDescription("Breathe").performTouchInput { up() }
+        compose.onNodeWithContentDescription("Breathe").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(2, breaths)
+        assertTrue(pressed.isEmpty())
+    }
+
+    @Test
+    fun rests_and_breaths_in_the_line_say_what_they_are() {
+        show(
+            FluteUiState(
+                tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.EIGHTH), TuneRest(NoteLength.HALF), TuneBreath),
+            ),
+        )
+        val line = hasAnyAncestor(hasContentDescription("Your tune, 1 note"))
+        compose.onNode(hasContentDescription("Rest, half a beat") and line).assertExists()
+        compose.onNode(hasContentDescription("Rest, 2 beats") and line).assertExists()
+        compose.onNode(hasContentDescription("Breathe here") and line).assertExists()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_held_rest_is_written_on_the_staff_with_its_length() {
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.HALF)), held = Held(midi = null, index = 0)))
+        compose.onAllNodesWithContentDescription("Rest").assertCountEquals(1) // the key
+        compose.onNodeWithContentDescription("Rest, 2 beats").assertExists()
+    }
+
+    @Test
+    fun rests_and_breaths_in_croatian() {
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER), TuneRest(NoteLength.EIGHTH), TuneBreath)), Locale("hr"))
+        compose.onNodeWithContentDescription("Stanka, 1 doba").assertExists()
+        compose.onNodeWithContentDescription("Stanka, pola dobe").assertExists()
+        compose.onNodeWithContentDescription("Ovdje udahni").assertExists()
+        compose.onNodeWithContentDescription("Udahni").assertExists()
+        compose.onNodeWithContentDescription("Stanka").assertExists()
+    }
+
+    @Test
+    fun the_line_starts_with_the_metronome_time_signature() {
+        show(FluteUiState(), timeSignature = TimeSignature.THREE_FOUR)
+        compose.onNodeWithContentDescription("Time signature 3/4").assertIsDisplayed()
+        compose.onNodeWithText("👆 Tap or hold a note").assertIsDisplayed()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER)))
+        setTimeSignature(TimeSignature.SIX_EIGHT)
+        compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Time signature 3/4").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_note_tied_across_a_bar_line_is_read_once_at_its_whole_length() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.DOTTED_HALF), TuneNote(69, NoteLength.HALF), TuneRest(NoteLength.WHOLE))))
+        compose.onAllNodesWithContentDescription("A4, 2 beats").assertCountEquals(1)
+        compose.onAllNodesWithContentDescription("Rest, 4 beats").assertCountEquals(1)
+    }
+
+    @Test
+    fun the_time_signature_in_croatian() {
+        show(FluteUiState(), Locale("hr"), timeSignature = TimeSignature.SIX_EIGHT)
+        compose.onNodeWithContentDescription("Mjera 6/8").assertExists()
+    }
+
+    @Test
+    fun a_new_time_signature_rewrites_the_staff_without_moving_the_keys() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.HALF)), held = Held(60, index = 0)))
+        val before = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
+        setTimeSignature(TimeSignature.SIX_EIGHT)
+        compose.onNodeWithContentDescription("Time signature 6/8").assertIsDisplayed()
+        compose.onNodeWithContentDescription("C4, 2 beats").assertExists()
+        assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
+    }
+
+    @Test
+    fun the_speed_knob_names_the_drums_animal_and_sits_at_the_staffs_top_left() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
+        knob.assertIsDisplayed()
+        val knobBounds = knob.getBoundsInRoot()
+        // The tune's row starts NOTES_CLIP (57 dp) into the staff, so the knob, 54 dp from the staff's left
+        // edge, ends before it; the time signature stands lower, between the first and third lines.
+        val tuneRow = compose.onNodeWithContentDescription("Your tune, 1 note").getBoundsInRoot()
+        val signature = compose.onNodeWithContentDescription("Time signature 4/4").getBoundsInRoot()
+        assertTrue("the knob $knobBounds should end before the notes start $tuneRow", knobBounds.right <= tuneRow.left + 1.dp)
+        assertTrue("the knob $knobBounds should sit above the time signature $signature", knobBounds.bottom <= signature.top + 1.dp)
+        assertTrue("the knob $knobBounds should start left of the time signature $signature", knobBounds.left < signature.left)
+        assertTrue("the knob should be 54 dp, was ${knobBounds.width}", abs((knobBounds.width - 54.dp).value) <= 0.5f)
+        // The clef's tip is one space (18 dp) over the top line, where the signature's box starts. The
+        // knob's shadow, 5 dp under it, ends over the tip with white between (it lay on the tip until 2026-11-10).
+        val shadowEnd = knobBounds.bottom + 5.dp
+        assertTrue("the knob's shadow, ending at $shadowEnd, should end over the clef's tip", shadowEnd + 3.dp <= signature.top - 18.dp)
+        compose.runOnIdle { metronome.value = MetronomeUiState(config = MetronomeConfig(bpm = 60)) }
+        compose.onNodeWithContentDescription("Speed: Turtle, tap to change").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_speed_knob_shows_on_an_empty_tune_too() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").assertIsDisplayed()
+        compose.onNodeWithText("👆 Tap or hold a note").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        assertEquals(1, speedOpens)
+    }
+
+    @Test
+    fun the_knob_speaks_croatian() {
+        show(FluteUiState(), Locale("hr"))
+        compose.onNodeWithContentDescription("Brzina: Zec, dodirni za promjenu").assertIsDisplayed()
+    }
+
+    /** The knob as it is drawn; the emoji have no semantics, so its pixels are how a test sees them. */
+    private fun knobPixels(animal: String): PixelMap =
+        compose.onNodeWithContentDescription("Speed: $animal, tap to change").captureToImage().toPixelMap()
+
+    private fun setSpeed(bpm: Int) = compose.runOnIdle { metronome.value = MetronomeUiState(config = MetronomeConfig(bpm = bpm)) }
+
+    /** Where the badge starts in a [knob] of 54 dp: 28 dp from its top and from its left. */
+    private fun badgeStart(knob: PixelMap) = knob.width * 28 / 54
+
+    @Test
+    fun the_speed_changes_only_the_knobs_badge_and_the_drum_stays_as_it_is() {
+        needsDevice()
+        show(FluteUiState())
+        val rabbit = knobPixels("Rabbit")
+        setSpeed(60)
+        val turtle = knobPixels("Turtle")
+        val start = badgeStart(rabbit)
+        for (x in 0 until start) {
+            for (y in 0 until start) assertEquals("($x, $y) is the drum's", rabbit[x, y], turtle[x, y])
+        }
+        val badge = (start until rabbit.width).flatMap { x -> (start until rabbit.height).map { y -> x to y } }
+        assertTrue("the badge should show the speed's animal", badge.any { (x, y) -> rabbit[x, y] != turtle[x, y] })
+    }
+
+    @Test
+    fun the_knob_keeps_its_drum_and_loses_its_animal_while_the_tune_runs() {
+        needsDevice()
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        val rabbit = knobPixels("Rabbit")
+        setSpeed(60)
+        val turtle = knobPixels("Turtle")
+        for (x in 0 until rabbit.width) {
+            for (y in 0 until rabbit.height) assertEquals("($x, $y) should not follow the speed", rabbit[x, y], turtle[x, y])
+        }
+        // An empty disc is one colour inside its ring; the drum is not.
+        val middle = rabbit.width / 3 until rabbit.width * 2 / 3
+        val colours = middle.flatMap { x -> middle.map { y -> rabbit[x, y] } }.toSet()
+        assertTrue("the drum should stay on the knob, found ${colours.size} colour(s)", colours.size > 1)
+    }
+
+    @Test
+    fun a_tap_on_the_knobs_badge_opens_the_speed_panel() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performTouchInput {
+            click(Offset(width * 0.78f, height * 0.78f)) // the badge's middle, 42 dp in
+        }
+        assertEquals(1, speedOpens)
+    }
+
+    @Test
+    fun the_knobs_badge_sinks_with_the_knob() {
+        needsDevice()
+        show(FluteUiState())
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
+        val top = knob.getBoundsInRoot().top
+        val rest = knob.captureToImage().toPixelMap()
+        knob.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(200) // past the press delay of a scrolling column
+        assertTrue("the knob should sink", knob.getBoundsInRoot().top > top)
+        // The capture follows the sunk knob, so a badge that went with it lands on the same pixels.
+        val pressed = knob.captureToImage().toPixelMap()
+        knob.performTouchInput { up() }
+        val start = badgeStart(rest)
+        val width = minOf(rest.width, pressed.width)
+        val height = minOf(rest.height, pressed.height)
+        val badge = (start until width).flatMap { x -> (start until height).map { y -> x to y } }
+        val moved = badge.count { (x, y) ->
+            val a = rest[x, y]
+            val b = pressed[x, y]
+            abs(a.red - b.red) + abs(a.green - b.green) + abs(a.blue - b.blue) > 0.5f
+        }
+        assertTrue("$moved of ${badge.size} pixels of the badge stayed behind", moved < badge.size / 12)
+    }
+
+    @Test
+    fun the_book_button_shows_the_open_books_sweet_and_opens_the_shelf() {
+        show(FluteUiState(openBook = 1))
+        compose.onNodeWithContentDescription("Tune: Cookie, tap to change").assertIsEnabled().performClick()
+        assertEquals(1, shelfOpens)
+    }
+
+    @Test
+    fun the_book_button_is_inert_while_the_tune_runs() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER)), playing = Playing(0)))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").assertIsNotEnabled().performClick()
+        assertEquals(0, shelfOpens)
+        compose.onNodeWithContentDescription("Lollipop, open now").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_corner_buttons_tell_a_screen_reader_they_are_off_once_the_tune_starts() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        val book = "Tune: Lollipop, tap to change"
+        val knob = "Speed: Rabbit, tap to change"
+        assertTrue("the book at rest", accessibilityEnabled(book))
+        assertTrue("the knob at rest", accessibilityEnabled(knob))
+        state.value = state.value.copy(playing = Playing(0))
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription(book).assertIsNotEnabled()
+        compose.onNodeWithContentDescription(knob).assertIsNotEnabled()
+        assertFalse("a screen reader is told the book is on while the tune runs", accessibilityEnabled(book))
+        assertFalse("a screen reader is told the knob is on while the tune runs", accessibilityEnabled(knob))
+    }
+
+    /**
+     * Whether Android's accessibility layer reports the button described as [description] as
+     * enabled, read from the merged button a screen reader focuses. Not from a `uiautomator dump`
+     * matched by `content-desc`: when a merged button has children, Compose adds a child node
+     * holding only the description (`SemanticsNode.emitFakeNodes`), and that child always reads
+     * enabled. The book's cover has its sweet as a child; the knob loses its animal while the tune
+     * runs, which is why a dump showed the knob off and the book on.
+     */
+    private fun accessibilityEnabled(description: String): Boolean {
+        val node = compose.onNodeWithContentDescription(description).fetchSemanticsNode()
+        val view = (node.root as ViewRootForTest).view
+        var enabled: Boolean? = null
+        compose.runOnUiThread {
+            enabled = view.accessibilityNodeProvider!!.createAccessibilityNodeInfo(node.id)!!.isEnabled
+        }
+        return enabled!!
+    }
+
+    @Test
+    fun the_book_button_speaks_croatian() {
+        show(FluteUiState(openBook = 3), locale = Locale("hr"))
+        compose.onNodeWithContentDescription("Pjesmica: Krafna, dodirni za promjenu").assertExists()
+    }
+
+    @Test
+    fun the_book_button_sits_under_the_clef_left_of_the_notes() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        // The node is the book's cover, the pressable part; its page edges stand 6 dp further right.
+        val cover = compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").getBoundsInRoot()
+        val bookRight = cover.right + 6.dp
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").getBoundsInRoot()
+        // The tune's row starts NOTES_CLIP (57 dp) into the staff; the book, the knob's twin one corner
+        // down, stands in the same column left of it, under the time signature, beside the names.
+        val tuneRow = compose.onNodeWithContentDescription("Your tune, 1 note").getBoundsInRoot()
+        val signature = compose.onNodeWithContentDescription("Time signature 4/4").getBoundsInRoot()
+        assertTrue("the book $cover should sit below the time signature $signature", cover.top >= signature.bottom - 1.dp)
+        assertTrue("the book, page edges and all, ending at $bookRight, should end before the notes start $tuneRow", bookRight <= tuneRow.left + 1.dp)
+        assertTrue("the book, ending at $bookRight, should end no further right than the knob $knob", bookRight <= knob.right + 1.dp)
+        assertTrue("the cover should be 48 dp wide, was ${cover.width}", abs((cover.width - 48.dp).value) <= 0.5f)
+        assertTrue("the cover should be 64 dp tall, was ${cover.height}", abs((cover.height - 64.dp).value) <= 0.5f)
+    }
+
+    // ---- The shelf ----
+
+    /** Six books, all empty but the cookie's, which holds three notes. */
+    private val threeNoteCookie = List(6) { Book() }.toMutableList().also {
+        it[1] = Book(listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER)))
+    }
+
+    @Test
+    fun the_shelf_takes_the_stage_with_six_books() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        assertEquals(1, shelfOpens)
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Your tune, 1 note").assertDoesNotExist()
+        compose.onNodeWithText("Play").assertDoesNotExist()
+        listOf("Lollipop, open now", "Cookie, 3 notes", "Cupcake, empty", "Donut, empty", "Ice cream, empty", "Candy, empty")
+            .forEach { compose.onNodeWithContentDescription(it).assertExists() }
+    }
+
+    @Test
+    fun a_tap_on_a_book_chooses_it_and_closes_the_shelf() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Cookie, 3 notes").performClick()
+        assertEquals(listOf(1), chosenBooks)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithContentDescription("Cookie, 3 notes").assertDoesNotExist()
+    }
+
+    @Test
+    fun a_tap_on_the_open_book_closes_the_shelf() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Lollipop, open now").performClick()
+        assertEquals(listOf(0), chosenBooks)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithContentDescription("Lollipop, open now").assertDoesNotExist()
+    }
+
+    /** The cover of the shelf's book that a screen reader hears as [description], as it is drawn. */
+    private fun coverPixels(description: String): PixelMap =
+        compose.onNodeWithContentDescription(description).captureToImage().toPixelMap()
+
+    /**
+     * An empty book is the one to tap for a new tune, and faded means "cannot be pressed" everywhere else in the
+     * app, so its sweet is drawn whole: the same picture as when the book holds notes. The sweet stands over the
+     * label, in the cover's upper half, and the label is the same size either way, so it does not move.
+     */
+    @Test
+    fun an_empty_book_shows_its_sweet_whole() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = List(6) { Book() }))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        val empty = coverPixels("Cookie, empty")
+        compose.runOnIdle { state.value = state.value.copy(books = threeNoteCookie) }
+        val full = coverPixels("Cookie, 3 notes")
+        var differing = 0
+        for (y in empty.height * 22 / 100 until empty.height * 54 / 100) {
+            for (x in empty.width * 15 / 100 until empty.width * 85 / 100) if (empty[x, y] != full[x, y]) differing++
+        }
+        assertEquals("an empty book's sweet should be drawn as a full one's, not faded", 0, differing)
+    }
+
+    /**
+     * The longest unbroken stretch of dark ink along any row of a cover's label: the label stands in the lower half,
+     * clear of the spine at the start (12 dp of ink) and of the cover's outline at the other edge.
+     */
+    private fun longestInkRun(cover: PixelMap): Int {
+        var longest = 0
+        for (y in cover.height * 56 / 100 until cover.height * 78 / 100) {
+            var run = 0
+            for (x in cover.width * 12 / 100 until cover.width * 95 / 100) {
+                run = if (cover[x, y].luminance() < 0.3f) run + 1 else 0
+                longest = maxOf(longest, run)
+            }
+        }
+        return longest
+    }
+
+    /** An empty book's label is a dashed, pale outline, as every empty place in the app is; a full one's is solid ink. */
+    @Test
+    fun an_empty_books_label_is_dashed() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        val full = coverPixels("Cookie, 3 notes")
+        val empty = coverPixels("Cupcake, empty")
+        assertTrue("a full book's label has a solid outline, ${longestInkRun(full)} of ${full.width} px", longestInkRun(full) > full.width / 3)
+        assertTrue("an empty book's label has no solid outline, ${longestInkRun(empty)} of ${empty.width} px", longestInkRun(empty) < empty.width / 10)
+    }
+
+    // ---- The phone's Back ----
+
+    @Test
+    fun back_leaves_the_app_while_the_child_writes() {
+        show(FluteUiState(tune = twoNotes))
+        assertFalse("nothing is open, so Back is the phone's, as before", back.taken(compose))
+    }
+
+    @Test
+    fun back_closes_the_speed_panel_as_ok_does() {
+        show(FluteUiState(tune = twoNotes))
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        back.press(compose)
+        assertEquals(1, speedDones)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        assertFalse("the panel is closed, so Back is the phone's again", back.taken(compose))
+    }
+
+    @Test
+    fun back_closes_an_open_wheel_before_the_speed_panel() {
+        show(FluteUiState(tune = twoNotes))
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        compose.onNodeWithText("120").performClick()
+        compose.onNodeWithText("119").assertIsDisplayed()
+        back.press(compose)
+        compose.onNodeWithText("119").assertDoesNotExist()
+        assertEquals(0, speedDones)
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertIsDisplayed()
+        back.press(compose)
+        assertEquals(1, speedDones)
+    }
+
+    @Test
+    fun back_closes_the_shelf_on_the_open_book() {
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.HALF)), books = threeNoteCookie))
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        back.press(compose)
+        assertEquals(listOf(0), chosenBooks)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        assertFalse(back.taken(compose))
+    }
+
+    @Test
+    fun back_is_not_now_on_the_microphone_card() {
+        show(FluteUiState(tune = twoNotes, micDenied = true))
+        back.press(compose)
+        assertEquals(1, micDismissals)
+    }
+
+    @Test
+    fun back_stops_a_tune_that_runs() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        back.press(compose)
+        assertEquals(1, stops)
+    }
+
+    @Test
+    fun the_shelf_survives_re_creation() {
+        val restoration = StateRestorationTester(compose)
+        show(FluteUiState(), restoration = restoration)
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithContentDescription("Lollipop, open now").assertExists()
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_shelf_speaks_croatian() {
+        show(FluteUiState(books = threeNoteCookie), locale = Locale("hr"))
+        compose.onNodeWithContentDescription("Pjesmica: Lizalica, dodirni za promjenu").performClick()
+        compose.onNodeWithContentDescription("Lizalica, otvorena pjesmica").assertExists()
+        compose.onNodeWithContentDescription("Keks, 3 note").assertExists()
+        compose.onNodeWithContentDescription("Muffin, prazna pjesmica").assertExists()
+    }
+
+    @Test
+    fun the_shelf_fits_a_short_phone_without_scrolling() {
+        // 470 dp is about what a 360 x 640 dp phone leaves the tab: above the shelf's minimum, so all six show.
+        show(FluteUiState(books = threeNoteCookie), height = 470.dp)
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Lollipop, open now").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Candy, empty").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_shelf_reaches_its_last_book_on_a_short_screen() {
+        // Below the shelf's minimum the books keep their height and the shelf scrolls.
+        show(FluteUiState(books = threeNoteCookie), height = 340.dp)
+        compose.onNodeWithContentDescription("Tune: Lollipop, tap to change").performClick()
+        compose.onNodeWithContentDescription("Candy, empty").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun tapping_the_knob_opens_the_drums_stage_in_place_and_ok_brings_the_tune_back() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        assertEquals(1, speedOpens)
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Beats in a bar: 4").assertIsDisplayed()
+        compose.onNodeWithText("OK").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+        compose.onNodeWithText("Play").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Erase the last note").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Your tune, 1 note").assertDoesNotExist()
+
+        compose.onNodeWithContentDescription("More beats").performClick()
+        assertEquals(TimeSignature.FIVE_FOUR, chosenSignature)
+        compose.onNodeWithContentDescription("Duck").performClick()
+        assertEquals(80, chosenBpm)
+
+        compose.onNodeWithText("OK").performClick()
+        assertEquals(1, speedDones)
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithText("Play").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Your tune, 1 note").assertExists()
+        compose.onNodeWithContentDescription("Speed: Duck, tap to change").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_speed_panel_survives_recreation() {
+        val restoration = StateRestorationTester(compose)
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))), restoration = restoration)
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed").assertIsDisplayed()
+        compose.onNodeWithText("OK").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_speed_panel_fits_a_short_screen() {
+        // Short, but above the drum's 420 dp minimum, so the panel does not scroll: the ring shrinks.
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))), height = 500.dp)
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").performClick()
+        compose.onNodeWithText("OK").assertIsDisplayed()
+        val ring = compose.onNodeWithContentDescription("Tempo ring, drag around it to change the speed")
+        ring.assertIsDisplayed()
+        assertTrue("the ring should shrink below 304 dp on a short screen, was ${ring.getBoundsInRoot().height}", ring.getBoundsInRoot().height < 304.dp)
+    }
+
+    // ---- Your turn ----
+
+    private val twoNotes = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+
+    @Test
+    fun your_turn_sits_beside_play_and_needs_a_note() {
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER))))
+        compose.onNodeWithText("Play").assertIsEnabled()
+        compose.onNodeWithText("Listen to me").assertIsDisplayed()
+        compose.onNodeWithText("Listen to me").assertIsNotEnabled()
+        val play = compose.onNodeWithText("Play").getBoundsInRoot()
+        val yourTurn = compose.onNodeWithText("Listen to me").getBoundsInRoot()
+        val keys = compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot()
+        assertTrue("Your turn $yourTurn should sit right of Play $play", yourTurn.left >= play.right)
+        assertEquals("both big buttons share the height", play.height, yourTurn.height)
+        assertTrue("both big buttons share the width: $play $yourTurn", abs((play.width - yourTurn.width).value) <= 1f)
+        assertTrue(
+            "Play $play and Your turn $yourTurn should span the keys' width $keys",
+            abs((play.left - keys.left).value) <= 1f && abs((yourTurn.right - keys.right).value) <= 1f,
+        )
+        state.value = state.value.copy(tune = twoNotes)
+        compose.onNodeWithText("Listen to me").assertIsEnabled()
+        compose.onNodeWithText("Listen to me").performClick()
+        assertEquals(1, yourTurns)
+    }
+
+    @Test
+    fun while_the_tune_runs_the_keys_and_the_sponge_are_gone_and_stop_is_wide() {
+        show(FluteUiState(tune = twoNotes, playing = Playing(0)))
+        fun checkRunning() {
+            compose.onNodeWithText("Stop").assertIsDisplayed()
+            compose.onNodeWithText("Play").assertDoesNotExist()
+            compose.onNodeWithText("Listen to me").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Erase the last note").assertDoesNotExist()
+            val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
+            val root = compose.onRoot().getBoundsInRoot()
+            assertTrue("Stop $stop should span the row of $root", stop.width > root.width * 0.8f)
+        }
+        checkRunning()
+        compose.onNodeWithText("Stop").performClick()
+        assertEquals(1, stops)
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0))
+        checkRunning()
+        compose.onNodeWithText("Stop").performClick()
+        assertEquals(2, stops)
+        assertEquals(0, playToggles)
+    }
+
+    @Test
+    fun the_staff_grows_while_the_tune_runs() {
+        show(FluteUiState(tune = twoNotes))
+        val rest = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
+        assertTrue("at rest the staff is ${rest.height}, expected $TuneStaffHeight", abs((rest.height - TuneStaffHeight).value) <= 1f)
+        state.value = state.value.copy(listening = Listening(index = 0))
+        val running = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
+        val expected = tuneStaffHeight(RunningStaffScale)
+        assertTrue("running the staff is ${running.height}, expected $expected", abs((running.height - expected).value) <= 1f)
+    }
+
+    /**
+     * What a Galaxy A55 with three navigation buttons leaves the tab, about 652 dp (2026-11-10): the
+     * stage, the keys and the Play row need 642 of it. The height check counted 664, so that phone
+     * was laid out as one too short: its spare height lay under the Play row instead of round the
+     * keys, and Stop stood 100 dp over Play's place.
+     */
+    @Test
+    fun a_phone_that_only_just_holds_the_tab_is_laid_out_like_a_taller_one() {
+        show(FluteUiState(tune = twoNotes), height = 652.dp)
+        val keys = compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot()
+        val expected = FluteKeysMinHeight + 10.dp
+        assertTrue("the keys' room should take the spare height: ${keys.height}, expected $expected", abs((keys.height - expected).value) <= 1f)
+        val play = compose.onNodeWithText("Play").getBoundsInRoot()
+        state.value = state.value.copy(listening = Listening(index = 0))
+        val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
+        assertTrue("Stop ($stop) should stand where Play ($play) was", abs((stop.bottom - play.bottom).value) <= 1f)
+    }
+
+    @Test
+    fun marks_and_the_waiting_animal_read_on_the_staff() {
+        show(FluteUiState(tune = twoNotes, marks = mapOf(0 to StepMark.FIRST_TRY), listening = Listening(index = 1)))
+        compose.onNodeWithContentDescription("C4, 1 beat, got it").assertExists()
+        compose.onNodeWithContentDescription("G4, 1 beat, play this one").assertExists()
+        state.value = state.value.copy(listening = Listening(index = 1, wrong = WrongNote(index = 1, midi = 69)))
+        compose.onNodeWithContentDescription("G4, 1 beat, heard A4").assertExists()
+        state.value = state.value.copy(listening = null, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY))
+        compose.onNodeWithContentDescription("C4, 1 beat, got it").assertExists()
+        compose.onNodeWithContentDescription("G4, 1 beat, got it after a retry").assertExists()
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+    }
+
+    /**
+     * The pixels of the marks row under the first beat of a captured step: where its star, the
+     * note heard or the listening dots are drawn, [StaffGeometry.MARKS_TOP] down and
+     * [StaffGeometry.BEAT_WIDTH] wide, at the running scale.
+     */
+    private fun marksRow(step: PixelMap): List<Color> {
+        val s = RunningStaffScale
+        val density = compose.density
+        val top = with(density) { (StaffGeometry.MARKS_TOP * s).dp.roundToPx() }
+        val bottom = minOf(step.height, with(density) { ((StaffGeometry.MARKS_TOP + StaffGeometry.MARKS_HEIGHT) * s).dp.roundToPx() })
+        val right = minOf(step.width, with(density) { (StaffGeometry.BEAT_WIDTH * s).dp.roundToPx() })
+        return (0 until right).flatMap { x -> (top until bottom).map { y -> step[x, y] } }
+    }
+
+    private fun Color.near(other: Color) = abs(red - other.red) + abs(green - other.green) + abs(blue - other.blue) < 0.15f
+
+    @Test
+    fun the_note_heard_now_shows_live_under_the_waited_step_and_dots_while_nothing_is_heard() {
+        needsDevice()
+        show(FluteUiState(tune = twoNotes, marks = mapOf(0 to StepMark.FIRST_TRY), listening = Listening(index = 1)))
+        val waited = compose.onNodeWithContentDescription("G4, 1 beat, play this one")
+        val a = noteColor(69)
+        val silent = marksRow(waited.captureToImage().toPixelMap())
+        val card = silent.first()
+        assertTrue("in silence the row holds the listening dots, not an A bubble", silent.none { it.near(a) })
+        assertTrue("in silence the row shows the listening dots' ring, not nothing", silent.count { !it.near(card) } > silent.size / 20)
+        state.value = state.value.copy(listening = Listening(index = 1, heardNow = 69))
+        val hearing = marksRow(waited.captureToImage().toPixelMap())
+        assertTrue("the A heard now should fill a bubble under the waited step", hearing.count { it.near(a) } > hearing.size / 3)
+        compose.onNodeWithContentDescription("G4, 1 beat, play this one").assertExists() // a screen reader is not told of the passing note
+        state.value = state.value.copy(listening = null)
+        val rest = marksRow(compose.onNodeWithContentDescription("G4, 1 beat").captureToImage().toPixelMap())
+        assertTrue("at rest the row under a step with no mark is empty", rest.all { it.near(rest.first()) })
+    }
+
+    @Test
+    fun the_staff_keeps_the_note_just_played_in_view_before_the_lit_one() {
+        // Thirty quarter notes, far more than the running staff shows at once, so the lit one lands mid-tune.
+        val tune = MutableList(30) { TuneNote(if (it % 2 == 0) 60 else 62, NoteLength.QUARTER) }
+        tune[18] = TuneNote(84, NoteLength.QUARTER) // C6: the note before the one just played
+        tune[19] = TuneNote(83, NoteLength.QUARTER) // B5: just played, with its star
+        tune[20] = TuneNote(81, NoteLength.QUARTER) // A5: waited on now
+        show(FluteUiState(tune = tune, marks = mapOf(19 to StepMark.FIRST_TRY), listening = Listening(index = 20)))
+        val line = hasAnyAncestor(hasContentDescription("Your tune, 30 notes"))
+        assertWhollyShown(hasContentDescription("B5, 1 beat, got it") and line)
+        assertWhollyShown(hasContentDescription("A5, 1 beat, play this one") and line)
+        assertNotWhollyShown(hasContentDescription("C6, 1 beat") and line)
+    }
+
+    /** The one node matching [matcher] is on screen with none of it clipped away by the staff's edge. */
+    private fun assertWhollyShown(matcher: SemanticsMatcher) {
+        val node = compose.onNode(matcher).fetchSemanticsNode()
+        assertTrue("${matcher.description}: ${node.boundsInRoot} shows less than its ${node.size}", node.boundsInRoot.width >= node.size.width - 1f)
+    }
+
+    /** No node matching [matcher] is on screen in full: a step scrolled off the staff may still exist, unplaced or clipped to a sliver. */
+    private fun assertNotWhollyShown(matcher: SemanticsMatcher) {
+        val whole = compose.onAllNodes(matcher).fetchSemanticsNodes()
+            .filter { it.layoutInfo.isPlaced && it.boundsInRoot.width >= it.size.width - 1f }
+        assertTrue("${matcher.description} is wholly on screen", whole.isEmpty())
+    }
+
+    @Test
+    fun the_advice_line_speaks_only_while_the_sound_is_unclear() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)))
+        compose.onNodeWithText("🎵 Play one long, clear note").assertIsDisplayed()
+        state.value = state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR))
+        compose.onNodeWithText("📱 Come closer to the phone").assertIsDisplayed()
+        state.value = state.value.copy(listening = Listening(index = 0))
+        compose.onNodeWithText("📱 Come closer to the phone").assertDoesNotExist()
+        compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
+        state.value = FluteUiState(tune = twoNotes, playing = Playing(0))
+        compose.onNodeWithText("🎵 Play one long, clear note").assertDoesNotExist()
+    }
+
+    /** A faded button's shadow, [depth] deep, must show right down under the middle of its bottom edge. */
+    private fun assertWholeShadowUnder(button: SemanticsNodeInteraction, depth: Dp) {
+        val bounds = button.getBoundsInRoot()
+        val screen = compose.onRoot().captureToImage().toPixelMap()
+        val pixels = { dp: Dp -> with(compose.density) { dp.toPx() }.roundToInt() }
+        val x = pixels((bounds.left + bounds.right) / 2)
+        val shadow = screen[x, pixels(bounds.bottom + depth - 1.dp)]
+        val under = screen[x, pixels(bounds.bottom + depth + 3.dp)]
+        assertTrue(
+            "the shadow's last row $shadow should be darker than what is under it $under",
+            shadow.luminance() < under.luminance() - 0.1f,
+        )
+    }
+
+    @Test
+    fun the_faded_knob_and_book_keep_their_whole_shadow_while_the_tune_runs() {
+        needsDevice()
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        assertWholeShadowUnder(compose.onNodeWithContentDescription("Speed: Rabbit, tap to change"), 5.dp)
+        assertWholeShadowUnder(compose.onNodeWithContentDescription("Tune: Lollipop, tap to change"), 5.dp)
+    }
+
+    @Test
+    fun the_faded_keys_and_buttons_of_an_empty_tune_keep_their_whole_shadow() {
+        needsDevice()
+        show(FluteUiState())
+        assertWholeShadowUnder(compose.onNodeWithContentDescription("Erase the last note"), 5.dp)
+        assertWholeShadowUnder(compose.onNodeWithText("Play"), 8.dp)
+        assertWholeShadowUnder(compose.onNodeWithText("Listen to me"), 8.dp)
+    }
+
+    @Test
+    fun the_knob_is_inert_while_the_tune_runs() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        val knob = compose.onNodeWithContentDescription("Speed: Rabbit, tap to change")
+        knob.assertIsDisplayed()
+        knob.assertIsNotEnabled()
+        knob.performClick()
+        assertEquals(0, speedOpens)
+        state.value = FluteUiState(tune = twoNotes)
+        compose.onNodeWithContentDescription("Speed: Rabbit, tap to change").assertIsEnabled()
+    }
+
+    @Test
+    fun a_denied_microphone_shows_the_card_with_a_way_back() {
+        show(FluteUiState(tune = twoNotes, micDenied = true))
+        compose.onNodeWithText("Can I listen?").assertIsDisplayed()
+        compose.onNodeWithText("Yes").assertIsDisplayed()
+        // Settings leaves the app, so it waits until the phone will not ask again.
+        compose.onNodeWithText("Settings").assertDoesNotExist()
+        compose.onNodeWithText("Not now").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Flute keys").assertDoesNotExist()
+        compose.onNodeWithText("Play").assertDoesNotExist()
+        compose.onNodeWithText("Listen to me").assertDoesNotExist()
+        compose.onNodeWithText("Yes").performClick()
+        assertEquals(1, micRequests)
+        state.value = state.value.copy(micBlocked = true)
+        compose.onNodeWithText("Settings").performClick()
+        assertEquals(1, settingsOpens)
+        compose.onNodeWithText("Not now").performClick()
+        assertEquals(1, micDismissals)
+        state.value = state.value.copy(micDenied = false)
+        compose.onNodeWithContentDescription("Flute keys").assertExists()
+        compose.onNodeWithText("Listen to me").assertIsDisplayed()
+    }
+
+    @Test
+    fun croatian_mic_card() {
+        show(FluteUiState(tune = twoNotes, micDenied = true, micBlocked = true), Locale("hr"))
+        compose.onNodeWithText("Smijem li slušati?").assertIsDisplayed()
+        compose.onNodeWithText("Da").assertIsDisplayed()
+        compose.onNodeWithText("Postavke").assertIsDisplayed()
+        compose.onNodeWithText("Ne sad").assertIsDisplayed()
+    }
+
+    // ---- The room under the stage while the flute listens (the user's "3C" of 2026-11-10) ----
+
+    @Test
+    fun listening_asks_for_the_first_note_until_one_is_judged() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        compose.onNodeWithText("🪈 Play C4").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1), marks = mapOf(0 to StepMark.FIRST_TRY))
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        compose.onNodeWithText("🪈 Play G4").assertDoesNotExist()
+    }
+
+    /**
+     * After a wrong note the room shows how the wanted note is fingered, with "Check your fingers", between the
+     * stage and Stop and as wide as the stage, until the right note is played.
+     */
+    @Test
+    fun a_wrong_note_brings_the_wanted_notes_fingering() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64))))
+        val fingering = compose.onNodeWithContentDescription("Fingering for C4").assertIsDisplayed().getBoundsInRoot()
+        compose.onNodeWithText("👀 Check your fingers").assertIsDisplayed()
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        val staff = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
+        val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
+        val line = compose.onNodeWithText("👀 Check your fingers").getBoundsInRoot()
+        assertTrue("the fingering $fingering stands under the staff $staff", fingering.top >= staff.bottom)
+        assertTrue("the line $line stands under the fingering $fingering and over Stop $stop", line.top >= fingering.bottom && line.bottom <= stop.top)
+        assertTrue("the fingering is ${fingering.width} wide", fingering.width > 300.dp)
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1), marks = mapOf(0 to StepMark.RETRY))
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        compose.onNodeWithText("👀 Check your fingers").assertDoesNotExist()
+    }
+
+    @Test
+    fun playing_the_tune_back_asks_for_nothing() {
+        show(FluteUiState(tune = twoNotes, playing = Playing(0)))
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_listening_room_speaks_croatian() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"))
+        compose.onNodeWithText("🪈 Odsviraj c1").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64)))
+        compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
+        compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
     }
 }

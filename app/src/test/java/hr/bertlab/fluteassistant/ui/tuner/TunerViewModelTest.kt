@@ -1,12 +1,19 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.tuner
 
-import hr.bertlab.fluteassistant.audio.tuner.PitchFrame
+import hr.bertlab.fluteassistant.audio.TONE_VOLUME
+import hr.bertlab.fluteassistant.domain.listen.Hearing
+import hr.bertlab.fluteassistant.domain.listen.HearingTracker
+import hr.bertlab.fluteassistant.domain.listen.ListenRules
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.tuner.FluteRange
+import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.fakes.FakeReferenceTonePlayer
 import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
-import hr.bertlab.fluteassistant.domain.tuner.FluteRange
-import hr.bertlab.fluteassistant.domain.tuner.NoteMath
-import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.fakes.FakeTunerEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,7 +54,7 @@ class TunerViewModelTest {
     private fun quiet(level: Float = 0.3f) = PitchFrame(null, 0.0, level)
 
     /** A held note: enough agreeing frames for the tuner to trust it. */
-    private fun steady(freq: Double) = repeat(TunerViewModel.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
+    private fun steady(freq: Double) = repeat(ListenRules.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
 
     private fun listeningViewModel(): TunerViewModel = TunerViewModel(engine, settings, tonePlayer, logger).apply {
         onPermissionResult(true)
@@ -69,14 +76,13 @@ class TunerViewModelTest {
         advanceUntilIdle()
         assertTrue(vm.state.value.isListening)
 
-        repeat(TunerViewModel.SMOOTHING_WINDOW) { engine.frames.tryEmit(pitched(440.0)) }
+        repeat(ListenRules.SMOOTHING_WINDOW) { engine.frames.tryEmit(pitched(440.0)) }
         advanceUntilIdle()
 
         val reading = vm.state.value.reading
         assertNotNull(reading)
-        assertEquals("A4", reading!!.label)
+        assertEquals(69, reading!!.midi)
         assertEquals(0.0, reading.cents, 0.01)
-        assertEquals(0.4f, vm.state.value.level)
     }
 
     @Test
@@ -86,7 +92,7 @@ class TunerViewModelTest {
         steady(440.0)
         listOf(880.0, 439.8, 440.2, 440.1).forEach { engine.frames.tryEmit(pitched(it)) }
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
         assertEquals(0.0, vm.state.value.reading!!.cents, 1.0)
     }
 
@@ -94,7 +100,7 @@ class TunerViewModelTest {
     fun `a brief blip never shows a note`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         advanceUntilIdle()
-        repeat(TunerViewModel.LOCK_FRAMES - 1) { engine.frames.tryEmit(pitched(440.0)) } // a bump, a syllable
+        repeat(ListenRules.LOCK_FRAMES - 1) { engine.frames.tryEmit(pitched(440.0)) } // a bump, a syllable
         advanceUntilIdle()
         assertNull(vm.state.value.reading)
     }
@@ -105,11 +111,11 @@ class TunerViewModelTest {
         advanceUntilIdle()
         steady(440.0)
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
 
         listOf(300.0, 330.0, 360.0).forEach { engine.frames.tryEmit(pitched(it)) } // a voice gliding past
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
         assertEquals(0.0, vm.state.value.reading!!.cents, 0.01)
     }
 
@@ -120,7 +126,7 @@ class TunerViewModelTest {
         steady(440.0)
         steady(392.0)
         advanceUntilIdle()
-        assertEquals("G4", vm.state.value.reading!!.label)
+        assertEquals(67, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -129,11 +135,11 @@ class TunerViewModelTest {
         advanceUntilIdle()
         steady(440.0)
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
 
         engine.frames.tryEmit(pitched(1000.0, probability = 0.3))
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -143,38 +149,13 @@ class TunerViewModelTest {
         steady(440.0)
         advanceUntilIdle()
 
-        repeat(TunerViewModel.HOLD_FRAMES - 1) { engine.frames.tryEmit(silence) }
+        repeat(ListenRules.HOLD_FRAMES - 1) { engine.frames.tryEmit(silence) }
         advanceUntilIdle()
         assertNotNull(vm.state.value.reading)
 
         engine.frames.tryEmit(silence)
         advanceUntilIdle()
         assertNull(vm.state.value.reading)
-    }
-
-    @Test
-    fun `changing the reference pitch recalculates the reading`() = runTest(dispatcher) {
-        val vm = listeningViewModel()
-        advanceUntilIdle()
-        steady(440.0)
-        advanceUntilIdle()
-
-        vm.setReferenceA4(442.0)
-        assertEquals(442.0, vm.state.value.referenceA4, 0.0)
-        assertEquals(-7.85, vm.state.value.reading!!.cents, 0.05)
-
-        vm.setReferenceA4(9999.0)
-        assertEquals(TunerViewModel.MAX_A4, vm.state.value.referenceA4, 0.0)
-        assertEquals(TunerViewModel.MAX_A4, settings.referenceA4, 0.0)
-    }
-
-    @Test
-    fun `stored reference pitch is reset to standard on load`() {
-        // The simplified UI cannot show or change A4, so a stale 442 or 466 must not silently
-        // relabel every note; only an explicit setReferenceA4 (future advanced mode) changes it.
-        settings.referenceA4 = 442.0
-        val vm = TunerViewModel(engine, settings, tonePlayer, logger)
-        assertEquals(NoteMath.DEFAULT_A4, vm.state.value.referenceA4, 0.0)
     }
 
     @Test
@@ -191,12 +172,26 @@ class TunerViewModelTest {
     }
 
     @Test
-    fun `engine failures surface as an error message`() = runTest(dispatcher) {
+    fun `an engine failure tells the screen and keeps its cause in the log`() = runTest(dispatcher) {
         engine.flowOverride = flow { throw IllegalStateException("Microphone busy") }
         val vm = listeningViewModel()
         advanceUntilIdle()
         assertFalse(vm.state.value.isListening)
-        assertEquals("Microphone busy", vm.state.value.errorMessage)
+        assertTrue(vm.state.value.micFailed)
+        assertEquals("Microphone busy", logger.events("tuner.error").single()["message"])
+    }
+
+    @Test
+    fun `listening again clears the failure`() = runTest(dispatcher) {
+        engine.flowOverride = flow { throw IllegalStateException("Microphone busy") }
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        engine.flowOverride = null
+        vm.startListening()
+        advanceUntilIdle()
+        assertTrue(vm.state.value.isListening)
+        assertFalse(vm.state.value.micFailed)
+        vm.stopListening()
     }
 
     @Test
@@ -205,6 +200,21 @@ class TunerViewModelTest {
         assertFalse(vm.state.value.permissionRequested)
         vm.onPermissionRequested()
         assertTrue(vm.state.value.permissionRequested)
+    }
+
+    @Test
+    fun `settings are offered only when the phone will not ask again`() = runTest(dispatcher) {
+        val vm = TunerViewModel(engine, settings, tonePlayer, logger)
+        vm.onPermissionAnswer(granted = false, canAskAgain = true)
+        assertFalse(vm.state.value.permissionGranted)
+        assertFalse("the phone will ask again, so Yes is enough", vm.state.value.micBlocked)
+        vm.onPermissionAnswer(granted = false, canAskAgain = false)
+        assertTrue("the phone will not ask again: only Settings is left", vm.state.value.micBlocked)
+        vm.onPermissionResult(false) // the screen's own check, on coming back to the tab: it knows nothing new
+        assertTrue(vm.state.value.micBlocked)
+        vm.onPermissionResult(true) // granted in the phone's settings
+        assertTrue(vm.state.value.permissionGranted)
+        assertFalse(vm.state.value.micBlocked)
     }
 
     @Test
@@ -245,19 +255,7 @@ class TunerViewModelTest {
 
         vm.setTargetNote(67)
         assertEquals(200.0, vm.state.value.centsOffTarget!!, 0.05)
-        assertEquals("A4", vm.state.value.reading!!.label)
-    }
-
-    @Test
-    fun `reference pitch moves the deviation from the target`() = runTest(dispatcher) {
-        val vm = listeningViewModel()
-        advanceUntilIdle()
-        steady(440.0)
-        advanceUntilIdle()
-
-        vm.setTargetNote(69)
-        vm.setReferenceA4(442.0)
-        assertEquals(-7.85, vm.state.value.centsOffTarget!!, 0.05)
+        assertEquals(69, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -277,7 +275,6 @@ class TunerViewModelTest {
 
     @Test
     fun `playing the target note sounds it and pauses the readings`() = runTest(dispatcher) {
-        settings.volume = 0.7f // left over from an old build; nothing can change it now, so it is ignored
         val vm = listeningViewModel()
         advanceUntilIdle()
         vm.setTargetNote(69)
@@ -285,7 +282,7 @@ class TunerViewModelTest {
         vm.playTargetNote()
         assertTrue(vm.state.value.isPlayingReference)
         assertEquals(
-            listOf(FakeReferenceTonePlayer.Played(440.0, TunerViewModel.REFERENCE_TONE_MS, TunerViewModel.REFERENCE_TONE_VOLUME)),
+            listOf(FakeReferenceTonePlayer.Played(440.0, TunerViewModel.REFERENCE_TONE_MS, TONE_VOLUME)),
             tonePlayer.played,
         )
 
@@ -298,7 +295,7 @@ class TunerViewModelTest {
         assertEquals(1, tonePlayer.stopCount) // the finished track is released, not left registered as playing
         steady(440.0)
         advanceUntilIdle()
-        assertEquals("A4", vm.state.value.reading!!.label)
+        assertEquals(69, vm.state.value.reading!!.midi)
     }
 
     @Test
@@ -329,7 +326,7 @@ class TunerViewModelTest {
             throw IllegalStateException("Microphone busy")
         }
         val vm = listeningViewModel(); advanceUntilIdle()
-        assertEquals("Microphone busy", vm.state.value.errorMessage)
+        assertTrue(vm.state.value.micFailed)
         assertEquals(Hearing.CLEAR, vm.state.value.hearing)
         assertEquals(TunerAdvice.NONE, vm.state.value.advice)
     }
@@ -350,10 +347,10 @@ class TunerViewModelTest {
     fun `a wandering pitch clears the reading after the hold`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        repeat(TunerViewModel.HOLD_FRAMES - 1) { engine.frames.tryEmit(pitched(300.0 + it * 7)) } // a glissando: no three frames agree
+        repeat(ListenRules.HOLD_FRAMES - 1) { engine.frames.tryEmit(pitched(300.0 + it * 7)) } // a glissando: no three frames agree
         advanceUntilIdle()
         assertNotNull(vm.state.value.reading)
-        engine.frames.tryEmit(pitched(300.0 + (TunerViewModel.HOLD_FRAMES - 1) * 7))
+        engine.frames.tryEmit(pitched(300.0 + (ListenRules.HOLD_FRAMES - 1) * 7))
         advanceUntilIdle()
         assertNull(vm.state.value.reading)
     }
@@ -376,7 +373,7 @@ class TunerViewModelTest {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
         // Two frames are unsteady while the pitch moves, then each frame is shown nearer A♯4.
-        frames(a4(60.0), TunerViewModel.LOCK_FRAMES - 1 + TunerViewModel.SWITCH_FRAMES - 1)
+        frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         advanceUntilIdle()
         assertEquals(70, vm.state.value.reading!!.midi)
         assertEquals(69, vm.state.value.homeMidi)
@@ -392,9 +389,9 @@ class TunerViewModelTest {
     fun `back on the note the drift starts again`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        frames(a4(60.0), TunerViewModel.LOCK_FRAMES - 1 + TunerViewModel.SWITCH_FRAMES - 1)
+        frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         steady(440.0)
-        frames(a4(60.0), TunerViewModel.LOCK_FRAMES - 1 + TunerViewModel.SWITCH_FRAMES - 1)
+        frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         advanceUntilIdle()
         assertEquals(69, vm.state.value.homeMidi)
     }
@@ -403,7 +400,7 @@ class TunerViewModelTest {
     fun `a clear step to another note moves the ring at once`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        frames(a4(100.0), TunerViewModel.LOCK_FRAMES) // A♯4 in tune
+        frames(a4(100.0), ListenRules.LOCK_FRAMES) // A♯4 in tune
         advanceUntilIdle()
         assertEquals(70, vm.state.value.homeMidi)
         assertEquals(TuningStatus.IN_TUNE, vm.state.value.status)
@@ -413,7 +410,7 @@ class TunerViewModelTest {
     fun `after silence the ring takes the next note at once`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        repeat(TunerViewModel.HOLD_FRAMES) { engine.frames.tryEmit(silence) }
+        repeat(ListenRules.HOLD_FRAMES) { engine.frames.tryEmit(silence) }
         advanceUntilIdle()
         assertNull(vm.state.value.homeMidi)
         steady(a4(60.0))

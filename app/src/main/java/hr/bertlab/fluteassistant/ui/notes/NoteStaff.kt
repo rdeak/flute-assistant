@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.notes
 
 import androidx.compose.foundation.Canvas
@@ -10,17 +13,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -34,17 +41,78 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.toSize
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
+import kotlin.math.min
 
 /**
  * Where the note column sits, as a fraction of the width: the middle, clear of the clef on the
  * left and of a right-handed finger sliding on the right, so the see-through note stays in view.
  */
 private const val NOTE_COLUMN = 0.5f
+
+/** How far apart the columns of a Hear phrase sit, as a fraction of the width: a head and a bit between them. */
+private const val COLUMN_STEP = 0.16f
+
+/**
+ * Hear's slots, the staff's answer to the first child test (2026-11-09: "it has confused player what needs to
+ * be done, why first one is marked and second is not"). Every note still to find stands on the staff as a tall
+ * dashed capsule in its column, so the child sees where a note goes and how many are left. Its half width is
+ * [SLOT_HALF_WIDTH] pitches, or [SLOT_STEP_SHARE] of a column step where that is less (a narrow staff), so
+ * neighbours keep a gap; its corners are round to the half width, the whole of its ends.
+ */
+private const val SLOT_HALF_WIDTH = 1f
+private const val SLOT_STEP_SHARE = 0.42f
+
+/**
+ * A slot's look, as fractions of full alpha: the note to find is a pale yellow, the later ones have no fill; a
+ * slot whose note is sounding ([SLOT_LIT_ALPHA]) is a strong yellow. The dashes are 6 dp on and 4 off, as the
+ * see-through note's.
+ */
+private const val SLOT_FILL_ALPHA = 0.28f
+private const val SLOT_LIT_ALPHA = 0.75f
+private const val SLOT_DASH_ON = 6
+private const val SLOT_DASH_OFF = 4
+
+/**
+ * The ❓ in a slot, in pitches, its alpha when the slot is a later one, and its size while its note sounds
+ * (it grows, which with the strong yellow is the pulse: the state flips per note, nothing animates).
+ */
+private const val SLOT_MARK = 1.4f
+private const val SLOT_MARK_LIT = 1.6f
+private const val SLOT_MARK_LATER_ALPHA = 0.35f
+
+/**
+ * The halo behind a head whose note is sounding: [HALO_RADIUS] pitches round its middle (1.15 reached the next
+ * capsule at true size), [HALO_ALPHA] of the sun. On a narrow staff the next capsule's edge is nearer than that
+ * (a column step less the slot's half width), and the halo stops there.
+ */
+private const val HALO_RADIUS = 1f
+private const val HALO_ALPHA = 0.7f
+
+/**
+ * The columns of a phrase of [count] notes, as fractions of the width: spread evenly around
+ * the middle, so the longest phrase of four still leaves the clef its room on the left and the
+ * finger its room on the right. One note, or none (Find), is [NOTE_COLUMN] alone.
+ */
+internal fun phraseColumns(count: Int): List<Float> =
+    if (count <= 1) listOf(NOTE_COLUMN) else List(count) { NOTE_COLUMN + (it - (count - 1) / 2f) * COLUMN_STEP }
+
+/**
+ * The columns that hold a slot, the stand-in for a note still to find. In Hear, every note of the phrase from
+ * [placed] on, less the one just found while [solved] (its head stands there). In Find, which has no phrase, its
+ * one column until its note is found (since 2026-11-10: Find's staff showed nothing to do, as Hear's had).
+ */
+internal fun slotIndices(phraseSize: Int, placed: Int, solved: Boolean): List<Int> = when {
+    phraseSize == 0 -> if (solved) emptyList() else listOf(0)
+    else -> (placed until phraseSize).filterNot { solved && it == placed }
+}
 
 /**
  * Room kept above the highest place and below the lowest, in places, so the clef's loop and
@@ -72,8 +140,8 @@ private const val G_LINE = 4
 private const val LEDGER_HALF = 1f
 
 /**
- * A treble staff that fills whatever height it is given: the places shown are
- * [StaffNotes.visiblePositions] of [practiceNotes] (the staff and its two neighbouring spaces,
+ * The staff of the round in [state]. A treble staff that fills whatever height it is given: the places shown are
+ * [StaffNotes.visiblePositions] of [NotesRound.practiceNotes] (the staff and its two neighbouring spaces,
  * plus the ledger-line notes only as far as a chosen note needs them), and the size of a place
  * follows from the height, so the fewer places the bigger they are. Every place is a
  * full-width band, the spaces faintly tinted, the lines thick in the text colour, the clef
@@ -82,38 +150,65 @@ private const val LEDGER_HALF = 1f
  * The child answers by touch and slide: a finger down puts a see-through note on the nearest
  * place ([placing], reported through [onPlacingChange]) and turns its band yellow; it follows
  * the finger with a small tick at each new place, and lifting the finger answers that place
- * through [onNoteTapped]. Sliding off the staff cancels. Each of [wrongTaps] gets a cross,
- * the latest ([lastWrongTap]) with an arrow pointing up or down towards [currentMidi]; once
- * [solved], the note sits on its place in its letter's colour with sparkles. [enabled] is
- * false while the answer shows.
+ * through [onNoteTapped]. Sliding off the staff cancels. Each of [NotesRound.wrongTaps] gets a cross,
+ * the latest ([NotesRound.lastWrongTap]) with an arrow pointing up or down towards [NotesRound.currentMidi]; once
+ * [NotesRound.solved], the note sits on its place in its letter's colour with sparkles. The staff takes
+ * no touch while the answer shows, nor while the phrase sounds ([NotesRound.phrasePlaying]).
+ *
+ * In Hear the staff holds the whole [NotesRound.phrase] across the width, one column a note
+ * ([phraseColumns]): the first [NotesRound.placed] notes sit in their columns in their letters' colours
+ * (never with sparkles or dashes, as they are given or done), and everything else above, the
+ * far places' dashed ledger stubs, the see-through note, the crosses and the sparkles of the
+ * last note, belongs to the column of the note to place, [NotesRound.placed]. In Find the [NotesRound.phrase] is
+ * empty and the staff is the one column in the middle. [NotesRound.hearing] only changes the staff's
+ * description for a screen reader.
+ *
+ * Under every note, a slot for each note still to find ([slotIndices]: Hear's phrase from the note to place on,
+ * and Find's one note): a dashed capsule in its column from the
+ * top place to the bottom one with a ❓ in it, the next one pale yellow and the later ones faint, so the child
+ * sees what the staff is asking and how much is left (the first child test, 2026-11-09). The ❓ of the note to
+ * place gives way to the see-through note while a finger is down, and every ❓ gives way to the crosses while a
+ * wrong tap stands. While the phrase plays, the note at index [NotesRound.sounding] lights: a halo behind its head, or
+ * its slot a strong yellow with a bigger ❓. Slots are drawn before every note, so a slot never hides one.
  *
  * For assistive technology every place is also a button named by position, never by note
  * (so a screen reader does not give the answer away), that answers at once.
  */
 @Composable
 fun NoteStaff(
-    currentMidi: Int,
-    wrongTaps: Set<Int>,
-    lastWrongTap: Int?,
-    solved: Boolean,
-    practiceNotes: Set<Int>,
+    state: NotesRound,
     placing: Int?,
     onPlacingChange: (Int?) -> Unit,
     onNoteTapped: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val currentMidi = state.currentMidi
+    val wrongTaps = state.wrongTaps
+    val lastWrongTap = state.lastWrongTap
+    val solved = state.solved
+    val practiceNotes = state.practiceNotes
+    val phrase = state.phrase
+    val placed = state.placed
+    val locked = state.phrasePlaying
+    val hearing = state.hearing
+    val sounding = state.sounding
     val colors = FluteTheme.colors
     val haptics = LocalHapticFeedback.current
-    val staffDescription = stringResource(R.string.staff_description)
+    val staffDescription = stringResource(if (hearing) R.string.staff_description_hear else R.string.staff_description)
+    val columns = phraseColumns(phrase.size)
+    val currentColumn = columns[placed.coerceIn(0, columns.lastIndex)]
     val visible = StaffNotes.visiblePositions(practiceNotes)
     val currentPosition = StaffNotes.positionOf(currentMidi)
     val wrongPositions = wrongTaps.map(StaffNotes::positionOf).filter { it in visible }
     val lastWrongPosition = lastWrongTap?.let(StaffNotes::positionOf)?.takeIf { it in visible }
-    val enabled = !solved
+    val enabled = !solved && !locked
     val currentOnPlacingChange by rememberUpdatedState(onPlacingChange)
     val currentOnNoteTapped by rememberUpdatedState(onNoteTapped)
+    val placedNotes = phrase.take(placed).map { it to noteColor(it) }
     val noteColor = noteColor(currentMidi)
     val sparkle = rememberTextMeasurer()
+    // The layer paint of a faded emoji: one, whose alpha is set for each, not one per emoji per frame.
+    val fadePaint = remember { Paint() }
     val emojiStyle = MaterialTheme.typography.titleLarge
 
     Box(
@@ -132,24 +227,31 @@ fun NoteStaff(
                     var position: Int? = positionAt(down.position.y)
                     currentOnPlacingChange(position)
                     haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
-                    while (true) {
-                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) {
-                            position?.let { currentOnNoteTapped(StaffNotes.midiAt(it)) }
-                            break
+                    // Finally: a gesture cut short (the staff locking or unlocking under the finger restarts this block)
+                    // must let go of the place too, or the speaker bubble would wait for a lift that never comes.
+                    try {
+                        while (true) {
+                            val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                // A lift already consumed is a cancel (the system took the touch back, or the staff went
+                                // away under the finger), not a child letting go: it answers nothing.
+                                if (!change.isConsumed) position?.let { currentOnNoteTapped(StaffNotes.midiAt(it)) }
+                                break
+                            }
+                            change.consume()
+                            val inside = change.position.x in 0f..size.width.toFloat() &&
+                                change.position.y in 0f..size.height.toFloat()
+                            // Off the staff is a change of mind: nothing is answered for this touch.
+                            val next = if (inside && position != null) positionAt(change.position.y) else null
+                            if (next != position) {
+                                position = next
+                                currentOnPlacingChange(next)
+                                if (next != null) haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
+                            }
                         }
-                        change.consume()
-                        val inside = change.position.x in 0f..size.width.toFloat() &&
-                            change.position.y in 0f..size.height.toFloat()
-                        // Off the staff is a change of mind: nothing is answered for this touch.
-                        val next = if (inside && position != null) positionAt(change.position.y) else null
-                        if (next != position) {
-                            position = next
-                            currentOnPlacingChange(next)
-                            if (next != null) haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)
-                        }
+                    } finally {
+                        currentOnPlacingChange(null)
                     }
-                    currentOnPlacingChange(null)
                 }
             },
     ) {
@@ -158,7 +260,7 @@ fun NoteStaff(
             val space = pitch * 2f
             val lineWidth = 3.dp.toPx()
             fun yOf(position: Int) = (visible.last - position + END_MARGIN_PLACES + 0.5f) * pitch
-            val x = size.width * NOTE_COLUMN
+            val x = size.width * currentColumn
 
             // The bands: spaces tinted, the place under the finger yellow.
             for (position in visible) {
@@ -176,23 +278,85 @@ fun NoteStaff(
             }
             drawTrebleClef(space * CLEF_SCALE, Offset(space * 0.15f, yOf(G_LINE) - space * CLEF_SCALE * CLEF_CURL), colors.mutedText.copy(alpha = 0.4f))
 
-            // The ledger lines the far places need, dashed until a note sits on them.
-            val ledgerHalf = pitch * LEDGER_HALF
-            val dashes = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 6.dp.toPx()))
-            for (position in visible) {
-                if (position % 2 == 0 && position !in StaffNotes.LINE_POSITIONS) {
-                    drawLine(
-                        colors.mutedText, Offset(x - ledgerHalf, yOf(position)), Offset(x + ledgerHalf, yOf(position)),
-                        lineWidth, pathEffect = dashes,
-                    )
+            fun emoji(text: String, centre: Offset, sizePx: Float, alpha: Float = 1f) {
+                val layout = sparkle.measure(text, emojiStyle.copy(fontSize = (sizePx / density / fontScale).sp))
+                val topLeft = centre - Offset(layout.size.width / 2f, layout.size.height / 2f)
+                if (alpha >= 1f) {
+                    drawText(layout, topLeft = topLeft)
+                } else {
+                    // A layer, not drawText's alpha: that fades the colour the text is painted in, and an emoji brings its own.
+                    val bounds = Rect(topLeft, layout.size.toSize()).inflate(sizePx * 0.25f)
+                    fadePaint.alpha = alpha
+                    drawContext.canvas.saveLayer(bounds, fadePaint)
+                    drawText(layout, topLeft = topLeft)
+                    drawContext.canvas.restore()
                 }
             }
 
-            fun head(position: Int, fill: Color, dashed: Boolean = false) {
-                val topLeft = Offset(x - pitch * HEAD_RX, yOf(position) - pitch * HEAD_RY)
+            // The slot of a note still to find, under every note. The note to place has a pale yellow and an outline in
+            // the text colour (the outline colour is nearly the card's own at night); the later ones only a light outline.
+            // The ❓ gives way to the see-through note while a finger is down, and to the crosses and the arrow while a
+            // wrong tap stands: they are drawn over the middle of the column, where the ❓ is.
+            val columnStepPx = size.width * COLUMN_STEP
+            val slotHalf = min(pitch * SLOT_HALF_WIDTH, columnStepPx * SLOT_STEP_SHARE)
+            val slotTop = yOf(visible.last) - pitch / 2
+            val slotBottom = yOf(visible.first) + pitch / 2
+            fun slot(index: Int) {
+                val centreX = size.width * columns[index]
+                val current = index == placed
+                val lit = sounding == index
+                val topLeft = Offset(centreX - slotHalf, slotTop)
+                val slotSize = Size(slotHalf * 2, slotBottom - slotTop)
+                val fill = when {
+                    lit -> Sun.copy(alpha = SLOT_LIT_ALPHA)
+                    current -> Sun.copy(alpha = SLOT_FILL_ALPHA)
+                    else -> null
+                }
+                if (fill != null) drawRoundRect(fill, topLeft, slotSize, CornerRadius(slotHalf))
+                drawRoundRect(
+                    if (current) colors.text else colors.border, topLeft, slotSize, CornerRadius(slotHalf),
+                    style = Stroke(lineWidth, pathEffect = PathEffect.dashPathEffect(floatArrayOf(SLOT_DASH_ON.dp.toPx(), SLOT_DASH_OFF.dp.toPx()))),
+                )
+                if (wrongTaps.isEmpty() && (!current || placing == null)) {
+                    emoji(
+                        QUESTION_EMOJI, Offset(centreX, (slotTop + slotBottom) / 2), pitch * if (lit) SLOT_MARK_LIT else SLOT_MARK,
+                        alpha = if (current || lit) 1f else SLOT_MARK_LATER_ALPHA,
+                    )
+                }
+            }
+            // The notes still to find (Find's one too); once solved, the found note stands where the current slot was.
+            val slots = slotIndices(phrase.size, placed, solved)
+            slots.forEach(::slot)
+
+            // The ledger lines the far places need, dashed until a note sits on them. In Hear the column being answered
+            // has its slot, and the stub is clipped to the capsule: cut to its half width it still poked out at the
+            // rounded end, where the capsule is narrower than that.
+            val ledgerHalf = pitch * LEDGER_HALF
+            val slotDrawn = placed in slots
+            val stubHalf = if (slotDrawn) min(ledgerHalf, slotHalf) else ledgerHalf
+            val dashes = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 6.dp.toPx()))
+            fun stubs() {
+                for (position in visible) {
+                    if (position % 2 == 0 && position !in StaffNotes.LINE_POSITIONS) {
+                        drawLine(
+                            colors.mutedText, Offset(x - stubHalf, yOf(position)), Offset(x + stubHalf, yOf(position)),
+                            lineWidth, pathEffect = dashes,
+                        )
+                    }
+                }
+            }
+            if (slotDrawn) {
+                val slotShape = RoundRect(x - slotHalf, slotTop, x + slotHalf, slotBottom, CornerRadius(slotHalf))
+                clipPath(Path().apply { addRoundRect(slotShape) }) { stubs() }
+            } else {
+                stubs()
+            }
+
+            fun head(position: Int, fill: Color, dashed: Boolean = false, centreX: Float = x) {
+                val topLeft = Offset(centreX - pitch * HEAD_RX, yOf(position) - pitch * HEAD_RY)
                 val headSize = Size(pitch * HEAD_RX * 2, pitch * HEAD_RY * 2)
                 StaffNotes.ledgerLinesFor(position).forEach {
-                    drawLine(colors.text, Offset(x - ledgerHalf, yOf(it)), Offset(x + ledgerHalf, yOf(it)), lineWidth)
+                    drawLine(colors.text, Offset(centreX - ledgerHalf, yOf(it)), Offset(centreX + ledgerHalf, yOf(it)), lineWidth)
                 }
                 drawOval(fill, topLeft, headSize)
                 drawOval(
@@ -201,10 +365,22 @@ fun NoteStaff(
                 )
             }
 
-            fun emoji(text: String, centre: Offset, sizePx: Float) {
-                val layout = sparkle.measure(text, emojiStyle.copy(fontSize = (sizePx / density / fontScale).sp))
-                drawText(layout, topLeft = centre - Offset(layout.size.width / 2f, layout.size.height / 2f))
+            // The halo of the note sounding, behind its head: a pitch round it, or less where the next capsule's edge is
+            // nearer (a column step less the slot's half width), so it never reaches the next slot.
+            fun halo(position: Int, centreX: Float) = drawCircle(
+                Sun.copy(alpha = HALO_ALPHA), min(pitch * HALO_RADIUS, columnStepPx - slotHalf), Offset(centreX, yOf(position)),
+            )
+
+            // Hear: the notes of the phrase already on the staff, each in its own column.
+            placedNotes.forEachIndexed { index, (midi, fill) ->
+                val position = StaffNotes.positionOf(midi)
+                if (position in visible) {
+                    if (sounding == index) halo(position, size.width * columns[index])
+                    head(position, fill, centreX = size.width * columns[index])
+                }
             }
+            // The last note's own halo goes under the crosses with the others; its head is drawn with its sparkles.
+            if (solved && sounding == placed && currentPosition in visible) halo(currentPosition, x)
 
             for (position in wrongPositions) {
                 val centre = Offset(x, yOf(position))
@@ -257,26 +433,4 @@ fun NoteStaff(
 private const val UP_EMOJI = "\u2B06\uFE0F" // up arrow
 private const val DOWN_EMOJI = "\u2B07\uFE0F" // down arrow
 private const val SPARKLES_EMOJI = "\u2728" // sparkles
-
-/**
- * A stroked treble clef, drawn in [unit]s from [origin]: the hook and dot at the bottom, the
- * stem up to the loop at the top, the sweep back down and the curl around the G line.
- */
-private fun DrawScope.drawTrebleClef(unit: Float, origin: Offset, color: Color) {
-    fun x(u: Float) = origin.x + u * unit
-    fun y(u: Float) = origin.y + u * unit
-    val path = Path().apply {
-        moveTo(x(0.6f), y(4.7f))
-        cubicTo(x(0.65f), y(5.1f), x(1.1f), y(5.12f), x(1.05f), y(4.65f))
-        cubicTo(x(1.0f), y(3.8f), x(1.1f), y(2.0f), x(1.3f), y(0.5f))
-        cubicTo(x(1.35f), y(-0.2f), x(1.5f), y(-0.8f), x(1.55f), y(-1.0f))
-        cubicTo(x(1.7f), y(-0.9f), x(1.85f), y(-0.3f), x(1.75f), y(0.3f))
-        cubicTo(x(1.65f), y(1.2f), x(0.9f), y(1.9f), x(0.5f), y(2.4f))
-        cubicTo(x(0.1f), y(2.9f), x(0.1f), y(3.5f), x(0.5f), y(3.9f))
-        cubicTo(x(0.9f), y(4.25f), x(1.55f), y(4.0f), x(1.6f), y(3.3f))
-        cubicTo(x(1.65f), y(2.7f), x(1.1f), y(2.4f), x(0.8f), y(2.75f))
-        cubicTo(x(0.55f), y(3.0f), x(0.7f), y(3.4f), x(1.0f), y(3.3f))
-    }
-    drawPath(path, color, style = Stroke(width = unit * 0.13f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    drawCircle(color, radius = unit * 0.15f, center = Offset(x(0.6f), y(4.7f)))
-}
+private const val QUESTION_EMOJI = "\u2753" // red question mark, the slot's and the Hear prompt's symbol

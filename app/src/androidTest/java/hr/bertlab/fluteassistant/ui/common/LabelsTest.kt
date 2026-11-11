@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.ui.common
 
 import android.content.res.Configuration
@@ -5,9 +8,9 @@ import android.content.res.Resources
 import android.os.LocaleList
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import hr.bertlab.fluteassistant.domain.model.MetronomeConfig
-import hr.bertlab.fluteassistant.domain.model.SoundProfile
-import hr.bertlab.fluteassistant.domain.model.Subdivision
+import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
+import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.playback.summary
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -25,10 +28,10 @@ class LabelsTest {
     }
 
     @Test
-    fun summary_is_localised() {
-        val config = MetronomeConfig(bpm = 120, subdivision = Subdivision.NONE, sound = SoundProfile.WOODBLOCK)
-        assertEquals("120 BPM · 4/4 · Quarter · Woodblock", config.summary(resources(Locale.ENGLISH)))
-        assertEquals("120 BPM · 4/4 · Četvrtinke · Drveni blok", config.summary(resources(Locale("hr"))))
+    fun the_summary_is_the_tempo_and_the_bar() {
+        val config = MetronomeConfig(bpm = 120)
+        assertEquals("120 BPM · 4/4", config.summary(resources(Locale.ENGLISH)))
+        assertEquals("120 BPM · 4/4", config.summary(resources(Locale("hr"))))
     }
 
     @Test
@@ -75,16 +78,17 @@ class LabelsTest {
     }
 
     @Test
-    fun note_names_without_octave_follow_the_locale() {
-        assertEquals("B", noteName(resources(Locale.ENGLISH), 71))
-        assertEquals("H", noteName(resources(Locale("hr")), 71))
-        assertEquals("A♯", noteName(resources(Locale.ENGLISH), 70))
-        assertEquals("B", noteName(resources(Locale("hr")), 70))
+    fun notes_games_are_named() {
+        // The emoji is part of the word, so the pill draws none of its own.
+        assertEquals("🔎 Find", resources(Locale.ENGLISH).getString(NotesGame.FIND.labelRes()))
+        assertEquals("👂 Hear", resources(Locale.ENGLISH).getString(NotesGame.HEAR.labelRes()))
+        assertEquals("🔎 Nađi", resources(Locale("hr")).getString(NotesGame.FIND.labelRes()))
+        assertEquals("👂 Slušaj", resources(Locale("hr")).getString(NotesGame.HEAR.labelRes()))
     }
 
     @Test
     fun other_system_languages_fall_back_to_english() {
-        assertEquals("Triplets", resources(Locale.GERMAN).getString(Subdivision.TRIPLET.labelRes()))
-        assertEquals("Bell", resources(Locale.FRENCH).getString(SoundProfile.BELL.labelRes()))
+        assertEquals("🔎 Find", resources(Locale.GERMAN).getString(NotesGame.FIND.labelRes()))
+        assertEquals("👂 Hear", resources(Locale.FRENCH).getString(NotesGame.HEAR.labelRes()))
     }
 }

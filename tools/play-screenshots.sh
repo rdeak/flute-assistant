@@ -1,18 +1,34 @@
 #!/bin/bash
-# Play Store phone screenshots: one per tab, English and Croatian, light mode, padded to 9:16.
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+# Play Store screenshots: one per tab, English and Croatian, light mode, padded to Play's ratio.
 #
 # Needs the headless emulator (AVD Medium_Phone_API_37.0, 1080x2400, started with -no-audio, see
 # CLAUDE.md) and a debug APK (./gradlew assembleDebug). Installs the APK, clears the app's data,
 # drives each tab through uiautomator and writes docs/release/play-listing/screenshots/<lang>/N-tab.jpg.
 # Play wants 9:16 and no alpha channel, so each 1080x2400 capture is scaled to 864x1920, padded to
 # 1080x1920 with the app's sky-blue page colour and saved as JPEG.
+#
+# `tools/play-screenshots.sh tablet` writes the tablet shots instead, for Play's two tablet slots, under
+# docs/release/play-listing/screenshots-tablet/. There is no tablet AVD, so the phone AVD fakes one with
+# `wm size` and `wm density`, at exactly Play's ratios, so nothing is padded or scaled: padding left the
+# white rail floating between bars of the page colour. 7-inch: upright, 1296x2304 (9:16, 648 x 1152 dp).
+# 10-inch: sideways, 2880x1620 (16:9, 1440 x 810 dp). Android's demo mode tidies the status bar. Upload
+# them by hand in Play Console (docs/release/README.md).
 set -u
 cd "$(dirname "$0")/.." || exit 2
 ADB=${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}
 export ANDROID_SERIAL=${ANDROID_SERIAL:-emulator-5554}
 export PYTHONUTF8=1
 PKG=hr.bertlab.fluteassistant
+MODE=phone
+if [ "${1:-}" = tablet ]; then
+  MODE=tablet
+  shift
+  [ $# -eq 0 ] || { echo "tablet mode writes to screenshots-tablet/ and takes no folder" >&2; exit 2; }
+fi
 OUT=${1:-docs/release/play-listing/screenshots}
+MIC_WAIT=0 # seconds on the tuner before its shot, for the microphone chip to go
 RAW=$(mktemp -d)
 BG=EAF4FF # ui/theme/Color.kt LightFluteColors.page
 
@@ -40,6 +56,11 @@ tap() { # $1 exact label; or "text <regex>" / "desc <regex>" for a pattern on th
   r=$(find_node "$mode" "$want"); [ -n "$r" ] || { echo "no node: $1" >&2; return 1; }
   read -r x y _ <<<"$r"; $ADB shell input tap "$x" "$y"; $ADB shell sleep 0.4
 }
+wait_node() { # $1 exact label: waits for it to appear (the first start after an install is slow)
+  local i
+  for i in $(seq 20); do [ -n "$(find_node exact "$1")" ] && { echo "$1 up after $i dump(s)"; return 0; }; $ADB shell sleep 0.5; done
+  echo "never appeared: $1" >&2; return 1
+}
 hold() { # $1 exact label, $2 ms: keeps a finger on it that long without moving
   local r x y
   r=$(find_node exact "$1"); [ -n "$r" ] || { echo "no node: $1" >&2; return 1; }
@@ -49,9 +70,13 @@ shot() { # $1 language, $2 file name
   local raw="$RAW/$1-$2.png" out="$OUT/$1/$2.jpg"
   mkdir -p "$OUT/$1"
   $ADB exec-out screencap -p > "$raw"
-  sips -z 1920 864 "$raw" --out "$RAW/$1-$2-scaled.png" >/dev/null &&
-    sips -p 1920 1080 --padColor $BG "$RAW/$1-$2-scaled.png" >/dev/null &&
-    sips -s format jpeg -s formatOptions 95 "$RAW/$1-$2-scaled.png" --out "$out" >/dev/null
+  if [ "$MODE" = tablet ]; then
+    sips -s format jpeg -s formatOptions 95 "$raw" --out "$out" >/dev/null
+  else
+    sips -z 1920 864 "$raw" --out "$RAW/$1-$2-scaled.png" >/dev/null &&
+      sips -p 1920 1080 --padColor $BG "$RAW/$1-$2-scaled.png" >/dev/null &&
+      sips -s format jpeg -s formatOptions 95 "$RAW/$1-$2-scaled.png" --out "$out" >/dev/null
+  fi
   echo "shot $out"
 }
 answer_note() { # taps the staff place of the note named on screen (C4..C6 in English, c1..c3 in Croatian)
@@ -68,37 +93,74 @@ print(\"CDEFGAB\".index(letter) + 7 * (octave - lowest) + 1)" "$name")
   echo "$name -> staff position $pos"
 }
 
-run_language() { # lang, tuner tab, notes tab, flute tab, play, stop, target-mode pill, tune notes...
-  local L=$1 TAB_TUNER=$2 TAB_NOTES=$3 TAB_FLUTE=$4 PLAY=$5 STOP=$6 TARGET=$7; shift 7
+run_language() { # lang, flute tab, metronome tab, tuner tab, notes tab, play, stop, target-mode pill, tune notes...
+  local L=$1 TAB_FLUTE=$2 TAB_METRONOME=$3 TAB_TUNER=$4 TAB_NOTES=$5 PLAY=$6 STOP=$7 TARGET=$8; shift 8
   local TUNE=("$@") last i n r x y
   last=${TUNE[$((${#TUNE[@]} - 1))]}
   $ADB shell pm clear $PKG >/dev/null
   $ADB shell pm grant $PKG android.permission.RECORD_AUDIO
   $ADB shell pm grant $PKG android.permission.POST_NOTIFICATIONS
   $ADB shell cmd locale set-app-locales $PKG --user 0 --locales "$L"
-  $ADB shell am start -n $PKG/.MainActivity >/dev/null; $ADB shell sleep 3
-  # Metronome, running so a beat bubble is lit with the speed's animal on it.
-  tap "$PLAY"; $ADB shell sleep 1.3; shot "$L" 1-metronome; tap "$STOP"
-  # Tuner in "Tune" mode: the target note in its pitch window and its fingering show without a microphone.
-  tap "$TAB_TUNER"; $ADB shell sleep 1; tap "text .*$TARGET"; $ADB shell sleep 1; shot "$L" 2-tuner
-  # Notes: three right answers, then the fourth caught during its feedback (the note in colour, flames).
-  tap "$TAB_NOTES"; $ADB shell sleep 1
-  for i in 1 2 3; do answer_note; $ADB shell sleep 1.6; done
-  answer_note; $ADB shell sleep 0.3; shot "$L" 3-notes; $ADB shell sleep 1.5
-  # Flute: the first notes of a tune played, the last one held while the shot is taken.
+  $ADB shell am start -n $PKG/.MainActivity >/dev/null
+  # The shots follow the tab bar's order, so the listing leads with the tab the app opens on. Each
+  # tab is tapped, never assumed open: in English the flute's Play and the metronome's share a label.
+  # Flute: the first notes of a tune played, the last one held while the shot is taken. The keys
+  # are held right after the start, so wait for the screen: a key held too early is lost.
+  wait_node "$TAB_FLUTE" || return 1; $ADB shell sleep 1
   tap "$TAB_FLUTE"; $ADB shell sleep 1
   # A note is as long as its key is held, in beats of the metronome's tempo (120 after pm clear,
   # so 500 ms is a beat): each a quarter note, then the last held past two beats during the shot,
-  # so its pill is a half note and two hold dots are filled, as on the canvas board.
+  # so the held step's yellow band has grown to a half note, as on the canvas board.
   for n in "${TUNE[@]:0:$((${#TUNE[@]} - 1))}"; do hold "$n" 500; done
   r=$(find_node exact "$last"); read -r x y _ <<<"$r"
-  $ADB shell input swipe "$x" "$y" "$x" "$y" 2500 & $ADB shell sleep 1.0; shot "$L" 4-flute; wait
+  $ADB shell input swipe "$x" "$y" "$x" "$y" 2500 & $ADB shell sleep 1.0; shot "$L" 1-flute; wait
+  # Metronome, running so a beat bubble is lit with the speed's animal on it.
+  tap "$TAB_METRONOME"; $ADB shell sleep 1
+  tap "$PLAY"; $ADB shell sleep 1.3; shot "$L" 2-metronome; tap "$STOP"
+  # Tuner in "Tune" mode: the target note in its pitch window and its fingering show without a microphone.
+  tap "$TAB_TUNER"; $ADB shell sleep 1; tap "text .*$TARGET"; $ADB shell sleep 1; $ADB shell sleep "$MIC_WAIT"; shot "$L" 3-tuner
+  # Notes: three right answers, then the fourth caught during its feedback (the note in colour, flames).
+  tap "$TAB_NOTES"; $ADB shell sleep 1
+  for i in 1 2 3; do answer_note; $ADB shell sleep 1.6; done
+  answer_note; $ADB shell sleep 0.3; shot "$L" 4-notes; $ADB shell sleep 1.5
 }
 
 $ADB install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null || exit 1
 $ADB shell cmd uimode night no >/dev/null
-run_language en Tuner Notes Flute Play Stop Tune C4 C4 G4 G4 A4 A4 G4
-run_language hr Štimer Note Flauta Sviraj Stani Ugodi c1 c1 g1 g1 a1 a1 g1
+both_languages() {
+  rm -f "$OUT"/*/[0-9]-*.jpg # a renamed tab must not leave its old shot behind
+  run_language en Flute Metronome Tuner Notes Play Stop Tune C4 C4 G4 G4 A4 A4 G4
+  run_language hr Flauta Metronom Štimer Note Sviraj Stani Ugodi c1 c1 g1 g1 a1 a1 g1
+}
+demo() { $ADB shell am broadcast -a com.android.systemui.demo -e command "$@" >/dev/null; } # the status bar's demo mode
+tablet_pass() { # slot, wm size, user_rotation
+  OUT=docs/release/play-listing/screenshots-tablet/$1
+  $ADB shell wm size "$2"
+  $ADB shell wm density 320
+  $ADB shell settings put system user_rotation "$3"
+  $ADB shell sleep 2 # the status bar is drawn anew at the new size, and demo mode must come after it
+  demo enter
+  demo clock -e hhmm 1000
+  demo notifications -e visible false
+  demo battery -e level 100 -e plugged false
+  demo network -e wifi show -e level 4
+  both_languages
+  demo exit
+}
+if [ "$MODE" = tablet ]; then
+  MIC_WAIT=8
+  $ADB shell settings put system accelerometer_rotation 0
+  $ADB shell settings put global sysui_demo_allowed 1
+  tablet_pass 7-inch 1296x2304 0
+  tablet_pass 10-inch 1620x2880 1
+  $ADB shell settings put global sysui_demo_allowed 0
+  $ADB shell wm size reset
+  $ADB shell wm density reset
+  $ADB shell settings put system user_rotation 0
+  OUT=docs/release/play-listing/screenshots-tablet
+else
+  both_languages
+fi
 $ADB shell pm clear $PKG >/dev/null
 $ADB shell cmd locale set-app-locales $PKG --user 0 --locales en
 rm -rf "$RAW"

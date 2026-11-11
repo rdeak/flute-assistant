@@ -1,0 +1,1 @@
+The digital flute's tone. What must not be broken is in `../../ui/flute/CLAUDE.md`; how the sound works, with the reasons behind it, is in `../../ui/flute/DESIGN.md` (the second paragraph, from "Sound:"). Read it before changing anything here.

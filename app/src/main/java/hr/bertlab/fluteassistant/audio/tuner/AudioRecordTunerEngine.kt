@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Bertlab d.o.o. Additional terms: see NOTICE.
+
 package hr.bertlab.fluteassistant.audio.tuner
 
 import android.Manifest
@@ -12,18 +15,16 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
 
 /**
  * Captures microphone audio with [AudioRecord] and runs the flute-tuned [YinPitchDetector]
@@ -32,8 +33,10 @@ import kotlin.math.sqrt
  * - Prefers the UNPROCESSED source (no AGC / noise suppression) when the device supports it,
  *   because automatic gain and suppression distort the signal a tuner wants to analyse.
  * - Analysis window: 4096 samples, advanced by 2048 per frame (~43 ms at 48 kHz).
- * - Runs on [Dispatchers.IO] (the reads block) and conflates, so a slow collector always
- *   sees the newest frame; the microphone is released when the collector cancels.
+ * - Runs on [Dispatchers.IO] (the reads block), which buffers the frames (64 deep) rather than
+ *   conflating them, so a busy main thread delays a frame but never loses one: the flute's "Your
+ *   turn" counts frames (a gap is two in a row). The microphone is released when the collector
+ *   cancels.
  * - Logs `mic.open` (source, rate, buffer) and `mic.close` under [LogTags.TUNER]; failures
  *   propagate to the collector, which logs them.
  */
@@ -41,6 +44,7 @@ import kotlin.math.sqrt
 class AudioRecordTunerEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val logger: Logger,
+    private val tap: AudioTap,
 ) : TunerEngine {
 
     override fun pitchFrames(): Flow<PitchFrame> = flow {
@@ -62,13 +66,19 @@ class AudioRecordTunerEngine @Inject constructor(
             "rate" to record.sampleRate, "bufferFrames" to record.bufferSizeInFrames,
             "window" to WINDOW_SIZE, "hop" to HOP_SIZE,
         )
+        tap.opened(record.sampleRate, sourceName(record.audioSource))
 
         try {
             record.startRecording()
             check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microphone is busy" }
             while (currentCoroutineContext().isActive) {
                 val read = record.read(chunk, 0, HOP_SIZE, AudioRecord.READ_BLOCKING)
+                // The collector may have cancelled during the read: that hop is nobody's, least of
+                // all the tap's, where it would open the next run's recording (if one started
+                // within 43 ms) with a hop of this one.
+                if (!currentCoroutineContext().isActive) break
                 if (read <= 0) throw IllegalStateException("Microphone read failed (code $read)")
+                tap.samples(chunk, read)
 
                 // Slide the analysis window left and append the new samples.
                 System.arraycopy(window, read, window, 0, WINDOW_SIZE - read)
@@ -80,16 +90,18 @@ class AudioRecordTunerEngine @Inject constructor(
                     PitchFrame(
                         frequency = estimate?.frequency,
                         probability = estimate?.probability ?: 0.0,
-                        level = levelOf(window),
+                        level = FrameLevels.level(window),
+                        minLevel = FrameLevels.minLevel(window, HOP_SIZE),
                     ),
                 )
             }
         } finally {
             runCatching { record.stop() }
             record.release()
+            tap.closed()
             logger.i(LogTags.TUNER, "mic.close", "frames" to frames)
         }
-    }.conflate().flowOn(Dispatchers.IO) // blocking reads belong on IO; the UI only wants the newest frame
+    }.flowOn(Dispatchers.IO) // blocking reads belong on IO; each collector decides whether to conflate or buffer
 
     private fun pickSampleRate(): Int =
         PREFERRED_SAMPLE_RATES.firstOrNull { rate ->
@@ -134,18 +146,11 @@ class AudioRecordTunerEngine @Inject constructor(
         else -> source.toString()
     }
 
-    private fun levelOf(window: FloatArray): Float {
-        var energy = 0.0
-        for (v in window) energy += v.toDouble() * v
-        val rms = sqrt(energy / window.size)
-        // Rough dB-style mapping: -60 dBFS -> 0, 0 dBFS -> 1.
-        val db = 20.0 * kotlin.math.log10(rms + 1e-9)
-        return min(1f, max(0f, ((db + 60.0) / 60.0).toFloat()))
-    }
-
-    private companion object {
+    companion object {
+        /** Samples the detector sees at once; public so the replay of a recorded session frames audio the same way. */
         const val WINDOW_SIZE = 4096
+        /** Samples read, and the window advanced, per frame: about 43 ms at 48 kHz. */
         const val HOP_SIZE = 2048
-        val PREFERRED_SAMPLE_RATES = intArrayOf(48_000, 44_100)
+        private val PREFERRED_SAMPLE_RATES = intArrayOf(48_000, 44_100)
     }
 }

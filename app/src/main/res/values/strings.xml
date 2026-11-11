@@ -4,6 +4,8 @@
     <string name="tab_tuner">Tuner</string>
     <string name="tab_notes">Notes</string>
     <string name="tab_flute">Flute</string>
+    <!-- The metronome tab's state for a screen reader while the drum beats -->
+    <string name="tab_metronome_playing">Playing</string>
 
     <!-- Metronome -->
     <string name="play">Play</string>
@@ -19,6 +21,17 @@
     <!-- In-app language switch (the language names themselves are endonyms in ui/common/AppLanguage.kt) -->
     <string name="language">Language</string>
 
+    <!-- The day/night switch beside the flag: a moon or a sun, so this name is for a screen reader. -->
+    <string name="theme_dark">Dark theme</string>
+
+    <!-- Credits: a long press on the app icon opens them. The address stays plain text, never a link. -->
+    <string name="credits_open">Show credits</string>
+    <string name="credits_version">Version %1$s</string>
+    <string name="credits_website_url" translatable="false">flute-assistant.bertlab.hr</string>
+    <string name="credits_copyright">Copyright © 2026 Bertlab d.o.o.</string>
+    <string name="credits_android_robot">The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.</string>
+    <string name="credits_done">OK</string>
+
     <!-- The tempo ring's five speeds, slowest first, each with an animal emoji (ui/metronome/MetronomeUiState.kt) -->
     <string name="band_snail">Snail</string>
     <string name="band_turtle">Turtle</string>
@@ -26,22 +39,11 @@
     <string name="band_rabbit">Rabbit</string>
     <string name="band_cheetah">Cheetah</string>
 
-    <!-- Subdivisions and click sounds (the domain enums map to these in ui/common/Labels.kt) -->
-    <string name="subdivision_quarter">Quarter</string>
-    <string name="subdivision_eighth">8ths</string>
-    <string name="subdivision_sixteenth">16ths</string>
-    <string name="subdivision_triplet">Triplets</string>
-    <string name="subdivision_shuffle">Shuffle</string>
-    <string name="sound_woodblock">Woodblock</string>
-    <string name="sound_beep">Digital Beep</string>
-    <string name="sound_bell">Bell</string>
-    <!-- BPM, meter, subdivision, sound -->
-    <string name="config_summary">%1$d BPM · %2$s · %3$s · %4$s</string>
+    <!-- The playback notification's line: BPM, meter -->
+    <string name="config_summary">%1$d BPM · %2$s</string>
 
     <!-- One-shot messages -->
     <string name="msg_audio_unavailable">Oops, the sound is busy right now. Try again in a moment.</string>
-    <string name="msg_save_failed">Oops, that could not be saved.</string>
-    <string name="msg_delete_failed">Oops, that could not be deleted.</string>
 
     <!-- Playback notification -->
     <string name="notification_channel_playback">Metronome playback</string>
@@ -64,13 +66,15 @@
     <!-- Shown in silence; the argument is the chosen note, e.g. "A4" -->
     <string name="play_note_prompt">👂 Play %1$s</string>
     <string name="in_tune">🎉 Perfect!</string>
-    <string name="too_low">⬇️ Too low</string>
-    <string name="too_high">⬆️ Too high</string>
-    <!-- Target mode, a note that is not the chosen one; the argument is the heard note, e.g. "A4" -->
-    <string name="heard_lower_note">⬇️ That\'s %1$s</string>
-    <string name="heard_higher_note">⬆️ That\'s %1$s</string>
-    <string name="octave_too_low">⬇️ An octave too low</string>
-    <string name="octave_too_high">⬆️ An octave too high</string>
+    <!-- Off the note: the line says which way to go, and its arrow points the way the pitch window's own arrow
+         does (since 2026-11-10; it said "Too low" with an arrow down beside the window's arrow up) -->
+    <string name="too_low">⬆️ A little higher</string>
+    <string name="too_high">⬇️ A little lower</string>
+    <!-- Target mode, a note that is not the chosen one; the argument is the heard note, e.g. "A4"; the arrow is the way to the chosen one -->
+    <string name="heard_lower_note">⬆️ That\'s %1$s</string>
+    <string name="heard_higher_note">⬇️ That\'s %1$s</string>
+    <string name="octave_too_low">⬆️ An octave higher</string>
+    <string name="octave_too_high">⬇️ An octave lower</string>
     <!-- What a screen reader says for the pitch window (ui/tuner/TunerScreen.kt) -->
     <string name="pitch_listening">Listening, no note heard yet</string>
     <string name="pitch_home">Home ring for %1$s, nothing heard yet</string>
@@ -87,18 +91,36 @@
     <string name="advice_faster_air">💨 Faster air</string>
     <string name="advice_gentler_air">🍃 Gentler air</string>
     <string name="advice_check_fingers">👀 Check your fingers</string>
+    <string name="advice_play_again">🔁 Stop, then play it again</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
+    <!-- The tuner when the microphone will not open or stops. The cause goes to the log, as a child can do nothing with it -->
+    <string name="mic_failed">I can\'t listen right now.</string>
     <string name="allow_microphone">Yes</string>
     <string name="open_settings">Settings</string>
+    <!-- The quiet way back from the microphone card on the flute tab, which works without the microphone -->
+    <string name="mic_not_now">Not now</string>
     <!-- Note reading game (ui/notes): the staff, feedback, the round and the note picker -->
     <string name="notes_correct">🎉 That\'s it!</string>
     <string name="notes_wrong">🙈 Try again</string>
     <!-- Feedback line while the child slides a finger over the staff, before letting go -->
     <string name="notes_placing">👆 Slide, let go</string>
-    <!-- Over the note to find, in the row above the staff -->
+    <!-- The two games, as the pills on top of the notes tab (the emoji is in the word) -->
     <string name="find_note">🔎 Find</string>
+    <string name="hear_game">👂 Hear</string>
+    <!-- Accessibility name of the pair of pills -->
+    <string name="notes_game">Game</string>
+    <!-- The speaker bubble that plays the phrase again; accessibility name only -->
+    <string name="hear_again">Hear it again</string>
+    <!-- Feedback line while the phrase sounds and the staff takes no answer -->
+    <string name="notes_listening">👂 Listen</string>
+    <!-- Feedback line in Hear while the phrase is not playing and no finger is down; the ❓ is the slot's own symbol -->
+    <string name="hear_prompt">❓ Find the next note</string>
     <string name="staff_description">Staff, press where the note goes and let go</string>
+    <string name="staff_description_hear">Staff, press where the next note goes and let go</string>
+    <!-- The argument is a note's name, e.g. "C4" -->
+    <string name="note_known">%1$s, learned</string>
+    <string name="your_notes">Your notes</string>
     <!-- Accessibility name of one tappable place, counted from the bottom; never the note's name -->
     <string name="staff_position">Staff position %1$d</string>
     <plurals name="round_progress">
@@ -110,14 +132,8 @@
     <string name="round_great">🌟 Great job!</string>
     <string name="round_good">👍 Good work!</string>
     <string name="round_keep_going">💪 Keep practising!</string>
-    <!-- Round summary: the three tiles' words, and what a screen reader says for the stars and tiles -->
-    <string name="summary_streak">Streak</string>
-    <string name="summary_aim">Aim</string>
-    <string name="summary_speed">Speed</string>
+    <!-- Round summary: what a screen reader hears for the trophy, the round's score (the tiles' words went on 2026-11-10) -->
     <string name="summary_stars">Right first time: %1$d of %2$d</string>
-    <string name="aim_description">Aim: %1$d of 3 stars</string>
-    <!-- The argument is one of the metronome's animals, e.g. "Rabbit" -->
-    <string name="speed_description">Speed: %1$s</string>
     <string name="play_again">Again</string>
     <!-- The Pick button's accessibility name (its word is pick_notes), the hero row's title while
          choosing, and the big button under the picker that closes it -->
@@ -131,24 +147,59 @@
     <!-- Digital flute (ui/flute): keys that sound while held, a line of the notes played, one Play button -->
     <string name="flute_hint">👆 Tap or hold a note</string>
     <string name="flute_play">Play</string>
+    <!-- The second big button (the feature called "Your turn" in code and docs): the phone listens to the child
+         playing the tune on a real flute and marks each note. Worded as the child speaking to the phone, like
+         Croatian "Poslušaj me" (since 2026-11-04; it said "Your turn") -->
+    <string name="flute_your_turn">Listen to me</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
-    <!-- Accessibility name of the tune line; the argument is how many notes it holds -->
+    <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->
+    <string name="flute_speed_knob">Speed: %1$s, tap to change</string>
+    <!-- The white sweet button under the staff's clef (its content description; the argument is the open book's sweet, e.g. "Cookie"): a tap opens the shelf of tunes -->
+    <string name="flute_book_button">Tune: %1$s, tap to change</string>
+    <!-- The screen reader's names for the six books on the flute's shelf, each the sweet that marks its book (the book button shows the open one's) -->
+    <string name="book_lollipop">Lollipop</string>
+    <string name="book_cookie">Cookie</string>
+    <string name="book_cupcake">Cupcake</string>
+    <string name="book_donut">Donut</string>
+    <string name="book_ice_cream">Ice cream</string>
+    <string name="book_candy">Candy</string>
+    <!-- The shelf's books (each one's content description; the argument is its sweet, e.g. "Cookie"): the open one, an empty one, and one holding notes -->
+    <string name="flute_book_open">%1$s, open now</string>
+    <string name="flute_book_empty">%1$s, empty</string>
+    <plurals name="flute_book_notes">
+        <item quantity="one">%1$s, %2$d note</item>
+        <item quantity="other">%1$s, %2$d notes</item>
+    </plurals>
+    <!-- The big button under the ring that opens in place over the flute's staff, closing it -->
+    <string name="speed_done">OK</string>
+    <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->
+    <string name="flute_rest">Rest</string>
+    <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
+    <string name="flute_breath">Breathe</string>
+    <!-- Accessibility name of a breath sign on the staff -->
+    <string name="flute_breath_here">Breathe here</string>
+    <!-- Accessibility name of the time signature after the clef on the staff, e.g. "Time signature 4/4" -->
+    <string name="flute_time_signature">Time signature %1$d/%2$d</string>
+    <!-- Accessibility name of the tune on the staff; the argument is how many notes it holds -->
     <plurals name="flute_tune_line">
         <item quantity="one">Your tune, %1$d note</item>
         <item quantity="other">Your tune, %1$d notes</item>
     </plurals>
-    <!-- Accessibility name of one note of the tune line: the note (e.g. "C4") and its length in beats -->
+    <!-- Accessibility name of one note on the staff: the note (e.g. "C4") and its length in beats -->
     <plurals name="flute_note_beats">
         <item quantity="one">%1$s, %2$d beat</item>
         <item quantity="other">%1$s, %2$d beats</item>
     </plurals>
     <string name="flute_note_half_beat">%1$s, half a beat</string>
-    <!-- Accessibility name of the dots under the note while a key is held -->
-    <plurals name="flute_held_beats">
-        <item quantity="one">Held for %1$d beat</item>
-        <item quantity="other">Held for %1$d beats</item>
-    </plurals>
+    <!-- "Your turn": appended to a note's accessibility name on the flute staff while the flute listens or after it did -->
+    <string name="flute_mark_first_try">got it</string>
+    <string name="flute_mark_retry">got it after a retry</string>
+    <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
+    <string name="flute_mark_heard">heard %1$s</string>
+    <string name="flute_listen_here">play this one</string>
+    <!-- The line under the staff when "Listen to me" starts, until the first note is judged; the argument is the note waited on, e.g. "B4". The flute shows what the child does. -->
+    <string name="flute_play_prompt">🪈 Play %1$s</string>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>
