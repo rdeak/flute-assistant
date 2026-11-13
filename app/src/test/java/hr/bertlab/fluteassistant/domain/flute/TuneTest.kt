@@ -59,7 +59,7 @@ class TuneTest {
         for (signature in TimeSignature.entries) {
             val pulse = Pulse(100, signature)
             val metronomeBarMs = signature.beatsPerBar * pulse.clickMs
-            assertEquals(signature.name, metronomeBarMs, Bars.halfBeatsPerBar(signature) * pulse.quarterMs / 2, 0.001)
+            assertEquals(signature.name, metronomeBarMs, Bars.halfBeatsPerBar(signature) * pulse.halfBeatMs, 0.001)
         }
     }
 

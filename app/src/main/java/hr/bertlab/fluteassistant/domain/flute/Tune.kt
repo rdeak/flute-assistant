@@ -58,6 +58,9 @@ data class Pulse(val bpm: Int, val timeSignature: TimeSignature = TimeSignature.
     /** How long a quarter note lasts, the unit [NoteLength] counts in: two clicks in 6/8, one in 4/4, half of one in 2/2. */
     val quarterMs: Double get() = clickMs * timeSignature.noteValue / 4
 
+    /** How long a half beat lasts, the step [NoteLength.halfBeats] counts in: an eighth note. */
+    val halfBeatMs: Double get() = quarterMs / 2
+
     /** How many half beats of the flute's beat (a quarter note) one click lasts: 2 in x/4, 1 in x/8, 4 in x/2. */
     val halfBeatsPerClick: Int get() = 8 / timeSignature.noteValue
 }
@@ -119,7 +122,7 @@ object Tune {
     private const val BREATH = "b"
 
     /** How long a note of [length] lasts at [pulse], gap included, in ms. */
-    fun durationMs(length: NoteLength, pulse: Pulse): Long = (length.halfBeats * pulse.quarterMs / 2).roundToLong()
+    fun durationMs(length: NoteLength, pulse: Pulse): Long = (length.halfBeats * pulse.halfBeatMs).roundToLong()
 
     /** The silence at the end of a note lasting [durationMs]. */
     fun gapMs(durationMs: Long): Long = minOf(GAP_MS.toLong(), durationMs / 4)
@@ -148,7 +151,7 @@ object Tune {
             }
             val duration = durationMs(length, pulse)
             val clicks = (0 until length.halfBeats).filter { (startsAt + it) % pulse.halfBeatsPerClick == 0 }
-            val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.quarterMs / 2).roundToLong(), it) } +
+            val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.halfBeatMs).roundToLong(), it) } +
                 listOfNotNull(if (item is TuneNote) PlayStep.Moment(duration - gapMs(duration), null) else null)
             startsAt += length.halfBeats
             PlayStep(index, (item as? TuneNote)?.midi, duration, clickAtStart = clicks.firstOrNull() == 0, inside.sortedBy { it.atMs })

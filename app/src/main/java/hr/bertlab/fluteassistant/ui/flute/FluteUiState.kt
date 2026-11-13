@@ -101,14 +101,14 @@ data class FluteUiState(
      * The step of the staff ringed in yellow: the playing step, else the one the animal is on while listening (the
      * one waited for, or an earned note finishing its time; none once the last is counted), else the held key's.
      */
-    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing }?.let { it.walk?.index ?: it.index } ?: heldIndex
+    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing }?.animalIndex ?: heldIndex
 
     /**
      * The step the knob's animal stands over while the tune runs: the playing step, else, listening, the note it
      * walks, stopped on or finishes ([Listening.walk]) or the one waited for, or the last counted while its sound
      * ends; null at rest.
      */
-    val animalIndex: Int? get() = playing?.index ?: listening?.let { it.walk?.index ?: it.index }
+    val animalIndex: Int? get() = playing?.index ?: listening?.animalIndex
 
     /**
      * Whether the animal waits for the child to play the step it stands over: listening, not finishing, and not
@@ -117,7 +117,7 @@ data class FluteUiState(
     val waiting: Boolean get() = listening?.let { !it.finishing && it.index != null && it.walk?.phase != Walk.Phase.DONE } == true
 
     /** How many half beats into [animalIndex]'s step the animal stands: the last click's, in Play and in Your turn's walk; else the step's start. */
-    val animalHalfBeat: Int get() = playing?.halfBeat ?: listening?.walk?.halfBeat ?: 0
+    val animalHalfBeat: Int get() = playing?.halfBeat ?: listening?.animalHalfBeat ?: 0
 
     /** The wrong note last heard for the step waited on, a bubble under that step ([Listening.wrong]). */
     val wrong: WrongNote? get() = listening?.wrong

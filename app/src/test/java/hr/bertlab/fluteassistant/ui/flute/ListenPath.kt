@@ -6,6 +6,7 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
 import hr.bertlab.fluteassistant.audio.tuner.FrameLevels
 import hr.bertlab.fluteassistant.audio.tuner.YinPitchDetector
+import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
@@ -28,19 +29,21 @@ import hr.bertlab.fluteassistant.domain.listen.PitchFrame
  */
 object ListenPath {
 
-    /** What one hop became: the frame, the tracker's decision, sounding note and onset, the floor after it, the verdict if judged, the step waited on before it, and where the animal was after it. */
-    data class Step(
-        val frame: Int,
-        val pitch: PitchFrame,
-        val decision: FrameDecision,
-        val sounding: Int?,
-        val onset: NoteOnsetTracker.Onset?,
-        val floor: Float?,
-        val verdict: Verdict?,
-        val waited: Int?,
-        val expected: Int?,
-        val walk: Walk? = null,
-    )
+    /**
+     * What hop [frame] (from 1) became: the [row] the session recorder keeps of it, the phone's own table. The
+     * properties are the row's cells a replay compares and prints; a new column needs only the row and the table.
+     */
+    data class Step(val frame: Int, val row: ListenFrame) {
+        val pitch: PitchFrame get() = row.frame
+        val decision: FrameDecision get() = row.decision
+        val sounding: Int? get() = row.sounding
+        val onset: NoteOnsetTracker.Onset? get() = row.onset
+        val floor: Float? get() = row.floor
+        val verdict: Verdict? get() = row.verdict
+        val waited: Int? get() = row.waited
+        val expected: Int? get() = row.expected
+        val walk: Walk? get() = row.walk
+    }
 
     /** A note that began: the step it was judged against (null once the tune was done), the onset, and when. */
     data class Heard(val index: Int?, val onset: NoteOnsetTracker.Onset, val atMs: Long)
@@ -85,7 +88,7 @@ object ListenPath {
             val frame = i + 1
             val row = listen.onFrame(pitch).row
             row.onset?.let { heard += Heard(row.waited, it, frame * hop * 1000L / frames.rate) }
-            steps += Step(frame, pitch, row.decision, row.sounding, row.onset, row.floor, row.verdict, row.waited, row.expected, row.walk)
+            steps += Step(frame, row)
         }
         return Run(steps, heard, listen.marks)
     }

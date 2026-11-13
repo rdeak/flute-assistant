@@ -4,14 +4,11 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
-import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
-import hr.bertlab.fluteassistant.domain.listen.Hearing
-import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.ui.flute.FluteSound
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
@@ -41,7 +38,7 @@ class PinnedSessionTest {
         r.opened(FluteSound.RATE, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
-            r.frame(ListenFrame(step.pitch, step.decision, step.sounding, step.onset, step.floor, step.verdict, step.waited, step.expected, null, TunerAdvice.NONE, false, false, Hearing.CLEAR))
+            r.frame(step.row)
         }
         r.end(run.marks)
         val dir = File(root, "sessions").listFiles()!!.single()

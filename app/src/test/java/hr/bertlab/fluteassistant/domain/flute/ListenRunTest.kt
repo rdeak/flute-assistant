@@ -7,6 +7,9 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.framesFor
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.pitched
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.silent
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.HearingTracker
 import hr.bertlab.fluteassistant.domain.listen.ListenRules
@@ -20,18 +23,12 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.ceil
-import kotlin.math.pow
 
 /** A "Your turn" fed hand-made frames, no microphone and no coroutines; real sound is `ListenPathTest`'s. */
 class ListenRunTest {
 
     private fun q(midi: Int) = TuneNote(midi, QUARTER)
     private fun h(midi: Int) = TuneNote(midi, HALF)
-    /** A frame of a note at a real flute's level at the phone (the recorded sessions: 0.67 and over), clear of the tracker's floor. */
-    private fun pitched(midi: Int, cents: Double = 0.0, probability: Double = 0.97, hopMs: Double = PitchFrame.DEFAULT_HOP_MS) =
-        PitchFrame(NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0), probability, level = 0.7f, hopMs = hopMs)
-
     /** The rule of before 2026-11-11, pitch only: every note is long enough at its onset. */
     private fun pitchOnly(tune: List<TuneItem>) = ListenRun(tune, Pulse(60), run = ListenRun.Rules.PITCH_ONLY)
 
@@ -49,9 +46,7 @@ class ListenRunTest {
      * [begin]'s note has sounded [ListenRules.LOCK_FRAMES] whole frames (the onset's and the ones that
      * locked it).
      */
-    private fun after(ms: Double, hopMs: Double = PitchFrame.DEFAULT_HOP_MS) =
-        ceil(ms / hopMs).toInt() - ListenRules.LOCK_FRAMES
-    private val silent = PitchFrame(null, 0.0, level = 0f)
+    private fun after(ms: Double, hopMs: Double = PitchFrame.DEFAULT_HOP_MS) = framesFor(ms, hopMs) - ListenRules.LOCK_FRAMES
 
     /** Enough agreeing frames for [midi] to lock: the note begins on the last. */
     private fun ListenRun.begin(midi: Int, hopMs: Double = PitchFrame.DEFAULT_HOP_MS): ListenRun.Step =
@@ -327,7 +322,7 @@ class ListenRunTest {
         val run = timed(h(60), q(62))
         run.begin(60)
         run.hold(60, after(1200.0))
-        run.onFrame(PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.65f, minLevel = 0.2f)) // the breath dips
+        run.onFrame(pitched(60, level = 0.65f, minLevel = 0.2f)) // the breath dips
         val again = run.onFrame(pitched(60))
         assertEquals("the tracker heard a restart", NoteOnsetTracker.Onset(60, fresh = true), again.row.onset)
         assertNull(again.short)
@@ -344,7 +339,7 @@ class ListenRunTest {
         val run = timed(h(60), q(62), run = halfBeatSlack.copy(restartCuts = true))
         run.begin(60)
         run.hold(60, after(1200.0))
-        run.onFrame(PitchFrame(NoteMath.midiToFrequency(60), 0.97, level = 0.65f, minLevel = 0.2f)) // the tongue stops the air
+        run.onFrame(pitched(60, level = 0.65f, minLevel = 0.2f)) // the tongue stops the air
         val again = run.onFrame(pitched(60))
         assertEquals(0, again.short?.index)
         assertTrue(again.hop)
@@ -384,7 +379,9 @@ class ListenRunTest {
         val run = timed(q(60), q(62))
         run.begin(60)
         run.stop()
-        run.begin(64)
+        val other = run.begin(64)
+        assertEquals("logged as the screen shows it", Verdict.IGNORED, other.heard?.verdict)
+        assertEquals(Verdict.IGNORED, other.row.verdict)
         assertNull(run.listening.wrong)
         assertEquals(TunerAdvice.HOLD_LONGER, run.listening.advice)
         assertEquals(64, run.listening.heardNow)
@@ -442,7 +439,7 @@ class ListenRunTest {
 
     @Test
     fun `at 44_1 kHz the same note is earned after fewer frames`() {
-        val hop = 2048 * 1000.0 / 44_100
+        val hop = PitchFrame.hopMsAt(44_100)
         val run = timed(q(60), q(62))
         run.begin(60, hopMs = hop)
         repeat(after(500.0, hop) - 1) { assertFalse(run.onFrame(pitched(60, hopMs = hop)).advanced) }
@@ -627,8 +624,7 @@ class ListenRunTest {
         val places = mutableListOf<Pair<Int?, Int>>()
         fun feed(frame: PitchFrame) {
             val step = run.onFrame(frame)
-            val walk = run.listening.walk
-            if (step.hop) places += (walk?.index ?: run.listening.index) to (walk?.halfBeat ?: 0)
+            if (step.hop) places += run.listening.animalIndex to run.listening.animalHalfBeat
         }
         repeat(ListenRules.LOCK_FRAMES + after(1000.0)) { feed(pitched(60)) } // c, for all of its beat
         repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { feed(silent) }
@@ -659,7 +655,8 @@ class ListenRunTest {
         assertTrue("noise earned the note", steps.none { it.advanced })
         val short = steps.mapNotNull { it.short }.single()
         assertEquals(0, short.index)
-        assertTrue("$short", short.heldMs <= 5 * 43)
+        // The three that locked it and the two of grace.
+        assertTrue("$short", short.heldMs <= (ListenRules.LOCK_FRAMES + ListenRun.GRACE_FRAMES) * PitchFrame.DEFAULT_HOP_MS)
         assertTrue(run.marks.isEmpty())
     }
 
@@ -686,6 +683,15 @@ class ListenRunTest {
     }
 
     @Test
+    fun `how many frames a note's time runs on past its last shown frame is the run's own rule`() {
+        val run = timed(q(60), q(62), run = halfBeatSlack.copy(graceFrames = 0))
+        run.begin(60)
+        run.hold(60, 8) // 11 frames, 469 ms
+        assertFalse("no grace: the unshown frame adds nothing", run.onFrame(pitched(60, probability = 0.5)).advanced)
+        assertEquals("the tracker's own gap is not it", NoteOnsetTracker.ONSET_GAP_FRAMES, ListenRun.GRACE_FRAMES)
+    }
+
+    @Test
     fun `a breathy stretch inside a note counts in full once the tone is back`() {
         val run = timed(q(60), q(62))
         run.begin(60)
@@ -703,11 +709,14 @@ class ListenRunTest {
         assertEquals(
             listOf(
                 "repeatAdviceFrames" to "25", "finishFrames" to "35", "lengthSlack" to "1.5", "maxNeedMs" to "3000.0",
-                "restartCuts" to "0",
+                "restartCuts" to "0", "graceFrames" to "2",
             ),
             ListenRun.Rules().fields(),
         )
-        assertEquals(setOf("repeatAdviceFrames", "finishFrames", "lengthSlack", "maxNeedMs", "restartCuts"), ListenRun.Rules.NAMES)
+        assertEquals(
+            setOf("repeatAdviceFrames", "finishFrames", "lengthSlack", "maxNeedMs", "restartCuts", "graceFrames"),
+            ListenRun.Rules.NAMES,
+        )
     }
 
     @Test
@@ -719,12 +728,8 @@ class ListenRunTest {
         assertEquals(ListenRun.Rules(restartCuts = true), ListenRun.Rules().with("restartCuts", 1.0))
         assertEquals(ListenRun.Rules(restartCuts = false), ListenRun.Rules(restartCuts = true).with("restartCuts", 0.0))
         assertEquals("1", ListenRun.Rules(restartCuts = true).fields().toMap()["restartCuts"])
+        assertEquals(ListenRun.Rules(graceFrames = 3), ListenRun.Rules().with("graceFrames", 3.0))
         assertTrue(runCatching { ListenRun.Rules().with("stopDrop", 0.1) }.exceptionOrNull() is IllegalArgumentException)
-    }
-
-    @Test
-    fun `pitch only is the rule of before 2026-11-11, so a restart cuts as it did then`() {
-        assertTrue(ListenRun.Rules.PITCH_ONLY.restartCuts)
     }
 
     @Test

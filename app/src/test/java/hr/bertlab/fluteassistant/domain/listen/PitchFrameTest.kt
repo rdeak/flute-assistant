@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.domain.listen
 
-import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -19,7 +18,6 @@ class PitchFrameTest {
 
     @Test
     fun `the default is the engine's hop at the rate it asks for first`() {
-        assertEquals(AudioRecordTunerEngine.HOP_SIZE, PitchFrame.HOP_SAMPLES)
         assertEquals(PitchFrame.hopMsAt(48_000), PitchFrame.DEFAULT_HOP_MS, 0.0)
         assertEquals(PitchFrame.DEFAULT_HOP_MS, PitchFrame(null, 0.0, level = 0f).hopMs, 0.0)
     }

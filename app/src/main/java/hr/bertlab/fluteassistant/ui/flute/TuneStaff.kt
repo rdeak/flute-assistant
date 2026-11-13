@@ -161,8 +161,11 @@ internal const val BREATH_EMOJI = "😮‍💨" // face exhaling
 /** How much bigger than [StaffGeometry]'s dp everything on the staff is drawn: 1 at rest, [RunningStaffScale] while the tune runs. */
 private val LocalStaffScale = compositionLocalOf { 1f }
 
-/** The theme's colours as the staff uses them, read once per composition. */
-private class StaffInk(
+/**
+ * The theme's colours as the staff uses them. A data class, so a staff recomposed with the same theme hands every
+ * step an equal ink and the steps that did not change skip: the walking animal recomposes the staff on each hop.
+ */
+private data class StaffInk(
     /** The lines, stems, ledger and bar lines, ties and dots: the text colour. */
     val line: Color,
     /** Round a note head, like everything outlined. */
@@ -382,11 +385,11 @@ private fun TuneMarks(
     val target = Bars.anchor(lineMarks, tune, litIndex)
     val density = LocalDensity.current
     var rowWidth by remember { mutableFloatStateOf(0f) }
-    // On from there by as much as the walking animal needs to stay in the row: 0 while it is in view, so its hops
-    // inside the row scroll nothing (a staff the child dragged back stays until the next note, as before).
-    val follow = animal?.let { animalX(it, lineMarks, starts) }
-        ?.takeIf { rowWidth > 0f }
-        ?.let { StaffGeometry.followScroll(starts[target], it, rowWidth, s) } ?: 0f
+    // Where the walking animal stands along the row, and how far on the staff scrolls for it to stay in the row:
+    // 0 while it is in view, so its hops inside the row scroll nothing (a staff the child dragged back stays until
+    // the next note, as before).
+    val animalX = animal?.let { animalX(it, lineMarks, starts) }
+    val follow = animalX?.takeIf { rowWidth > 0f }?.let { StaffGeometry.followScroll(starts[target], it, rowWidth, s) } ?: 0f
     // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
     LaunchedEffect(target, lineMarks, follow) {
         listState.animateScrollToItem(target, with(density) { follow.dp.roundToPx() })
@@ -429,7 +432,7 @@ private fun TuneMarks(
                 }
             }
         }
-        if (animal != null) WalkingAnimal(animal, lineMarks, starts, listState)
+        if (animal != null && animalX != null) WalkingAnimal(animal, animalX, starts, listState)
     }
 }
 
@@ -454,9 +457,8 @@ private fun animalX(animal: StaffAnimal, lineMarks: List<LineMark>, starts: List
  * text, and silent: a screen reader hears "play this one" on the step itself.
  */
 @Composable
-private fun WalkingAnimal(animal: StaffAnimal, lineMarks: List<LineMark>, starts: List<Float>, listState: LazyListState) {
+private fun WalkingAnimal(animal: StaffAnimal, target: Float, starts: List<Float>, listState: LazyListState) {
     val s = LocalStaffScale.current
-    val target = animalX(animal, lineMarks, starts) ?: return
     val x = remember { Animatable(target) }
     LaunchedEffect(target) {
         x.animateTo(target, tween(FLASH_DURATION_MS, easing = FastOutSlowInEasing))

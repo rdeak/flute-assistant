@@ -3,21 +3,16 @@
 
 package hr.bertlab.fluteassistant.domain.listen
 
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.pitched
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.silent
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.pow
 
 class NoteOnsetTrackerTest {
-
-    /** A frame of a note at a real flute's level at the phone: the recorded sessions judged every note at 0.67 or over. */
-    private fun pitched(midi: Int, cents: Double = 0.0, probability: Double = 0.97) =
-        PitchFrame(NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0), probability, level = 0.7f)
-
-    private val silent = PitchFrame(null, 0.0, level = 0f)
 
     private fun feed(tracker: NoteOnsetTracker, frames: List<PitchFrame>): List<NoteOnsetTracker.Result> = frames.map(tracker::onFrame)
 
@@ -140,8 +135,7 @@ class NoteOnsetTrackerTest {
         assertEquals(listOf(null, null, 60), feed(tracker, List(3) { note }).onsets())
     }
 
-    private fun note(midi: Int, level: Float, minLevel: Float = level) =
-        PitchFrame(NoteMath.midiToFrequency(midi), 0.97, level, minLevel)
+    private fun note(midi: Int, level: Float, minLevel: Float = level) = pitched(midi, level = level, minLevel = minLevel)
 
     @Test
     fun `a tongued stop inside the newest hop starts the same note again`() {

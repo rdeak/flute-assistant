@@ -237,8 +237,8 @@ internal object StaffGeometry {
      * How far past the mark the staff keeps at its left ([anchorStart], dp at rest from the row's first mark) the
      * row must scroll, in dp on screen, for the walking animal over [animalX] (the same measure) to stand inside a
      * row [rowWidth] dp wide drawn at [scale], its whole box ([CORNER_BUTTON]) in view; 0 when it is in view already.
-     * Since 2026-11-13: on a whole note after a whole note the animal walked off the row's end (the child's report of
-     * 2026-11-12), so the staff follows it by just that much and the note before stays as far in view as it can.
+     * A whole note's last beat after a whole note lies past a phone's edge: the staff follows by just that much, and
+     * the note before stays as far in view as it can.
      */
     fun followScroll(anchorStart: Float, animalX: Float, rowWidth: Float, scale: Float): Float {
         val middle = (NOTES_START - NOTES_CLIP) * scale + (animalX - anchorStart) * scale

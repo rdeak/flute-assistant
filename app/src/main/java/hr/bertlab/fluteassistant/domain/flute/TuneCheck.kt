@@ -25,6 +25,8 @@ enum class Verdict { RIGHT, RETRY, IGNORED, WRONG }
  *   unless that letter is also the one waited on, a written repeat, *and* the note was a fresh
  *   start after a gap: a repeat can only be played by stopping and starting again, so a step
  *   without a gap (the octave pop of the note just counted) never counts a repeat as played;
+ * - also **ignored**: any other note while the step waited on was begun and cut short ([judge]'s
+ *   `begun`): the child went on, and the step waits to be played again;
  * - **wrong**: anything else; the place is kept, and the step is remembered as stumbled. One
  *   exception, [forgiven]: when the step waited on repeats the note just judged, was not heard
  *   itself, and the heard note is the one written after it, the repeat was slurred on to or
@@ -65,10 +67,10 @@ class TuneCheck(private val tune: List<TuneItem>) {
      * ([earn]); repeats it forgives are, at once.
      *
      * [begun] says the step waited on was already begun at its right pitch and cut short, which
-     * [ListenRun] knows (its walk stands there). Then a written repeat is no longer one the phone
-     * could not hear: the note written after it does not forgive it (the user's "wait",
-     * 2026-11-11), and its own letter coming back by a step is the child returning to it, not the
-     * tail of the note before, which ended when the repeat began.
+     * [ListenRun] knows (its walk stands there). Then any other letter is ignored, not wrong: the
+     * child went on, and the step waits to be played again (the user's "wait"). So the
+     * note written after a repeat does not forgive it, and its own letter coming back by a step is
+     * the child returning to it, not the tail of the note before, which ended when the repeat began.
      */
     fun judge(heard: Int, fresh: Boolean, begun: Boolean = false): Verdict {
         forgiven = emptyList()
@@ -96,6 +98,7 @@ class TuneCheck(private val tune: List<TuneItem>) {
             }
         }
         if (!sameLetter(heard, expected)) {
+            if (begun) return Verdict.IGNORED
             stumbled = true
             return Verdict.WRONG
         }

@@ -31,6 +31,9 @@ MARK_WORD = {"right": "right, a star", "retry": "right after a stumble, a faint 
 # phase turns DONE), and a note that stopped first is cut short. A table from before has no walk columns, and
 # there a right pitch was the star.
 PITCH_GLYPH = {"right": "♪", "retry": "♪"}
+# a step's mark (session.end), as the star row and the walk's "long enough" draw it
+STAR_GLYPH = {"FIRST_TRY": "★", "RETRY": "☆"}
+STAR_COLOR = {"FIRST_TRY": "var(--good)", "RETRY": "var(--warn)"}
 PITCH_WORD = {"right": "the right pitch: the note begins", "retry": "the right pitch after a stumble: the note begins"}
 
 
@@ -234,6 +237,8 @@ def build(session, folder):
     a_top, a_h = 24, 170
     def ya(level):
         return a_top + a_h - level * a_h
+    def level_y(r):  # where a row's level stands in lane A, a mark drawn above it
+        return ya(max(0.0, min(1.0, fnum(r["level"], 0.0))))
     # ---- lane B: pitch ----------------------------------------------------------------------
     b_top = a_top + a_h + 56
     b_h = 190
@@ -297,7 +302,7 @@ def build(session, folder):
     for i, r in enumerate(rows):
         if r["onset"]:
             x = x_of(i + 1)
-            y = ya(max(0.0, min(1.0, fnum(r["level"], 0.0))))
+            y = level_y(r)
             fill = "var(--s1)" if r["onset"] == "fresh" else "var(--surface)"
             w('<circle cx="%.1f" cy="%.1f" r="6" fill="var(--surface)"/><circle cx="%.1f" cy="%.1f" r="4.5" fill="%s" stroke="var(--s1)" stroke-width="2"/>' % (x, y, x, y, fill))
             v = r["verdict"]
@@ -310,12 +315,12 @@ def build(session, folder):
     before = (None, None)
     for i, r in enumerate(rows):
         now = (r.get("walk") or None, r.get("phase") or None)
-        if now != before and now[1] in ("DONE", "SHORT") and (before[0] != now[0] or before[1] != now[1]):
+        if now != before and now[1] in ("DONE", "SHORT"):
             x = x_of(i + 1)
-            y = ya(max(0.0, min(1.0, fnum(r["level"], 0.0))))
+            y = level_y(r)
             if now[1] == "DONE":
-                faint = marks.get(int(now[0])) == "RETRY"
-                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s was long enough: %s</title>%s</text>' % (x, y - 12, "var(--warn)" if faint else "var(--good)", now[0], "a faint star" if faint else "a star", "☆" if faint else "★"))
+                mark = "RETRY" if marks.get(int(now[0])) == "RETRY" else "FIRST_TRY"
+                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s was long enough: %s</title>%s</text>' % (x, y - 12, STAR_COLOR[mark], now[0], "a faint star" if mark == "RETRY" else "a star", STAR_GLYPH[mark]))
             else:
                 w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was cut short: hold it longer</title>✂</text>' % (x, y - 12, now[0]))
         before = now
@@ -427,8 +432,8 @@ def build(session, folder):
     p("<h2>The tune and what it earned</h2><div class=\"card\"><div class=\"tune\">")
     for (i, kind, midi, length) in tune:
         m = marks.get(i)
-        glyph = {"FIRST_TRY": "★", "RETRY": "☆"}.get(m, "·" if kind == "note" else "")
-        color = {"FIRST_TRY": "var(--good)", "RETRY": "var(--warn)"}.get(m, "var(--muted)")
+        glyph = STAR_GLYPH.get(m, "·" if kind == "note" else "")
+        color = STAR_COLOR.get(m, "var(--muted)")
         label = note_name(midi) if kind == "note" else ("rest" if kind == "rest" else "breath")
         p("<div class=\"step\"><span class=\"m\" style=\"color:%s\" title=\"%s\">%s</span><span class=\"n\">%s</span><span class=\"l\">%d %s</span></div>" % (color, html.escape(m or "no mark"), glyph, html.escape(label), i, html.escape(length.lower())))
     p("</div><p class=\"note\">★ a star, first try; ☆ a faint star, after a stumble (a forgiven repeat too); · no mark.</p></div>")

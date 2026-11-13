@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogLine
+import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
@@ -14,8 +15,10 @@ import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
 import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
 import java.io.File
@@ -114,9 +117,8 @@ class Session(
                 } else {
                     null
                 }
-                ListenPath.Step(
-                    frame = cell("frame").toInt(),
-                    pitch = PitchFrame(
+                val row = ListenFrame(
+                    frame = PitchFrame(
                         cell("f").toDoubleOrNull(), cell("p").toDouble(), cell("level").toFloat(), cell("minLevel").toFloat(),
                         PitchFrame.hopMsAt(rate),
                     ),
@@ -131,8 +133,15 @@ class Session(
                     verdict = cell("verdict").takeIf { it.isNotEmpty() }?.let { Verdict.valueOf(it.uppercase(Locale.ROOT)) },
                     waited = cell("waited").toIntOrNull(),
                     expected = cell("expected").toIntOrNull(),
+                    // What the screen showed: kept for the row, compared by no diff, so a name since renamed reads as none.
+                    heardNow = cell("heardNow").toIntOrNull(),
+                    advice = TunerAdvice.entries.firstOrNull { it.name == cell("advice") } ?: TunerAdvice.NONE,
+                    repeatHeld = cell("repeatHeld").toBoolean(),
+                    finishing = cell("finishing").toBoolean(),
+                    hearing = Hearing.entries.firstOrNull { it.name == cell("hearing") } ?: Hearing.CLEAR,
                     walk = walk,
                 )
+                ListenPath.Step(cell("frame").toInt(), row)
             } to recordsWalk
         }
     }

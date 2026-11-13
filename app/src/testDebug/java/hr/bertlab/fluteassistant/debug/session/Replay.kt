@@ -7,6 +7,8 @@ import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
@@ -43,35 +45,43 @@ object Replay {
     }
 
     private fun same(a: ListenPath.Step, b: ListenPath.Step?, walk: Boolean): Boolean =
-        b != null && a.decision == b.decision && a.sounding == b.sounding && a.onset == b.onset && a.verdict == b.verdict &&
+        b != null && a.decision == b.decision && a.sounding == b.sounding && a.onset == b.onset && sameVerdict(a, b) &&
             (!walk || a.walk == b.walk)
 
-    /** Rules younger than the first recorded sessions, each with the value that switches it off: what a build before it did. */
-    private val OFF = mapOf("minLevel" to 0.0)
+    /**
+     * The same verdict, or the "wrong" a phone logged until 2026-11-13 for a note heard while a note cut short waited,
+     * which the screen never showed as wrong and today's rules call ignored: only the word changed.
+     */
+    private fun sameVerdict(phone: ListenPath.Step, replay: ListenPath.Step): Boolean =
+        phone.verdict == replay.verdict ||
+            phone.verdict == Verdict.WRONG && replay.verdict == Verdict.IGNORED && phone.walk?.phase == Walk.Phase.SHORT
 
     /**
-     * The rules the phone ran [session] under: its `session.rules` line. A rule the line does not name is younger
-     * than the recording and did not act on the phone, so it is switched off ([OFF]); a name that is a rule no
-     * longer is left out.
+     * Rules younger than the first recorded sessions, by name, each with what the builds before it did: a session
+     * whose `session.rules` line does not name one ran with that value. One table for the tracker's rules and the run's.
      */
-    fun recordedRules(session: Session): NoteOnsetTracker.Rules {
-        val names = NoteOnsetTracker.Rules().fields().map { it.first }.toSet()
-        var rules = NoteOnsetTracker.Rules()
-        for ((name, off) in OFF) if (name !in session.rules) rules = rules.with(name, off)
-        for ((name, value) in session.rules) if (name in names) rules = rules.with(name, value.toDouble())
-        return rules
-    }
+    private val BEFORE = mapOf(
+        "minLevel" to 0.0, // 2026-11-10: no loudness floor
+        "lengthSlack" to Double.POSITIVE_INFINITY, // 2026-11-11: pitch only, no length rule
+        "maxNeedMs" to Double.POSITIVE_INFINITY,
+        "restartCuts" to 1.0, // 2026-11-13: a gapless restart cut the note walked
+        "graceFrames" to 2.0, // 2026-11-13: the tracker's onsetGapFrames, 2 in every recording
+    )
 
-    /**
-     * The run's own rules the phone ran [session] under: those its `session.rules` line names. One it does not
-     * name is younger than the recording and did not act on the phone: the length rule of 2026-11-11 is then off
-     * ([ListenRun.Rules.PITCH_ONLY]: no slack to run out of, no longest hold).
-     */
-    fun recordedRunRules(session: Session): ListenRun.Rules {
-        var rules = ListenRun.Rules.PITCH_ONLY
-        for ((name, value) in session.rules) if (name in ListenRun.Rules.NAMES) rules = rules.with(name, value.toDouble())
-        return rules
-    }
+    /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */
+    private fun <R> recorded(session: Session, today: R, names: Set<String>, with: R.(String, Double) -> R): R =
+        names.fold(today) { rules, name -> (session.rules[name]?.toDouble() ?: BEFORE[name])?.let { rules.with(name, it) } ?: rules }
+
+    /** The tracker's rules the phone ran [session] under. */
+    fun recordedRules(session: Session): NoteOnsetTracker.Rules =
+        recorded(session, NoteOnsetTracker.Rules(), NoteOnsetTracker.Rules.NAMES, NoteOnsetTracker.Rules::with)
+
+    /** The run's own rules the phone ran [session] under. */
+    fun recordedRunRules(session: Session): ListenRun.Rules =
+        recorded(session, ListenRun.Rules(), ListenRun.Rules.NAMES, ListenRun.Rules::with)
+
+    /** Every rule's name and value, the tracker's then the run's, in the order a session's line has them. */
+    private fun fields(rules: NoteOnsetTracker.Rules, run: ListenRun.Rules) = rules.fields() + run.fields()
 
     /**
      * The replay under [rules] and [run], by default the ones the session was recorded with, which is what the
@@ -92,7 +102,7 @@ object Replay {
         )
         out.appendLine("facts: " + session.facts.entries.joinToString(" ") { "${it.key}=${it.value}" })
         out.appendLine("tune: " + session.tune.withIndex().joinToString(" ") { (i, item) -> "$i:${spell(item)}" })
-        out.appendLine("rules: " + (rules.fields() + run.fields()).joinToString(" ") { "${it.first}=${it.second}" })
+        out.appendLine("rules: " + fields(rules, run).joinToString(" ") { "${it.first}=${it.second}" })
         out.appendLine("pulse: bpm=${session.pulse.bpm} time=${session.pulse.timeSignature.label}")
         out.appendLine("replay:")
         for (step in replay.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
@@ -116,11 +126,10 @@ object Replay {
         val today = NoteOnsetTracker.Rules()
         val todayRun = ListenRun.Rules()
         if (today != rules || todayRun != run) {
-            // A rule of the run the session never wrote down was not there to record: "none", not the value that stands in for it.
-            val recorded = rules.fields() + run.fields().map { (name, value) -> name to if (name in session.rules) value else "none" }
-            val changed = (today.fields() + todayRun.fields()).zip(rules.fields() + run.fields()).zip(recorded)
-                .filter { (values, _) -> values.first.second != values.second.second }
-            out.appendLine("today's rules differ: " + changed.joinToString(" ") { (values, then) -> "${values.first.first}=${values.first.second} (recorded ${then.second})" })
+            val then = fields(rules, run).toMap()
+            val changed = fields(today, todayRun).filter { (name, value) -> then[name] != value }
+            // A rule the session never wrote down was not there to record: "none", not the value that stands in for it.
+            out.appendLine("today's rules differ: " + changed.joinToString(" ") { (name, value) -> "$name=$value (recorded ${session.rules[name] ?: "none"})" })
             val now = ListenPath.run(session.frames, session.tune, session.pulse, today, session.floor, todayRun)
             for (step in now.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
             out.appendLine("  marks=" + Session.spell(now.marks))
@@ -143,8 +152,8 @@ object Replay {
         val values = spec.substringAfter(':').split(',').map { it.trim().toDouble() }
         val out = StringBuilder()
         out.appendLine("sweep of $name over ${session.dir.name}:")
+        val ofRun = name in ListenRun.Rules.NAMES
         for (value in values) {
-            val ofRun = name in ListenRun.Rules.NAMES
             val run = ListenPath.run(
                 session.frames, session.tune, session.pulse,
                 rules = if (ofRun) NoteOnsetTracker.Rules() else NoteOnsetTracker.Rules().with(name, value),

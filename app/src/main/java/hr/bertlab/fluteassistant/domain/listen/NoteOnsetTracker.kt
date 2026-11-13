@@ -106,6 +106,11 @@ class NoteOnsetTracker(
                 else -> throw IllegalArgumentException("no rule named $name")
             }
         }
+
+        companion object {
+            /** The names [with] knows. */
+            val NAMES: Set<String> = Rules().fields().map { it.first }.toSet()
+        }
     }
 
     /**
@@ -363,13 +368,11 @@ class NoteOnsetTracker(
 
         /**
          * How far under the note's recent level the quietest stretch of a hop must fall to be a
-         * stop: 0.12, about 7 dB. A beginner's breathy tone wobbles by a decibel or two over 21 ms;
-         * a tongued stop falls 10 dB or more even with the room ringing on. But a child's breath can
-         * also dip about 10 dB for a moment inside a held note (the runs of 2026-11-12: to 0.49 to
-         * 0.52 under 0.69, where the tongued stops of 2026-11-05 fell to 0.16 or under), which this
-         * hears as a stop and a restart; the flute's walk does not cut a note on it
-         * (`ListenRun.Rules.restartCuts`). It stays at 0.12: at 0.2 the synthetic 40 ms tongue in a
-         * lively room is no longer heard (`ListenPathTest`).
+         * stop: 0.12, about 7 dB; a tongued stop falls 10 dB or more even with the room ringing on.
+         * A child's breath can dip about as far for a moment inside a held note, which this hears as
+         * a stop and a restart: the flute's walk does not cut a note on it
+         * (`ListenRun.Rules.restartCuts`), and a higher value would lose the 40 ms tongue in a lively
+         * room (`ListenPathTest`; `ui/flute/DESIGN.md`, "The first runs with the walk").
          */
         const val STOP_DROP = 0.12f
 

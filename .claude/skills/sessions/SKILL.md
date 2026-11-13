@@ -66,11 +66,12 @@ python3 tools/session-report.py sessions/<folder>        # <folder>/report.html:
 ```
 
 The replay that is compared with the phone runs under the rules the session was recorded with (its
-`session.rules` line; a rule younger than the recording, `minLevel` for sessions before 2026-11-10
-and the length rule (`lengthSlack`, `maxNeedMs`) for sessions before 2026-11-11, is switched off, and
-`restartCuts` for sessions before 2026-11-13 is on, as it was then:
-`Replay.recordedRules`, `Replay.recordedRunRules`), so a rule added since does not show up as a
-difference. A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
+`session.rules` line; a rule younger than the recording takes what the builds before it did, from one
+table for the tracker's rules and the run's, `Replay.BEFORE`: no `minLevel` before 2026-11-10, no length
+rule (`lengthSlack`, `maxNeedMs`) before 2026-11-11, `restartCuts` on and `graceFrames` 2 before
+2026-11-13; a new rule gets a line there), so a rule added since does not show up as a difference. A
+"wrong" logged before 2026-11-13 for a note heard while a note cut short waited is today's "ignored"
+(only the word changed: `Replay.sameVerdict`). A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
 has it compared too: the frame a note was earned or cut short on. `report.html` draws those frames
 (★ or ☆ long enough, ✂ cut short; ♪ is a right pitch beginning a note). Where
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they

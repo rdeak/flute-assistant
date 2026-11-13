@@ -12,6 +12,7 @@ import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.Verdict
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.flute.Walk
@@ -63,7 +64,7 @@ class ReplayTest {
         r.opened(rate, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
-            r.frame(ListenFrame(step.pitch, step.decision, step.sounding, step.onset, step.floor, step.verdict, step.waited, step.expected, null, TunerAdvice.NONE, false, false, Hearing.CLEAR, step.walk))
+            r.frame(step.row)
         }
         repeat(extraHops) { r.samples(FloatArray(hop), hop) }
         r.end(run.marks)
@@ -108,7 +109,7 @@ class ReplayTest {
         val then = report.substringBefore("today's rules")
         assertTrue(report, then.contains("diff: none"))
         assertTrue(report, then.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
-        assertTrue(report, report.contains("today's rules differ: minLevel=0.45 (recorded 0.0)"))
+        assertTrue(report, report.contains("today's rules differ: minLevel=0.45 (recorded none)"))
         val now = report.substringAfter("today's rules").substringBefore("phone:")
         assertTrue("under the floor nothing of it is a note: $report", now.contains("marks=\n") && !now.contains("verdict="))
     }
@@ -163,8 +164,10 @@ class ReplayTest {
         log.writeText(log.readText().replace(Regex(" (lengthSlack|restartCuts)=[^ \n]*"), ""))
         val session = Session.load(dir)
         assertEquals(Pulse(40), session.pulse)
-        assertEquals(ListenRun.Rules.PITCH_ONLY, Replay.recordedRunRules(session).copy(maxNeedMs = Double.POSITIVE_INFINITY))
-        assertEquals("a rule the line names is the phone's", 3000.0, Replay.recordedRunRules(session).maxNeedMs, 0.0)
+        val recorded = Replay.recordedRunRules(session)
+        assertEquals("no length rule then", Double.POSITIVE_INFINITY, recorded.lengthSlack, 0.0)
+        assertTrue("a restart cut a note then", recorded.restartCuts)
+        assertEquals("a rule the line names is the phone's", 3000.0, recorded.maxNeedMs, 0.0)
         val report = Replay.report(session)
         val then = report.substringBefore("today's rules")
         assertTrue(report, then.contains("diff: none"))
@@ -224,6 +227,24 @@ class ReplayTest {
         assertTrue(report, report.contains("diff: first=$at count=1"))
         assertTrue(report, report.contains("SHORT") && report.contains("SOUNDING"))
         assertEquals("the walk is compared only when asked", 0, Replay.diff(altered.rows, ListenPath.run(altered.frames, tune, altered.pulse).steps).count)
+    }
+
+    /**
+     * Until 2026-11-13 a note heard while a note cut short waited was logged "wrong", though the screen never showed it
+     * as wrong (the child went on); since then it is "ignored". Only the word changed, so it is no difference.
+     */
+    @Test
+    fun `a wrong note logged while a note cut short waited is the ignored one of today`() {
+        val short = Walk(0, 2, Walk.Phase.SHORT)
+        fun step(verdict: Verdict, walk: Walk?) = ListenPath.Step(
+            9,
+            ListenFrame(
+                PitchFrame(330.0, 0.99, 0.7f), FrameDecision.SHOWN, 64, NoteOnsetTracker.Onset(64, fresh = true), null, verdict,
+                0, 60, 64, TunerAdvice.HOLD_LONGER, false, false, Hearing.CLEAR, walk,
+            ),
+        )
+        assertEquals(0, Replay.diff(listOf(step(Verdict.WRONG, short)), listOf(step(Verdict.IGNORED, short)), walk = true).count)
+        assertEquals("with no note cut short, wrong is wrong", 1, Replay.diff(listOf(step(Verdict.WRONG, null)), listOf(step(Verdict.IGNORED, null))).count)
     }
 
     @Test

@@ -336,7 +336,8 @@ quarter on its onset frame), the animal steps to each click inside the note at t
 (`Tune.playSteps`), with a hop, and only to another place: a note beginning where the animal already stands is no hop
 (the user's rule of 2026-11-04 for Play, never two hops in one place; the first build hopped at the onset too, on
 the spot, 128 ms after landing there). What counts as the note sounding is every frame the tracker shows it and at
-most two more after the last such (`onsetGapFrames`, the frames a gap takes to be seen, so a note's thinning end still
+most two more after the last such (`ListenRun.Rules.graceFrames`, the frames a gap takes to be seen and a rule of its own
+since 2026-11-13, so a sweep of the tracker's `onsetGapFrames` no longer moves note lengths; so a note's thinning end still
 counts, as the recorded quarters need); the tracker holds a note on through loud frames with no pitch for most of a
 second (`HOLD_FRAMES`: a pause is not a blink), and that is not the note's time (the same review: air noise after
 128 ms of tone had earned a quarter), while a breathy stretch inside a note counts in full once the tone is back. The
@@ -364,7 +365,9 @@ user chose this, "wait", over "mark and move on" (the short note gets the faint 
 on) after seeing what the recordings would have done: every child there went on through the tune after a short note,
 so the run will often stop at the first long note until the child slows to the animal's pace, which is the lesson.
 Any other note heard while a note cut short waits shows in the live bubble but is no wrong note: the child went on,
-and "Check your fingers" would be false; nor does the note written after a repeat that was heard and cut short forgive
+and "Check your fingers" would be false. `TuneCheck` judges it ignored (since 2026-11-13; before, it was logged "wrong"
+while the screen showed nothing, which misled the reading of sessions, and the replay takes that old "wrong" as the
+ignored of today: `Replay.sameVerdict`); nor does the note written after a repeat that was heard and cut short forgive
 that repeat (`TuneCheck.forgiven` is for a repeat the phone never heard; forgiving this one would be "mark and move
 on"), and that repeat's own letter coming back by a step walks again: the run tells the check the step was begun
 (`TuneCheck.judge`'s `begun`, the walk standing there cut short; the one owner of that fact), since the note before
@@ -386,9 +389,9 @@ note), `19-02-37` (the laptop's speaker) step 0, `17-03-03` unchanged. Tests: `L
 `FluteViewModelTest` (the hops, `flute.held`, `flute.short`, the tempo read at the start), `FluteUiStateTest`,
 `FluteScreenTest` and `FluteSidewaysTest` (the line in both languages); `ReplayTest` (a session recorded before the
 walk replays pitch only, and the sweeps). The run's own rules are one value, `ListenRun.Rules` (`lengthSlack`,
-`maxNeedMs`, `repeatAdviceFrames`, `finishFrames`, `restartCuts`), made like the tracker's: a session writes it down beside them,
-`Replay.recordedRunRules` reads it back (a rule a session does not name did not act on the phone:
-`Rules.PITCH_ONLY`, no slack to run out of, no longest hold, and a restart that cuts), and a sweep moves one by its name, the audio
+`maxNeedMs`, `repeatAdviceFrames`, `finishFrames`, `restartCuts`, `graceFrames`), made like the tracker's: a session writes it
+down beside them, `Replay.recordedRunRules` reads it back (a rule a session does not name did not act on the phone, and
+takes what the builds before it did from one table for both sets, `Replay.BEFORE`), and a sweep moves one by its name, the audio
 detected once (`Session.frames`) for every value. A session that recorded the walk (`walk,halfBeat,phase` in
 `frames.csv`) has it compared in the replay's diff, so "diff: none" also says the notes were earned and cut short on
 the phone's frames; `tools/session-report.py` draws ♪ where a right pitch began a note, ★ or ☆ where it was long

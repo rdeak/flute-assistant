@@ -184,7 +184,7 @@ class TuneCheckTest {
         check.earn()
         assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
         check.stumble()
-        assertEquals(Verdict.WRONG, check.judge(62, fresh = false, begun = true))
+        assertEquals("the child went on: no wrong note", Verdict.IGNORED, check.judge(62, fresh = false, begun = true))
         assertTrue(check.forgiven.isEmpty())
         assertEquals(1, check.index)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), check.marks)
@@ -199,7 +199,7 @@ class TuneCheckTest {
         check.earn()
         assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
         check.stumble()
-        assertEquals(Verdict.WRONG, check.judge(67, fresh = false, begun = true))
+        assertEquals(Verdict.IGNORED, check.judge(67, fresh = false, begun = true))
         assertEquals(Verdict.RETRY, check.judge(60, fresh = false, begun = true))
         assertEquals("not begun, the same step back is the first c's tail", Verdict.IGNORED, check.judge(60, fresh = false))
     }
