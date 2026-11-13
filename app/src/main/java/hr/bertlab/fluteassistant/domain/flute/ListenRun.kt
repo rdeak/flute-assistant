@@ -35,14 +35,21 @@ data class Walk(val index: Int, val halfBeat: Int, val phase: Phase) {
 
         /** The note was long enough and is earned: the animal finishes its written time, then goes to the next note. */
         DONE,
+
+        /**
+         * A rest after an earned note's written time, or opening or ending the tune: the animal walks its clicks in
+         * silence, as in Play, then goes to the next note ([ListenRun.Rules.walkRests]).
+         */
+        REST,
     }
 }
 
 /**
  * What the screen shows of a "Your turn" in progress.
  *
- * @property index the step of the tune waited on, the one a note heard is judged against; once
- * the last note is earned it stays on that note while its sound ends ([finishing]).
+ * @property index the step of the tune waited on, the one a note heard is judged against (a rest is
+ * never waited on); once the last note is earned it stays on that note, while its sound ends
+ * ([finishing]) or a rest after it is walked.
  * @property wrong the wrong note last heard for the step waited on, kept until the next note is
  * judged (no timer: the child reads it at their own pace).
  * @property hearing what the microphone makes of sound that yields no note.
@@ -54,9 +61,10 @@ data class Walk(val index: Int, val halfBeat: Int, val phase: Phase) {
  * child is holding it instead of starting it again, which the phone can only hear as one note.
  * @property finishing from the last note being earned until its sound ends (or
  * [ListenRun.FINISH_FRAMES] pass): the run goes on so the screen does not snap back while the
- * child is still playing.
- * @property walk where the animal is while a note is walked, cut short or finishing its time; null
- * while it waits at the head of [index].
+ * child is still playing. Not with a rest after the last note: that rest is walked, and its end
+ * ends the run.
+ * @property walk where the animal is while a note is walked, cut short or finishing its time, or a
+ * rest is walked; null while it waits at the head of [index].
  * @property faded the note cut short faded away before it stopped ([ListenRun.FADE_RATIO]): the line
  * guesses the air ran out; false again once a note is walked.
  */
@@ -112,13 +120,15 @@ data class Listening(
  * note; an octave pop, a slow sag or its own note started again with no gap is the same note going
  * on, [Rules.restartCuts]) is cut short: the animal stays where it got to, the run waits on it again, and it earns a faint
  * star once played long enough. An earned note's written time is finished on the clicks, sound or
- * not, and then the animal goes to the next note, at once if the child starts it sooner. Time is
+ * not, then the rests after it are walked on theirs as in Play ([Walk.Phase.REST], [Rules.walkRests]),
+ * and then the animal goes to the next note, at once if the child starts it sooner. Time is
  * the sum of the frames' own lengths ([PitchFrame.hopMs]), never a clock, so the app, the
  * synthetic tests and the replay of a recorded session hear a run alike. The time between notes
  * and the rests are not judged.
  *
  * The last note earned does not end the run at once: it goes on ([Listening.finishing]) until
- * that note's sound ends or [Rules.finishFrames] pass, and then [isOver].
+ * that note's sound ends or [Rules.finishFrames] pass, and then [isOver]; with a rest after it, the
+ * run is over once that rest is walked.
  *
  * Pure Kotlin. The flute's view model feeds it the microphone, and the tests and the replay of a
  * recorded session feed it audio, so all three hear a run by the same rules. [rules] and [floor]
@@ -145,6 +155,8 @@ class ListenRun(
      * letter started again with no gap (1 in a session's line; the rule until 2026-11-13). Off, only a gap cuts a
      * note: a child's breath dips like a tongued stop (`DESIGN.md`, "The first runs with the walk").
      * @property graceFrames [GRACE_FRAMES].
+     * @property walkRests whether the animal walks the rests (1 in a session's line, since 2026-11-13), as in Play;
+     * before, the run passed them over and the animal jumped to the note after a rest.
      */
     data class Rules(
         val lengthSlack: Double = LENGTH_SLACK,
@@ -153,12 +165,14 @@ class ListenRun(
         val finishFrames: Int = FINISH_FRAMES,
         val restartCuts: Boolean = false,
         val graceFrames: Int = GRACE_FRAMES,
+        val walkRests: Boolean = true,
     ) {
         /** Name and value of every rule, in the order a session's `session.rules` line has them after the tracker's. */
         fun fields(): List<Pair<String, String>> = listOf(
             "repeatAdviceFrames" to repeatAdviceFrames.toString(), "finishFrames" to finishFrames.toString(),
             "lengthSlack" to lengthSlack.toString(), "maxNeedMs" to maxNeedMs.toString(),
             "restartCuts" to if (restartCuts) "1" else "0", "graceFrames" to graceFrames.toString(),
+            "walkRests" to if (walkRests) "1" else "0",
         )
 
         /** These rules with the one named [name] set to [value] (rounded for a frame count, not 0 for a yes); an unknown name is refused. */
@@ -169,6 +183,7 @@ class ListenRun(
             "finishFrames" -> copy(finishFrames = Math.round(value).toInt())
             "restartCuts" -> copy(restartCuts = value != 0.0)
             "graceFrames" -> copy(graceFrames = Math.round(value).toInt())
+            "walkRests" -> copy(walkRests = value != 0.0)
             else -> throw IllegalArgumentException("no rule named $name")
         }
 
@@ -199,8 +214,9 @@ class ListenRun(
      * @property forgiven the written repeats this frame's judgement passed over ([TuneCheck.forgiven]).
      * @property hearingMean the mean level that decided [Listening.hearing], when it changed on this frame.
      * @property done the tune's last note was earned on this frame.
-     * @property hop the animal hops on this frame, to another place: a click inside the note it walks, the next
-     * note's head, or back to the head of a note played again. A note beginning where it stands is no hop.
+     * @property hop the animal hops on this frame, to another place: a click inside the note or rest it walks, a
+     * rest's head, the next note's head, or back to the head of a note played again. A note beginning where it stands
+     * is no hop.
      * @property short a note was cut short on this frame.
      * @property held a note became long enough on this frame: it is earned and its mark shows.
      * @property cents the pitch the judged note locked at, in cents from [Heard.expected] (the step waited on when it
@@ -256,13 +272,17 @@ class ListenRun(
     /** Frames since the animal finished an earned note's written time: what a written repeat held on is counted from. */
     private var pastLengthFrames = 0
 
-    var listening = Listening(index = check.index)
+    // A rest that opens the tune is walked from the start, as Play plays it.
+    var listening = Listening(index = check.index, walk = restFrom(0)?.let { Walk(it, 0, Walk.Phase.REST) })
         private set
 
     /** What each judged step earned so far, by its index in the tune. */
     val marks: Map<Int, StepMark> get() = check.marks
 
-    /** True once the last note has been counted and its sound has ended, or gone on for [FINISH_FRAMES]. */
+    /**
+     * True once the last note has been counted and its sound has ended, or gone on for [FINISH_FRAMES]; or, with
+     * rests after the last note, once they are walked.
+     */
     var isOver = false
         private set
 
@@ -287,7 +307,7 @@ class ListenRun(
             } else {
                 cutShort(moves)
             }
-            Walk.Phase.DONE -> finishTime(moves)
+            Walk.Phase.DONE, Walk.Phase.REST -> writtenTime(moves)
             Walk.Phase.SHORT -> Unit
             null -> pastLengthFrames++
         }
@@ -381,7 +401,8 @@ class ListenRun(
         listening = listening.copy(
             index = if (done) index else check.index,
             walk = listening.walk!!.copy(phase = Walk.Phase.DONE),
-            finishing = done, wrong = null, heardNow = null, repeatHeld = false,
+            // A rest after the last note is walked before the run ends: it is not finishing while its sound ends.
+            finishing = done && restFrom(index + 1) == null, wrong = null, heardNow = null, repeatHeld = false,
         )
     }
 
@@ -413,11 +434,38 @@ class ListenRun(
     private fun nearAbove(heard: Int, lockHz: Double?, written: Int): Boolean =
         heard == written + 1 && lockHz != null && NoteMath.centsBetween(lockHz, written) in 0.0..ListenRules.NEAR_CENTS
 
-    /** An earned note's written time goes on on the clicks, sound or not; at its end the animal goes to the next note. */
-    private fun finishTime(moves: Moves) {
+    /**
+     * An earned note's written time, or a rest's, goes on on its clicks, sound or not; at its end the animal walks the
+     * rest after it, or goes to the next note's head.
+     */
+    private fun writtenTime(moves: Moves) {
+        val walk = listening.walk!!
         val since = nowMs - time.startMs
         stepTo(since, moves)
-        if (!check.isDone && since + EPSILON_MS >= fullMs(listening.walk!!.index)) leaveWalk(moves)
+        if (since + EPSILON_MS < fullMs(walk.index)) return
+        val rest = restFrom(walk.index + 1)
+        when {
+            rest != null -> walkRest(rest, startMs = time.startMs + fullMs(walk.index), moves)
+            !check.isDone -> leaveWalk(moves)
+            // The rest that ends the tune is walked: the run is over. A last note with no rest after it ends by its
+            // sound instead ([Listening.finishing]).
+            walk.phase == Walk.Phase.REST -> isOver = true
+        }
+    }
+
+    /** The animal walks the rest at [index], which began at [startMs] on the run's clock: the beat the step before it ended on. */
+    private fun walkRest(index: Int, startMs: Double, moves: Moves) {
+        time = WalkTime(startMs)
+        listening = listening.copy(walk = Walk(index, 0, Walk.Phase.REST))
+        moves.hop = true
+        stepTo(nowMs - startMs, moves)
+    }
+
+    /** The rest the animal walks from step [index] on, breaths passed over; null when a note (or nothing) comes first, or rests are not walked. */
+    private fun restFrom(index: Int): Int? {
+        if (!run.walkRests) return null
+        val next = (index until tune.size).firstOrNull { tune[it] !is TuneBreath } ?: return null
+        return next.takeIf { tune[it] is TuneRest }
     }
 
     /** The animal leaves the note it walks for the head of the step waited on, with a hop. */
@@ -427,7 +475,7 @@ class ListenRun(
         moves.hop = true
     }
 
-    /** The animal steps to the last click inside the note walked that [since] has reached, with a hop. */
+    /** The animal steps to the last click inside the note or rest walked that [since] has reached, with a hop. */
     private fun stepTo(since: Double, moves: Moves) {
         val walk = listening.walk!!
         val place = clicks[walk.index].orEmpty().lastOrNull { it * pulse.halfBeatMs <= since + EPSILON_MS } ?: 0
@@ -459,7 +507,11 @@ class ListenRun(
 
     private fun noteAt(index: Int): Int = (tune[index] as TuneNote).midi
 
-    private fun halfBeatsAt(index: Int): Int = (tune[index] as TuneNote).length.halfBeats
+    private fun halfBeatsAt(index: Int): Int = when (val item = tune[index]) {
+        is TuneNote -> item.length.halfBeats
+        is TuneRest -> item.length.halfBeats
+        TuneBreath -> 0
+    }
 
     /** How long the note at [index] must sound to be earned: its length less the slack, never under nothing nor over the longest hold. */
     private fun needMs(index: Int): Double = minOf(maxOf(0.0, halfBeatsAt(index) - run.lengthSlack) * pulse.halfBeatMs, run.maxNeedMs)

@@ -61,7 +61,7 @@ class ListenRunTest {
     @Test
     fun `it waits on the first note, and a right note in any octave earns a star and moves on`() {
         val run = pitchOnly(listOf(TuneRest(QUARTER), q(60), q(62)))
-        assertEquals(Listening(index = 1), run.listening)
+        assertEquals("the opening rest is walked, as in Play", Listening(index = 1, walk = Walk(0, 0, Walk.Phase.REST)), run.listening)
         val step = run.begin(72)
         assertEquals(ListenRun.Heard(index = 1, expected = 60, NoteOnsetTracker.Onset(72, fresh = true), Verdict.RIGHT), step.heard)
         assertTrue(step.advanced)
@@ -495,18 +495,6 @@ class ListenRunTest {
     }
 
     @Test
-    fun `a rest is passed over`() {
-        val run = timed(q(60), TuneRest(QUARTER), q(62))
-        run.begin(60)
-        run.hold(60, after(500.0))
-        assertEquals(2, run.listening.index)
-        assertEquals(0, run.listening.walk?.index)
-        run.hold(60, after(1000.0) - after(500.0))
-        assertNull(run.listening.walk)
-        assertEquals("the animal waits on the note after the rest", 2, run.listening.index)
-    }
-
-    @Test
     fun `a written repeat slurred on is forgiven and the next note walks`() {
         val run = timed(q(60), q(60), q(62))
         run.begin(60)
@@ -528,6 +516,195 @@ class ListenRunTest {
         assertEquals(TunerAdvice.COME_CLOSER, Listening(index = 0, wrong = WrongNote(0, 72, tooHigh = true), hearing = Hearing.QUIET_UNCLEAR).advice)
         assertEquals(TunerAdvice.OUT_OF_AIR, Listening(index = 0, walk = short, faded = true, wrong = WrongNote(0, 64)).advice)
         assertEquals(TunerAdvice.PLAY_AGAIN, Listening(index = 0, repeatHeld = true, walk = short, faded = true).advice)
+    }
+
+    // ---- Rests walked as in Play (2026-11-13, spec 2026-11-13-flute-your-turn-rests-design) ----
+
+    private val rest = TuneRest(QUARTER)
+
+    /** Feeds [frames], keeping each new walk the run shows with whether that frame hopped, and how many frames a rest was walked. */
+    private class Watch(val run: ListenRun) {
+        val walks = mutableListOf<Pair<Walk?, Boolean>>()
+        var restFrames = 0
+        private var last = run.listening.walk
+        fun feed(frame: PitchFrame): ListenRun.Step {
+            val step = run.onFrame(frame)
+            val walk = run.listening.walk
+            if (walk != last) walks += walk to step.hop
+            last = walk
+            if (walk?.phase == Walk.Phase.REST) restFrames++
+            return step
+        }
+        fun feed(frame: PitchFrame, n: Int) = List(n) { feed(frame) }.lastOrNull()
+        val sawRest get() = walks.any { it.first?.phase == Walk.Phase.REST }
+    }
+
+    /** A watched run over [tune] whose first note (60) has been earned: begun, then held half a beat. */
+    private fun earned(vararg tune: TuneItem, run: ListenRun.Rules = halfBeatSlack): Watch {
+        val watch = Watch(timed(*tune, run = run))
+        watch.feed(pitched(60), ListenRules.LOCK_FRAMES + after(500.0))
+        assertTrue(watch.run.marks.isNotEmpty())
+        return watch
+    }
+
+    /** Silence until the walk stands on a rest. */
+    private fun Watch.untilRest() {
+        repeat(framesFor(2000.0)) { if (run.listening.walk?.phase != Walk.Phase.REST) feed(silent) }
+        assertEquals(Walk.Phase.REST, run.listening.walk?.phase)
+    }
+
+    @Test
+    fun `a rest after a note is walked on its clicks and then the animal waits at the next note`() {
+        val watch = earned(q(60), TuneRest(HALF), q(62))
+        watch.feed(silent, framesFor(3500.0))
+        assertEquals(
+            listOf(Walk(0, 0, Walk.Phase.SOUNDING), Walk(0, 0, Walk.Phase.DONE), Walk(1, 0, Walk.Phase.REST), Walk(1, 2, Walk.Phase.REST), null),
+            watch.walks.map { it.first },
+        )
+        assertTrue("every move after the note was earned is a hop: ${watch.walks}", watch.walks.drop(2).all { it.second })
+        assertEquals(2, watch.run.listening.index)
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), watch.run.marks)
+        assertTrue("the half rest lasted ${watch.restFrames} frames", watch.restFrames in framesFor(2000.0) - 1..framesFor(2000.0) + 1)
+    }
+
+    @Test
+    fun `a note begun before the rest goes on to the note after it`() {
+        val watch = earned(q(60), rest, q(62))
+        watch.feed(silent, NoteOnsetTracker.ONSET_GAP_FRAMES)
+        watch.feed(pitched(62), ListenRules.LOCK_FRAMES)
+        assertEquals(Walk(2, 0, Walk.Phase.SOUNDING), watch.run.listening.walk)
+        assertFalse(watch.sawRest)
+    }
+
+    @Test
+    fun `a right note during a rest counts at once`() {
+        val watch = earned(q(60), TuneRest(HALF), q(62))
+        watch.untilRest()
+        val step = watch.feed(pitched(62), ListenRules.LOCK_FRAMES)!!
+        assertEquals(2, step.heard?.index)
+        assertEquals(Verdict.RIGHT, step.heard?.verdict)
+        assertEquals(Walk(2, 0, Walk.Phase.SOUNDING), watch.run.listening.walk)
+        assertTrue(step.hop)
+    }
+
+    @Test
+    fun `a wrong note during a rest shows at the next note`() {
+        val watch = earned(q(60), TuneRest(HALF), q(62))
+        watch.untilRest()
+        val step = watch.feed(pitched(64), ListenRules.LOCK_FRAMES)!!
+        assertEquals(WrongNote(2, 64), watch.run.listening.wrong)
+        assertNull(watch.run.listening.walk)
+        assertEquals(2, watch.run.listening.animalIndex)
+        assertTrue(step.hop)
+    }
+
+    @Test
+    fun `rests in a row are walked one after the other`() {
+        val watch = earned(q(60), rest, rest, q(62))
+        watch.feed(silent, framesFor(3500.0))
+        assertEquals(
+            listOf(Walk(1, 0, Walk.Phase.REST), Walk(2, 0, Walk.Phase.REST), null),
+            watch.walks.map { it.first }.dropWhile { it?.phase != Walk.Phase.REST },
+        )
+        assertEquals(3, watch.run.listening.index)
+    }
+
+    @Test
+    fun `a breath still takes no time`() {
+        val watch = earned(q(60), TuneBreath, q(62))
+        watch.feed(silent, framesFor(1500.0))
+        assertFalse(watch.sawRest)
+        assertNull(watch.run.listening.walk)
+        assertEquals(2, watch.run.listening.index)
+    }
+
+    @Test
+    fun `a rest that opens the tune is walked from the start`() {
+        val run = timed(rest, q(60))
+        assertEquals(Walk(0, 0, Walk.Phase.REST), run.listening.walk)
+        assertEquals(1, run.listening.index)
+        repeat(framesFor(1000.0)) { run.onFrame(silent) }
+        assertNull(run.listening.walk)
+        val early = timed(rest, q(60))
+        early.begin(60)
+        assertEquals("the first note may begin during it", Walk(1, 0, Walk.Phase.SOUNDING), early.listening.walk)
+    }
+
+    @Test
+    fun `a rest that ends the tune is walked and then the run is over`() {
+        val watch = earned(q(60), rest)
+        assertTrue(watch.run.marks.isNotEmpty())
+        watch.feed(pitched(60), framesFor(1100.0)) // the last note held on past its written time
+        assertEquals(Walk(1, 0, Walk.Phase.REST), watch.run.listening.walk)
+        assertFalse(watch.run.listening.finishing)
+        assertFalse(watch.run.isOver)
+        val late = watch.feed(pitched(62), ListenRules.LOCK_FRAMES)!!
+        assertNull("nothing is waited on: not judged", late.heard)
+        repeat(framesFor(1000.0)) { if (!watch.run.isOver) watch.feed(pitched(62)) }
+        assertTrue(watch.run.isOver)
+    }
+
+    @Test
+    fun `a rest waits behind a note cut short`() {
+        val watch = Watch(timed(h(60), rest, q(62)))
+        watch.feed(pitched(60), ListenRules.LOCK_FRAMES + 15)
+        watch.feed(silent, framesFor(3000.0))
+        assertEquals(Walk.Phase.SHORT, watch.run.listening.walk?.phase)
+        assertEquals(0, watch.run.listening.index)
+        assertFalse(watch.sawRest)
+    }
+
+    @Test
+    fun `a rest after a note played again is timed from that note's start`() {
+        val watch = Watch(timed(h(60), rest, q(62)))
+        watch.feed(pitched(60), ListenRules.LOCK_FRAMES + 15)
+        watch.feed(silent, NoteOnsetTracker.ONSET_GAP_FRAMES) // cut short
+        watch.feed(pitched(60), ListenRules.LOCK_FRAMES) // played again: its start is three frames back
+        var frames = ListenRules.LOCK_FRAMES
+        while (watch.run.listening.walk?.phase != Walk.Phase.REST && frames < framesFor(3000.0)) {
+            watch.feed(if (frames < framesFor(1600.0)) pitched(60) else silent)
+            frames++
+        }
+        assertEquals(mapOf(0 to StepMark.RETRY), watch.run.marks)
+        assertTrue("the rest began $frames frames after the note did", frames in framesFor(2000.0) - 1..framesFor(2000.0) + 1)
+    }
+
+    @Test
+    fun `a written repeat held on through a rest asks to stop once the rest is over`() {
+        // g, rest, g: the first g held on through the rest. Nothing is asked while the animal walks the rest; the
+        // advice comes REPEAT_ADVICE_FRAMES after it, when the repeat is waited on.
+        val watch = Watch(timed(q(67), rest, q(67)))
+        watch.feed(pitched(67), ListenRules.LOCK_FRAMES + after(1000.0))
+        while (watch.run.listening.walk?.phase != Walk.Phase.REST) watch.feed(pitched(67))
+        while (watch.run.listening.walk?.phase == Walk.Phase.REST) {
+            watch.feed(pitched(67))
+            assertFalse(watch.run.listening.repeatHeld)
+        }
+        watch.feed(pitched(67), ListenRun.REPEAT_ADVICE_FRAMES - 1)
+        assertFalse(watch.run.listening.repeatHeld)
+        watch.feed(pitched(67))
+        assertTrue(watch.run.listening.repeatHeld)
+        assertEquals(TunerAdvice.PLAY_AGAIN, watch.run.listening.advice)
+    }
+
+    @Test
+    fun `a wrong note during an opening rest shows at the first note`() {
+        val run = timed(rest, q(60))
+        run.begin(64)
+        assertEquals(WrongNote(1, 64), run.listening.wrong)
+        assertNull(run.listening.walk)
+        assertEquals(1, run.listening.animalIndex)
+    }
+
+    @Test
+    fun `with walkRests off rests are passed over as before`() {
+        val off = halfBeatSlack.copy(walkRests = false)
+        val watch = earned(q(60), rest, q(62), run = off)
+        watch.feed(silent, framesFor(1100.0))
+        assertFalse(watch.sawRest)
+        assertNull(watch.run.listening.walk)
+        assertEquals(2, watch.run.listening.index)
+        assertNull(timed(rest, q(60), run = off).listening.walk)
     }
 
     // ---- Why, in a few words (2026-11-13, spec 2026-11-13-flute-your-turn-why-lines-design) ----
@@ -840,12 +1017,12 @@ class ListenRunTest {
         assertEquals(
             listOf(
                 "repeatAdviceFrames" to "25", "finishFrames" to "35", "lengthSlack" to "1.5", "maxNeedMs" to "3000.0",
-                "restartCuts" to "0", "graceFrames" to "2",
+                "restartCuts" to "0", "graceFrames" to "2", "walkRests" to "1",
             ),
             ListenRun.Rules().fields(),
         )
         assertEquals(
-            setOf("repeatAdviceFrames", "finishFrames", "lengthSlack", "maxNeedMs", "restartCuts", "graceFrames"),
+            setOf("repeatAdviceFrames", "finishFrames", "lengthSlack", "maxNeedMs", "restartCuts", "graceFrames", "walkRests"),
             ListenRun.Rules.NAMES,
         )
     }
@@ -860,6 +1037,7 @@ class ListenRunTest {
         assertEquals(ListenRun.Rules(restartCuts = false), ListenRun.Rules(restartCuts = true).with("restartCuts", 0.0))
         assertEquals("1", ListenRun.Rules(restartCuts = true).fields().toMap()["restartCuts"])
         assertEquals(ListenRun.Rules(graceFrames = 3), ListenRun.Rules().with("graceFrames", 3.0))
+        assertEquals(ListenRun.Rules(walkRests = false), ListenRun.Rules().with("walkRests", 0.0))
         assertTrue(runCatching { ListenRun.Rules().with("stopDrop", 0.1) }.exceptionOrNull() is IllegalArgumentException)
     }
 

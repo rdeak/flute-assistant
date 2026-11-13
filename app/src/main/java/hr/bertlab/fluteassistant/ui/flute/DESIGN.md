@@ -309,7 +309,8 @@ earned logs `flute.listen_done` at once but does not end the run at once: `Flute
 keeps the microphone open and the animal over the last note with its star (`litIndex` and
 `waiting` drop it, so nothing is ringed or "play this one") until that note's sound ends or
 `FINISH_FRAMES` (about 1.5 s) pass, so the keys do not snap back while the child is still blowing
-the last note; Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
+the last note (a rest after the last note is walked instead, ringed, and its end ends the run, sound or not, since
+2026-11-13); Stop (`stopRun`, one wide red pill where the Play row was), a key, erase,
 the speed knob, the book button and leaving the tab end it early (`flute.listen_stop`); the marks stay in
 `FluteUiState.marks` until a new run, a switch to another book or any write to the tune (`save()` clears them), are not
 saved, and show no number anywhere. `HearingTracker` feeds `FluteUiState.hearing` for the
@@ -383,11 +384,22 @@ longer" while the child held the right note). While a note is walked its step is
 note being played, the phone saying it hears it, and a screen reader still hears "play this one": keep playing it. An earned note's written time is finished on the clicks, sound or not
 (`Walk.Phase.DONE`; its star shows, the ring stays with the animal, `waiting` is false), and then the animal hops to
 the next note and stands still there; a note begun in that last half beat is judged for the next step and takes the
-animal there at once. The one move the animal makes in silence is that one (Claude's call in the spec, which the user let stand): a child lets go a little early to
+animal there at once. The animal moves in silence only there and on the rests after it (below) (Claude's call in the spec, which the user let stand): a child lets go a little early to
 breathe or to tongue the next note, and a still animal must keep meaning one of two things, "hold it longer" or "your
 turn to start the next note". A written repeat's "Stop, then play it again" counts its second from the end of the
-note's written length, when holding it stops being right. Rests and breaths are passed over, holding a note too long
-is fine, and the time between notes is not judged. A metronome left running on its own tab keeps clicking, and its
+note's written length, when holding it stops being right (with a rest between the two, from the end of the rest: the
+animal walks the rest first, and nothing is asked while it does). Rests behave as in Play since 2026-11-13 (the user, after
+the phone tests: the child follows the animal above the notes, and it skipped them; spec
+`2026-11-13-flute-your-turn-rests-design.md`): when an earned note's written time is over and a rest follows (breaths
+passed over), the rest is ringed and the animal walks it on its clicks (`Walk.Phase.REST`), from the beat the note's
+written time ended on, then the next rest after it, then the next note's head, where it waits; a rest opening the tune
+is walked from the start, and one ending it after the last note's time, the run then over (the keys come back when it
+ends, and a note heard during it is not judged). Nothing stands under a rest (`waiting` is false) and it earns no
+mark. A note the child starts during a rest is judged at once for the next note and the animal jumps to it (the user's
+pick "A" over "wait until the rest is over": a rest punished for being short is harder for a child to understand than
+a note held too briefly; the three runs through the 80 a minute quarter rest left 0.85 to 0.98 s of its 0.75). A run
+rule, `walkRests`, is 0 for the sessions recorded before it (`Replay.BEFORE`), which passed rests over. Breaths take
+no time, as in Play; holding a note too long is fine, and the time between notes is not judged. A metronome left running on its own tab keeps clicking, and its
 clicks will not line up with the animal's hops, which are timed from the child's note; the two tabs' view models never
 reference each other, so that stays. The pinned sessions of 2026-11-05 and 2026-11-10 earn other marks under the walk and
 were pinned again at the user's "ok" the same day: `17-01-39` and `17-04-38` steps 0 to 5 (they stop on the first half
@@ -501,7 +513,7 @@ past a bar line inside a tied note), like the metronome's beat bubbles: a half n
 head; it slides to each new place in `FLASH_DURATION_MS` with `FastOutSlowInEasing` while it hops,
 so it lands as the hop ends, across bar lines and breaths too. In Your turn it walks the note the child
 plays the same way and then goes on to the next, and `ListenRun` says when it hops (`ListenRun.Step.hop`: a click
-inside the note walked, the move to the next note, back to the head of a note played again, never a note beginning
+inside the note or rest walked, a rest's head, the move to the next note, back to the head of a note played again, never a note beginning
 where it stands; `beatPulse` goes up on each and at the start; "Each note held for its length" above). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
 `StaffGeometry.ANIMAL_Y` (27 dp, unscaled like the knob: the knob's middle until the knob was lifted
 8 dp on 2026-11-10, the animal's line staying where its hop keeps inside the box) from the box's top,

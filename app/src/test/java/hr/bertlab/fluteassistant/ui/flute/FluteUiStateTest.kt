@@ -182,6 +182,19 @@ class FluteUiStateTest {
     }
 
     @Test
+    fun `a rest walked is ringed and not waited on`() {
+        // Rests behave as in Play (2026-11-13): ringed, the animal on its clicks, nothing waited on under it.
+        val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER))
+        val resting = FluteUiState(tune = tune, listening = Listening(index = 2, walk = Walk(1, 0, Walk.Phase.REST)))
+        assertEquals(1, resting.litIndex)
+        assertEquals(1, resting.animalIndex)
+        assertFalse(resting.waiting)
+        val ending = FluteUiState(tune = tune.take(2), listening = Listening(index = 0, walk = Walk(1, 0, Walk.Phase.REST)))
+        assertEquals("the rest that ends the tune is ringed too", 1, ending.litIndex)
+        assertFalse(ending.waiting)
+    }
+
+    @Test
     fun `a note cut short asks to hold it longer with no fingering`() {
         val short = FluteUiState(tune = lamb, listening = Listening(index = 1, walk = Walk(1, 0, Walk.Phase.SHORT)))
         assertEquals(TunerAdvice.HOLD_LONGER, short.advice)

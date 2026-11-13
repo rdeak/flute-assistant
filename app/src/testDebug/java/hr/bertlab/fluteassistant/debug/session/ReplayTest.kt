@@ -178,6 +178,14 @@ class ReplayTest {
     }
 
     @Test
+    fun `a session recorded before rests were walked replays them passed over`() {
+        val dir = recorded()
+        val log = File(dir, "session.log")
+        log.writeText(log.readText().replace(" walkRests=1", ""))
+        assertFalse(Replay.recordedRunRules(Session.load(dir)).walkRests)
+    }
+
+    @Test
     fun `a lengthSlack sweep gives one line per value`() {
         val out = Replay.sweep(Session.load(recorded(pulse = Pulse(60))), "lengthSlack:0,8")
         val lines = out.lines().filter { it.startsWith("lengthSlack=") }

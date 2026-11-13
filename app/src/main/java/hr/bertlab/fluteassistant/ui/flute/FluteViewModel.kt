@@ -274,7 +274,7 @@ class FluteViewModel @Inject constructor(
         activationJob?.cancel()
         val run = ListenRun(writer.tune, pulse(), floor = roomFloor).also { this.run = it }
         listenSummary.reset()
-        // The animal lands on the first note with a hop.
+        // The animal lands on the first note, or on a rest that opens the tune, with a hop.
         _state.update { it.copy(listening = run.listening, marks = emptyMap(), beatPulse = it.beatPulse + 1) }
         // The session opens first, so the flute.listen line and the first hop are in it.
         recorder.start(writer.tune, pulse(), roomFloor)

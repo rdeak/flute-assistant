@@ -68,8 +68,8 @@ python3 tools/session-report.py sessions/<folder>        # <folder>/report.html:
 The replay that is compared with the phone runs under the rules the session was recorded with (its
 `session.rules` line; a rule younger than the recording takes what the builds before it did, from one
 table for the tracker's rules and the run's, `Replay.BEFORE`: no `minLevel` before 2026-11-10, no length
-rule (`lengthSlack`, `maxNeedMs`) before 2026-11-11, `restartCuts` on and `graceFrames` 2 before
-2026-11-13; a new rule gets a line there), so a rule added since does not show up as a difference. A
+rule (`lengthSlack`, `maxNeedMs`) before 2026-11-11, `restartCuts` on, `graceFrames` 2 and
+`walkRests` off (rests passed over) before 2026-11-13; a new rule gets a line there), so a rule added since does not show up as a difference. A
 "wrong" logged before 2026-11-13 for a note heard while a note cut short waited is today's "ignored"
 (only the word changed: `Replay.sameVerdict`). A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
 has it compared too: the frame a note was earned or cut short on. `report.html` draws those frames

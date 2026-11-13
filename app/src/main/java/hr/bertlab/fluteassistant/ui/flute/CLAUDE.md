@@ -39,8 +39,10 @@ change that part). The songbook is in `SONGBOOK.md`.
   `lengthSlack`, `maxNeedMs`), and one cut short is played again. Only a gap cuts a note: its own
   letter started again with no gap is the note going on (`ListenRun.Rules.restartCuts`: a child's
   breath dips like a tongued stop). The animal walks a note only while the child plays it and never hops twice in one
-  place; the one move it makes in silence is on from a note that was long enough, through the rest
-  of that note's written time to the head of the next, where it waits. `ListenRun`'s own rules are
+  place; it moves in silence only on from a note that was long enough, through the rest of that note's
+  written time and any rests after it (ringed and walked as in Play, `Walk.Phase.REST`,
+  `ListenRun.Rules.walkRests`), to the head of the next note, where it waits; a note started during
+  a rest counts at once. `ListenRun`'s own rules are
   one value (`ListenRun.Rules`: a session records it, a replay moves it): add a rule there.
   `DESIGN.md`, "Each note held for its length". A miss never shows
   silence: the heard note, or the listening dots, stands under the step waited on.

@@ -8,6 +8,7 @@ import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import org.junit.Assert.assertEquals
@@ -126,6 +127,15 @@ class ListenPathTest {
     }
 
     // ---- The length rule on sound (2026-11-11): the notes are 400, 400 and 1500 ms ----
+
+    @Test
+    fun `a rest in the tune is walked on sound, and the note after it counts`() {
+        // At 120 a minute the quarter rest lasts 500 ms; the 400 ms gap ends inside it, and that note counts at once.
+        val withRest = listOf(TuneNote(71, NoteLength.QUARTER), TuneRest(NoteLength.QUARTER), TuneNote(71, NoteLength.QUARTER), TuneNote(71, NoteLength.HALF))
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, withRest, Pulse(120))
+        assertTrue("the rest was walked", run.steps.any { it.walk?.phase == Walk.Phase.REST })
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY, 3 to StepMark.FIRST_TRY), run.marks)
+    }
 
     @Test
     fun `notes long enough at their tempo earn their stars`() {

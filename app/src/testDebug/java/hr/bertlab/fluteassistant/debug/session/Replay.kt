@@ -66,6 +66,7 @@ object Replay {
         "maxNeedMs" to Double.POSITIVE_INFINITY,
         "restartCuts" to 1.0, // 2026-11-13: a gapless restart cut the note walked
         "graceFrames" to 2.0, // 2026-11-13: the tracker's onsetGapFrames, 2 in every recording
+        "walkRests" to 0.0, // 2026-11-13: rests passed over, the animal jumped to the note after
     )
 
     /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */

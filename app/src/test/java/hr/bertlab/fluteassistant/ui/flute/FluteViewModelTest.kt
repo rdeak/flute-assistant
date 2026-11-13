@@ -1020,12 +1020,13 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `your turn waits on the first note, skipping a leading rest, and opens the microphone`() = runTest(dispatcher) {
+    fun `your turn waits on the first note, walking a leading rest, and opens the microphone`() = runTest(dispatcher) {
         val vm = listeningViewModel(TuneRest(QUARTER), q(60), q(62))
         assertTrue(vm.current.isListening)
         assertTrue(vm.current.isRunning)
         assertEquals(1, vm.current.listening?.index)
-        assertEquals(1, vm.current.litIndex)
+        assertEquals("the opening rest is ringed while the animal walks it, as in Play", 0, vm.current.litIndex)
+        assertEquals(0, vm.current.animalIndex)
         assertTrue(vm.current.marks.isEmpty())
         assertEquals(1, engine.subscriptions)
         assertEquals(2, logger.events("flute.listen").single()["notes"])
@@ -1176,6 +1177,21 @@ class FluteViewModelTest {
         val after = vm.current
         play(60) // the microphone is closed: nothing changes
         assertEquals(after, vm.current)
+    }
+
+    @Test
+    fun `a rest that ends the tune keeps listening until it is walked, then the run ends`() = runTest(dispatcher) {
+        // At 120 a minute the last quarter's written time ends at 500 ms and the quarter rest at 1000.
+        val vm = listeningViewModel(q(60), TuneRest(QUARTER))
+        play(60) // earned at once, then its sound ends: without the rest the run would end here
+        assertTrue(vm.current.isListening)
+        repeat(framesFor(900.0) - quarterFrames - NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
+        assertTrue("the rest is still walked", vm.current.isListening)
+        assertEquals(1, vm.current.litIndex)
+        repeat(framesFor(1100.0) - framesFor(900.0)) { emit(silent) }
+        assertFalse(vm.current.isListening)
+        assertEquals(1, logger.events("flute.listen_done").size)
+        assertTrue(logger.events("flute.listen_stop").isEmpty())
     }
 
     @Test
