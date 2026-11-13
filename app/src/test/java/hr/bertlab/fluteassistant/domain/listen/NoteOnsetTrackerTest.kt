@@ -311,9 +311,31 @@ class NoteOnsetTrackerTest {
     }
 
     @Test
-    fun `unsteady frames before the lock count as the note's start`() {
+    fun `frames of another note before the lock are not the note's start`() {
         val tracker = NoteOnsetTracker()
         val results = feed(tracker, List(2) { pitched(61) } + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a long wobble of other notes before the lock gives the note no head start`() {
+        // Nine counted frames between e and f sharp that never agree (a voice, a slide, a warbling wrong note), with
+        // no gap, then c: the c began with its own first frame. Before, all eleven frames were its lead, and a
+        // quarter was earned on its onset frame (the review of 2026-11-11).
+        val tracker = NoteOnsetTracker()
+        val wobble = List(9) { pitched(if (it % 2 == 0) 64 else 66) }
+        val results = feed(tracker, wobble + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertTrue("the wobble never locks", results.dropLast(1).all { it.onset == null })
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), results.last().onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, results.last().leadFrames)
+    }
+
+    @Test
+    fun `unsteady frames of the note itself before the lock are its start`() {
+        // An attack that wavers inside c before it settles is still the child's c.
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, listOf(pitched(60, cents = 40.0), pitched(60, cents = -40.0)) + List(ListenRules.LOCK_FRAMES) { pitched(60) })
         assertEquals(60, results.last().onset?.midi)
         assertEquals(ListenRules.LOCK_FRAMES + 1, results.last().leadFrames)
     }
@@ -372,5 +394,25 @@ class NoteOnsetTrackerTest {
         val results = feed(tracker, listOf(pitched(60), pitched(60, probability = 0.5), pitched(60), pitched(60)))
         assertEquals(60, results.last().onset?.midi)
         assertEquals(3, results.last().leadFrames)
+    }
+
+    @Test
+    fun `an attack that scoops into the note from over the halfway point is the note's start`() {
+        // The recorded session 2026-11-05_17-04-38, frame 199: a tongued g begins 55 cents sharp, nearer g sharp,
+        // and settles within three frames. That frame is the child's g; a frame a semitone or more away is not.
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, listOf(pitched(67, cents = 55.0), pitched(67, cents = 36.0), pitched(67, cents = 24.0), pitched(67, cents = 17.0)))
+        assertEquals(NoteOnsetTracker.Onset(67, fresh = true), results.last().onset)
+        assertEquals(3, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a slide down to the note counts only its last frames`() {
+        // e sliding to c in steps the tracker never locks: only the frames near c are c's.
+        val tracker = NoteOnsetTracker()
+        val slide = listOf(400.0, 320.0, 240.0, 160.0, 80.0, 40.0).map { pitched(60, cents = it) }
+        val results = feed(tracker, slide + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals("the frame 40 cents off and the two that locked it", ListenRules.LOCK_FRAMES, results.last().leadFrames)
     }
 }

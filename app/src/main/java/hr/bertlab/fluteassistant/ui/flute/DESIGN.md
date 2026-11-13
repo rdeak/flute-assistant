@@ -328,11 +328,21 @@ the recordings of 2026-11-05 showed it was the rule, not a slip: every half note
 metronome how long it lasts: `ListenRun` takes the `Pulse` the knob had when the run started (the knob ends a run) and
 walks each right note (`Walk`, on `Listening.walk`): from the moment its sound began, inside the first frame that
 heard it, whose hop counts in full, with the frames that locked it before the onset (`NoteOnsetTracker.Result.leadFrames`:
-two frames as a rule, after silence and after another note alike; none for a tongued restart of the same note), the
-animal steps to each click inside the note at the half beats Play puts them on
-(`Tune.playSteps`), with a hop, and the note is earned once it has sounded its written length less
-`ListenRun.LENGTH_SLACK` (one half beat: a quarter needs half a beat, a half note one and a half, a whole note three
-and a half; an eighth needs nothing past being heard), and never more than `ListenRun.MAX_NEED_MS`, 3 s: a whole note
+the frames in a row before the onset that sounded within `NEAR_CENTS` of the pitch that locked, two as a rule, after
+silence and after another note alike; none for a tongued restart of the same note; an attack that scoops into the note
+is the note's, as in the session `17-04-38`, whose g begins 55 cents sharp, and a wobble of other notes or a slide
+before it is not, which the second review of 2026-11-11 found counted: eleven frames of other notes had earned a
+quarter on its onset frame), the animal steps to each click inside the note at the half beats Play puts them on
+(`Tune.playSteps`), with a hop, and only to another place: a note beginning where the animal already stands is no hop
+(the user's rule of 2026-11-04 for Play, never two hops in one place; the first build hopped at the onset too, on
+the spot, 128 ms after landing there). What counts as the note sounding is every frame the tracker shows it and at
+most two more after the last such (`onsetGapFrames`, the frames a gap takes to be seen, so a note's thinning end still
+counts, as the recorded quarters need); the tracker holds a note on through loud frames with no pitch for most of a
+second (`HOLD_FRAMES`: a pause is not a blink), and that is not the note's time (the same review: air noise after
+128 ms of tone had earned a quarter), while a breathy stretch inside a note counts in full once the tone is back. The
+note is earned once it has sounded its written length less
+`ListenRun.LENGTH_SLACK` (three quarters of a beat since 2026-11-13, half a beat before: a quarter needs a quarter of a
+beat, a half note a beat and a quarter, a whole note three and a quarter; an eighth needs nothing past being heard), and never more than `ListenRun.MAX_NEED_MS`, 3 s: a whole note
 at 40 a minute would need 5.25 s in 4/4 and 10.5 s in 6/8, beyond a child's breath, and the run would wait on it until
 Stop (the final review found it; the user's "ok" to a recommended 3 s; swept as `maxNeedMs`). The animal still walks
 such a note's written time, and the next note takes it there at once. Time is the frames' own lengths added up (`PitchFrame.hopMs`,
@@ -342,9 +352,10 @@ half note earn every quarter before it and stop on it (played about 1 s of its 1
 beat earns the same; the final review's two measuring fixes (the lead after another note, the first frame in full)
 are what made the quarters pass, each a frame or two from the line. Those children followed no beat, so the number is
 to be swept again (`-Psweep=lengthSlack:...`) on the first sessions recorded with the walk, and changed only from them.
-A note stops (silence, an onset of another letter, or its own letter started again after a stop; an octave pop by a
-step and a slow sag into the next letter, the tracker's drift, are the same note going on, so a child blowing a long
-note out is never told it stopped) before it is long enough: it is cut short (`Walk.Phase.SHORT`, `flute.short`), the
+That sweep moved it (below, "The first runs with the walk").
+A note stops (silence, or an onset of another letter; an octave pop by a step, a slow sag into the next letter, the
+tracker's drift, and since 2026-11-13 its own letter started again with no gap, `ListenRun.Rules.restartCuts`, are the
+same note going on, so a child blowing a long note out is never told it stopped) before it is long enough: it is cut short (`Walk.Phase.SHORT`, `flute.short`), the
 animal stays on the click it reached, so the child sees how far the note got, the line says "🌬️ Hold it longer" /
 "🌬️ Drži notu dulje" (`advice_hold_longer`, `TunerAdvice.HOLD_LONGER`, under the microphone's advices and a held
 repeat, over "Check your fingers"; no fingering, the fingers were right; "drži notu" is the keys' own hint), and the
@@ -355,7 +366,10 @@ so the run will often stop at the first long note until the child slows to the a
 Any other note heard while a note cut short waits shows in the live bubble but is no wrong note: the child went on,
 and "Check your fingers" would be false; nor does the note written after a repeat that was heard and cut short forgive
 that repeat (`TuneCheck.forgiven` is for a repeat the phone never heard; forgiving this one would be "mark and move
-on"). While a note is walked its step is still the one waited on (`waiting`), so the live bubble under it shows the
+on"), and that repeat's own letter coming back by a step walks again: the run tells the check the step was begun
+(`TuneCheck.judge`'s `begun`, the walk standing there cut short; the one owner of that fact), since the note before
+it ended when the repeat began (before, such a note was ignored as that note's tail, and the run sat on "Hold it
+longer" while the child held the right note). While a note is walked its step is still the one waited on (`waiting`), so the live bubble under it shows the
 note being played, the phone saying it hears it, and a screen reader still hears "play this one": keep playing it. An earned note's written time is finished on the clicks, sound or not
 (`Walk.Phase.DONE`; its star shows, the ring stays with the animal, `waiting` is false), and then the animal hops to
 the next note and stands still there; a note begun in that last half beat is judged for the next step and takes the
@@ -371,7 +385,42 @@ note), `19-02-37` (the laptop's speaker) step 0, `17-03-03` unchanged. Tests: `L
 (`earn`, `stumble`), `NoteOnsetTrackerTest` (the lead), `ListenPathTest` (on sound, at 120 and at 40 a minute),
 `FluteViewModelTest` (the hops, `flute.held`, `flute.short`, the tempo read at the start), `FluteUiStateTest`,
 `FluteScreenTest` and `FluteSidewaysTest` (the line in both languages); `ReplayTest` (a session recorded before the
-walk replays pitch only, `ListenRun.LENGTH_OFF`, and the sweep).
+walk replays pitch only, and the sweeps). The run's own rules are one value, `ListenRun.Rules` (`lengthSlack`,
+`maxNeedMs`, `repeatAdviceFrames`, `finishFrames`, `restartCuts`), made like the tracker's: a session writes it down beside them,
+`Replay.recordedRunRules` reads it back (a rule a session does not name did not act on the phone:
+`Rules.PITCH_ONLY`, no slack to run out of, no longest hold, and a restart that cuts), and a sweep moves one by its name, the audio
+detected once (`Session.frames`) for every value. A session that recorded the walk (`walk,halfBeat,phase` in
+`frames.csv`) has it compared in the replay's diff, so "diff: none" also says the notes were earned and cut short on
+the phone's frames; `tools/session-report.py` draws ♪ where a right pitch began a note, ★ or ☆ where it was long
+enough and ✂ where it was cut short (an older table keeps the star at the onset, where it was earned then).
+
+The first runs with the walk (2026-11-12, issue #4's phone test: one child, twenty runs over a cable, a scale of whole
+notes and two tunes of quarters and half notes at 60, 80 and 100 a minute; the user: the notes took "much more time than
+when played back", the animal went off the screen on a long note, and the child is learning and was tired by the later
+runs). Every run replayed with no diff, so the rules did all of it, and three things changed on 2026-11-13. A child's
+breath dips about 10 dB for a moment inside a held note (the quietest 21 ms fell from 0.69 to 0.49 to 0.52, where a
+tongued stop in the runs of 2026-11-05 fell to 0.16 or under), which the tracker's `STOP_DROP` hears as a tongued stop:
+a whole note was cut and walked again from its head while the child never stopped, so an F needed 5.3 s of blowing for
+its 3 s and an E held 2.8 s was told "Hold it longer". Now a restart of the note walked with no gap goes on
+(`restartCuts` 0; only a gap, sound that ends, cuts a note), which also lets a half note tongued as two quarters
+count, a learner's slip the user asked to allow ("count in that the child is learning"). `STOP_DROP` itself stays: at
+0.2 the synthetic 40 ms tongue in a lively room (`ListenPathTest`) is no longer heard, so the tracker's repeats are
+untouched. The child played every length in proportion but at their own pace, about 85 a minute whatever the knob
+said: quarters 0.7 s and half notes 1.2 to 1.7 s at 60, where half a beat's slack needed 1.5 s and cut 5 of 12 half
+notes by 50 to 300 ms, just after the animal's second hop; the user picked three quarters of a beat (1.25 s, about one in twelve
+cut), and the four pinned sessions keep their marks. And the animal on a whole note's last beat after a whole note was
+past the phone's edge: the staff now follows it ("While the tune runs"). Not changed, at the user's word: 17 of the 52
+wrong notes were the right fingering played 50 to 70 cents sharp (the child's flute read +15 to +60 cents on every
+note, a headjoint pushed in or a hard blow), judged as the next semitone; the user kept exact semitones, so the fix
+is tuning the flute (the headjoint out a few millimetres, checked on the tuner tab), not a wider net. The other 35
+wrong notes were real. The flute was tuned on 2026-11-13, and it was not enough: the tuner's log shows steady A's at
+about +5 cents (15:14:30, 15:15:56 to 15:16:15) and, minutes apart on the same flute, at +25 to +40 (15:16:26 to 37,
+15:17:14 to 18), and the 18 runs after it (old build, every one "diff: none") played A at +31, G +24 and B +38, so 24
+of their 57 wrong notes were a B 46 to 66 cents sharp heard as C. The 12 runs on the new build after more tuning
+(15:47 to 15:57) still played G +31, A +34, B +42, the same shift on every note as a headjoint about 7 mm too far in
+would give, and louder was sharper still. They also showed why a wider net is wrong on such a flute: a G fingered as
+F# came out 52 to 72 cents under the G, so accepting 70 cents either way would have starred real wrong notes. The
+flute's tuning is the fix. `14-59-04` and `14-59-30` are pinned locally (whole notes with the breath dips).
 
 The room under the stage (since 2026-11-10, the user's "3C" of four drawn options: A as it was, B a line to start,
 C this, D the fingering under every note; the page is https://claude.ai/artifact/PbsKoRyeJvf17VzucDwKDz). While the tune
@@ -437,9 +486,9 @@ past a bar line inside a tied note), like the metronome's beat bubbles: a half n
 29 dp apart in 4/4, a whole note four, a quarter in 6/8 two places 14.5 apart, an eighth only its
 head; it slides to each new place in `FLASH_DURATION_MS` with `FastOutSlowInEasing` while it hops,
 so it lands as the hop ends, across bar lines and breaths too. In Your turn it walks the note the child
-plays the same way and then goes on to the next, and `ListenRun` says when it hops (`ListenRun.Step.hop`: a note's
-sound beginning, a click inside the note walked, the move to the next note; `beatPulse` goes up on each and at the
-start; "Each note held for its length" above). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
+plays the same way and then goes on to the next, and `ListenRun` says when it hops (`ListenRun.Step.hop`: a click
+inside the note walked, the move to the next note, back to the head of a note played again, never a note beginning
+where it stands; `beatPulse` goes up on each and at the start; "Each note held for its length" above). It is one layer over the `LazyRow`, the size of the knob (`CORNER_BUTTON`), its middle
 `StaffGeometry.ANIMAL_Y` (27 dp, unscaled like the knob: the knob's middle until the knob was lifted
 8 dp on 2026-11-10, the animal's line staying where its hop keeps inside the box) from the box's top,
 `ANIMAL_SIZE` (24 dp) times the scale tall, placed in `Modifier.offset {}` from the row's
@@ -449,7 +498,10 @@ only, so a staff the child drags back hides it rather than sliding it over the k
 stems of the notes from f² up it stands on the stems' tops, and over c³ it touches the top edge of
 the head (`StaffGeometryTest` checks every other head stays under it). The staff still scrolls on
 at every new note (`Bars.anchor`, below), so in a long tune the staff moves under the animal at
-each note and the animal steps on along a long note. Under the names a marks row
+each note and the animal steps on along a long note; and since 2026-11-13 on from there by just enough to keep the
+animal's box in the row (`StaffGeometry.followScroll`, keyed on that amount, so hops inside the row scroll nothing):
+on a whole note after a whole note its last beat lay past a phone's edge (the child's report of 2026-11-12), in Play and
+Your turn alike, and the note before then slides partly out. Under the names a marks row
 (`StaffGeometry.MARKS_TOP`, 26 dp, in the first beat's room so it stands under the head and the
 name; the staff grew 16 dp for it) holds, per step, the ⭐ it earned (`STAR_EMOJI`, faint at
 `RETRY_STAR_ALPHA` after a retry, both the notes game's) or the heard note's bubble (`HeardBubble`:

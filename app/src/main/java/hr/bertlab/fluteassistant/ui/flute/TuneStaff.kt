@@ -33,7 +33,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -53,6 +56,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -136,9 +140,10 @@ fun tuneStaffHeight(scale: Float): Dp = (StaffGeometry.TOTAL_HEIGHT * scale).dp
 
 /**
  * The knob's animal while the tune runs: over which step it stands and how many half beats into it
- * ([halfBeat], the last click's place in Play, 0 in Your turn), which animal, its hop ([flash], 1
- * just after a beat or a landing), and whether it waits for the child to play that step (Your
- * turn) or runs with the tune (Play).
+ * ([halfBeat], the last click's place: in Play the tune's, in Your turn the walk's along the note
+ * the child plays, 0 while it waits at a head), which animal, its hop ([flash], 1 just after a beat
+ * or a landing), and whether it waits for the child to play that step (Your turn) or runs with the
+ * tune (Play).
  */
 data class StaffAnimal(
     val index: Int,
@@ -192,7 +197,9 @@ private class StaffInk(
  * resting size (the geometry is one table in dp, so the running staff is one multiplication).
  * The staff follows the newest step and the lit one, keeping the last note before the lit one in
  * view ([Bars.anchor]: the note just played stays on the staff with what it earned, and the lit
- * step is the second thing in view), and the child can drag it back to look. The row's place is
+ * step is the second thing in view), and on from there by as much as the walking [animal] needs to
+ * stay in view ([StaffGeometry.followScroll]: a whole note's last beat after a whole note would be
+ * past a phone's edge); the child can drag it back to look. The row's place is
  * [listState], which a caller that draws the staff in more than one place (a phone on its side
  * lays Play and a run out differently) keeps above them, so the staff does not scroll in again
  * from its start each time it moves.
@@ -368,15 +375,29 @@ private fun TuneMarks(
     val notes = tune.count { it is TuneNote }
     val description = pluralStringResource(R.plurals.flute_tune_line, notes, notes)
     val lineMarks = remember(tune, signature) { Bars.write(tune, signature) }
+    // Where each mark starts along the row, in dp at rest, from the end of the row's start padding.
+    val starts = remember(lineMarks) { lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) } }
     // The last note before the lit step (so the note just played stays in view with its mark and
     // the lit step comes second), else the lit step, else the staff's end (a bar line, once a bar is full).
     val target = Bars.anchor(lineMarks, tune, litIndex)
+    val density = LocalDensity.current
+    var rowWidth by remember { mutableFloatStateOf(0f) }
+    // On from there by as much as the walking animal needs to stay in the row: 0 while it is in view, so its hops
+    // inside the row scroll nothing (a staff the child dragged back stays until the next note, as before).
+    val follow = animal?.let { animalX(it, lineMarks, starts) }
+        ?.takeIf { rowWidth > 0f }
+        ?.let { StaffGeometry.followScroll(starts[target], it, rowWidth, s) } ?: 0f
     // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
-    LaunchedEffect(target, lineMarks) {
-        listState.animateScrollToItem(target)
+    LaunchedEffect(target, lineMarks, follow) {
+        listState.animateScrollToItem(target, with(density) { follow.dp.roundToPx() })
     }
     // The row starts a little before the first step, so a ring round it is never cut off.
-    Box(Modifier.padding(start = (StaffGeometry.NOTES_CLIP * s).dp).fillMaxSize()) {
+    Box(
+        Modifier
+            .padding(start = (StaffGeometry.NOTES_CLIP * s).dp)
+            .fillMaxSize()
+            .onSizeChanged { rowWidth = with(density) { it.width.toDp().value } },
+    ) {
         LazyRow(
             state = listState,
             modifier = Modifier
@@ -408,8 +429,15 @@ private fun TuneMarks(
                 }
             }
         }
-        if (animal != null) WalkingAnimal(animal, lineMarks, listState)
+        if (animal != null) WalkingAnimal(animal, lineMarks, starts, listState)
     }
+}
+
+/** Where [animal] stands along the row, in dp at rest from its first mark ([starts]); null when its step is not on the line. */
+private fun animalX(animal: StaffAnimal, lineMarks: List<LineMark>, starts: List<Float>): Float? {
+    val step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == animal.index }
+    if (step < 0) return null
+    return starts[step] + StaffGeometry.beatX((lineMarks[step] as LineMark.Step).parts, animal.halfBeat)
 }
 
 /**
@@ -426,13 +454,9 @@ private fun TuneMarks(
  * text, and silent: a screen reader hears "play this one" on the step itself.
  */
 @Composable
-private fun WalkingAnimal(animal: StaffAnimal, lineMarks: List<LineMark>, listState: LazyListState) {
+private fun WalkingAnimal(animal: StaffAnimal, lineMarks: List<LineMark>, starts: List<Float>, listState: LazyListState) {
     val s = LocalStaffScale.current
-    // Where each mark starts along the row, in dp at rest, from the end of the row's start padding.
-    val starts = remember(lineMarks) { lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) } }
-    val step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == animal.index }
-    if (step < 0) return
-    val target = starts[step] + StaffGeometry.beatX((lineMarks[step] as LineMark.Step).parts, animal.halfBeat)
+    val target = animalX(animal, lineMarks, starts) ?: return
     val x = remember { Animatable(target) }
     LaunchedEffect(target) {
         x.animateTo(target, tween(FLASH_DURATION_MS, easing = FastOutSlowInEasing))

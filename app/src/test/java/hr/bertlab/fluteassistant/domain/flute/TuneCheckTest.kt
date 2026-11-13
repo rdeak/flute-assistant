@@ -184,9 +184,23 @@ class TuneCheckTest {
         check.earn()
         assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
         check.stumble()
-        assertEquals(Verdict.WRONG, check.judge(62, fresh = false))
+        assertEquals(Verdict.WRONG, check.judge(62, fresh = false, begun = true))
         assertTrue(check.forgiven.isEmpty())
         assertEquals(1, check.index)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), check.marks)
+    }
+
+    @Test
+    fun `a repeat begun and cut short is played again by a step back to it`() {
+        // Written c c d: the second c was tongued (begun), a finger slipped to g, and the c came back by a step.
+        // That c is the child returning to the note waited on, not the tail of the first c.
+        val check = TuneCheck(listOf(q(60), q(60), q(62)))
+        check.judge(60, fresh = true)
+        check.earn()
+        assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        check.stumble()
+        assertEquals(Verdict.WRONG, check.judge(67, fresh = false, begun = true))
+        assertEquals(Verdict.RETRY, check.judge(60, fresh = false, begun = true))
+        assertEquals("not begun, the same step back is the first c's tail", Verdict.IGNORED, check.judge(60, fresh = false))
     }
 }

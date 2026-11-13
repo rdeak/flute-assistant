@@ -8,6 +8,7 @@ import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -134,16 +135,16 @@ class ListenPathTest {
     }
 
     @Test
-    fun `notes too short for a slow tempo are played again for the first step`() {
-        // At 40 a minute a quarter needs 750 ms: both 400 ms notes are cut short for the first step, and the
-        // 1500 ms one, played for it a third time, earns it a faint star.
+    fun `a note too short for a slow tempo is cut short and waited on`() {
+        // At 40 a minute a quarter needs 375 ms and the half note 1875: the quarters are long enough, and the 1500 ms
+        // note is cut short for the half note when its sound ends.
         val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(40))
-        assertEquals(mapOf(0 to StepMark.RETRY), run.marks)
-        assertEquals(run.heard.toString(), 3, run.heard.size)
-        assertTrue(run.heard.toString(), run.heard.all { it.index == 0 })
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), run.marks)
+        assertEquals(Walk.Phase.SHORT, run.steps.last().walk?.phase)
+        assertEquals(2, run.steps.last().walk?.index)
     }
 
     /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules], pitch only. */
     private fun listen(samples: DoubleArray, rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules()): ListenPath.Run =
-        ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(60), rules, lengthSlack = ListenRun.LENGTH_OFF)
+        ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(60), rules, run = ListenRun.Rules.PITCH_ONLY)
 }

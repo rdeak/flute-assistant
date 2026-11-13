@@ -92,7 +92,7 @@ class AudioRecordTunerEngine @Inject constructor(
                         probability = estimate?.probability ?: 0.0,
                         level = FrameLevels.level(window),
                         minLevel = FrameLevels.minLevel(window, HOP_SIZE),
-                        hopMs = HOP_SIZE * 1000.0 / record.sampleRate,
+                        hopMs = PitchFrame.hopMsAt(record.sampleRate, read), // the window advanced by what was read
                     ),
                 )
             }
@@ -151,7 +151,7 @@ class AudioRecordTunerEngine @Inject constructor(
         /** Samples the detector sees at once; public so the replay of a recorded session frames audio the same way. */
         const val WINDOW_SIZE = 4096
         /** Samples read, and the window advanced, per frame: about 43 ms at 48 kHz. */
-        const val HOP_SIZE = 2048
+        const val HOP_SIZE = PitchFrame.HOP_SAMPLES
         private val PREFERRED_SAMPLE_RATES = intArrayOf(48_000, 44_100)
     }
 }

@@ -9,7 +9,8 @@ reads the folder's session.log and frames.csv (a debug build wrote them; the des
 docs/superpowers/specs/2026-11-05-flute-listen-session-recorder-design.md) and writes
 report.html next to them: the facts, the tune with the marks it earned, every rule in force,
 and three lanes over one time axis, loudness (level and minLevel, the frames a note was
-sounding shaded, onsets and verdicts), pitch (what was detected against the note waited on,
+sounding shaded, onsets and verdicts, and since 2026-11-11 where a note was long enough or cut
+short), pitch (what was detected against the note waited on,
 the sounding note as a step line) and the decision strip with what the child saw under it;
 then the log's events and the whole frames table. Hover the picture for a frame's row.
 Standard library only. The audio is not needed.
@@ -26,6 +27,11 @@ NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
 DECISIONS = ["SILENT", "LOW_PROBABILITY", "FAINT", "UNSTEADY", "SHOWN", "IGNORED"]
 MARK_GLYPH = {"right": "★", "retry": "☆", "wrong": "✕", "ignored": "·"}
 MARK_WORD = {"right": "right, a star", "retry": "right after a stumble, a faint star", "wrong": "wrong", "ignored": "ignored"}
+# Since 2026-11-11 a right pitch only begins a note: the star comes where the note was long enough (the walk's
+# phase turns DONE), and a note that stopped first is cut short. A table from before has no walk columns, and
+# there a right pitch was the star.
+PITCH_GLYPH = {"right": "♪", "retry": "♪"}
+PITCH_WORD = {"right": "the right pitch: the note begins", "retry": "the right pitch after a stumble: the note begins"}
 
 
 def note_name(midi):
@@ -213,6 +219,7 @@ def build(session, folder):
     gate = fnum(session["rules"].get("gate"), 0.85)
     tune = tune_items(session)
     marks = marks_of(session["end"].get("marks"))
+    has_walk = bool(rows) and "phase" in rows[0]
 
     def x_of(frame):
         return left + frame * HOP / rate * px
@@ -246,7 +253,7 @@ def build(session, folder):
     c_top = b_top + b_h + 52
     strip_h = 14
     row_h = 18
-    c_h = strip_h + 4 + 3 * row_h
+    c_h = strip_h + 4 + 4 * row_h
     height = c_top + c_h + 40
 
     w('<svg id="timeline" width="%d" height="%d" viewBox="0 0 %d %d" role="img" aria-label="The run on a timeline">' % (width, height, width, height))
@@ -296,7 +303,22 @@ def build(session, folder):
             v = r["verdict"]
             if v:
                 color = {"right": "var(--good)", "retry": "var(--warn)", "wrong": "var(--critical)"}.get(v, "var(--muted)")
-                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>%s</title>%s</text>' % (x, y - 12, color, html.escape(MARK_WORD.get(v, v)), MARK_GLYPH.get(v, v)))
+                glyph = (PITCH_GLYPH if has_walk else {}).get(v, MARK_GLYPH.get(v, v))
+                word = (PITCH_WORD if has_walk else {}).get(v, MARK_WORD.get(v, v))
+                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>%s</title>%s</text>' % (x, y - 12, color, html.escape(word), glyph))
+    # the walk: a star on the frame a note was long enough, a mark on the frame one was cut short
+    before = (None, None)
+    for i, r in enumerate(rows):
+        now = (r.get("walk") or None, r.get("phase") or None)
+        if now != before and now[1] in ("DONE", "SHORT") and (before[0] != now[0] or before[1] != now[1]):
+            x = x_of(i + 1)
+            y = ya(max(0.0, min(1.0, fnum(r["level"], 0.0))))
+            if now[1] == "DONE":
+                faint = marks.get(int(now[0])) == "RETRY"
+                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s was long enough: %s</title>%s</text>' % (x, y - 12, "var(--warn)" if faint else "var(--good)", now[0], "a faint star" if faint else "a star", "☆" if faint else "★"))
+            else:
+                w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was cut short: hold it longer</title>✂</text>' % (x, y - 12, now[0]))
+        before = now
 
     # lane B
     w('<text x="%d" y="%d" fill="var(--ink-2)" font-size="12" font-weight="600">Pitch</text>' % (left, b_top - 8))
@@ -356,6 +378,7 @@ def build(session, folder):
         strip(start, n, cur)
     labels = [("heardNow", "heard now", lambda r: note_name(int(r["heardNow"])) if r["heardNow"] else ""),
               ("advice", "advice", lambda r: r["advice"].replace("_", " ").lower() if r["advice"] else ""),
+              ("phase", "walk", lambda r: ("step %s +%s %s" % (r["walk"], r["halfBeat"], r["phase"].lower())) if r.get("phase") else ""),
               ("finishing", "finishing", lambda r: "finishing" if r["finishing"] == "true" else "")]
     for k, (key, title, text_of) in enumerate(labels):
         y = c_top + strip_h + 4 + k * row_h
@@ -410,7 +433,7 @@ def build(session, folder):
         p("<div class=\"step\"><span class=\"m\" style=\"color:%s\" title=\"%s\">%s</span><span class=\"n\">%s</span><span class=\"l\">%d %s</span></div>" % (color, html.escape(m or "no mark"), glyph, html.escape(label), i, html.escape(length.lower())))
     p("</div><p class=\"note\">★ a star, first try; ☆ a faint star, after a stumble (a forgiven repeat too); · no mark.</p></div>")
     p("<h2>Timeline</h2><div class=\"card\"><div class=\"scroll\">%s<div id=\"tip\" class=\"tip\"></div></div>" % svg)
-    p("<div class=\"legend\"><span><i style=\"background:var(--s1)\"></i>level</span><span><i style=\"background:var(--s2)\"></i>minLevel, the quietest stretch of the hop</span><span><i style=\"background:var(--muted)\"></i>floor the tracker holds</span><span><i class=\"wash\" style=\"background:var(--s1)\"></i>a note sounding</span><span><i class=\"dot\" style=\"background:var(--s1)\"></i>fresh onset</span><span><i class=\"dot\" style=\"border:2px solid var(--s1)\"></i>onset by a step</span><span>★ right &nbsp;☆ retry &nbsp;✕ wrong &nbsp;· ignored</span></div>")
+    p("<div class=\"legend\"><span><i style=\"background:var(--s1)\"></i>level</span><span><i style=\"background:var(--s2)\"></i>minLevel, the quietest stretch of the hop</span><span><i style=\"background:var(--muted)\"></i>floor the tracker holds</span><span><i class=\"wash\" style=\"background:var(--s1)\"></i>a note sounding</span><span><i class=\"dot\" style=\"background:var(--s1)\"></i>fresh onset</span><span><i class=\"dot\" style=\"border:2px solid var(--s1)\"></i>onset by a step</span><span>%s</span></div>" % ("♪ right pitch, the note begins &nbsp;★ long enough &nbsp;☆ long enough after a stumble &nbsp;✂ cut short &nbsp;✕ wrong &nbsp;· ignored" if has_walk else "★ right &nbsp;☆ retry &nbsp;✕ wrong &nbsp;· ignored"))
     p("<div class=\"legend\"><span><i class=\"dot\" style=\"background:var(--s1)\"></i>detected pitch (faint under the gate %.2f)</span><span><i style=\"background:var(--s3)\"></i>sounding note</span><span><i class=\"sw\" style=\"background:var(--band)\"></i>the note waited on</span></div>" % gate)
     p("<div class=\"legend\">" + "".join("<span><i class=\"sw\" style=\"background:%s\"></i>%s</span>" % (colors[d], d.replace("_", " ").lower()) for d in DECISIONS) + "</div>")
     p("</div>")

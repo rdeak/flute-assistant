@@ -37,9 +37,10 @@ data class FluteUiState(
     /** What "Your turn" shows while the microphone is open and the child plays the tune; null otherwise. */
     val listening: Listening? = null,
     /**
-     * Goes up by one on every click while the tune plays back, and on every step the animal hops
-     * to while the flute listens; never reset, only its changes key the animal's hop (like
-     * `MetronomeUiState.beatPulse`).
+     * Goes up by one on every click while the tune plays back, and on every hop the run reports
+     * while the flute listens (`ListenRun.Step.hop`: a click inside the note the child plays, the
+     * move to the next note, back to the head of a note played again; never two in one place);
+     * never reset, only its changes key the animal's hop (like `MetronomeUiState.beatPulse`).
      */
     val beatPulse: Long = 0L,
     /** What each step earned in the last "Your turn", by its index in [tune]; cleared by a new run and by any change to the tune. */

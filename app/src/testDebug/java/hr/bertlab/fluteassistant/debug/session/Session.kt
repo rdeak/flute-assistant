@@ -12,6 +12,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
@@ -40,7 +41,12 @@ class Session(
     val pin: Map<Int, StepMark>?,
     /** The metronome's pulse the tune was checked at (`session.pulse`); 60 in 4/4 when the log has none. */
     val pulse: Pulse = Pulse(60),
+    /** Whether `frames.csv` has the walk's columns (since 2026-11-11): only then do the [rows] say where the animal was. */
+    val recordsWalk: Boolean = false,
 ) {
+    /** The [audio] as the engine frames it, detected once however many rules it is then replayed under. */
+    val frames: ListenPath.Frames by lazy { ListenPath.frames(audio.samples, audio.sampleRate) }
+
     companion object {
         private val HEADER_EVENTS = setOf("session.start", "session.rules", "session.pulse", "session.tune", "pin")
 
@@ -74,9 +80,11 @@ class Session(
                     else -> if (event !in HEADER_EVENTS) events += line
                 }
             }
+            val audio = WavFile.read(File(dir, FileSessionRecorder.AUDIO))
+            val (rows, recordsWalk) = rows(File(dir, FileSessionRecorder.FRAMES), audio.sampleRate)
             return Session(
-                dir, tune.values.toList(), WavFile.read(File(dir, FileSessionRecorder.AUDIO)), floor,
-                rows(File(dir, FileSessionRecorder.FRAMES)), events, rules, facts, pin, pulse,
+                dir, tune.values.toList(), audio, floor,
+                rows, events, rules, facts, pin, pulse, recordsWalk,
             )
         }
 
@@ -90,18 +98,28 @@ class Session(
         fun spell(marks: Map<Int, StepMark>): String =
             marks.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value.name}" }
 
-        private fun rows(csv: File): List<ListenPath.Step> {
-            if (!csv.isFile) return emptyList() // a pinned folder may keep only the audio and the log
+        /** The rows of [csv], and whether it has the walk's columns (a table from before 2026-11-11 ends at `floor`). */
+        private fun rows(csv: File, rate: Int): Pair<List<ListenPath.Step>, Boolean> {
+            if (!csv.isFile) return emptyList<ListenPath.Step>() to false // a pinned folder may keep only the audio and the log
             val lines = csv.readLines().filter { it.isNotBlank() }
-            if (lines.isEmpty()) return emptyList()
+            if (lines.isEmpty()) return emptyList<ListenPath.Step>() to false
             val columns = lines.first().split(',').withIndex().associate { it.value to it.index }
+            val recordsWalk = "phase" in columns
             return lines.drop(1).map { line ->
                 val cells = line.split(',')
                 fun cell(name: String) = cells.getOrNull(columns.getValue(name)).orEmpty()
                 val sounding = cell("sounding").toIntOrNull()
+                val walk = if (recordsWalk && cell("phase").isNotEmpty()) {
+                    Walk(cell("walk").toInt(), cell("halfBeat").toInt(), Walk.Phase.valueOf(cell("phase")))
+                } else {
+                    null
+                }
                 ListenPath.Step(
                     frame = cell("frame").toInt(),
-                    pitch = PitchFrame(cell("f").toDoubleOrNull(), cell("p").toDouble(), cell("level").toFloat(), cell("minLevel").toFloat()),
+                    pitch = PitchFrame(
+                        cell("f").toDoubleOrNull(), cell("p").toDouble(), cell("level").toFloat(), cell("minLevel").toFloat(),
+                        PitchFrame.hopMsAt(rate),
+                    ),
                     decision = FrameDecision.valueOf(cell("decision")),
                     sounding = sounding,
                     onset = when (cell("onset")) {
@@ -113,8 +131,9 @@ class Session(
                     verdict = cell("verdict").takeIf { it.isNotEmpty() }?.let { Verdict.valueOf(it.uppercase(Locale.ROOT)) },
                     waited = cell("waited").toIntOrNull(),
                     expected = cell("expected").toIntOrNull(),
+                    walk = walk,
                 )
-            }
+            } to recordsWalk
         }
     }
 }

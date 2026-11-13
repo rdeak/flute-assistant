@@ -91,6 +91,26 @@ class StaffGeometryTest {
         assertEquals(StaffGeometry.BEAT_WIDTH + StaffGeometry.BAR_SLOT + StaffGeometry.HEAD_X, StaffGeometry.beatX(tied, 9))
     }
 
+    /**
+     * The child's report of 2026-11-12: on a whole note after a whole note the animal walked off the staff's right
+     * edge. The staff keeps the note before the lit one at its left ([Bars.anchor]); that leaves the lit whole note's
+     * last beat past the row on a phone, so the staff scrolls on by just as much as the animal needs.
+     */
+    @Test
+    fun `the staff scrolls on just enough to keep the walking animal in its row`() {
+        val s = RunningStaffScale
+        val whole = listOf(StepPart.Length(NoteLength.WHOLE))
+        val start = StaffGeometry.slotWidth(NoteLength.WHOLE) + StaffGeometry.BAR_SLOT // the second whole note
+        val lastBeat = start + StaffGeometry.beatX(whole, 6)
+        val row = 300f
+        val scroll = StaffGeometry.followScroll(anchorStart = 0f, animalX = lastBeat, rowWidth = row, scale = s)
+        assertTrue("the last beat is past the row: $scroll", scroll > 0f)
+        val middle = (StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP) * s + lastBeat * s - scroll
+        assertEquals("the animal's box ends at the row's end", row, middle + StaffGeometry.CORNER_BUTTON / 2, 0.01f)
+        assertEquals("its head needs no scroll", 0f, StaffGeometry.followScroll(0f, start + StaffGeometry.beatX(whole, 0), row, s))
+        assertEquals("at rest there is room", 0f, StaffGeometry.followScroll(0f, lastBeat, row, 1f))
+    }
+
     @Test
     fun `a mark's room is what the staff draws for it`() {
         val tied = LineMark.Step(0, listOf(StepPart.Length(NoteLength.QUARTER), LineMark.BarLine, StepPart.Length(NoteLength.HALF)))

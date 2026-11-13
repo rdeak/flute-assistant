@@ -30,8 +30,8 @@ enum class Verdict { RIGHT, RETRY, IGNORED, WRONG }
  *   itself, and the heard note is the one written after it, the repeat was slurred on to or
  *   skipped, which the phone cannot tell apart, so it gets [StepMark.RETRY] and the heard note is
  *   judged for the step after it (several repeats in a row the same way), rather than the run
- *   stopping on a note the phone may not be able to hear. A repeat heard and then cut short is
- *   waited on like any note cut short.
+ *   stopping on a note the phone may not be able to hear. A repeat begun and then cut short is
+ *   waited on like any note cut short ([judge]'s `begun`).
  *
  * Waiting for the right note is what keeps every mark under the note it is about: a skipped or
  * extra note cannot shift the ones after it. Nothing here is timed: [ListenRun] is.
@@ -52,8 +52,6 @@ class TuneCheck(private val tune: List<TuneItem>) {
 
     /** Whether a wrong note, or a note cut short, has been heard for the step waited on. */
     private var stumbled = false
-    /** Whether the step waited on was heard at its right pitch (and is being walked, or was cut short): no repeat to forgive. */
-    private var heardRight = false
     /** The written note of the step earned last; null before the first. */
     var previous: Int? = null
         private set
@@ -65,18 +63,23 @@ class TuneCheck(private val tune: List<TuneItem>) {
      * Judges the note [heard] (MIDI) against the step waited on; [fresh] says it began after a
      * gap rather than by a step from the note sounding before it. A right one is not yet earned
      * ([earn]); repeats it forgives are, at once.
+     *
+     * [begun] says the step waited on was already begun at its right pitch and cut short, which
+     * [ListenRun] knows (its walk stands there). Then a written repeat is no longer one the phone
+     * could not hear: the note written after it does not forgive it (the user's "wait",
+     * 2026-11-11), and its own letter coming back by a step is the child returning to it, not the
+     * tail of the note before, which ended when the repeat began.
      */
-    fun judge(heard: Int, fresh: Boolean): Verdict {
+    fun judge(heard: Int, fresh: Boolean, begun: Boolean = false): Verdict {
         forgiven = emptyList()
         var current = index ?: return Verdict.IGNORED
         var expected = (tune[current] as TuneNote).midi
         val last = previous
-        if (last != null && sameLetter(heard, last) && !(fresh && sameLetter(heard, expected))) {
+        if (last != null && sameLetter(heard, last) && !((fresh || begun) && sameLetter(heard, expected))) {
             return Verdict.IGNORED
         }
-        // Repeats of the note just judged that were not heard before the note after them: forgiven. One that was
-        // heard and then cut short is no such repeat: the run waits for it (the user's "wait", 2026-11-11).
-        if (!sameLetter(heard, expected) && last != null && sameLetter(expected, last) && !heardRight) {
+        // Repeats of the note just judged that were not heard before the note after them: forgiven.
+        if (!sameLetter(heard, expected) && last != null && sameLetter(expected, last) && !begun) {
             val repeats = mutableListOf<Int>()
             var after: Int? = current
             while (after != null && sameLetter((tune[after] as TuneNote).midi, last)) {
@@ -96,7 +99,6 @@ class TuneCheck(private val tune: List<TuneItem>) {
             stumbled = true
             return Verdict.WRONG
         }
-        heardRight = true
         return if (stumbled) Verdict.RETRY else Verdict.RIGHT
     }
 
@@ -110,7 +112,6 @@ class TuneCheck(private val tune: List<TuneItem>) {
         earned[current] = mark
         previous = (tune[current] as TuneNote).midi
         stumbled = false
-        heardRight = false
         index = nextNoteFrom(current + 1)
         return mark
     }

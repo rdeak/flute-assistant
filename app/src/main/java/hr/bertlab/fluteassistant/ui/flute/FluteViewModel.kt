@@ -460,8 +460,8 @@ class FluteViewModel @Inject constructor(
         step.short?.let { logger.d(LogTags.FLUTE, "flute.short", "index" to it.index, "heldMs" to it.heldMs, "needMs" to it.needMs) }
         step.held?.let { logger.d(LogTags.FLUTE, "flute.held", "index" to it.index, "heldMs" to it.heldMs) }
         _state.update {
-            // A step earned (or a repeat forgiven): its mark shows. The animal hops when the run says: a note began, a
-            // click inside the note it walks, or it went on to the next note.
+            // A step earned (or a repeat forgiven): its mark shows. The animal hops when the run says, to another
+            // place: a click inside the note it walks, the next note, or back to the head of a note played again.
             val marks = if (step.advanced || step.forgiven.isNotEmpty()) run.marks.toMap() else it.marks
             it.copy(listening = listening, marks = marks, beatPulse = if (step.hop) it.beatPulse + 1 else it.beatPulse)
         }

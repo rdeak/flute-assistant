@@ -12,6 +12,9 @@ import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
@@ -52,15 +55,15 @@ class ReplayTest {
         samples: FloatArray = this.samples,
         rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
         pulse: Pulse = Pulse(90),
-        lengthSlack: Double = ListenRun.LENGTH_SLACK,
+        run: ListenRun.Rules = ListenRun.Rules(),
     ): File {
-        val run = ListenPath.run(samples, rate, tune, pulse, rules, lengthSlack = lengthSlack)
+        val run = ListenPath.run(samples, rate, tune, pulse, rules, run = run)
         val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
         r.start(tune, pulse, floor = null)
         r.opened(rate, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
-            r.frame(ListenFrame(step.pitch, step.decision, step.sounding, step.onset, step.floor, step.verdict, step.waited, step.expected, null, TunerAdvice.NONE, false, false, Hearing.CLEAR))
+            r.frame(ListenFrame(step.pitch, step.decision, step.sounding, step.onset, step.floor, step.verdict, step.waited, step.expected, null, TunerAdvice.NONE, false, false, Hearing.CLEAR, step.walk))
         }
         repeat(extraHops) { r.samples(FloatArray(hop), hop) }
         r.end(run.marks)
@@ -148,25 +151,27 @@ class ReplayTest {
     }
 
     /**
-     * A session recorded before 2026-11-11 names no `lengthSlack`: its phone checked pitch only, so its replay does
-     * too, and the report says what the length rule makes of it. Here at 40 a minute, where a quarter needs 750 ms
-     * and the notes are 400, 400 and 1500.
+     * A session recorded before 2026-11-11 names no `lengthSlack` (nor `restartCuts`): its phone checked pitch only, so
+     * its replay does too, and the report says what the length rule makes of it. Here at 40 a minute, where a quarter
+     * needs 375 ms and the half note 1875, and the notes are 400, 400 and 1500.
      */
     @Test
     fun `a session without lengthSlack replays pitch only, and the report adds the length rule`() {
-        val dir = recorded(pulse = Pulse(40), lengthSlack = ListenRun.LENGTH_OFF)
+        val dir = recorded(pulse = Pulse(40), run = ListenRun.Rules.PITCH_ONLY)
         val log = File(dir, "session.log")
-        log.writeText(log.readText().replace(" lengthSlack=1.0", "")) // as a build before the length rule wrote it
+        // As a build before the length rule wrote it.
+        log.writeText(log.readText().replace(Regex(" (lengthSlack|restartCuts)=[^ \n]*"), ""))
         val session = Session.load(dir)
         assertEquals(Pulse(40), session.pulse)
-        assertEquals(ListenRun.LENGTH_OFF, Replay.recordedLengthSlack(session), 0.0)
+        assertEquals(ListenRun.Rules.PITCH_ONLY, Replay.recordedRunRules(session).copy(maxNeedMs = Double.POSITIVE_INFINITY))
+        assertEquals("a rule the line names is the phone's", 3000.0, Replay.recordedRunRules(session).maxNeedMs, 0.0)
         val report = Replay.report(session)
         val then = report.substringBefore("today's rules")
         assertTrue(report, then.contains("diff: none"))
         assertTrue(report, then.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
-        assertTrue(report, report.contains("today's rules differ: lengthSlack=1.0 (recorded 8.0)"))
+        assertTrue(report, report.contains("today's rules differ: lengthSlack=1.5 (recorded none) restartCuts=0 (recorded none)"))
         val now = report.substringAfter("today's rules").substringBefore("phone:")
-        assertFalse(report, now.contains("1:FIRST_TRY"))
+        assertTrue(report, now.contains("marks=0:FIRST_TRY,1:FIRST_TRY\n"))
     }
 
     @Test
@@ -174,24 +179,75 @@ class ReplayTest {
         val out = Replay.sweep(Session.load(recorded(pulse = Pulse(60))), "lengthSlack:0,8")
         val lines = out.lines().filter { it.startsWith("lengthSlack=") }
         assertEquals(out, 2, lines.size)
-        // 0: a quarter needs all of its 1000 ms, so only the long note earns the first step.
-        assertTrue(lines[0], lines[0].startsWith("lengthSlack=0 ") && lines[0].endsWith("marks=0:RETRY"))
+        // 0: a quarter needs all of its 1000 ms. The tongued stops do not cut it ([ListenRun.Rules.restartCuts]): the
+        // three notes walk as one, which the third makes long enough for the first step, and nothing is left for the others.
+        assertTrue(lines[0], lines[0].startsWith("lengthSlack=0 heard=71,71,71 ") && lines[0].endsWith("marks=0:FIRST_TRY"))
         assertTrue(lines[1], lines[1].startsWith("lengthSlack=8 heard=71,71,71 marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
     }
 
     @Test
     fun `a maxNeedMs sweep gives one line per value, and a session without it had no cap`() {
-        val dir = recorded(pulse = Pulse(60))
+        val dir = recorded(pulse = Pulse(40))
         val log = File(dir, "session.log")
         log.writeText(log.readText().replace(" maxNeedMs=3000.0", ""))
         val session = Session.load(dir)
-        assertEquals(Double.POSITIVE_INFINITY, Replay.recordedMaxNeedMs(session), 0.0)
-        // At 60 the 1500 ms note is the first to be long enough for the half note's 1500 ms need; capped at 300, the
-        // 400 ms notes are too.
+        assertEquals(Double.POSITIVE_INFINITY, Replay.recordedRunRules(session).maxNeedMs, 0.0)
+        assertEquals(ListenRun.LENGTH_SLACK, Replay.recordedRunRules(session).lengthSlack, 0.0)
+        // At 40 the half note needs 1875 ms, more than its 1500; capped at 300 it is long enough.
         val out = Replay.sweep(session, "maxNeedMs:300,3000")
         val lines = out.lines().filter { it.startsWith("maxNeedMs=") }
         assertEquals(out, 2, lines.size)
-        assertTrue(lines[0], lines[0].startsWith("maxNeedMs=300 ") && lines[0].contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
+        assertTrue(lines[0], lines[0].startsWith("maxNeedMs=300 ") && lines[0].endsWith("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
+        assertTrue(lines[1], lines[1].startsWith("maxNeedMs=3000 ") && lines[1].endsWith("marks=0:FIRST_TRY,1:FIRST_TRY"))
+    }
+
+    // ---- The walk in a session (the review of 2026-11-11): read back, and part of the diff ----
+
+    @Test
+    fun `the rows carry where the animal was, and a walk the phone and the replay disagree on is a difference`() {
+        val dir = recorded()
+        val session = Session.load(dir)
+        assertTrue(session.recordsWalk)
+        assertTrue(session.rows.any { it.walk?.phase == Walk.Phase.SOUNDING })
+        assertTrue(session.rows.any { it.walk?.phase == Walk.Phase.DONE })
+        assertTrue(Replay.report(session).contains("diff: none"))
+
+        // The phone says a note was cut short on a frame where the rules say it still sounded: the frame a note
+        // was earned on, or the hop the child saw, went another way than the replay's.
+        val csv = File(dir, "frames.csv")
+        val lines = csv.readLines().toMutableList()
+        val at = lines.indexOfFirst { it.endsWith(",SOUNDING") }
+        lines[at] = lines[at].removeSuffix("SOUNDING") + "SHORT"
+        csv.writeText(lines.joinToString("\n") + "\n")
+        val altered = Session.load(dir)
+        val report = Replay.report(altered)
+        assertTrue(report, report.contains("diff: first=$at count=1"))
+        assertTrue(report, report.contains("SHORT") && report.contains("SOUNDING"))
+        assertEquals("the walk is compared only when asked", 0, Replay.diff(altered.rows, ListenPath.run(altered.frames, tune, altered.pulse).steps).count)
+    }
+
+    @Test
+    fun `a table from before the walk is not compared on it`() {
+        val dir = recorded()
+        val csv = File(dir, "frames.csv")
+        csv.writeText(csv.readLines().joinToString("\n") { it.split(',').dropLast(3).joinToString(",") } + "\n")
+        val session = Session.load(dir)
+        assertFalse(session.recordsWalk)
+        assertTrue(session.rows.all { it.walk == null })
+        assertTrue(Replay.report(session).contains("diff: none"))
+    }
+
+    @Test
+    fun `the rows are timed at the rate the session was recorded at`() {
+        val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
+        r.start(tune, Pulse(90), floor = null)
+        r.opened(44_100, "MIC")
+        r.samples(FloatArray(hop), hop)
+        r.frame(ListenFrame(PitchFrame(null, 0.0, 0f), FrameDecision.SILENT, null, null, null, null, 0, 71, null, TunerAdvice.NONE, false, false, Hearing.CLEAR))
+        r.end(emptyMap())
+        val session = Session.load(File(folder.root, "sessions").listFiles()!!.single())
+        assertEquals(PitchFrame.hopMsAt(44_100), session.rows.single().pitch.hopMs, 0.0)
+        assertEquals(PitchFrame.hopMsAt(44_100), session.frames.frames.single().hopMs, 0.0)
     }
 
     @Test

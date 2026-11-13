@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
+import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.HearingTracker
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
@@ -89,10 +90,10 @@ data class Listening(
  * (since 2026-11-11, `docs/superpowers/specs/2026-11-11-flute-your-turn-note-length-design.md`).
  * A right note is walked ([Walk]): from the moment its sound began (the frames that locked it
  * included) the animal steps to each click inside it, and the note is earned once it has sounded
- * its written length less [lengthSlack] half beats, and never more than [maxNeedMs] (a slow tempo's
- * long note is beyond a child's breath). A note that stops first (silence, another
- * note, or its own note started again; an octave pop or a slow sag is the same note going on) is
- * cut short: the animal stays where it got to, the run waits on it again, and it earns a faint
+ * its written length less [Rules.lengthSlack] half beats, and never more than [Rules.maxNeedMs] (a
+ * slow tempo's long note is beyond a child's breath). A note that stops first (silence, or another
+ * note; an octave pop, a slow sag or its own note started again with no gap is the same note going
+ * on, [Rules.restartCuts]) is cut short: the animal stays where it got to, the run waits on it again, and it earns a faint
  * star once played long enough. An earned note's written time is finished on the clicks, sound or
  * not, and then the animal goes to the next note, at once if the child starts it sooner. Time is
  * the sum of the frames' own lengths ([PitchFrame.hopMs]), never a clock, so the app, the
@@ -100,22 +101,75 @@ data class Listening(
  * and the rests are not judged.
  *
  * The last note earned does not end the run at once: it goes on ([Listening.finishing]) until
- * that note's sound ends or [FINISH_FRAMES] pass, and then [isOver].
+ * that note's sound ends or [Rules.finishFrames] pass, and then [isOver].
  *
  * Pure Kotlin. The flute's view model feeds it the microphone, and the tests and the replay of a
  * recorded session feed it audio, so all three hear a run by the same rules. [rules] and [floor]
  * (the room's level the tracker starts from, the one the run before ended with) are the tracker's;
- * [lengthSlack] at [LENGTH_OFF] gives the verdicts and marks of the pitch-only rule of before, which
- * a replay of a session recorded before 2026-11-11 runs.
+ * [run] are the run's own ([Rules]), which [Rules.PITCH_ONLY] turns back into the pitch-only rule a
+ * session recorded before 2026-11-11 ran under.
  */
 class ListenRun(
     private val tune: List<TuneItem>,
     private val pulse: Pulse,
     rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
     floor: Float? = null,
-    private val lengthSlack: Double = LENGTH_SLACK,
-    private val maxNeedMs: Double = MAX_NEED_MS,
+    private val run: Rules = Rules(),
 ) {
+    /**
+     * The run's own rules, beside the tracker's [NoteOnsetTracker.Rules] and made like them: a value whose
+     * defaults are the constants, which the app runs with, a session writes down ([fields]) and a replay moves
+     * one at a time ([with]).
+     *
+     * @property lengthSlack half beats of its written length a note may stop short of ([LENGTH_SLACK]).
+     * @property maxNeedMs the longest any note needs to sound ([MAX_NEED_MS]).
+     * @property repeatAdviceFrames [REPEAT_ADVICE_FRAMES].
+     * @property finishFrames [FINISH_FRAMES].
+     * @property restartCuts whether the note walked, not yet long enough, is cut short when the tracker hears its own
+     * letter started again with no gap between (a tongued stop, or a breath dipping): the rule until 2026-11-13 (1 in a
+     * session's line). Since then it goes on (0): the sessions of 2026-11-12 showed a child's breath dipping 10 dB
+     * inside a whole note, which the tracker hears as a stop, and the note was cut and walked again three times while
+     * the child never stopped. Only a gap, sound that ends, cuts a note now.
+     */
+    data class Rules(
+        val lengthSlack: Double = LENGTH_SLACK,
+        val maxNeedMs: Double = MAX_NEED_MS,
+        val repeatAdviceFrames: Int = REPEAT_ADVICE_FRAMES,
+        val finishFrames: Int = FINISH_FRAMES,
+        val restartCuts: Boolean = false,
+    ) {
+        /** Name and value of every rule, in the order a session's `session.rules` line has them after the tracker's. */
+        fun fields(): List<Pair<String, String>> = listOf(
+            "repeatAdviceFrames" to repeatAdviceFrames.toString(), "finishFrames" to finishFrames.toString(),
+            "lengthSlack" to lengthSlack.toString(), "maxNeedMs" to maxNeedMs.toString(),
+            "restartCuts" to if (restartCuts) "1" else "0",
+        )
+
+        /** These rules with the one named [name] set to [value] (rounded for a frame count, not 0 for a yes); an unknown name is refused. */
+        fun with(name: String, value: Double): Rules = when (name) {
+            "lengthSlack" -> copy(lengthSlack = value)
+            "maxNeedMs" -> copy(maxNeedMs = value)
+            "repeatAdviceFrames" -> copy(repeatAdviceFrames = Math.round(value).toInt())
+            "finishFrames" -> copy(finishFrames = Math.round(value).toInt())
+            "restartCuts" -> copy(restartCuts = value != 0.0)
+            else -> throw IllegalArgumentException("no rule named $name")
+        }
+
+        companion object {
+            /** The names [with] knows. */
+            val NAMES: Set<String> = Rules().fields().map { it.first }.toSet()
+
+            /**
+             * No length rule: no slack to run out of and no longest hold, so every note is long enough the
+             * moment it is heard. The verdicts and marks are those of before 2026-11-11 (the animal still
+             * finishes each note's written time, which a replay of such a session does not compare). A restart
+             * cuts as it did then, so a session that names the length rule and not [restartCuts] (recorded on
+             * 2026-11-11 or 12) replays with the cut it ran under.
+             */
+            val PITCH_ONLY = Rules(lengthSlack = Double.POSITIVE_INFINITY, maxNeedMs = Double.POSITIVE_INFINITY, restartCuts = true)
+        }
+    }
+
     /** A note that was judged: the step it was judged for, that step's written note, the note that began and what it earned. */
     data class Heard(val index: Int, val expected: Int, val onset: NoteOnsetTracker.Onset, val verdict: Verdict)
 
@@ -131,7 +185,8 @@ class ListenRun(
      * @property hearingMean the mean level that decided [Listening.hearing], when it changed on this frame.
      * @property advanced a step was earned on this frame (long enough): its mark shows.
      * @property done the tune's last note was earned on this frame.
-     * @property hop the animal hops on this frame: a note began, a click inside the note it walks, or it went on to the next note.
+     * @property hop the animal hops on this frame, to another place: a click inside the note it walks, the next
+     * note's head, or back to the head of a note played again. A note beginning where it stands is no hop.
      * @property short a note was cut short on this frame.
      * @property held a note became long enough on this frame.
      */
@@ -168,8 +223,17 @@ class ListenRun(
     private var nowMs = 0.0
     /** When the note walked began, on [nowMs]'s clock. */
     private var startMs = 0.0
-    /** How long the note walked had sounded at the last frame that still held it. */
+    /**
+     * How long the note walked has sounded, as far as the phone is sure of it: to the last frame the tracker showed
+     * it, and no more than [graceFrames] past that, the frames a gap takes to be seen. The tracker holds a note on
+     * through loud frames with no pitch for most of a second (a pause is not a blink); that is not the note's time.
+     */
     private var heldMs = 0.0
+    /** [nowMs] at the last frame the tracker showed the note walked. */
+    private var sureMs = 0.0
+    private val graceFrames = rules.onsetGapFrames
+    /** The length of the frame being heard. */
+    private var hopMs = 0.0
     /** Frames since the animal finished an earned note's written time: what a written repeat held on is counted from. */
     private var pastLengthFrames = 0
 
@@ -187,7 +251,8 @@ class ListenRun(
     val floor: Float? get() = tracker.floor
 
     fun onFrame(frame: PitchFrame): Step {
-        nowMs += frame.hopMs
+        hopMs = frame.hopMs
+        nowMs += hopMs
         val result = tracker.onFrame(frame)
         val runMean = hearingTracker.levelMean // read before onFrame, which empties the window when the run ends
         val hearing = hearingTracker.onFrame(frame.level, result.decision)
@@ -199,8 +264,8 @@ class ListenRun(
         var onset = result.onset
         when (listening.walk?.phase) {
             Walk.Phase.SOUNDING -> if (goesOn(onset)) {
-                onset = null // an octave pop of the note walked: the same note going on
-                walkOn(moves)
+                onset = null // an octave pop of the note walked, or its own letter again with no gap: the same note going on
+                walkOn(shown = result.decision == FrameDecision.SHOWN, moves)
             } else {
                 cutShort(moves)
             }
@@ -217,7 +282,7 @@ class ListenRun(
             heardNow = listening.heardNow, advice = listening.advice, repeatHeld = listening.repeatHeld,
             finishing = listening.finishing, hearing = listening.hearing, walk = listening.walk,
         )
-        if (wasFinishing && (tracker.sounding == null || ++finishFrames >= FINISH_FRAMES)) isOver = true
+        if (wasFinishing && (tracker.sounding == null || ++finishFrames >= run.finishFrames)) isOver = true
         return Step(
             row, heard, check.forgiven.takeIf { heard != null }.orEmpty(), hearingMean,
             advanced = moves.advanced, done = moves.advanced && check.isDone,
@@ -227,18 +292,22 @@ class ListenRun(
 
     /**
      * Whether the note walked goes on through this frame: the tracker still holds a note (its own,
-     * or a neighbour it sagged into with no onset) and nothing new began but an octave pop of it.
+     * or a neighbour it sagged into with no onset) and nothing new began but its own letter, by an
+     * octave pop or, unless [Rules.restartCuts], started again with no gap (while the tracker sounds, a
+     * fresh onset is that). How much of that is the note's time is [walkOn]'s to say.
      */
     private fun goesOn(onset: NoteOnsetTracker.Onset?): Boolean {
         val walked = noteAt(listening.walk!!.index)
-        return tracker.sounding != null && (onset == null || (!onset.fresh && TuneCheck.sameLetter(onset.midi, walked)))
+        return tracker.sounding != null &&
+            (onset == null || (TuneCheck.sameLetter(onset.midi, walked) && (!onset.fresh || !run.restartCuts)))
     }
 
     /** A new note began ([onset], [leadMs] before this frame's end, its first frame's hop included): judge it against the note waited on; null when nothing is waited on. */
     private fun judge(onset: NoteOnsetTracker.Onset, leadMs: Double, moves: Moves): Heard? {
         val index = check.index ?: return null
         val expected = noteAt(index)
-        val verdict = check.judge(onset.midi, onset.fresh)
+        // A walk cut short stands on the step waited on: its note was begun, which the check must know.
+        val verdict = check.judge(onset.midi, onset.fresh, begun = listening.walk?.phase == Walk.Phase.SHORT)
         when (verdict) {
             Verdict.RIGHT, Verdict.RETRY -> startWalk(leadMs, moves)
             // A note heard while one cut short waits is not wrong: the child went on, the line says hold it longer.
@@ -257,18 +326,31 @@ class ListenRun(
         return Heard(index, expected, onset, verdict)
     }
 
-    /** The right note for the step waited on began [leadMs] ago: the animal walks it from its head. */
+    /**
+     * The right note for the step waited on began [leadMs] ago: the animal walks it from its head,
+     * which it reaches with a hop unless it stands there already (it never hops twice in one place:
+     * the user's rule of 2026-11-04).
+     */
     private fun startWalk(leadMs: Double, moves: Moves) {
         val index = check.index!! // the heard note's step, after any repeats forgiven
+        val from = place()
         startMs = nowMs - leadMs
-        moves.hop = true
         listening = listening.copy(index = index, walk = Walk(index, 0, Walk.Phase.SOUNDING), wrong = null, heardNow = null, repeatHeld = false)
-        walkOn(moves)
+        if (place() != from) moves.hop = true
+        walkOn(shown = true, moves)
     }
 
-    /** The note walked sounds on: to the click it reached, and earned once it is long enough. */
-    private fun walkOn(moves: Moves) {
-        heldMs = nowMs - startMs
+    /** Where the animal stands: the step and the half beat into it; the head of the step waited on when it walks nothing. */
+    private fun place(): Pair<Int?, Int> = listening.walk?.let { it.index to it.halfBeat } ?: (listening.index to 0)
+
+    /**
+     * The note walked goes on through this frame, [shown] by the tracker or only held by it: to the click it
+     * reached, and earned once it is long enough. A stretch the tracker only held (the gate blinking on a breathy
+     * tone) counts in full once the note is shown again.
+     */
+    private fun walkOn(shown: Boolean, moves: Moves) {
+        if (shown) sureMs = nowMs
+        heldMs = minOf(nowMs, sureMs + graceFrames * hopMs) - startMs
         stepTo(heldMs, moves)
         val walk = listening.walk!!
         if (heldMs + EPSILON_MS >= needMs(walk.index)) earn(walk.index, moves)
@@ -334,7 +416,7 @@ class ListenRun(
         listening = listening.copy(
             heardNow = sounding.takeUnless { ofPrevious && !ofExpected },
             repeatHeld = ofPrevious && ofExpected && listening.walk == null &&
-                pastLengthFrames >= REPEAT_ADVICE_FRAMES && tracker.framesSinceOnset >= REPEAT_ADVICE_FRAMES,
+                pastLengthFrames >= run.repeatAdviceFrames && tracker.framesSinceOnset >= run.repeatAdviceFrames,
         )
     }
 
@@ -342,8 +424,8 @@ class ListenRun(
 
     private fun halfBeatsAt(index: Int): Int = (tune[index] as TuneNote).length.halfBeats
 
-    /** How long the note at [index] must sound to be earned: its length less [lengthSlack] half beats, never under nothing nor over [maxNeedMs]. */
-    private fun needMs(index: Int): Double = minOf(maxOf(0.0, halfBeatsAt(index) - lengthSlack) * halfBeatMs, maxNeedMs)
+    /** How long the note at [index] must sound to be earned: its length less the slack, never under nothing nor over the longest hold. */
+    private fun needMs(index: Int): Double = minOf(maxOf(0.0, halfBeatsAt(index) - run.lengthSlack) * halfBeatMs, run.maxNeedMs)
 
     /** The note's written length at [pulse]. */
     private fun fullMs(index: Int): Double = halfBeatsAt(index) * halfBeatMs
@@ -365,18 +447,14 @@ class ListenRun(
 
         /**
          * Half beats of a note's written length it may stop short of and still be long enough: a
-         * child lets go a little early to breathe or to start the next note. Half a beat held the
-         * quarters and caught the half notes of the recorded runs of 2026-11-05 (the spec's "The
-         * slack"). Changed only from recorded sessions: a sweep of `lengthSlack`.
+         * child lets go a little early to breathe or to start the next note. Three quarters of a beat
+         * since 2026-11-13 (the user's pick, "count in that the child is learning"): in the first runs
+         * recorded with the walk (2026-11-12, 60 a minute) the child stopped half notes at 1.2 to 1.7 s,
+         * just after the animal's second hop, and half a beat (1.5 s) cut 5 of 12 of them by 50 to
+         * 300 ms; at 1.25 s one is cut, and a half note played as a tap still is. Half a beat until
+         * then, from the runs of 2026-11-05. Changed only from recorded sessions: a sweep of `lengthSlack`.
          */
-        const val LENGTH_SLACK = 1.0
-
-        /**
-         * A slack as long as the longest note: every note is long enough at its onset, so the verdicts and marks are
-         * those of the pitch-only rule of before 2026-11-11 (the animal still finishes each note's written time,
-         * which a replay does not compare).
-         */
-        const val LENGTH_OFF = 8.0
+        const val LENGTH_SLACK = 1.5
 
         /**
          * The longest any note needs to sound, however long it is written at however slow a tempo: about a

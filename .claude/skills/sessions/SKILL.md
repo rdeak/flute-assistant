@@ -54,16 +54,25 @@ tools/pull-sessions.sh                                   # the phone's sessions 
                                                          # also <folder>/sweep.txt: what each value would have heard
 ./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=minLevel:0,0.3,0.4,0.45
                                                          # the loudness floor: did it leave a child's soft notes out, or let the room in?
-./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=lengthSlack:0.5,1,2
+./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=lengthSlack:1,1.5,2
                                                          # the length rule (half beats a note may stop short of its written
-                                                         # length, 2026-11-11): did it catch long notes and keep the quarters?
+                                                         # length, 1.5 since 2026-11-13): did it catch long notes and keep the quarters?
+                                                         # also -Psweep=restartCuts:0,1 (1: a restart with no gap cuts the
+                                                         # note walked, the rule until 2026-11-13; a child's breath dips do that)
                                                          # also -Psweep=maxNeedMs:2000,3000,4000, the longest any note needs
+                                                         # (the run's own rules are ListenRun.Rules; a sweep names one of them
+                                                         # or one of the tracker's, and detects the audio once for all values)
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
 ```
 
 The replay that is compared with the phone runs under the rules the session was recorded with (its
-`session.rules` line; a rule younger than the recording, `minLevel` for sessions before 2026-11-10,
-is switched off: `Replay.recordedRules`), so a rule added since does not show up as a difference. Where
+`session.rules` line; a rule younger than the recording, `minLevel` for sessions before 2026-11-10
+and the length rule (`lengthSlack`, `maxNeedMs`) for sessions before 2026-11-11, is switched off, and
+`restartCuts` for sessions before 2026-11-13 is on, as it was then:
+`Replay.recordedRules`, `Replay.recordedRunRules`), so a rule added since does not show up as a
+difference. A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
+has it compared too: the frame a note was earned or cut short on. `report.html` draws those frames
+(★ or ☆ long enough, ✂ cut short; ♪ is a right pitch beginning a note). Where
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
 hear in the same sound. A sweep changes one of today's rules. The detector is not part of the rules:
 sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a

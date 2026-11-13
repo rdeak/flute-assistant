@@ -11,8 +11,10 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -41,7 +43,7 @@ class ListenPathRunTest {
     @Test
     fun `a note is judged while one is waited on and only reported after the tune is done`() {
         val tune = listOf(TuneNote(71, QUARTER))
-        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, tune, pitchOnly, lengthSlack = ListenRun.LENGTH_OFF)
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, tune, pitchOnly, run = ListenRun.Rules.PITCH_ONLY)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), run.marks)
         val judged = run.steps.filter { it.verdict != null }
         assertEquals(1, judged.size)
@@ -58,8 +60,8 @@ class ListenPathRunTest {
     fun `a seeded floor and other rules reach the tracker`() {
         val samples = FluteSound.render(FluteSound.sound(gapsMs = 50))
         val tune = List(3) { TuneNote(71, QUARTER) }
-        val heard = ListenPath.run(samples, rate, tune, pitchOnly, lengthSlack = ListenRun.LENGTH_OFF).heard.size
-        val deaf = ListenPath.run(samples, rate, tune, pitchOnly, rules = NoteOnsetTracker.Rules(stopDrop = 0.5f), lengthSlack = ListenRun.LENGTH_OFF).heard.size
+        val heard = ListenPath.run(samples, rate, tune, pitchOnly, run = ListenRun.Rules.PITCH_ONLY).heard.size
+        val deaf = ListenPath.run(samples, rate, tune, pitchOnly, rules = NoteOnsetTracker.Rules(stopDrop = 0.5f), run = ListenRun.Rules.PITCH_ONLY).heard.size
         assertTrue("stopDrop 0.5 hears no tongued stop: $deaf of $heard", deaf < heard)
         // One hop of noise louder than the seeded floor: the floor rises by one FLOOR_RISE from the seed, not from nothing.
         // Random, not a +/- pattern: that is a tone at half the rate, and the detector reads the newest hop.
@@ -67,5 +69,33 @@ class ListenPathRunTest {
         val noise = FloatArray(hop) { (random.nextFloat() - 0.5f) * 0.2f }
         val step = ListenPath.run(noise, rate, tune, pitchOnly, floor = 0.3f).steps.single()
         assertEquals(step.toString(), 0.3f + NoteOnsetTracker.FLOOR_RISE, step.floor!!, 1e-6f)
+    }
+
+    @Test
+    fun `frames detected once give the same run under any rules`() {
+        // The detector is no part of the rules: a sweep detects a recording once and replays the frames.
+        val samples = FluteSound.render(FluteSound.sound(gapsMs = 50))
+        val tune = List(3) { TuneNote(71, QUARTER) }
+        val frames = ListenPath.frames(samples, rate)
+        assertEquals(samples.size / hop, frames.frames.size)
+        assertEquals(rate, frames.rate)
+        assertTrue(frames.frames.all { it.hopMs == PitchFrame.hopMsAt(rate) })
+        for (rules in listOf(ListenRun.Rules(), ListenRun.Rules.PITCH_ONLY)) {
+            val once = ListenPath.run(frames, tune, Pulse(120), run = rules)
+            val again = ListenPath.run(samples, rate, tune, Pulse(120), run = rules)
+            assertEquals(again.steps, once.steps)
+            assertEquals(again.marks, once.marks)
+            assertEquals(again.heard, once.heard)
+        }
+    }
+
+    @Test
+    fun `a step says where the animal is`() {
+        // At 60 a quarter needs 250 ms, so the note is walked for a few frames after its onset before it is earned.
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, listOf(TuneNote(71, QUARTER), TuneNote(71, QUARTER)), Pulse(60))
+        val walks = run.steps.mapNotNull { it.walk }
+        assertTrue(walks.any { it.index == 0 && it.phase == Walk.Phase.SOUNDING })
+        assertTrue(walks.any { it.index == 0 && it.phase == Walk.Phase.DONE })
+        assertTrue(walks.any { it.index == 1 })
     }
 }

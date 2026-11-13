@@ -34,10 +34,15 @@ change that part). The songbook is in `SONGBOOK.md`.
   CLAUDE.md, "Turned down").
 - "Your turn" is opt-in and score-free, no number, marks not saved. The child decides when each
   note starts; the metronome decides how long it lasts: a note counts once it has sounded its
-  written length less half a beat (`ListenRun.LENGTH_SLACK`) and at most 3 s (`MAX_NEED_MS`), both
-  changed only from recorded sessions (sweeps of `lengthSlack`, `maxNeedMs`), and one cut short is
-  played again. The animal never moves on to a
-  note the child has not played: `DESIGN.md`, "Each note held for its length". A miss never shows
+  written length less three quarters of a beat (`ListenRun.LENGTH_SLACK`, the user's pick of
+  2026-11-13) and at most 3 s (`MAX_NEED_MS`), both changed only from recorded sessions (sweeps of
+  `lengthSlack`, `maxNeedMs`), and one cut short is played again. Only a gap cuts a note: its own
+  letter started again with no gap is the note going on (`ListenRun.Rules.restartCuts`: a child's
+  breath dips like a tongued stop). The animal walks a note only while the child plays it and never hops twice in one
+  place; the one move it makes in silence is on from a note that was long enough, through the rest
+  of that note's written time to the head of the next, where it waits. `ListenRun`'s own rules are
+  one value (`ListenRun.Rules`: a session records it, a replay moves it): add a rule there.
+  `DESIGN.md`, "Each note held for its length". A miss never shows
   silence: the heard note, or the listening dots, stands under the step waited on.
 - The room under the stage while it listens adds nothing while things go right: "Play B4" until the
   first note is judged, then silence; after a wrong note the wanted note's fingering over "Check
@@ -52,6 +57,10 @@ change that part). The songbook is in `SONGBOOK.md`.
   `finally`, so a key held through a turn ends its note. `staffPlace` is created in `FluteContent`'s
   writing and running branch, so the staff keeps its scroll through a turn, Play and Stop.
 - Text and emoji on the staff are sized in dp, so they stay in the staff at any text size.
+- The running staff keeps the note before the lit one at its left (`Bars.anchor`) and scrolls on only
+  as far as the walking animal needs to stay in view (`StaffGeometry.followScroll`).
+- Your turn judges the nearest semitone. A sharp flute's B heard as C is the flute's tuning, not
+  a wider net: the user kept exact semitones on 2026-11-13 (`DESIGN.md`, "The first runs with the walk").
 - Log event names under `FA.Flute` are stable. They are listed in `FluteViewModel`'s comment, and
   with what each means in `DESIGN.md` ("Log events").
 

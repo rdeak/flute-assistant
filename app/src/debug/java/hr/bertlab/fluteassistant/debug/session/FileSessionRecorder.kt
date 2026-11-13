@@ -20,6 +20,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
+import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import java.io.BufferedWriter
 import java.io.File
@@ -77,11 +78,8 @@ class FileSessionRecorder(
             s, "session.start", "at" to at, "app" to facts.app, "code" to facts.code, "device" to facts.device,
             "sdk" to facts.sdk, "floor" to floor?.let { level(it) },
         )
-        val rules = NoteOnsetTracker.Rules().fields() +
-            listOf(
-                "repeatAdviceFrames" to ListenRun.REPEAT_ADVICE_FRAMES.toString(), "finishFrames" to ListenRun.FINISH_FRAMES.toString(),
-                "lengthSlack" to ListenRun.LENGTH_SLACK.toString(), "maxNeedMs" to ListenRun.MAX_NEED_MS.toString(),
-            )
+        // The app runs with both sets of rules at their defaults, which is what is written down.
+        val rules = NoteOnsetTracker.Rules().fields() + ListenRun.Rules().fields()
         line(s, "session.rules", *rules.toTypedArray())
         line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
         tune.forEachIndexed { index, item ->
@@ -122,7 +120,7 @@ class FileSessionRecorder(
     override fun frame(frame: ListenFrame) = guarded {
         val s = session ?: return@guarded
         s.rows++
-        val ms = s.rows * AudioRecordTunerEngine.HOP_SIZE * 1000.0 / s.rate
+        val ms = s.rows * PitchFrame.hopMsAt(s.rate)
         val f = frame.frame
         val cells = listOf(
             s.rows.toString(), String.format(Locale.ROOT, "%.2f", ms),
