@@ -293,6 +293,42 @@ class FluteScreenTest {
         }
     }
 
+    /** Upright the advice is one line that shrinks to 14 sp and no further: every line, the longest Croatian ones too, shows whole. */
+    @Test
+    fun every_advice_shows_whole_on_a_narrow_phone_in_croatian_at_large_text() {
+        val twoNotes = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER))
+        val short = Walk(0, 0, Walk.Phase.SHORT)
+        val lines = listOf(
+            Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR) to "🎵 Odsviraj jedan dug, čist ton",
+            Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR) to "📱 Dođi bliže mobitelu",
+            Listening(index = 0, repeatHeld = true) to "🔁 Stani, pa odsviraj opet",
+            Listening(index = 0, walk = short) to "🌬️ Drži notu do ⭐",
+            Listening(index = 0, walk = short, faded = true) to "😮‍💨 Možda nema zraka? Udahni",
+            Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true)) to "🍃 Možda previsoko? Nježniji zrak",
+            Listening(index = 0, wrong = WrongNote(0, 64)) to "👀 Provjeri prste",
+        )
+        state = mutableStateOf(FluteUiState(tune = twoNotes, listening = lines.first().first))
+        compose.setContent {
+            LocaleProvider(Locale("hr")) {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {
+                    Box(Modifier.width(360.dp)) {
+                        FluteContent(state = state.value, metronome = MetronomeUiState(), actions = FluteActions())
+                    }
+                }
+            }
+        }
+        for ((listening, line) in lines) {
+            compose.runOnIdle { state.value = state.value.copy(listening = listening) }
+            compose.waitForIdle()
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(line, useUnmergedTree = true).fetchSemanticsNode()
+                .config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            val layout = layouts.single()
+            assertFalse("\"$line\" runs past its one line", layout.hasVisualOverflow)
+            assertEquals("\"$line\" shows whole", line.length, layout.getLineEnd(0, visibleEnd = true))
+        }
+    }
+
     @Test
     fun croatian_copy() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER))), Locale("hr"))
@@ -1136,11 +1172,11 @@ class FluteScreenTest {
     @Test
     fun a_note_cut_short_asks_to_hold_it_longer_with_no_fingering() {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))))
-        compose.onNodeWithText("🌬️ Hold it longer").assertIsDisplayed()
+        compose.onNodeWithText("🌬️ Hold it until the ⭐").assertIsDisplayed()
         compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
         compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SOUNDING)))
-        compose.onNodeWithText("🌬️ Hold it longer").assertDoesNotExist()
+        compose.onNodeWithText("🌬️ Hold it until the ⭐").assertDoesNotExist()
     }
 
     @Test
@@ -1151,6 +1187,26 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
         compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT)))
-        compose.onNodeWithText("🌬️ Drži notu dulje").assertIsDisplayed()
+        compose.onNodeWithText("🌬️ Drži notu do ⭐").assertIsDisplayed()
+    }
+
+    /** The guesses say maybe (2026-11-13): out of air for a note that faded, too high for a near miss above, the fingering still shown. */
+    @Test
+    fun the_why_lines_say_maybe_in_both_languages() {
+        val faded = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)
+        val high = Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true))
+        show(FluteUiState(tune = twoNotes, listening = faded))
+        compose.onNodeWithText("😮‍💨 Maybe out of air? Big breath first").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = high)
+        compose.onNodeWithText("🍃 Maybe too high? Gentler air").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_why_lines_speak_croatian() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)), Locale("hr"))
+        compose.onNodeWithText("😮‍💨 Možda nema zraka? Udahni").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true)))
+        compose.onNodeWithText("🍃 Možda previsoko? Nježniji zrak").assertIsDisplayed()
     }
 }

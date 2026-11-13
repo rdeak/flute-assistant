@@ -89,9 +89,10 @@ import javax.inject.Inject
  * what the metronome must be set to, none for an empty book, which leaves it alone) and
  * `flute.shelf_close` (book, when the open book was picked again and nothing changed); while
  * listening, `flute.listen` (notes), `flute.heard` (index, expected, heard, fresh, verdict:
- * right, retry, ignored or wrong: the pitch, at the note's onset), `flute.held` (index, heldMs:
- * the note became long enough and earned its mark), `flute.short` (index, heldMs, needMs: it
- * stopped before that; since 2026-11-11), `flute.repeat_forgiven` (index), `flute.listen_summary` every
+ * right, retry, ignored or wrong: the pitch, at the note's onset; cents: where it locked, from
+ * the expected note), `flute.held` (index, heldMs: the note became long enough and earned its
+ * mark), `flute.short` (index, heldMs, needMs: it stopped before that; faded: it had faded away
+ * first), `flute.repeat_forgiven` (index), `flute.listen_summary` every
  * [ListenRules.SUMMARY_FRAMES] frames (the tuner's summary fields, gate, expected, hearing),
  * `flute.hearing` (hearing, levelMean) when it changes, `flute.listen_done` (stars, retries),
  * `flute.listen_stop` (reason: pill, key, erase, leave, speed or book), `flute.listen_error`
@@ -453,11 +454,13 @@ class FluteViewModel @Inject constructor(
             logger.d(
                 LogTags.FLUTE, "flute.heard",
                 "index" to it.index, "expected" to it.expected, "heard" to it.onset.midi, "fresh" to it.onset.fresh,
-                "verdict" to it.verdict.name.lowercase(),
+                "verdict" to it.verdict.name.lowercase(), "cents" to step.cents,
             )
         }
         for (forgiven in step.forgiven) logger.d(LogTags.FLUTE, "flute.repeat_forgiven", "index" to forgiven)
-        step.short?.let { logger.d(LogTags.FLUTE, "flute.short", "index" to it.index, "heldMs" to it.heldMs, "needMs" to it.needMs) }
+        step.short?.let {
+            logger.d(LogTags.FLUTE, "flute.short", "index" to it.index, "heldMs" to it.heldMs, "needMs" to it.needMs, "faded" to it.faded)
+        }
         step.held?.let { logger.d(LogTags.FLUTE, "flute.held", "index" to it.index, "heldMs" to it.heldMs) }
         _state.update {
             // A step earned (or a repeat forgiven): its mark shows. The animal hops when the run says, to another

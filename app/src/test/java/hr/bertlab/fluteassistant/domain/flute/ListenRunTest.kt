@@ -525,6 +525,137 @@ class ListenRunTest {
         assertEquals(TunerAdvice.CLEAR_NOTE, Listening(index = 0, walk = short, hearing = Hearing.LOUD_UNCLEAR).advice)
         assertEquals(TunerAdvice.PLAY_AGAIN, Listening(index = 0, walk = short, repeatHeld = true).advice)
         assertEquals(TunerAdvice.HOLD_LONGER, Listening(index = 0, walk = short, wrong = WrongNote(0, 64)).advice)
+        assertEquals(TunerAdvice.COME_CLOSER, Listening(index = 0, wrong = WrongNote(0, 72, tooHigh = true), hearing = Hearing.QUIET_UNCLEAR).advice)
+        assertEquals(TunerAdvice.OUT_OF_AIR, Listening(index = 0, walk = short, faded = true, wrong = WrongNote(0, 64)).advice)
+        assertEquals(TunerAdvice.PLAY_AGAIN, Listening(index = 0, repeatHeld = true, walk = short, faded = true).advice)
+    }
+
+    // ---- Why, in a few words (2026-11-13, spec 2026-11-13-flute-your-turn-why-lines-design) ----
+
+    @Test
+    fun `a note stopped while still strong asks to hold it until the star`() {
+        val run = timed(h(60), q(62))
+        run.begin(60)
+        run.hold(60, 15)
+        val cut = List(NoteOnsetTracker.ONSET_GAP_FRAMES) { run.onFrame(silent) }.last()
+        assertEquals(false, cut.short?.faded)
+        assertFalse(run.listening.faded)
+        assertEquals(TunerAdvice.HOLD_LONGER, run.listening.advice)
+    }
+
+    @Test
+    fun `a note that fades away before it is long enough asks if the air ran out`() {
+        val run = timed(h(60), q(62))
+        run.begin(60)
+        run.hold(60, 15)
+        for (level in listOf(0.6f, 0.5f, 0.48f, 0.46f)) run.onFrame(pitched(60, level = level))
+        val cut = List(NoteOnsetTracker.ONSET_GAP_FRAMES) { run.onFrame(silent) }.last()
+        assertEquals(true, cut.short?.faded)
+        assertTrue(run.listening.faded)
+        assertEquals(TunerAdvice.OUT_OF_AIR, run.listening.advice)
+        run.begin(60)
+        assertFalse("played again, the guess goes", run.listening.faded)
+        assertEquals(TunerAdvice.NONE, run.listening.advice)
+    }
+
+    @Test
+    fun `a note cut short by another note is held too briefly, not out of air`() {
+        val run = timed(h(60), q(62))
+        run.begin(60)
+        run.hold(60, 15)
+        run.begin(62)
+        assertEquals(TunerAdvice.HOLD_LONGER, run.listening.advice)
+    }
+
+    @Test
+    fun `a note that sags and then slurs on to another is not out of air`() {
+        // The child is still blowing: a guess about the air would be wrong. Only a note that stopped can have run out.
+        val run = timed(h(60), q(62))
+        run.begin(60)
+        run.hold(60, 15)
+        for (level in listOf(0.6f, 0.5f, 0.48f)) run.onFrame(pitched(60, level = level))
+        run.begin(62)
+        assertFalse(run.listening.faded)
+        assertEquals(TunerAdvice.HOLD_LONGER, run.listening.advice)
+    }
+
+    @Test
+    fun `with a longer gap rule a note stopped while strong is still no fade`() {
+        // The tracker's gap frames are walked before the cut; they are silence, not the note's end.
+        val run = ListenRun(listOf(h(60), q(62)), Pulse(60), NoteOnsetTracker.Rules(onsetGapFrames = 4), run = halfBeatSlack)
+        run.begin(60)
+        run.hold(60, 15)
+        repeat(4) { run.onFrame(silent) }
+        assertEquals(Walk.Phase.SHORT, run.listening.walk?.phase)
+        assertFalse(run.listening.faded)
+    }
+
+    @Test
+    fun `eight frames walked are enough to tell a fade, seven are not`() {
+        fun cutAfter(holds: Int): ListenRun {
+            val run = timed(h(60), q(62))
+            run.begin(60)
+            run.hold(60, holds)
+            for (level in listOf(0.5f, 0.48f, 0.46f)) run.onFrame(pitched(60, level = level))
+            run.stop()
+            return run
+        }
+        assertTrue("onset, three held, three fading, one gap frame: eight", cutAfter(3).listening.faded)
+        assertFalse("seven: no guess", cutAfter(2).listening.faded)
+    }
+
+    @Test
+    fun `a note cut short at once is no guess about the air`() {
+        val run = timed(h(60), q(62))
+        run.begin(60)
+        run.onFrame(pitched(60, level = 0.5f))
+        run.stop()
+        assertFalse(run.listening.faded)
+        assertEquals(TunerAdvice.HOLD_LONGER, run.listening.advice)
+    }
+
+    @Test
+    fun `a note just above the written one, near its pitch, asks if it was too high`() {
+        // The sharp b of 2026-11-13: fingered b, blown 55 cents high, heard as c.
+        val run = timed(q(71), q(67))
+        val heard = List(ListenRules.LOCK_FRAMES) { run.onFrame(pitched(71, cents = 55.0)) }.last()
+        assertEquals(WrongNote(0, 72, tooHigh = true), run.listening.wrong)
+        assertEquals(TunerAdvice.TOO_HIGH, run.listening.advice)
+        assertEquals(55.0, heard.cents!!, 0.01)
+        run.stop()
+        run.begin(71)
+        assertNull(run.listening.wrong)
+        assertEquals(TunerAdvice.NONE, run.listening.advice)
+    }
+
+    @Test
+    fun `a note a semitone above but far from the written pitch is a wrong note`() {
+        val run = timed(q(71), q(67))
+        val heard = run.begin(72)
+        assertEquals(WrongNote(0, 72), run.listening.wrong)
+        assertEquals(TunerAdvice.CHECK_FINGERS, run.listening.advice)
+        assertEquals(100.0, heard.cents!!, 0.01)
+    }
+
+    @Test
+    fun `a note just under the written one is a wrong note, never too low`() {
+        val run = timed(q(71), q(67))
+        List(ListenRules.LOCK_FRAMES) { run.onFrame(pitched(71, cents = -55.0)) }
+        assertEquals(WrongNote(0, 70), run.listening.wrong)
+        assertEquals(TunerAdvice.CHECK_FINGERS, run.listening.advice)
+    }
+
+    @Test
+    fun `a note above the written one in another octave is a wrong note`() {
+        val run = timed(q(71), q(67))
+        List(ListenRules.LOCK_FRAMES) { run.onFrame(pitched(84, cents = -45.0)) }
+        assertEquals(WrongNote(0, 84), run.listening.wrong)
+        assertEquals(TunerAdvice.CHECK_FINGERS, run.listening.advice)
+    }
+
+    @Test
+    fun `nothing judged, no cents`() {
+        assertNull(timed(q(71)).onFrame(silent).cents)
     }
 
     @Test

@@ -120,8 +120,10 @@ class NoteOnsetTracker(
      * ([leadOf]), after silence as after another note (a step, an octave pop). Frames of other notes
      * before them are not its; nor is anything before a stop or, while a note sounded, before a
      * frame that did not count, so a tongued restart starts at its onset. 0 when no note began.
+     * [lockHz] is the pitch the note locked at, the median that named it (how far it lies from a
+     * written note says whether a wrong one was a near miss); null when no note began.
      */
-    data class Result(val decision: FrameDecision, val onset: Onset?, val leadFrames: Int = 0)
+    data class Result(val decision: FrameDecision, val onset: Onset?, val leadFrames: Int = 0, val lockHz: Double? = null)
 
     /**
      * A note that began: its MIDI, and whether it was a [fresh] start after a gap (nothing was
@@ -211,7 +213,7 @@ class NoteOnsetTracker(
         }
         sounding = identified
         ageStop()
-        return Result(FrameDecision.SHOWN, onset, lead)
+        return Result(FrameDecision.SHOWN, onset, lead, lockHz = median.takeIf { onset != null })
     }
 
     /**

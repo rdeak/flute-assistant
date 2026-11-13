@@ -15,4 +15,8 @@ enum class TunerAdvice {
     PLAY_AGAIN,
     /** The flute's only: a note stopped before it was long enough, to be played again (since 2026-11-11). */
     HOLD_LONGER,
+    /** The flute's only: a note faded away before it was long enough, a guess that the air ran out. */
+    OUT_OF_AIR,
+    /** The flute's only: a wrong note just above the written one, a guess that it was blown too high. */
+    TOO_HIGH,
 }

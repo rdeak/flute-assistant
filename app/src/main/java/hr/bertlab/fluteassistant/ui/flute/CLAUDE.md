@@ -48,6 +48,10 @@ change that part). The songbook is in `SONGBOOK.md`.
   first note is judged, then silence; after a wrong note the wanted note's fingering over "Check
   your fingers" until the right one (the user's pick of 2026-11-10). Not the fingering under every
   note, and no fingering on a phone on its side: `DESIGN.md`, "The room under the stage".
+- The line says why, in a few words with an emoji, and a guess says "maybe" (the user's ask of
+  2026-11-13): "Hold it until the ⭐" for a note stopped early, "Maybe out of air?" for one that faded
+  (`ListenRun.FADE_RATIO`), "Maybe too high?" for a wrong note just above the written one
+  (`WrongNote.tooHigh`, never "too low"). Only what the phone detects; a guess stated as fact is a bug.
 - The room is not judged: a clear pitch under `NoteOnsetTracker.MIN_LEVEL` (0.45) is not a note
   (`FrameDecision.FAINT`) and can earn no mark; the child sees the dots and, after a second of it,
   "Come closer". Change the number only from recorded sessions (a sweep of `minLevel`), never by

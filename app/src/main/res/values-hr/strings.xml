@@ -80,7 +80,9 @@
     <string name="advice_gentler_air">🍃 Nježniji zrak</string>
     <string name="advice_check_fingers">👀 Provjeri prste</string>
     <string name="advice_play_again">🔁 Stani, pa odsviraj opet</string>
-    <string name="advice_hold_longer">🌬️ Drži notu dulje</string>
+    <string name="advice_hold_longer">🌬️ Drži notu do ⭐</string>
+    <string name="advice_out_of_air">😮‍💨 Možda nema zraka? Udahni</string>
+    <string name="advice_too_high">🍃 Možda previsoko? Nježniji zrak</string>
     <string name="mic_permission_title">Smijem li slušati?</string>
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
     <string name="mic_failed">Sada ne mogu slušati.</string>

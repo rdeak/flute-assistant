@@ -6,13 +6,19 @@ package hr.bertlab.fluteassistant.domain.flute
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.HearingTracker
+import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlin.math.roundToLong
 
-/** A wrong note heard in "Your turn": [midi] came out for the step at [index] of the tune. */
-data class WrongNote(val index: Int, val midi: Int)
+/**
+ * A wrong note heard in "Your turn": [midi] came out for the step at [index] of the tune. [tooHigh]: it was one
+ * semitone above the written note and within [ListenRules.NEAR_CENTS] of it, so the right fingers blown high may have
+ * made it, and the line says so as a guess.
+ */
+data class WrongNote(val index: Int, val midi: Int, val tooHigh: Boolean = false)
 
 /**
  * Where the knob's animal is in "Your turn" when it is not simply waiting at the head of the step waited
@@ -51,6 +57,8 @@ data class Walk(val index: Int, val halfBeat: Int, val phase: Phase) {
  * child is still playing.
  * @property walk where the animal is while a note is walked, cut short or finishing its time; null
  * while it waits at the head of [index].
+ * @property faded the note cut short faded away before it stopped ([ListenRun.FADE_RATIO]): the line
+ * guesses the air ran out; false again once a note is walked.
  */
 data class Listening(
     val index: Int?,
@@ -60,6 +68,7 @@ data class Listening(
     val repeatHeld: Boolean = false,
     val finishing: Boolean = false,
     val walk: Walk? = null,
+    val faded: Boolean = false,
 ) {
     /** The step the animal stands on: the one it walks, else the one waited on. */
     val animalIndex: Int? get() = walk?.index ?: index
@@ -72,7 +81,9 @@ data class Listening(
      * instead, else come closer or play one clear note when the sound stays unclear, else hold it
      * longer while a note cut short waits to be played again (since 2026-11-11), else check the
      * fingers while a wrong note stands (since 2026-11-10: the heard note said what came out, and
-     * nothing said what to do about it), else nothing. A note cut short and a wrong note never
+     * nothing said what to do about it), else nothing. Two lines are guesses and say so ("maybe"):
+     * out of air for a note cut short that had [faded], too high for a wrong note [WrongNote.tooHigh].
+     * A note cut short and a wrong note never
      * stand together: a note heard while one is cut short is not a wrong note.
      */
     val advice: TunerAdvice
@@ -80,8 +91,8 @@ data class Listening(
             repeatHeld -> TunerAdvice.PLAY_AGAIN
             hearing == Hearing.QUIET_UNCLEAR -> TunerAdvice.COME_CLOSER
             hearing == Hearing.LOUD_UNCLEAR -> TunerAdvice.CLEAR_NOTE
-            walk?.phase == Walk.Phase.SHORT -> TunerAdvice.HOLD_LONGER
-            wrong != null -> TunerAdvice.CHECK_FINGERS
+            walk?.phase == Walk.Phase.SHORT -> if (faded) TunerAdvice.OUT_OF_AIR else TunerAdvice.HOLD_LONGER
+            wrong != null -> if (wrong.tooHigh) TunerAdvice.TOO_HIGH else TunerAdvice.CHECK_FINGERS
             else -> TunerAdvice.NONE
         }
 }
@@ -177,8 +188,8 @@ class ListenRun(
     /** A note that was judged: the step it was judged for, that step's written note, the note that began and what it earned. */
     data class Heard(val index: Int, val expected: Int, val onset: NoteOnsetTracker.Onset, val verdict: Verdict)
 
-    /** How long the note of the step at [index] sounded ([heldMs]) against what it needed ([needMs]). */
-    data class NoteTime(val index: Int, val heldMs: Long, val needMs: Long)
+    /** How long the note of the step at [index] sounded ([heldMs]) against what it needed ([needMs]); [faded]: cut short, it had faded away. */
+    data class NoteTime(val index: Int, val heldMs: Long, val needMs: Long, val faded: Boolean = false)
 
     /**
      * What one frame did.
@@ -192,6 +203,8 @@ class ListenRun(
      * note's head, or back to the head of a note played again. A note beginning where it stands is no hop.
      * @property short a note was cut short on this frame.
      * @property held a note became long enough on this frame: it is earned and its mark shows.
+     * @property cents the pitch the judged note locked at, in cents from [Heard.expected] (the step waited on when it
+     * began); null when none was judged.
      */
     class Step(
         val row: ListenFrame,
@@ -202,6 +215,7 @@ class ListenRun(
         val hop: Boolean = false,
         val short: NoteTime? = null,
         val held: NoteTime? = null,
+        val cents: Double? = null,
     ) {
         /** A step was earned on this frame. */
         val advanced: Boolean get() = held != null
@@ -223,6 +237,8 @@ class ListenRun(
     private class WalkTime(val startMs: Double) {
         var sureMs = startMs
         var heldMs = 0.0
+        /** The level of every frame walked, in order: whether the note faded before it stopped. */
+        val levels = mutableListOf<Float>()
     }
 
     private val check = TuneCheck(tune)
@@ -267,7 +283,7 @@ class ListenRun(
         when (listening.walk?.phase) {
             Walk.Phase.SOUNDING -> if (goesOn(onset)) {
                 onset = null // an octave pop of the note walked, or its own letter again with no gap: the same note going on
-                walkOn(shown = result.decision == FrameDecision.SHOWN, graceMs = run.graceFrames * frame.hopMs, moves)
+                walkOn(frame.level, shown = result.decision == FrameDecision.SHOWN, graceMs = run.graceFrames * frame.hopMs, moves)
             } else {
                 cutShort(moves)
             }
@@ -276,7 +292,7 @@ class ListenRun(
             null -> pastLengthFrames++
         }
         // The note began inside the first of its frames: that frame's hop counts in full, and the ones that locked it.
-        val heard = onset?.let { judge(it, leadMs = (result.leadFrames + 1) * frame.hopMs, moves) }
+        val heard = onset?.let { judge(it, result.lockHz, frame.level, leadMs = (result.leadFrames + 1) * frame.hopMs, moves) }
         if (!wasFinishing && !listening.finishing) followSound()
         val row = ListenFrame(
             frame = frame, decision = result.decision, sounding = tracker.sounding, onset = result.onset, floor = tracker.floor,
@@ -288,6 +304,7 @@ class ListenRun(
         return Step(
             row, heard, check.forgiven.takeIf { heard != null }.orEmpty(), hearingMean,
             done = moves.held != null && check.isDone, hop = moves.hop, short = moves.short, held = moves.held,
+            cents = heard?.let { h -> result.lockHz?.let { NoteMath.centsBetween(it, h.expected) } },
         )
     }
 
@@ -304,19 +321,22 @@ class ListenRun(
         return !(onset.fresh && run.restartCuts)
     }
 
-    /** A new note began ([onset], [leadMs] before this frame's end, its first frame's hop included): judge it against the note waited on; null when nothing is waited on. */
-    private fun judge(onset: NoteOnsetTracker.Onset, leadMs: Double, moves: Moves): Heard? {
+    /**
+     * A new note began ([onset], [leadMs] before this frame's end, its first frame's hop included, locked at [lockHz],
+     * its frame at [level]): judge it against the note waited on; null when nothing is waited on.
+     */
+    private fun judge(onset: NoteOnsetTracker.Onset, lockHz: Double?, level: Float, leadMs: Double, moves: Moves): Heard? {
         val index = check.index ?: return null
         val expected = noteAt(index)
         // A walk cut short stands on the step waited on: its note was begun, which the check must know.
         val verdict = check.judge(onset.midi, onset.fresh, begun = listening.walk?.phase == Walk.Phase.SHORT)
         when (verdict) {
-            Verdict.RIGHT, Verdict.RETRY -> startWalk(leadMs, moves)
+            Verdict.RIGHT, Verdict.RETRY -> startWalk(leadMs, level, moves)
             Verdict.WRONG -> {
                 // The note heard stays under the step until the next note is judged: no timer, so there
                 // is time to read it. The animal leaves an earned note's last half beat for it at once.
                 if (listening.walk != null) leaveWalk(moves)
-                listening = listening.copy(wrong = WrongNote(index, onset.midi))
+                listening = listening.copy(wrong = WrongNote(index, onset.midi, tooHigh = nearAbove(onset.midi, lockHz, expected)))
             }
             // An ignored note (the last step's tail, an octave pop, or the child going on while a note cut short
             // waits) leaves everything as it was.
@@ -329,20 +349,23 @@ class ListenRun(
      * The right note for the step waited on began [leadMs] ago: the animal walks it from its head,
      * which it reaches with a hop unless it stands there already (it never hops twice in one place).
      */
-    private fun startWalk(leadMs: Double, moves: Moves) {
+    private fun startWalk(leadMs: Double, level: Float, moves: Moves) {
         val index = check.index!! // the heard note's step, after any repeats forgiven
         if (listening.animalIndex != index || listening.animalHalfBeat != 0) moves.hop = true
         time = WalkTime(startMs = nowMs - leadMs)
-        listening = listening.copy(index = index, walk = Walk(index, 0, Walk.Phase.SOUNDING), wrong = null, heardNow = null, repeatHeld = false)
-        walkOn(shown = true, graceMs = 0.0, moves) // shown on this frame: no grace to add
+        listening = listening.copy(
+            index = index, walk = Walk(index, 0, Walk.Phase.SOUNDING), wrong = null, heardNow = null, repeatHeld = false, faded = false,
+        )
+        walkOn(level, shown = true, graceMs = 0.0, moves) // shown on this frame: no grace to add
     }
 
     /**
-     * The note walked goes on through this frame, [shown] by the tracker or only held by it, [graceMs] past the last
-     * frame shown at most: to the click it reached, and earned once it is long enough. A stretch the tracker only held
-     * (the gate blinking on a breathy tone) counts in full once the note is shown again.
+     * The note walked goes on through this frame, at [level], [shown] by the tracker or only held by it, [graceMs]
+     * past the last frame shown at most: to the click it reached, and earned once it is long enough. A stretch the
+     * tracker only held (the gate blinking on a breathy tone) counts in full once the note is shown again.
      */
-    private fun walkOn(shown: Boolean, graceMs: Double, moves: Moves) {
+    private fun walkOn(level: Float, shown: Boolean, graceMs: Double, moves: Moves) {
+        time.levels += level
         if (shown) time.sureMs = nowMs
         time.heldMs = minOf(nowMs, time.sureMs + graceMs) - time.startMs
         stepTo(time.heldMs, moves)
@@ -365,10 +388,30 @@ class ListenRun(
     /** The note walked stopped before it was long enough: the animal stays where it got to, and the step will earn a faint star. */
     private fun cutShort(moves: Moves) {
         val walk = listening.walk!!
+        // Only a note whose sound ended can have run out of air: one that went on into another note was still blown.
+        val faded = tracker.sounding == null && faded(time.levels)
         check.stumble()
-        moves.short = NoteTime(walk.index, time.heldMs.roundToLong(), needMs(walk.index).roundToLong())
-        listening = listening.copy(walk = walk.copy(phase = Walk.Phase.SHORT))
+        moves.short = NoteTime(walk.index, time.heldMs.roundToLong(), needMs(walk.index).roundToLong(), faded)
+        listening = listening.copy(walk = walk.copy(phase = Walk.Phase.SHORT), faded = faded)
     }
+
+    /**
+     * Whether a note walked through [levels] faded away before it stopped: its last [FADE_FRAMES] frames before the
+     * gap took over (the tracker's gap frames, walked, and the frame the sound stopped in) had fallen under
+     * [FADE_RATIO] of its own level, the median of the frames before them. Fewer than [FADE_FRAMES] of those is too
+     * few to tell: no guess.
+     */
+    private fun faded(levels: List<Float>): Boolean {
+        val gap = tracker.rules.onsetGapFrames
+        val own = levels.dropLast(gap + FADE_FRAMES)
+        if (own.size < FADE_FRAMES) return false
+        val end = levels.dropLast(gap).takeLast(FADE_FRAMES).average()
+        return end < FADE_RATIO * own.sorted()[own.size / 2]
+    }
+
+    /** Whether [heard], locked at [lockHz], is one semitone above [written] and within [ListenRules.NEAR_CENTS] of it. */
+    private fun nearAbove(heard: Int, lockHz: Double?, written: Int): Boolean =
+        heard == written + 1 && lockHz != null && NoteMath.centsBetween(lockHz, written) in 0.0..ListenRules.NEAR_CENTS
 
     /** An earned note's written time goes on on the clicks, sound or not; at its end the animal goes to the next note. */
     private fun finishTime(moves: Moves) {
@@ -459,6 +502,16 @@ class ListenRun(
          * a sweep of the tracker's gap moves note starts and not note lengths.
          */
         const val GRACE_FRAMES = NoteOnsetTracker.ONSET_GAP_FRAMES
+
+        /**
+         * The share of a note's own level its last frames must fall under for a note cut short to have faded away
+         * (the air running out) rather than stopped: the recordings of 2026-11-12 and 13 had 42 cuts stopped while
+         * strong and 3 faded. Changed only from recorded sessions.
+         */
+        const val FADE_RATIO = 0.85f
+
+        /** The frames at a note's end that [FADE_RATIO] judges, and the fewest of its own before them to judge against. */
+        const val FADE_FRAMES = 3
 
         /** Room for the sum of frame lengths to miss an exact beat by a rounding error. */
         private const val EPSILON_MS = 1e-6

@@ -1049,6 +1049,7 @@ class FluteViewModelTest {
         assertEquals(60, heard["expected"])
         assertEquals(72, heard["heard"])
         assertEquals("right", heard["verdict"])
+        assertEquals("an octave over the written c", 1200.0, heard["cents"] as Double, 0.01)
     }
 
     @Test
@@ -1641,6 +1642,7 @@ class FluteViewModelTest {
         val short = logger.events("flute.short").single()
         assertEquals(0, short["index"])
         assertEquals(625L, short["needMs"])
+        assertEquals(false, short["faded"])
         assertTrue("$short", (short["heldMs"] as Long) < 625)
         assertTrue(vm.current.marks.isEmpty())
         assertEquals(TunerAdvice.HOLD_LONGER, vm.current.advice)

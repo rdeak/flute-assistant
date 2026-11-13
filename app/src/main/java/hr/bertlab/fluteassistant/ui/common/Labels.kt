@@ -66,6 +66,8 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.CHECK_FINGERS -> R.string.advice_check_fingers
     TunerAdvice.PLAY_AGAIN -> R.string.advice_play_again
     TunerAdvice.HOLD_LONGER -> R.string.advice_hold_longer
+    TunerAdvice.OUT_OF_AIR -> R.string.advice_out_of_air
+    TunerAdvice.TOO_HIGH -> R.string.advice_too_high
 }
 
 /**

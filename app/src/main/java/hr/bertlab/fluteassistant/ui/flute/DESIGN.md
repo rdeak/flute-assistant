@@ -357,9 +357,16 @@ That sweep moved it (below, "The first runs with the walk").
 A note stops (silence, or an onset of another letter; an octave pop by a step, a slow sag into the next letter, the
 tracker's drift, and since 2026-11-13 its own letter started again with no gap, `ListenRun.Rules.restartCuts`, are the
 same note going on, so a child blowing a long note out is never told it stopped) before it is long enough: it is cut short (`Walk.Phase.SHORT`, `flute.short`), the
-animal stays on the click it reached, so the child sees how far the note got, the line says "🌬️ Hold it longer" /
-"🌬️ Drži notu dulje" (`advice_hold_longer`, `TunerAdvice.HOLD_LONGER`, under the microphone's advices and a held
-repeat, over "Check your fingers"; no fingering, the fingers were right; "drži notu" is the keys' own hint), and the
+animal stays on the click it reached, so the child sees how far the note got, the line says "🌬️ Hold it until the ⭐" /
+"🌬️ Drži notu do ⭐" (`advice_hold_longer`, `TunerAdvice.HOLD_LONGER`, under the microphone's advices and a held
+repeat, over "Check your fingers"; no fingering, the fingers were right; "drži notu" is the keys' own hint; the star
+is what shows the moment the note is long enough, so the line says how long, since 2026-11-13: it said "Hold it
+longer" before), or, when the note faded away before it stopped, "😮‍💨 Maybe out of air? Big breath first" / "😮‍💨 Možda
+nema zraka? Udahni" (`TunerAdvice.OUT_OF_AIR`, `Listening.faded`: its last frames before the gap had
+fallen under `ListenRun.FADE_RATIO`, 85%, of its own level; fewer than eight frames walked is no guess, nor is a note that went on into another one, still blown; a guess, so
+"maybe"; the Croatian is "Udahni" alone, to fit one line upright on a 360 dp phone at 1.3 times the text size: "Your turn: say why", spec `2026-11-13-flute-your-turn-why-lines-design.md`, the user's ask after the child
+"played it right" and was held back; the recordings of 2026-11-12 and 13 had 42 cuts stopped while strong and 3
+faded), and the
 run waits on that note until it is played again, from its head, and long enough, when it earns the faint star. The
 user chose this, "wait", over "mark and move on" (the short note gets the faint star and the next note moves the run
 on) after seeing what the recordings would have done: every child there went on through the tune after a short note,
@@ -436,7 +443,11 @@ line says "🪈 Play B4" / "🪈 Odsviraj h¹" (`flute_play_prompt`, the note wi
 a note was judged it says nothing, as before: the ring and the dots do, and a line changing under every note would
 pull the eye off the staff. After a wrong note the advice is "👀 Check your fingers" (`Listening.advice` gives
 `CHECK_FINGERS` while a wrong note stands, after the microphone's own advices and a held repeat, which keep their
-place) and over it stands the fingering of the note that was wanted (`FluteUiState.fingeringMidi`, the tuner's
+place), or, since 2026-11-13, for a wrong note one semitone above the written one that locked within `NEAR_CENTS`
+(70) of it, "🍃 Maybe too high? Gentler air" / "🍃 Možda previsoko? Nježniji zrak" (`WrongNote.tooHigh`,
+`TunerAdvice.TOO_HIGH`: the right fingers blown high sound like that, as the sharp flute of 2026-11-13 did on all 30
+of its b's heard as c; a guess, so "maybe"; "gentler air" is the tuner's own phrase; no "too low", since on that
+flute an f-sharp fingered for g came out just under the g and would have blamed the air), and over either stands the fingering of the note that was wanted (`FluteUiState.fingeringMidi`, the tuner's
 `FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage), until the right note is played: the
 heard note says what came out, this says how to get the other. Nothing is added while things go right, which is why
 the user chose it over the fingering under every note (the child would read the picture and not the notes). Playing
@@ -553,7 +564,8 @@ for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard
 heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
 retry, ignored or wrong, per new note the tracker reports: the pitch, at the onset), `flute.held` (index, heldMs:
 the note sounded long enough and earned its mark; since 2026-11-11), `flute.short` (index, heldMs, needMs: it
-stopped before that, "Hold it longer"), `flute.repeat_forgiven` (index: a
+stopped before that, "Hold it until the ⭐"; faded: it had faded away first, "Maybe out of air?"; since 2026-11-13),
+`flute.heard` also carries cents (where the note locked, from expected; since 2026-11-13), `flute.repeat_forgiven` (index: a
 written repeat of the note just judged passed over with a faint star because the note after it
 was heard, once per such step),
 `flute.listen_summary` every `ListenRules.SUMMARY_FRAMES` frames and once more at the end (the
@@ -639,4 +651,3 @@ longer than that scrolls as it does on a phone. `FluteTabletTest` holds these.
 A debug build records every "Your turn" run on the phone: the audio, a per-frame table and the run's
 log lines. How that works and how to pull, replay, sweep and pin a session is in the `sessions`
 skill (`.claude/skills/sessions/SKILL.md`). The audio is a child's playing: it leaves the phone only
-over the cable and never goes into git (the repository is public).

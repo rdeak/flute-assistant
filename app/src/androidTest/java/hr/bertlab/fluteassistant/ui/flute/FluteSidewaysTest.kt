@@ -352,7 +352,10 @@ class FluteSidewaysTest {
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)) to "🎵 Odsviraj jedan dug, čist ton",
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)) to "📱 Dođi bliže mobitelu",
             state.value.copy(listening = Listening(index = 0, repeatHeld = true)) to "🔁 Stani, pa odsviraj opet",
-            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))) to "🌬️ Drži notu dulje",
+            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))) to "🌬️ Drži notu do ⭐",
+            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)) to
+                "😮‍💨 Možda nema zraka? Udahni",
+            state.value.copy(listening = Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true))) to "🍃 Možda previsoko? Nježniji zrak",
         ).forEach { (next, advice) ->
             compose.runOnIdle { state.value = next }
             compose.waitForIdle()

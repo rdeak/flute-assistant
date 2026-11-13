@@ -11,8 +11,20 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.pow
 
 class NoteOnsetTrackerTest {
+
+    @Test
+    fun `the pitch a note locked at comes with its onset`() {
+        val tracker = NoteOnsetTracker()
+        val results = List(ListenRules.LOCK_FRAMES) { tracker.onFrame(pitched(71, cents = 55.0)) }
+        val locked = results.last()
+        assertEquals(72, locked.onset?.midi)
+        assertEquals(NoteMath.midiToFrequency(71) * 2.0.pow(55.0 / 1200), locked.lockHz!!, 1e-6)
+        assertTrue("no onset, no pitch passed on", results.dropLast(1).all { it.onset == null && it.lockHz == null })
+        assertNull(tracker.onFrame(pitched(71, cents = 55.0)).lockHz)
+    }
 
     private fun feed(tracker: NoteOnsetTracker, frames: List<PitchFrame>): List<NoteOnsetTracker.Result> = frames.map(tracker::onFrame)
 
