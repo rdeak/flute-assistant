@@ -21,6 +21,11 @@ which a tongued stop between two notes of one pitch drops where the window's lev
 produces the estimate; the engine uses `YinPitchDetector.forFlute`, which searches only one
 semitone beyond `FluteRange` (so voices and mains hum below the flute cannot register as low
 notes) and gates at `QUIET_ROOM_RMS` (about -60 dBFS, a value only a real phone can confirm).
+A dip still falling where the search ends gives no pitch (since 2026-11-14): it is the near side
+of a period longer than the range, and until then the end of the search was reported as that
+period, so a voice at 230 to 246 Hz read as a steady low B (246.15 Hz at 48 kHz) and "Your turn",
+which takes a note in any octave, took talk for the tune's B (`ui/flute/DESIGN.md`, "The room is
+not judged"). A real dip that bottoms out on the last lag is still a pitch.
 It reads the newest half of the window (since 2026-11-10; `differenceAt` sums over the stretch
 that ends on the window's last sample), so a frame's pitch and its `minLevel` describe the same
 hop: it read the oldest half before and heard every note one frame, 43 ms, late, which the

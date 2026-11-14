@@ -489,7 +489,16 @@ stops calling a sound close: `CLOSE_LEVEL` less its margin). So a miss still nev
 played at the phone can earn no mark. What it costs: a child playing very softly or far from the phone is asked to
 come closer instead of being judged; one room and one sitting of real playing stand behind the number, so a session
 where that happened is the thing to sweep (`-Psweep=minLevel:0,0.3,0.4,0.45`). A voice right at the phone is as loud
-as a flute and is still judged; no level can tell them apart. The tuner does not apply the floor. Tests:
+as a flute and is still judged; no level can tell them apart. The 20 runs of 2026-11-14 had such talk in most of
+them (somebody speaking before, between and after the notes, at 0.4 to 0.7), and showed one thing that was the
+detector's and not the room's: a voice a little under the flute's range came out as exactly the lowest pitch the
+detector searches (246.15 Hz, a low B; 73 frames that evening, 22 past the gate), because a dip still falling where
+the search ended was reported as a period. `TuneCheck` takes a note in any octave, so in `2026-11-14_20-24-41` talk
+was taken for the tune's B, two written repeats before it were passed over and the B's walk began with nobody
+playing. Such a dip gives no pitch since that evening (`YinPitchDetector.detect`, step 4; `YinPitchDetectorTest`):
+replayed, that run gives the two notes their full stars back, and no other mark changes in the 72 sessions recorded
+until then. A voice inside the range (twice that evening a low C at about 260 Hz between two notes, each costing a
+right note its full star) is still a pitch and still judged. The tuner does not apply the floor. Tests:
 `NoteOnsetTrackerTest` ("too faint to be the flute at the phone"), `ListenRunTest` (the advice), `ListenPathTest`
 (synthetic room sound before the child plays, with the floor and without). The synthetic tests' notes moved from
 0.4 to 0.7 with it: 0.4 was a guess from before sessions were recorded, and is the room's side of the floor now.

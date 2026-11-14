@@ -77,7 +77,10 @@ has it compared too: the frame a note was earned or cut short on. `report.html` 
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
 hear in the same sound. A sweep changes one of today's rules. The detector is not part of the rules:
 sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a
-frame or two whatever the rules. A frame's decision can be `FAINT` since 2026-11-10: a clear pitch
+frame or two whatever the rules, and sessions from before its fix of 2026-11-14 (a dip still falling
+where the search ends gives no pitch) differ on the frames where a voice read as the lowest pitch
+searched, 246.15 Hz: 40 of the 72 recorded until then, by 1 to 20 frames and no mark, and
+`2026-11-14_20-24-41` by 73 frames and two marks (the talk that was taken for a B). A frame's decision can be `FAINT` since 2026-11-10: a clear pitch
 under the loudness floor (`ui/flute/DESIGN.md`, "The room is not judged").
 
 `ListenPath` (test source set) frames the audio as the engine does and feeds it to `ListenRun`
