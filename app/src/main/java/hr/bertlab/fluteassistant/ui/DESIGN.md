@@ -121,10 +121,11 @@ under the tab bar). Each panel that takes a tab's place takes Back as its own wa
   book (`flute.shelf_close`); the microphone card: as Not now; a tune that runs, Play or Your turn: as Stop
   (`FluteContent`, a handler in each branch, and Compose asks the one composed last first);
 - the metronome tab: an open tempo wheel closes (`MetronomeContent`);
+- the tuner tab: the guide to tuning the flute closes (`TuningGuide`, since 2026-11-14);
 - the language list and the credits are a popup and a dialog and always closed on Back.
 
 With nothing open Back is the phone's: it leaves the app, as before, and a running metronome plays on. The tuner
-takes none (its microphone card has no way back: the tab is the microphone). The handlers stand above each
+takes none but for its guide (its microphone card has no way back: the tab is the microphone). The handlers stand above each
 `LocalSideways` branch, so a phone on its side has them too. Tests press it with `BackKey` (androidTest, `ui/common`):
 `Watch()` in the content, `press`, and `taken` for "Back is the phone's here"; a Back nothing takes would close the
 test's own Activity, so `press` refuses one.

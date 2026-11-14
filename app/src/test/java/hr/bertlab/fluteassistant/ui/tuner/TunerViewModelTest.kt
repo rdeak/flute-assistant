@@ -62,6 +62,31 @@ class TunerViewModelTest {
     }
 
     @Test
+    fun `the guide opens on the first card, moves and closes`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        assertNull(vm.state.value.guideCard)
+        vm.openGuide()
+        assertEquals(GuideCard.WARM_UP, vm.state.value.guideCard)
+        vm.showGuideCard(GuideCard.EACH_NOTE)
+        assertEquals(GuideCard.EACH_NOTE, vm.state.value.guideCard)
+        vm.closeGuide(GuideExit.BACK)
+        assertNull(vm.state.value.guideCard)
+        vm.openGuide()
+        assertEquals(GuideCard.WARM_UP, vm.state.value.guideCard) // always from the start
+        assertTrue(vm.state.value.isListening) // the microphone stays on underneath
+    }
+
+    @Test
+    fun `a closed guide is not moved or closed again`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        vm.showGuideCard(GuideCard.HEAD_JOINT)
+        assertNull(vm.state.value.guideCard)
+        vm.closeGuide(GuideExit.CLOSE)
+        assertNull(vm.state.value.guideCard)
+    }
+
+    @Test
     fun `does not listen without permission`() = runTest(dispatcher) {
         val vm = TunerViewModel(engine, settings, tonePlayer, logger)
         vm.startListening()

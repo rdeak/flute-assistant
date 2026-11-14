@@ -169,6 +169,26 @@ class TunerViewModel @Inject constructor(
         _state.update { it.copy(isPlayingReference = false) }
     }
 
+    /** Opens the guide to tuning the flute, always on its first card. The microphone stays on underneath. */
+    fun openGuide() {
+        logger.d(LogTags.TUNER, "tuner.guide", "action" to "open", "page" to GuideCard.WARM_UP.ordinal)
+        _state.update { it.copy(guideCard = GuideCard.WARM_UP) }
+    }
+
+    /** Shows [card] of an open guide; does nothing while it is closed. */
+    fun showGuideCard(card: GuideCard) {
+        if (_state.value.guideCard == null) return
+        logger.d(LogTags.TUNER, "tuner.guide", "action" to "page", "page" to card.ordinal)
+        _state.update { it.copy(guideCard = card) }
+    }
+
+    /** Closes the guide, logging the card it was left on and [via] what; does nothing while it is closed. */
+    fun closeGuide(via: GuideExit) {
+        val card = _state.value.guideCard ?: return
+        logger.d(LogTags.TUNER, "tuner.guide", "action" to "close", "page" to card.ordinal, "via" to via.name.lowercase())
+        _state.update { it.copy(guideCard = null) }
+    }
+
     /** Switches between naming the heard note and measuring against the chosen one; remembered. */
     fun setMode(mode: TunerMode) {
         settings.saveTunerMode(mode)

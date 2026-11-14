@@ -61,6 +61,7 @@ class TunerSidewaysTest {
     private val notes = mutableListOf<Int>()
     private val modes = mutableListOf<TunerMode>()
     private var hears = 0
+    private var guideOpens = 0
     private var requests = 0
     private var settings = 0
     private var dismissals = 0
@@ -91,6 +92,7 @@ class TunerSidewaysTest {
                         onPlayNote = { hears++ },
                         onRequestPermission = { requests++ },
                         onOpenSettings = { settings++ },
+                        onOpenGuide = { guideOpens++ },
                     )
                 }
             }
@@ -391,6 +393,13 @@ class TunerSidewaysTest {
                     assertNear("$label: Hear's width", each.column.dp, hear.right - hear.left)
                     assertTrue("$label: Hear ends at ${hear.bottom}, Which? starts at ${which.top}", hear.bottom <= which.top)
                     assertNear("$label: Hear is at the top of the column", 14.dp, hear.top)
+                    val how = bounds(word("How?").assertIsDisplayed())
+                    assertInside(each, "$label: How?", word("How?"), shadow = 5.dp)
+                    assertNear("$label: How?'s width", each.column.dp, how.right - how.left)
+                    assertTrue("$label: How? starts at ${how.top}, Hear ends at ${hear.bottom}", how.top >= hear.bottom)
+                    assertTrue("$label: How? and its shadow end at ${how.bottom + 5.dp}, Which? starts at ${which.top}", how.bottom + 5.dp <= which.top)
+                } else {
+                    word("How?").assertDoesNotExist()
                 }
             }
         }
@@ -451,7 +460,7 @@ class TunerSidewaysTest {
         show(listening(430.0), Phone(915, 411))
         val window = bounds(window())
         val status = bounds(word("⬆️ A little higher"))
-        val advice = bounds(word("🔄 Roll the flute out a little"))
+        val advice = bounds(word("🔧 Push the head joint in a little"))
         assertTrue("the status starts at ${status.left}, the window ends at ${window.right}", status.left >= window.right)
         assertTrue("the advice is under the status", advice.top >= status.bottom - SLACK)
         assertTrue("the fingering is under the advice", bounds(fingering()).top >= advice.bottom - SLACK)
@@ -465,8 +474,18 @@ class TunerSidewaysTest {
         Case(listening(261.63, targetMidi = 72), listOf("⬆️ An octave higher", "💨 Faster air"), listOf("⬆️ Oktavu više", "💨 Brži zrak")),
         Case(listening(329.63), listOf("⬆️ That's E4", "👀 Check your fingers"), listOf("⬆️ To je e1", "👀 Provjeri prste")),
         Case(listening(440.0, targetMidi = 67), listOf("⬇️ That's A4", "👀 Check your fingers"), listOf("⬇️ To je a1", "👀 Provjeri prste")),
-        Case(listening(430.0), listOf("⬆️ A little higher", "🔄 Roll the flute out a little"), listOf("⬆️ Malo više", "🔄 Zakreni flautu malo od sebe")),
-        Case(listening(443.0), listOf("⬇️ A little lower", "🔄 Roll the flute in a little"), listOf("⬇️ Malo niže", "🔄 Zakreni flautu malo k sebi")),
+        Case(listening(430.0), listOf("⬆️ A little higher", "🔧 Push the head joint in a little"), listOf("⬆️ Malo više", "🔧 Gurni glavu flaute malo unutra")),
+        Case(listening(443.0), listOf("⬇️ A little lower", "🔧 Pull the head joint out a little"), listOf("⬇️ Malo niže", "🔧 Izvuci glavu flaute malo van")),
+        Case(
+            listening(NoteMath.midiToFrequency(72) * 0.985, targetMidi = 72),
+            listOf("⬆️ A little higher", "🔄 Roll the flute out a little"),
+            listOf("⬆️ Malo više", "🔄 Zakreni flautu malo od sebe"),
+        ),
+        Case(
+            listening(NoteMath.midiToFrequency(72) * 1.015, targetMidi = 72),
+            listOf("⬇️ A little lower", "🔄 Roll the flute in a little"),
+            listOf("⬇️ Malo niže", "🔄 Zakreni flautu malo k sebi"),
+        ),
         Case(
             listening(null).copy(hearing = Hearing.LOUD_UNCLEAR),
             listOf("👂 Play A4", "🎵 Play one long, clear note"),
@@ -511,12 +530,63 @@ class TunerSidewaysTest {
         show(listening(null), locale = Locale("hr"), fontScale = 1.5f)
         PHONES.forEach { each ->
             on(each)
-            listOf("Koji?", "Ugodi", "Slušaj").forEach { name ->
+            listOf("Koji?", "Ugodi", "Slušaj", "Kako?").forEach { name ->
                 assertInside(each, name, word(name).assertIsDisplayed(), shadow = 5.dp)
                 assertWholeWords(each, name)
             }
         }
     }
+
+    // ---- How? ----
+
+    /** How? joins Hear above the pair, which stays where it stands in Which? mode, where neither is shown. */
+    @Test
+    fun the_mode_pair_does_not_move_when_how_is_added() {
+        show(listening(null, mode = TunerMode.IDENTIFY))
+        listOf(Phone(915, 411), Phone(800, 360), Phone(640, 360)).forEach { each ->
+            on(each)
+            compose.runOnIdle { state.value = listening(null, mode = TunerMode.IDENTIFY) }
+            compose.waitForIdle()
+            val which = bounds(word("Which?"))
+            val tune = bounds(word("Tune"))
+            compose.runOnIdle { state.value = listening(null, mode = TunerMode.TARGET) }
+            compose.waitForIdle()
+            word("How?").assertIsDisplayed()
+            assertNear("$each: Which?'s top", which.top, bounds(word("Which?")).top)
+            assertNear("$each: Which?'s bottom", which.bottom, bounds(word("Which?")).bottom)
+            assertNear("$each: Tune's top", tune.top, bounds(word("Tune")).top)
+        }
+    }
+
+    @Test
+    fun how_opens_the_guide() {
+        show(listening(null))
+        word("How?").performClick()
+        assertEquals(1, guideOpens)
+    }
+
+    private fun assertHearAndHowFit(locale: Locale, fontScale: Float, words: List<String>) {
+        show(listening(null), locale = locale, fontScale = fontScale)
+        PHONES.forEach { each ->
+            on(each)
+            words.forEach { name ->
+                assertInside(each, "$name at $fontScale", word(name).assertIsDisplayed(), shadow = 5.dp)
+                assertWholeWords(each, name)
+            }
+        }
+    }
+
+    @Test
+    fun how_fits_in_english_at_large_text() = assertHearAndHowFit(Locale.ENGLISH, 1.5f, listOf("Hear", "How?"))
+
+    @Test
+    fun how_fits_in_english_at_the_largest_text() = assertHearAndHowFit(Locale.ENGLISH, 2f, listOf("Hear", "How?"))
+
+    @Test
+    fun how_fits_in_croatian_at_large_text() = assertHearAndHowFit(Locale("hr"), 1.5f, listOf("Slušaj", "Kako?"))
+
+    @Test
+    fun how_fits_in_croatian_at_the_largest_text() = assertHearAndHowFit(Locale("hr"), 2f, listOf("Slušaj", "Kako?"))
 
     // ---- Asking for the microphone ----
 

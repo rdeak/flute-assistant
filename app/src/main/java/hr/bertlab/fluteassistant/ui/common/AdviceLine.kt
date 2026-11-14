@@ -6,6 +6,7 @@ package hr.bertlab.fluteassistant.ui.common
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -63,16 +64,22 @@ fun AdviceLine(
         WrappedAdvice(text, style.copy(lineHeight = 1.3.em), wrapMaxFont, modifier)
         return
     }
+    // The line height follows the size autoSize picks (the style's 28 over 22 at the normal size, so that
+    // size looks as before); in sp it stayed 28 sp, 42 dp at 1.5x, and no advice fitted the 28 dp box
+    // at a large text size. The floor is in dp for the same reason as the wrapped block's.
+    val floor = with(LocalDensity.current) { OneLineMinFont.toSp() }
     Text(
         text = text,
-        style = style,
+        style = style.copy(lineHeight = OneLineHeight),
         color = FluteTheme.colors.mutedText,
         textAlign = TextAlign.Center,
         maxLines = 1,
-        autoSize = TextAutoSize.StepBased(minFontSize = 14.sp, maxFontSize = 22.sp),
+        autoSize = TextAutoSize.StepBased(minFontSize = floor, maxFontSize = 22.sp),
         modifier = modifier
             .fillMaxWidth()
-            .height(28.dp),
+            .height(28.dp)
+            // A line that shrank is shorter than its 28 dp: in the middle of it, as the full-size line is.
+            .wrapContentHeight(),
     )
 }
 
@@ -109,6 +116,12 @@ private fun smaller(a: TextUnit, b: TextUnit): TextUnit = if (a < b) a else b
 
 /** The smallest the wrapped advice gets, whatever the text size: what 12 sp is at the normal one. */
 private val WrapMinFont = 12.dp
+
+/** The smallest the one-line advice gets, whatever the text size (it was 14 sp, which is 21 dp at 1.5x). */
+private val OneLineMinFont = 12.dp
+
+/** The one-line advice's line height relative to its size: bodyLarge's 28 sp over its 22 sp. */
+private val OneLineHeight = (28f / 22f).em
 
 /** The size, in px, a word is measured at. */
 private const val REFERENCE_PX = 100f

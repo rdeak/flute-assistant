@@ -112,7 +112,8 @@ Log events (tag `FA.Tuner`): `mic.open` (source, rate, buffer), `mic.close`, `tu
 `ListenRules.SUMMARY_FRAMES` frames (counts per decision, `faint` among them since 2026-11-10 and always 0 here, as only the flute's tracker decides it; pMin/pMax/pMean against `gate`,
 levelMean, reading, target, mode, hearing), `tuner.reading` when the shown note changes,
 `tuner.hearing` (hearing, levelMean) when it changes, `tuner.target`, `tuner.mode`,
-`tuner.reference`, `tuner.error`, `reference.error`.
+`tuner.reference`, `tuner.error`, `reference.error`, `tuner.guide` (action `open`, `page` or `close`; `page`,
+the card's index; `via` `ok`, `close` or `back` on close).
 
 ## The tab on screen
 
@@ -126,7 +127,29 @@ bubble fills, sits in the ring and gets a tick and sparkles, and in "Which?" sil
 grey with "…". In "Tune" the window sits between ‹ › with a "Hear" pill under it (spec:
 `docs/superpowers/specs/2026-10-22-tuner-target-note-design.md`); then the fingering for the ring's
 note, one status line and, under it, one quieter advice line that says what to change (roll the
-flute, air, fingers, come closer, a clear note), never a number.
+flute, the head joint, air, fingers, come closer, a clear note), never a number.
+
+**How to tune** (2026-11-14, at the user's request: "does not tell what to change on flute"; spec
+`docs/superpowers/specs/2026-11-14-tuning-guide-design.md`, mockups in the brainstorm folder it names).
+- **The head-joint hint.** In Tune mode with `FluteRange.TUNING_NOTE` (a1 / A4) chosen, a flat or sharp
+  reading of that note says "🔧 Push the head joint in a little" / "Pull … out" (`TunerAdvice.HEAD_JOINT_IN`,
+  `HEAD_JOINT_OUT`) where every other note, and Which? mode on A4 too, still says to roll the flute. The head
+  joint is set once, on one note, warmed up and at the usual loudness; afterwards single notes drift by
+  themselves (low flat, high sharp) and the lips fix them, so naming the head joint on any other note would
+  have a child move it for one note and spoil the rest. Revision 5 had left the head joint to the teacher;
+  the child's flute of 2026-11-12/13, sharp by about 30 cents on every note, is why it changed.
+- **The 🔧 How? pill** beside Hear in Tune mode, in Hear's row and at its height (both share the row and
+  shrink their words to 12 dp before either is cut); sideways under Hear in the column, both 80 dp tall (70
+  on a short phone), so the Which?/Tune pair does not move. It opens the guide.
+- **The guide** (`TuningGuide`, pictures in `TuningGuidePictures`) takes the tab's place: four cards
+  (`GuideCard`: warm up, the head joint on A4, check each note, one note still off: leave the head joint and
+  roll the whole flute), each a picture over a title and a few words, ‹ › and dots, ✕ to leave, a green OK
+  in place of the dots and › on the last card (upright; sideways a ✓ named OK, as "U redu" does not fit half
+  the column). The phone's Back closes it (`BackHandler` in `TuningGuide`). Its card is
+  `TunerUiState.guideCard`, so a turn and a tab switch keep it; it always opens on the first card, and
+  the microphone stays on underneath. The words give way before the picture: they shrink to 12 dp and the
+  picture keeps at least 40% of the card, upright and sideways, at 2x text (`TuningGuideTest`). The pictures
+  hold the text size at 1x and scale as a whole, and are silent to a screen reader: the card's words say it.
 
 **One direction on screen** (2026-11-10, found on the user's phone with real sound). Off the note, the status line
 says which way to go and its arrow points the way the window's own arrow does: "⬆️ A little higher" / "⬆️ Malo više"
@@ -170,9 +193,10 @@ as the height leaves little choice. The numbers come from `SidewaysGeometry`, wh
   line (`micFailed`, `mic_failed`) in the advice's box, as nothing is heard then, so it moves nothing either
   (upright it stands under the advice). The cause goes to the log (`tuner.error`) and never to the screen: a child can do nothing with it. Both shrink before they cut a
   word (`StatusLine` and `AdviceLine` have floors and `autoSize` for large text).
-- **The right column** holds the buttons, 116 wide with the emoji over the word: Hear at the top in Tune mode only
-  (84 tall, faded while the note plays), and Which? over Tune as one child low (92 tall, 80 when the window is short), the
-  chosen one yellow; one child, so the pair stays low whether or not Hear is above it. They are a
+- **The right column** holds the buttons, 116 wide with the emoji over the word: Hear over How? at the top in Tune
+  mode only, as one child (80 tall each with 10 between, 70 and 8 when the window is short; Hear faded while the note
+  plays; since 2026-11-14, Hear was 84 alone before), and Which? over Tune as one child low (92 tall, 80 when the
+  window is short), the chosen one yellow; one child each, so the pair stays low whether or not Hear and How? are above it. They are a
   `selectableGroup` with the `tuner_mode` description.
 - **Asking for the microphone** (tuner and flute): `MicrophonePermissionCard` branches itself, so the flute
   gets it free. The disc on the left of the card (up to 0.38 of its width), "Can I listen?" and its line beside

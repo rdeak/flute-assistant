@@ -45,7 +45,8 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   will not ask again (`tuner/CLAUDE.md`, "Asking for the microphone").
 - **The phone's Back** is the way back the screen itself shows, wherever one is open: OK on the
   notes picker and the flute's speed panel, a tap on the open book on the shelf, Not now on the
-  flute's microphone card, Stop while a tune runs, and it closes an open tempo wheel first. With
+  flute's microphone card, Stop while a tune runs, ✕ or OK on the tuner's guide, and it closes an open
+  tempo wheel first. With
   nothing open it is the phone's and leaves the app. A new panel gets a `BackHandler` and a test
   with `BackKey` (androidTest): `DESIGN.md`, "The phone's Back".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
@@ -54,7 +55,7 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   both too (it also takes the flute's "Play B4"): the same.
 - **A test of a fit compares bounds.** `assertIsDisplayed` does not prove one: what spills past a
   window is still displayed. Compare `getUnclippedBoundsInRoot()` with the room, and ask
-  `GetTextLayoutResult` about words (`TabletFitTest.assertWhole`).
+  `GetTextLayoutResult` about words (`assertWhole`, `ui/common/WholeText.kt` in androidTest).
 
 ## Sideways
 

@@ -23,7 +23,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -34,6 +33,8 @@ import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
+import hr.bertlab.fluteassistant.ui.tuner.GuideCard
+import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.TabletHost
 import hr.bertlab.fluteassistant.ui.common.TabletSize
@@ -47,7 +48,6 @@ import hr.bertlab.fluteassistant.ui.notes.NotesActions
 import hr.bertlab.fluteassistant.ui.notes.NotesContent
 import hr.bertlab.fluteassistant.ui.tuner.TunerContent
 import hr.bertlab.fluteassistant.ui.tuner.TunerUiState
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -121,7 +121,7 @@ class TabletFitTest {
         for (index in 0 until count) {
             val node = nodes[index]
             assertInside(case, node)
-            if (SemanticsActions.GetTextLayoutResult in node.fetchSemanticsNode().config) assertWhole(case, node)
+            if (SemanticsActions.GetTextLayoutResult in node.fetchSemanticsNode().config) assertWhole(case, node, textScale)
         }
     }
 
@@ -132,33 +132,6 @@ class TabletFitTest {
         val what = describe(node)
         assertTrue("$case: $what starts at ${bounds.left} x ${bounds.top}", bounds.left >= -SLACK && bounds.top >= -SLACK)
         assertTrue("$case: $what ends at ${bounds.right} x ${bounds.bottom}, the room is $right x $bottom", bounds.right <= right && bounds.bottom <= bottom)
-    }
-
-    private fun assertWhole(case: String, node: SemanticsNodeInteraction) {
-        val layouts = mutableListOf<TextLayoutResult>()
-        node.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
-        val layout = layouts.single()
-        val text = layout.layoutInput.text.text
-        // Not `hasVisualOverflow`: for a plain `Text` this action hands back a paragraph as wide as the room
-        // and a box as wide as the word, which reads as an overflow however short the word is.
-        val paragraph = layout.multiParagraph
-        // A note's name in its pill or bubble is set in a fixed size and clips at twice the text, on a
-        // phone just the same, so the tablet is not asked to do better; everything else is.
-        if (textScale > 1f && NOTE_NAME.matches(text)) return
-        if (text.isBlank()) return // The advice line with nothing to say.
-        val wider = layout.lineCount == 1 && paragraph.maxIntrinsicWidth > layout.size.width + ROUNDING
-        val taller = paragraph.height > layout.size.height + ROUNDING
-        val ellipsized = (0 until layout.lineCount).any(layout::isLineEllipsized)
-        assertFalse(
-            "$case: \"$text\" is cut short: its box is ${layout.size}, its text ${paragraph.maxIntrinsicWidth} x ${paragraph.height}",
-            paragraph.didExceedMaxLines || taller || wider || ellipsized,
-        )
-        for (line in 0 until layout.lineCount - 1) {
-            assertTrue(
-                "$case: \"$text\" breaks inside a word after line $line",
-                text[layout.getLineEnd(line) - 1].isWhitespace(),
-            )
-        }
     }
 
     private fun describe(node: SemanticsNodeInteraction) = node.fetchSemanticsNode().config.toString().take(120)
@@ -231,6 +204,12 @@ class TabletFitTest {
     }
 
     @Test
+    fun the_tuning_guide_fits() = assertFitsEverywhere(stays = R.string.tune_guide_warm_up_title) {
+        // The card's title, as only the upright guide has the "How to tune" heading.
+        Tuner(TunerUiState(permissionGranted = true, isListening = true, mode = TunerMode.TARGET, guideCard = GuideCard.WARM_UP))
+    }
+
+    @Test
     fun the_microphone_card_fits() = assertFitsEverywhere { Tuner(TunerUiState(permissionGranted = false, micBlocked = true)) }
 
     @Test
@@ -258,9 +237,6 @@ class TabletFitTest {
     private companion object {
         const val ROOM = "the_tab_area"
 
-        /** A box is rounded to whole pixels and its text is not. */
-        const val ROUNDING = 1f
-        val NOTE_NAME = Regex("[A-Ha-h][1-6]")
         val SLACK = 2.dp
     }
 }

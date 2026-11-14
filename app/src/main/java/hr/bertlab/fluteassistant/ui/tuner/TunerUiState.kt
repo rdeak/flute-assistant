@@ -39,6 +39,12 @@ data class TunerUiState(
     val hearing: Hearing = Hearing.CLEAR,
     /** The microphone would not open or stopped: what the child sees is a string resource, the cause is in the log. */
     val micFailed: Boolean = false,
+    /**
+     * The card of the guide to tuning the flute on screen in the tab's place, or null when the guide
+     * is closed. Kept here, not in the screen, so a turn and a tab switch keep it, and so opening and
+     * leaving it are logged (`tuner.guide`).
+     */
+    val guideCard: GuideCard? = null,
 ) {
     /** Distance in cents from [targetMidi] to the played note (positive = sharp), or null in silence. */
     val centsOffTarget: Double?
@@ -104,6 +110,9 @@ data class TunerUiState(
     /**
      * The one line of advice under the status line, derived so the composable only maps an
      * enum to a string. A reading wins over [hearing], and the reference tone wins over both.
+     * A flat or sharp note gets rolling, except when the child tunes on [FluteRange.TUNING_NOTE]:
+     * the head joint is set once, on that note, and every other note drifts by itself and is
+     * fixed with the lips, so only there does it name the head joint.
      */
     val advice: TunerAdvice
         get() = when {
@@ -118,10 +127,16 @@ data class TunerUiState(
                 TargetMismatch.OCTAVE_DOWN -> TunerAdvice.FASTER_AIR
                 TargetMismatch.OCTAVE_UP -> TunerAdvice.GENTLER_AIR
                 TargetMismatch.OTHER_NOTE -> TunerAdvice.CHECK_FINGERS
-                TargetMismatch.NONE ->
-                    if (status == TuningStatus.LOW) TunerAdvice.ROLL_OUT else TunerAdvice.ROLL_IN
+                TargetMismatch.NONE -> when {
+                    isTuningNote -> if (status == TuningStatus.LOW) TunerAdvice.HEAD_JOINT_IN else TunerAdvice.HEAD_JOINT_OUT
+                    else -> if (status == TuningStatus.LOW) TunerAdvice.ROLL_OUT else TunerAdvice.ROLL_IN
+                }
             }
         }
+
+    /** Tuning the flute itself: Tune mode with the tuning note chosen. */
+    private val isTuningNote: Boolean
+        get() = mode == TunerMode.TARGET && targetMidi == FluteRange.TUNING_NOTE
 
     companion object {
         /**

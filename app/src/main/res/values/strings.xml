@@ -59,6 +59,26 @@
     <string name="lower_note">Lower note</string>
     <string name="higher_note">Higher note</string>
     <string name="hear_note">Hear</string>
+    <!-- The tuner's Tune mode, beside Hear: opens the four picture cards on tuning the flute -->
+    <string name="tune_how">How?</string>
+    <!-- The guide to tuning the flute: the words under the arrows on its head-joint picture -->
+    <string name="tune_guide_push_in">push in</string>
+    <string name="tune_guide_pull_out">pull out</string>
+    <!-- The guide's heading, its buttons' names for a screen reader, its OK, and its four cards (title, words);
+         the head-joint card's %1$s is the tuning note, A4 -->
+    <string name="tune_guide_title">🔧 How to tune</string>
+    <string name="tune_guide_back">Back</string>
+    <string name="tune_guide_next">Next</string>
+    <string name="tune_guide_close">Close</string>
+    <string name="tune_guide_done">OK</string>
+    <string name="tune_guide_warm_up_title">🌡️ Warm up first</string>
+    <string name="tune_guide_warm_up_text">Play a few long notes. A cold flute sounds too low.</string>
+    <string name="tune_guide_head_joint_title">🎯 Tune on %1$s</string>
+    <string name="tune_guide_head_joint_text">Play a long %1$s, as loud as you always play. Move the head joint a tiny bit, as thin as a coin, the way the tuner says. Play again.</string>
+    <string name="tune_guide_each_note_title">👂 Check each note</string>
+    <string name="tune_guide_each_note_text">Pick a note with ‹ ›, tap 🔊 Hear, then play it long. Wait until the bubble stops moving, then look.</string>
+    <string name="tune_guide_one_note_off_title">🔄 One note still off?</string>
+    <string name="tune_guide_one_note_off_text">Don\'t slide the head joint again. Roll the whole flute a little, the way the small line under the tuner says.</string>
     <!-- Status line while the reference note sounds from the speaker -->
     <string name="listen_status">🔊 Listen</string>
     <!-- Accessibility name of the fingering diagram; the argument is the note, e.g. "A4" -->
@@ -88,6 +108,9 @@
     <string name="advice_clear_note">🎵 Play one long, clear note</string>
     <string name="advice_roll_out">🔄 Roll the flute out a little</string>
     <string name="advice_roll_in">🔄 Roll the flute in a little</string>
+    <!-- Only when tuning on a1 / A4 (FluteRange.TUNING_NOTE): the fix on the flute itself -->
+    <string name="advice_head_joint_in">🔧 Push the head joint in a little</string>
+    <string name="advice_head_joint_out">🔧 Pull the head joint out a little</string>
     <string name="advice_faster_air">💨 Faster air</string>
     <string name="advice_gentler_air">🍃 Gentler air</string>
     <string name="advice_check_fingers">👀 Check your fingers</string>

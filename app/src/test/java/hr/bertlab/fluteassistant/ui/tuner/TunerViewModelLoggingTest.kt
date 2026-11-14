@@ -56,6 +56,29 @@ class TunerViewModelLoggingTest {
     private fun steady(freq: Double) = repeat(ListenRules.LOCK_FRAMES) { engine.frames.tryEmit(pitched(freq)) }
 
     @Test
+    fun `the guide logs opening, each card and closing`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        vm.closeGuide(GuideExit.CLOSE) // closed already: nothing to log
+        vm.showGuideCard(GuideCard.EACH_NOTE) // closed: nothing to move
+        assertTrue(logger.events("tuner.guide").isEmpty())
+
+        vm.openGuide()
+        vm.showGuideCard(GuideCard.EACH_NOTE)
+        vm.closeGuide(GuideExit.BACK)
+
+        val events = logger.events("tuner.guide")
+        assertEquals(listOf("open", "page", "close"), events.map { it["action"] })
+        events.forEach {
+            assertEquals(LogTags.TUNER, it.tag)
+            assertEquals('d', it.level)
+        }
+        assertEquals(0, events[0]["page"])
+        assertEquals(2, events[1]["page"])
+        assertEquals(2, events[2]["page"])
+        assertEquals("back", events[2]["via"])
+    }
+
+    @Test
     fun `a summary of frame decisions is logged about once a second`() = runTest(dispatcher) {
         listeningViewModel()
         advanceUntilIdle()

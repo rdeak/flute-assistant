@@ -7,7 +7,8 @@ package hr.bertlab.fluteassistant.domain.listen
  * The one short line under the status line saying what to change: nothing, come closer to the
  * phone or play one long clear note when the sound is unclear, roll the flute out for a flat
  * note and in for a sharp one, faster air for the octave below and gentler air for the octave
- * above the chosen note, or check the fingers for any other note.
+ * above the chosen note, or check the fingers for any other note. On the tuning note the tuner
+ * names the head joint instead of rolling (since 2026-11-14).
  */
 enum class TunerAdvice {
     NONE, COME_CLOSER, CLEAR_NOTE, ROLL_OUT, ROLL_IN, FASTER_AIR, GENTLER_AIR, CHECK_FINGERS,
@@ -19,4 +20,8 @@ enum class TunerAdvice {
     OUT_OF_AIR,
     /** The flute's only: a wrong note just above the written one, a guess that it was blown too high. */
     TOO_HIGH,
+    /** The tuner's only: the tuning note chosen and played flat, so the head joint goes in a little. */
+    HEAD_JOINT_IN,
+    /** The tuner's only: the tuning note chosen and played sharp, so the head joint comes out a little. */
+    HEAD_JOINT_OUT,
 }

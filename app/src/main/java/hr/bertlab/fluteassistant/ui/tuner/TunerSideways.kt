@@ -88,6 +88,15 @@ private val ErrorMinFont = 12.dp
 /** The longest words shrink to this before they are cut; bigger than a bubble's number, and only a large text size on a small phone gets there. */
 private val StatusMinFont = 12.sp
 
+/**
+ * Hear over How? at the top of the column in Tune mode: 80 tall with 10 between on the 915 x 411 phone,
+ * 70 with 8 between on a short one, so both stand clear of the mode pair and its shadow.
+ */
+private val TopHeight = 80.dp
+private val TopHeightShort = 70.dp
+private val TopGap = 10.dp
+private val TopGapShort = 8.dp
+
 /** Mode buttons: 92 tall with 13 between on the 915 x 411 phone, 80 with 9 between on a short one. */
 private val ModeHeight = 92.dp
 private val ModeHeightShort = 80.dp
@@ -106,6 +115,7 @@ internal fun TunerSideways(
     onModeChange: (TunerMode) -> Unit,
     onPlayNote: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenGuide: () -> Unit = {},
 ) {
     val groupLabel = stringResource(R.string.tuner_mode)
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -117,12 +127,22 @@ internal fun TunerSideways(
         SidewaysPage(
             column = {
                 if (state.mode == TunerMode.TARGET) {
-                    SidewaysPlainButton(
-                        emoji = SPEAKER_EMOJI,
-                        text = stringResource(R.string.hear_note),
-                        onClick = onPlayNote,
-                        enabled = !state.isPlayingReference,
-                    )
+                    // Hear over How? as one child, so the column keeps two and the pair stays low.
+                    Column(verticalArrangement = Arrangement.spacedBy(if (short) TopGapShort else TopGap)) {
+                        SidewaysPlainButton(
+                            emoji = SPEAKER_EMOJI,
+                            text = stringResource(R.string.hear_note),
+                            onClick = onPlayNote,
+                            enabled = !state.isPlayingReference,
+                            height = if (short) TopHeightShort else TopHeight,
+                        )
+                        SidewaysPlainButton(
+                            emoji = WRENCH_EMOJI,
+                            text = stringResource(R.string.tune_how),
+                            onClick = onOpenGuide,
+                            height = if (short) TopHeightShort else TopHeight,
+                        )
+                    }
                 }
                 // One child, so the pair stays low whether or not Hear is above it.
                 Column(
