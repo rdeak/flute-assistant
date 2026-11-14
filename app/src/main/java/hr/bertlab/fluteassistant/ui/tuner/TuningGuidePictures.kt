@@ -118,25 +118,27 @@ private fun WarmUpPicture() {
 @Composable
 private fun HeadJointPicture() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        listOf(
-            Triple(R.string.too_low, JointArrow.PUSH_IN, R.string.tune_guide_push_in),
-            Triple(R.string.too_high, JointArrow.PULL_OUT, R.string.tune_guide_pull_out),
-        ).forEach { (status, arrow, label) ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                StatusChip(stringResource(status))
-                val gap = if (arrow == JointArrow.PULL_OUT) PULLED_GAP else 0f
-                FluteSide(Modifier.width(fluteWidth(gap)), jointGap = gap, arrow = arrow)
-                Text(
-                    stringResource(label),
-                    color = FluteTheme.colors.text,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .align(Alignment.Start)
-                        .padding(start = 18.dp),
-                )
-            }
-        }
+        JointMove(R.string.too_low, JointArrow.PUSH_IN, R.string.tune_guide_push_in)
+        JointMove(R.string.too_high, JointArrow.PULL_OUT, R.string.tune_guide_pull_out)
+    }
+}
+
+/** One of card 2's flutes: the tuner's [status] line over it, its head joint moved as [arrow] says, and the move's [label] under it. */
+@Composable
+private fun JointMove(status: Int, arrow: JointArrow, label: Int) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        StatusChip(stringResource(status))
+        val gap = if (arrow == JointArrow.PULL_OUT) PULLED_GAP else 0f
+        FluteSide(Modifier.width(fluteWidth(gap)), jointGap = gap, arrow = arrow)
+        Text(
+            stringResource(label),
+            color = FluteTheme.colors.text,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .align(Alignment.Start)
+                .padding(start = 18.dp),
+        )
     }
 }
 
@@ -273,50 +275,50 @@ internal fun FluteSide(
     val gridHeight = if (rollRing) GRID_HEIGHT else GRID_HEIGHT_NO_RING
     Canvas(modifier.aspectRatio(gridWidth / gridHeight)) {
         val unit = size.width / gridWidth
-        val grid = Grid(unit)
+        val grid = Grid(this, unit)
         val head = headColor ?: Metal
         val line = colors.text
 
-        if (breath) grid.breath(this)
-        if (rollRing) grid.ringBack(this, colors.mutedText)
+        if (breath) grid.breath()
+        if (rollRing) grid.ringBack(colors.mutedText)
 
-        grid.box(this, 8f, FLUTE_Y - TUBE / 2f, HEAD_END - 8f, TUBE, 6f, head)
-        grid.box(this, 2f, FLUTE_Y - 14f, 12f, 28f, 5f, MetalShade)
-        grid.box(this, 44f, FLUTE_Y - 17f, 38f, 34f, 14f, head)
+        grid.box(8f, FLUTE_Y - TUBE / 2f, HEAD_END - 8f, TUBE, 6f, head)
+        grid.box(2f, FLUTE_Y - 14f, 12f, 28f, 5f, MetalShade)
+        grid.box(44f, FLUTE_Y - 17f, 38f, 34f, 14f, head)
         drawOval(InkOnFill, grid.at(63f - 9f, FLUTE_Y - 6f), Size(18f * unit, 12f * unit))
         val bodyStart = HEAD_END + jointGap
-        grid.box(this, bodyStart, FLUTE_Y - TUBE / 2f, BODY_END - HEAD_END, TUBE, 4f, Metal)
-        grid.box(this, bodyStart - 6f, FLUTE_Y - TUBE / 2f - 3f, 12f, TUBE + 6f, 3f, MetalShade)
-        BODY_KEYS.forEach { grid.key(this, it + jointGap, 7f) }
-        grid.box(this, BODY_END + jointGap, FLUTE_Y - TUBE / 2f, 46f, TUBE, 5f, Metal)
-        grid.key(this, 314f + jointGap, 6f)
+        grid.box(bodyStart, FLUTE_Y - TUBE / 2f, BODY_END - HEAD_END, TUBE, 4f, Metal)
+        grid.box(bodyStart - 6f, FLUTE_Y - TUBE / 2f - 3f, 12f, TUBE + 6f, 3f, MetalShade)
+        BODY_KEYS.forEach { grid.key(it + jointGap, 7f) }
+        grid.box(BODY_END + jointGap, FLUTE_Y - TUBE / 2f, 46f, TUBE, 5f, Metal)
+        grid.key(314f + jointGap, 6f)
 
         when (arrow) {
-            JointArrow.PUSH_IN -> grid.arrow(this, 40f, 100f, pointsRight = true, InTuneGreen)
-            JointArrow.PULL_OUT -> grid.arrow(this, 48f, 108f, pointsRight = false, PullOrange)
+            JointArrow.PUSH_IN -> grid.arrow(40f, 100f, pointsRight = true, InTuneGreen)
+            JointArrow.PULL_OUT -> grid.arrow(48f, 108f, pointsRight = false, PullOrange)
             null -> Unit
         }
-        if (rollRing) grid.ringFront(this, line)
+        if (rollRing) grid.ringFront(line)
     }
 }
 
-/** The mockup's 340 x 130 grid scaled by [unit] px per grid step. */
-private class Grid(val unit: Float) {
+/** The mockup's 340 x 130 grid drawn on [scope], scaled by [unit] px per grid step. */
+private class Grid(private val scope: DrawScope, private val unit: Float) {
     fun at(x: Float, y: Float) = Offset(x * unit, y * unit)
 
     /** A rounded box filled with [fill] and outlined in ink, as every part of the flute is. */
-    fun box(scope: DrawScope, x: Float, y: Float, w: Float, h: Float, r: Float, fill: Color) = with(scope) {
+    fun box(x: Float, y: Float, w: Float, h: Float, r: Float, fill: Color) = with(scope) {
         drawRoundRect(fill, at(x, y), Size(w * unit, h * unit), CornerRadius(r * unit))
         drawRoundRect(InkOnFill, at(x, y), Size(w * unit, h * unit), CornerRadius(r * unit), style = Stroke(3f * unit))
     }
 
-    fun key(scope: DrawScope, x: Float, r: Float) = with(scope) {
+    fun key(x: Float, r: Float) = with(scope) {
         drawCircle(Color.White, r * unit, at(x, FLUTE_Y))
         drawCircle(InkOnFill, r * unit, at(x, FLUTE_Y), style = Stroke(2.5f * unit))
     }
 
     /** A thick arrow above the head joint from [from] to [to] (grid x), its head at the end it points to. */
-    fun arrow(scope: DrawScope, from: Float, to: Float, pointsRight: Boolean, color: Color) = with(scope) {
+    fun arrow(from: Float, to: Float, pointsRight: Boolean, color: Color) = with(scope) {
         val y = 30f
         val stroke = Stroke(7f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round)
         drawLine(color, at(from, y), at(to, y), 7f * unit, StrokeCap.Round)
@@ -331,7 +333,7 @@ private class Grid(val unit: Float) {
     }
 
     /** Two warm waves rising from the lip plate. */
-    fun breath(scope: DrawScope) = with(scope) {
+    fun breath() = with(scope) {
         listOf(36f to BreathRed, 56f to BreathOrange).forEach { (x, color) ->
             val wave = Path().apply {
                 moveTo(x * unit, 50f * unit)
@@ -343,7 +345,7 @@ private class Grid(val unit: Float) {
     }
 
     /** The ring's half behind the tube: dotted, from the top left round to the bottom. */
-    fun ringBack(scope: DrawScope, color: Color) = with(scope) {
+    fun ringBack(color: Color) = with(scope) {
         drawArc(
             color = color,
             startAngle = 90f,
@@ -360,7 +362,7 @@ private class Grid(val unit: Float) {
      * ring. At night its line is near-white, which all but vanishes where it crosses a yellow head joint, so a
      * light line gets an ink casing; by day the line is ink already and is drawn as the mockup draws it.
      */
-    fun ringFront(scope: DrawScope, color: Color) = with(scope) {
+    fun ringFront(color: Color) = with(scope) {
         val cased = color.luminance() > 0.5f
         // Angles are counted as on paper (anticlockwise from the right, y up); the canvas counts clockwise.
         fun arc(stroke: Float, arcColor: Color) = drawArc(

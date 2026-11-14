@@ -941,6 +941,24 @@ class ListenRunTest {
     }
 
     @Test
+    fun `a note played again that already reaches the click the animal stopped on is no hop`() {
+        // Cut short on its second beat, then played again with an attack that wavers for over a beat before it
+        // locks: those frames are the note's (the tracker's lead), so by its onset it has reached the same click.
+        // Before, the way back to the head counted as a hop, and the animal hopped on the spot.
+        val run = timed(h(60), q(62))
+        run.begin(60)
+        run.hold(60, after(1200.0))
+        run.stop()
+        assertEquals(Walk(0, 2, Walk.Phase.SHORT), run.listening.walk)
+        repeat(framesFor(1000.0)) { run.onFrame(pitched(60, cents = if (it % 2 == 0) 20.0 else -20.0)) }
+        assertEquals("the wavering attack is no note yet", Walk(0, 2, Walk.Phase.SHORT), run.listening.walk)
+        val again = generateSequence { run.onFrame(pitched(60)) }.first { it.heard != null }
+        assertEquals(Verdict.RETRY, again.heard?.verdict)
+        assertEquals(Walk(0, 2, Walk.Phase.SOUNDING), run.listening.walk)
+        assertFalse("it stands where it stood", again.hop)
+    }
+
+    @Test
     fun `a wobble of other notes before the note is not the note's time`() {
         val run = timed(q(60), q(62))
         repeat(9) { run.onFrame(pitched(if (it % 2 == 0) 64 else 66)) }

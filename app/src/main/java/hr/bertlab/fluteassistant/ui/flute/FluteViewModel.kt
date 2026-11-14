@@ -263,9 +263,10 @@ class FluteViewModel @Inject constructor(
 
     /**
      * "Your turn": opens the microphone and waits for the child to play the tune, from its first
-     * note (rests and breaths before it are passed over), marking each note once it is long
-     * enough; the last note earned ends it. Nothing is played. Nothing happens while the tune plays back, while it
-     * is listening already, or when the tune holds no note.
+     * note (a rest before it is walked on its clicks as in Play, a breath passed over), marking each
+     * note once it is long enough; the last note earned ends it, after any rest behind it is walked.
+     * Nothing is played. Nothing happens while the tune plays back, while it is listening already, or
+     * when the tune holds no note.
      */
     fun startListening() {
         val current = _state.value

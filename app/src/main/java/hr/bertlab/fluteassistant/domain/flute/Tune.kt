@@ -66,16 +66,21 @@ data class Pulse(val bpm: Int, val timeSignature: TimeSignature = TimeSignature.
 }
 
 /** One step of the child's tune: a [TuneNote], a [TuneRest] or a [TuneBreath]. */
-sealed interface TuneItem
+sealed interface TuneItem {
+    /** How long the step lasts: a note's or a rest's length, and null for a breath, which takes no time. */
+    val length: NoteLength?
+}
 
 /** One note of the child's tune: which key, and how long it lasts ([NoteLength], in beats). */
-data class TuneNote(val midi: Int, val length: NoteLength) : TuneItem
+data class TuneNote(val midi: Int, override val length: NoteLength) : TuneItem
 
 /** A silence the child made on purpose with the rest key, as long as the key was held, like a note. */
-data class TuneRest(val length: NoteLength) : TuneItem
+data class TuneRest(override val length: NoteLength) : TuneItem
 
 /** A sign for the player that this is the place to take a breath: no sound and no time, playback goes past it. */
-data object TuneBreath : TuneItem
+data object TuneBreath : TuneItem {
+    override val length: NoteLength? get() = null
+}
 
 /**
  * One step of the tune as Play plays it: the step at [index] sounds [midi] (null: a rest, silent)
@@ -144,11 +149,7 @@ object Tune {
     fun playSteps(items: List<TuneItem>, pulse: Pulse): List<PlayStep> {
         var startsAt = 0 // half beats from the start of the tune to this step
         return items.mapIndexedNotNull { index, item ->
-            val length = when (item) {
-                is TuneNote -> item.length
-                is TuneRest -> item.length
-                TuneBreath -> return@mapIndexedNotNull null
-            }
+            val length = item.length ?: return@mapIndexedNotNull null
             val duration = durationMs(length, pulse)
             val clicks = (0 until length.halfBeats).filter { (startsAt + it) % pulse.halfBeatsPerClick == 0 }
             val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.halfBeatMs).roundToLong(), it) } +

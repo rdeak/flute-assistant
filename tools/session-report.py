@@ -311,15 +311,21 @@ def build(session, folder):
                 glyph = (PITCH_GLYPH if has_walk else {}).get(v, MARK_GLYPH.get(v, v))
                 word = (PITCH_WORD if has_walk else {}).get(v, MARK_WORD.get(v, v))
                 w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>%s</title>%s</text>' % (x, y - 12, color, html.escape(word), glyph))
-    # the walk: a star on the frame a note was long enough, a mark on the frame one was cut short
+    # the walk: a star on the frame a note was long enough, a mark on the frame one was cut short. A session
+    # cut off before its end line has no marks: there a step that stumbled first (a wrong note, a cut) is faint.
+    stumbled = set()
     before = (None, None)
     for i, r in enumerate(rows):
+        if r.get("verdict") == "wrong" and r.get("waited"):
+            stumbled.add(r["waited"])
         now = (r.get("walk") or None, r.get("phase") or None)
+        if now[1] == "SHORT":
+            stumbled.add(now[0])
         if now != before and now[1] in ("DONE", "SHORT"):
             x = x_of(i + 1)
             y = level_y(r)
             if now[1] == "DONE":
-                mark = "RETRY" if marks.get(int(now[0])) == "RETRY" else "FIRST_TRY"
+                mark = marks.get(int(now[0])) or ("RETRY" if now[0] in stumbled else "FIRST_TRY")
                 w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s was long enough: %s</title>%s</text>' % (x, y - 12, STAR_COLOR[mark], now[0], "a faint star" if mark == "RETRY" else "a star", STAR_GLYPH[mark]))
             else:
                 w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was cut short: hold it longer</title>✂</text>' % (x, y - 12, now[0]))

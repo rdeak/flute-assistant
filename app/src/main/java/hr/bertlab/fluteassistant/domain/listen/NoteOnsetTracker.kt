@@ -119,7 +119,8 @@ class NoteOnsetTracker(
      * phone was sure of it: the frames in a row before it that sounded near the pitch that locked
      * ([leadOf]), after silence as after another note (a step, an octave pop). Frames of other notes
      * before them are not its; nor is anything before a stop or, while a note sounded, before a
-     * frame that did not count, so a tongued restart starts at its onset. 0 when no note began.
+     * frame that did not count or that showed that note going on, so a tongued restart starts at its
+     * onset and a slur starts after the last frame of the note before. 0 when no note began.
      * [lockHz] is the pitch the note locked at, the median that named it (how far it lies from a
      * written note says whether a wrong one was a near miss); null when no note began.
      */
@@ -165,8 +166,8 @@ class NoteOnsetTracker(
     /**
      * The newest frames in a row that a note beginning now may have begun in, oldest first: each counted frame's
      * frequency, and null for a frame the gate missed while nothing sounded (a breathy blink inside a note that
-     * is beginning). Emptied by a stop and, while a note sounds, by a frame that did not count: what came before
-     * was the old note's. [leadOf] reads [Result.leadFrames] from it.
+     * is beginning). Emptied by a stop and, while a note sounds, by a frame that did not count or that showed the
+     * note going on: what came before was the old note's. [leadOf] reads [Result.leadFrames] from it.
      */
     private val runFrames = ArrayDeque<Double?>()
     /** Frames since a stop was heard inside the sounding note, or -1 when none is pending. */
@@ -210,6 +211,10 @@ class NoteOnsetTracker(
             recentLevels.addLast(frame.level)
             framesSinceOnset = 0
             stopAge = -1
+        } else if (stopAge < 0) {
+            // Shown as the sounding note going on (no stop waits to be a restart): this frame and all before it are
+            // that note's, however near the pitch of a note stepped to after them (a sharp b, then a slur to c).
+            runFrames.clear()
         }
         sounding = identified
         ageStop()

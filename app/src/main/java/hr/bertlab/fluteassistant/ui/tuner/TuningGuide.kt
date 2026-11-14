@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -146,10 +147,8 @@ private fun TuningGuideUpright(card: GuideCard, onCard: (GuideCard) -> Unit, onC
                 .height(72.dp)
                 .padding(horizontal = 4.dp),
         ) {
-            StepIcon(AppIcons.ChevronLeft, R.string.tune_guide_back, enabled = card != GuideCard.entries.first(), Modifier.size(64.dp)) {
-                onCard(GuideCard.entries[card.ordinal - 1])
-            }
-            if (card == GuideCard.entries.last()) {
+            StepIcon(AppIcons.ChevronLeft, R.string.tune_guide_back, card.previous, onCard, Modifier.size(64.dp))
+            if (card.next == null) {
                 Spacer(Modifier.width(16.dp))
                 BigActionButton(
                     icon = AppIcons.Done,
@@ -161,9 +160,7 @@ private fun TuningGuideUpright(card: GuideCard, onCard: (GuideCard) -> Unit, onC
                 )
             } else {
                 Dots(card)
-                StepIcon(AppIcons.ChevronRight, R.string.tune_guide_next, enabled = true, Modifier.size(64.dp)) {
-                    onCard(GuideCard.entries[card.ordinal + 1])
-                }
+                StepIcon(AppIcons.ChevronRight, R.string.tune_guide_next, card.next, onCard, Modifier.size(64.dp))
             }
         }
     }
@@ -190,10 +187,8 @@ private fun TuningGuideSideways(card: GuideCard, onCard: (GuideCard) -> Unit, on
                     val pair = Modifier
                         .weight(1f)
                         .height(if (short) 80.dp else 92.dp)
-                    StepIcon(AppIcons.ChevronLeft, R.string.tune_guide_back, enabled = card != GuideCard.entries.first(), pair, RoundedCornerShape(26.dp)) {
-                        onCard(GuideCard.entries[card.ordinal - 1])
-                    }
-                    if (card == GuideCard.entries.last()) {
+                    StepIcon(AppIcons.ChevronLeft, R.string.tune_guide_back, card.previous, onCard, pair, RoundedCornerShape(26.dp))
+                    if (card.next == null) {
                         // No room for "U redu" in half the column: the tick alone, named OK for a screen reader.
                         ChunkyButton(
                             onClick = { onClose(GuideExit.OK) },
@@ -205,9 +200,7 @@ private fun TuningGuideSideways(card: GuideCard, onCard: (GuideCard) -> Unit, on
                             Icon(AppIcons.Done, contentDescription = stringResource(R.string.tune_guide_done), tint = OnAction, modifier = Modifier.size(30.dp))
                         }
                     } else {
-                        StepIcon(AppIcons.ChevronRight, R.string.tune_guide_next, enabled = true, pair, RoundedCornerShape(26.dp)) {
-                            onCard(GuideCard.entries[card.ordinal + 1])
-                        }
+                        StepIcon(AppIcons.ChevronRight, R.string.tune_guide_next, card.next, onCard, pair, RoundedCornerShape(26.dp))
                     }
                 }
             },
@@ -302,17 +295,20 @@ private fun Dots(card: GuideCard) {
     }
 }
 
-/** A ‹ or › of the guide: a chunky button with the drawn chevron, named for a screen reader, faded when it cannot go. */
+/**
+ * A ‹ or › of the guide, to the card [to]: a chunky button with the drawn chevron, named for a screen reader, faded
+ * when there is no such card.
+ */
 @Composable
 private fun StepIcon(
     icon: ImageVector,
     description: Int,
-    enabled: Boolean,
+    to: GuideCard?,
+    onCard: (GuideCard) -> Unit,
     modifier: Modifier,
-    shape: androidx.compose.ui.graphics.Shape = CircleShape,
-    onClick: () -> Unit,
+    shape: Shape = CircleShape,
 ) {
-    ChunkyButton(onClick = onClick, enabled = enabled, shape = shape, modifier = modifier) {
+    ChunkyButton(onClick = { to?.let(onCard) }, enabled = to != null, shape = shape, modifier = modifier) {
         Icon(icon, contentDescription = stringResource(description), modifier = Modifier.size(32.dp))
     }
 }

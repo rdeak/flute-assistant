@@ -421,4 +421,16 @@ class NoteOnsetTrackerTest {
         assertEquals(60, results.last().onset?.midi)
         assertEquals("the frame 40 cents off and the two that locked it", ListenRules.LOCK_FRAMES, results.last().leadFrames)
     }
+
+    @Test
+    fun `a held note played sharp gives the semitone slurred to after it no head start`() {
+        // b held 35 cents sharp, then a slur to c 5 cents flat: the two lie 60 cents apart, inside the near band, but
+        // the b sounded as b and its frames are b's. Before, all twenty were the c's lead, and a whole note was earned
+        // on its onset frame.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(20) { pitched(71, cents = 35.0) })
+        val slurred = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(72, cents = -5.0) }).last()
+        assertEquals(NoteOnsetTracker.Onset(72, fresh = false), slurred.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, slurred.leadFrames)
+    }
 }

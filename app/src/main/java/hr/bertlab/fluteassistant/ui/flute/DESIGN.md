@@ -333,7 +333,9 @@ the frames in a row before the onset that sounded within `NEAR_CENTS` of the pit
 silence and after another note alike; none for a tongued restart of the same note; an attack that scoops into the note
 is the note's, as in the session `17-04-38`, whose g begins 55 cents sharp, and a wobble of other notes or a slide
 before it is not, which the second review of 2026-11-11 found counted: eleven frames of other notes had earned a
-quarter on its onset frame), the animal steps to each click inside the note at the half beats Play puts them on
+quarter on its onset frame; nor is a frame the tracker showed as the note before going on, however near, as a b held
+35 cents sharp and slurred to c lies inside `NEAR_CENTS` of it and gave the c every one of its frames, the review of
+2026-11-14), the animal steps to each click inside the note at the half beats Play puts them on
 (`Tune.playSteps`), with a hop, and only to another place: a note beginning where the animal already stands is no hop
 (the user's rule of 2026-11-04 for Play, never two hops in one place; the first build hopped at the onset too, on
 the spot, 128 ms after landing there). What counts as the note sounding is every frame the tracker shows it and at
