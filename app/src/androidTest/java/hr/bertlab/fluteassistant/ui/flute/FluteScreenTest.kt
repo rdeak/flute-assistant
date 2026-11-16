@@ -106,6 +106,7 @@ class FluteScreenTest {
     private val released = mutableListOf<Int>()
     private val activated = mutableListOf<Int>()
     private val scrolled = mutableListOf<Int>()
+    private val scrolledCanMove = mutableListOf<Boolean>()
     private var playToggles = 0
     private var erases = 0
     private val restEvents = mutableListOf<String>()
@@ -152,7 +153,10 @@ class FluteScreenTest {
                             onKeyPressed = { pressed += it },
                             onKeyReleased = { released += it },
                             onKeyActivated = { activated += it },
-                            onKeyScrolled = { midi, _, _ -> scrolled += midi },
+                            onKeyScrolled = { midi, _, _, canMove ->
+                                scrolled += midi
+                                scrolledCanMove += canMove
+                            },
                             onRestPressed = { restEvents += "press" },
                             onRestReleased = { restEvents += "release" },
                             onRestActivated = { restEvents += "activate" },
@@ -1874,6 +1878,30 @@ class FluteScreenTest {
             }
         }
         assertEquals("ring pixels above the rows' top", 0, sun)
+    }
+
+    /**
+     * A press taken back says whether the rows could move the way the finger went (the user, 2026-11-16, for the phone
+     * test): at their bottom a drag up cannot move them, so such a press was a sloppy tap, not a scroll; a drag down can.
+     */
+    @Test
+    fun a_press_taken_back_says_whether_the_rows_could_move() {
+        show(FluteUiState(), height = avdTab)
+        val key = compose.onNodeWithContentDescription("C4")
+        key.performTouchInput {
+            down(center)
+            advanceEventTime(40)
+            moveBy(Offset(0f, -30.dp.toPx()))
+            up()
+        }
+        key.performTouchInput {
+            down(center)
+            advanceEventTime(40)
+            moveBy(Offset(0f, 30.dp.toPx()))
+            up()
+        }
+        assertEquals(listOf(60, 60), scrolled)
+        assertEquals(listOf(false, true), scrolledCanMove)
     }
 
 }

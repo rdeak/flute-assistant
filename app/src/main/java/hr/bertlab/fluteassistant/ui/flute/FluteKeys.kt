@@ -109,7 +109,7 @@ internal const val KEY_ROWS_TAG = "flute_key_rows"
 /**
  * A finger on a key in the scrolling rows that starts them scrolling within this long of its press was a scroll, and its
  * press is taken back; held longer, the key is a note and the rows stand still under it (2026-11-16, the user's rule A; set
- * from a phone test with a child, by `flute.press_scrolled`'s ms).
+ * from a phone test with a child, by `flute.press_scrolled`'s ms, dy and canMove).
  */
 internal const val SCROLL_DECIDE_MS = 150L
 
@@ -196,7 +196,7 @@ fun FluteKeys(
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
     KeepAtBottom(place)
-    val touch = remember { KeysTouch() }
+    val touch = remember(place) { KeysTouch(place.scroll) }
     BoxWithConstraints(modifier.semantics { contentDescription = groupLabel }) {
         val density = LocalDensity.current
         val white = KeysGeometry.whiteHeight(maxHeight.value, maxKeyHeight.value)
@@ -358,9 +358,12 @@ private fun ScrollingRows(grid: KeysGrid, height: Int, litMidi: Int?, actions: F
     }
 }
 
-/** The fingers on the keys: how many keys are down, and how many of them hold the scrolling rows still. */
+/**
+ * The fingers on the keys: how many keys are down, and how many of them hold the scrolling rows still; and the rows'
+ * [scroll], which says whether a drag could move them.
+ */
 @Stable
-private class KeysTouch {
+private class KeysTouch(val scroll: ScrollState) {
     var down by mutableIntStateOf(0)
     var holding by mutableIntStateOf(0)
 
@@ -632,7 +635,7 @@ private fun FluteKey(
                         touch = touch,
                         onPress = { currentOnPress(midi) },
                         onRelease = { currentOnRelease(midi) },
-                        onScrolled = { ms, dy -> currentOnScrolled(midi, ms, dy) },
+                        onScrolled = { ms, dy, canMove -> currentOnScrolled(midi, ms, dy, canMove) },
                     )
                     return@pointerInput
                 }
@@ -681,10 +684,13 @@ private suspend fun PointerInputScope.rowKeyGesture(
     touch: KeysTouch,
     onPress: () -> Unit,
     onRelease: () -> Unit,
-    onScrolled: (ms: Long, dy: Float) -> Unit,
+    onScrolled: (ms: Long, dy: Float, canMove: Boolean) -> Unit,
 ) = awaitEachGesture {
     val down = awaitFirstDown()
     down.consume()
+    // Where the rows stand as the finger lands: at an end, a drag that way cannot move them (`canMove`).
+    val atTop = touch.scroll.value <= 0
+    val atBottom = touch.scroll.value >= touch.scroll.maxValue
     var holds = false
     fun hold() {
         if (!holds) {
@@ -715,7 +721,8 @@ private suspend fun PointerInputScope.rowKeyGesture(
             if (!change.pressed) break
             if (!holds && change.isConsumed && change.positionChangeIgnoreConsumed() != Offset.Zero) {
                 letGo = false
-                onScrolled(waited, (change.position.y - down.position.y).toDp().value)
+                val dy = (change.position.y - down.position.y).toDp().value
+                onScrolled(waited, dy, if (dy > 0) !atTop else !atBottom) // a finger going down shows the rows above
                 break
             }
             if (change.isOutOfBounds(size, extendedTouchPadding)) break

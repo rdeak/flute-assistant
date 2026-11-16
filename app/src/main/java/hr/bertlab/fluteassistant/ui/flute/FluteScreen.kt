@@ -160,8 +160,11 @@ class FluteActions(
     val onRestReleased: () -> Unit = {},
     val onRestActivated: () -> Unit = {},
     val onBreath: () -> Unit = {},
-    /** A press taken back: the finger on the key began scrolling the keys, after ms and dy dp (since 2026-11-16). */
-    val onKeyScrolled: (Int, Long, Float) -> Unit = { _, _, _ -> },
+    /**
+     * A press taken back: the finger on the key began scrolling the keys, after ms and dy dp, and whether the rows could
+     * move that way (since 2026-11-16).
+     */
+    val onKeyScrolled: (Int, Long, Float, Boolean) -> Unit = { _, _, _, _ -> },
     /** The ⌒ key: the next note is joined to the last one (since 2026-11-16). */
     val onJoin: () -> Unit = {},
     val onEraseLast: () -> Unit = {},

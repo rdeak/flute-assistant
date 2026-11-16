@@ -83,8 +83,8 @@ import javax.inject.Inject
  * Logs under [LogTags.FLUTE]: `flute.note` per note ended (midi, heldMs, length, added: false
  * at the cap, joined: joined to the note before), `flute.rest` per rest ended (heldMs, length, added), `flute.rejoin` (midi, none
  * for the rest, gapMs) when a key let go of goes on, `flute.breath` (added: false
- * at the cap or right after a breath), `flute.press_scrolled` (midi, ms, dy: a press taken back because the finger began
- * scrolling the keys, since 2026-11-16), `flute.join` (waiting: true when the ⌒ key set a join, false when its
+ * at the cap or right after a breath), `flute.press_scrolled` (midi, ms, dy, canMove: a press taken back because the
+ * finger began scrolling the keys, and whether the rows could move that way, since 2026-11-16), `flute.join` (waiting: true when the ⌒ key set a join, false when its
  * second tap cancelled one or there was nothing to join from), `flute.join_cancel` (reason: rest, breath, erase,
  * play, listen, book, speed or leave: a waiting join dropped), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
  * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left),
@@ -185,9 +185,11 @@ class FluteViewModel @Inject constructor(
      * The finger on the key of [midi] began scrolling the keys within [ms] of its press, [dy] dp from where it landed
      * (since 2026-11-16): the press is taken back, the sound stopped and nothing else changes, not the tune, the stored
      * book, the marks of the last Listen to me or a waiting join. A press that cannot be taken back (it ended another
-     * key's hold) is let go as a note.
+     * key's hold) is let go as a note. [canMove]: whether the rows could move the way the finger went, as they stood
+     * when it landed; false at their end, where such a press was a sloppy tap rather than a scroll (logged for the
+     * phone test that sets `SCROLL_DECIDE_MS`).
      */
-    fun onKeyScrolled(midi: Int, ms: Long, dy: Float) {
+    fun onKeyScrolled(midi: Int, ms: Long, dy: Float, canMove: Boolean) {
         if (midi != writer.held?.midi) return
         if (!writer.takeBack()) return onKeyReleased(midi)
         tonePlayer.noteOff()
@@ -196,7 +198,7 @@ class FluteViewModel @Inject constructor(
         written()
         _state.update { it.copy(marks = marksBeforePress) }
         storeBook()
-        logger.d(LogTags.FLUTE, "flute.press_scrolled", "midi" to midi, "ms" to ms, "dy" to dy)
+        logger.d(LogTags.FLUTE, "flute.press_scrolled", "midi" to midi, "ms" to ms, "dy" to dy, "canMove" to canMove)
     }
 
     /** A screen reader activated the key of [midi]: sound it for one beat and add it, a quarter note. */

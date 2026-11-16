@@ -132,7 +132,7 @@ change that part). The songbook is in `SONGBOOK.md`.
   (C6 and 💤 held count too); a press that ended another key's hold is never taken back. The rows have no stretch at
   their ends (`overscrollEffect = null`): while one relaxes the rows take every touch, and a key tapped right after a
   flick made no sound. Change the 150 only from a phone test with the child
-  (`flute.press_scrolled`'s ms and dy). The staff: a black note on its letter's place with its ♯ or ♭, and a ♮ on a
+  (`flute.press_scrolled`'s ms, dy and canMove: false when the rows were at their end that way, a sloppy tap). The staff: a black note on its letter's place with its ♯ or ♭, and a ♮ on a
   white note whose place carried a ♯ or ♭ earlier in the bar (`Bars`); a signed step is `ACCIDENTAL_ROOM` (10 dp)
   wider. Listen to me keeps exact semitones; a semitone slurred on a flute off its pitch is a step, read from the
   note heard sounding (`NoteOnsetTracker.Rules.stepFromSounding`); F fingered for F♯ on a flute 60 cents sharp reads

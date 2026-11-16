@@ -752,8 +752,8 @@ held, since the final review); rows that fit do not scroll at all, so a drag on 
 Where the rows stood at their bottom is saved with their scroll, so a restore (a language switch) keeps rows a child left
 at their top. The costs, accepted: a blip of sound when a
 scroll starts on a key, a tap whose finger slides past the slop inside the 150 ms writes nothing, a drag begun after
-resting on a key writes a note and scrolls nothing. The 150 is to be set from a phone test with the child, by the ms and
-dy `flute.press_scrolled` carries. On the staff (Claude's calls, from `staff.html`): a black note sits on its letter's
+resting on a key writes a note and scrolls nothing. The 150 is to be set from a phone test with the child, by the ms, dy
+and canMove `flute.press_scrolled` carries (canMove false: the rows were at their end that way, a sloppy tap). On the staff (Claude's calls, from `staff.html`): a black note sits on its letter's
 place (`FluteNotes.positionOf`) with its own ♯ or ♭, and a white note whose place carried a ♯ or ♭ earlier in the bar
 gets a ♮ (`Bars`, the bar is the one the note's first piece starts in; a rest or a breath changes nothing; the next bar
 starts clean); a signed step is `ACCIDENTAL_ROOM` (10 dp) wider, the sign centred `SIGN_X` (17 dp) left of the head
@@ -779,8 +779,11 @@ length, added: false at the cap, joined: joined to the note before, since 2026-1
 (waiting: true when the ⌒ key set a join, false when its second tap cancelled one or there was nothing to join from;
 since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, play, listen, book, speed or leave: a waiting join
 dropped; since 2026-11-16), `flute.rest` (heldMs, length, added, per rest
-ended), `flute.press_scrolled` (midi, ms, dy: a press on a key in the scrolling rows taken back because the rows took
-the finger for a scroll ms after it landed, dy dp from where it landed; since 2026-11-16, in place of its
+ended), `flute.press_scrolled` (midi, ms, dy, canMove: a press on a key in the scrolling rows taken back because the
+rows took the finger for a scroll ms after it landed, dy dp from where it landed; canMove whether the rows could move the
+way the finger went, as they stood when it landed, false at their end, where a drag that way moves nothing (or, on a tab
+too short for them, only the tab), so such a press was a sloppy tap rather than a scroll, the user's ask of 2026-11-16 for
+the phone test; dy at the moment of the decision is about the touch slop either way; since 2026-11-16, in place of its
 `flute.note`; a press that had gone on with a note let go a moment before logs its `flute.rejoin` first, and taken
 back it leaves that note as it was let go, which no line says again), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pressed again within
 `HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
