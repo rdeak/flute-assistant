@@ -43,7 +43,8 @@ clicks under the bubble went with the bubble in the canvas of 2026-11-02, see be
 of the note) taken out of its end so a repeated note is heard twice and the tempo stays exact.
 The time between presses is not recorded (a child hunting for the next key would make the tune
 halting): a silence is only ever a rest the child put there. The stored string
-(`"60:2,r:2,b,67:4"`: a note's MIDI or `r` for a rest, then half beats, and `b` for a breath;
+(`"60:2,r:2,b,67:4,69:2:s"`: a note's MIDI or `r` for a rest, then half beats, and `b` for a breath; a third field `s`
+on a note joined to the one before since 2026-11-16, "Legato";
 `decode` is lenient and ignores a third field, `sanitize` keeps only `StaffNotes.ALL` notes and
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
 snapped (never under 300), converted at the stored tempo; since 2026-11-04 the tune is one of the
@@ -664,9 +665,56 @@ the tune goes through `save()`, which writes the open book, and `FluteViewModel`
 `open_book` key being missing, never by the books being empty: a child who wipes all six must not
 get the old tune back.
 
+Legato (2026-11-16; spec `docs/superpowers/specs/2026-11-16-flute-legato-design.md`, plan
+`docs/superpowers/plans/2026-11-16-flute-legato.md`, both local). The child learned slurs and has sheet music with them
+(the user: "legato is next thing child has learned and has notes with it", and not to wait for recordings: "this is new
+feature"). Of three ways the user picked a join key, one tap per pair (A); a slur switch (B) stays on and joins the wrong
+notes when tapped a note late, and pressing the next key before letting go (C) is invisible and needs two fingers;
+sliding across the keys was out, each row being an octave. The ⌒ key stands left of 💤 (the top row had three empty
+columns; the user's offer to shrink and scroll the keys is kept for the next feature, more notes). From true-size
+mockups (`.superpowers/brainstorm/9597-1794833435/`) the user took 1C, the key's picture the slur it draws (the staff's
+own crescent, `slurPath`); 2A, the slur under the heads in ink, where the sheet music has it with every stem up, and one
+muted arc under the pills, as ties are drawn; 3A, ✂️ in the star's place (a cut arc sat half hidden at the running
+staff's left edge, where the note before the lit one stands). Writing: a tap after a note, or while its key is held
+(which goes on sounding: `onJoin` never ends a held key), waits, the key down in its ring, read as selected, and a
+dashed arc running on from the note; the next note pressed is `TuneNote.joined`. A second tap, 💤, 😮‍💨, 🧽 (which
+cancels and erases nothing), Play, Listen to me, the book, the speed panel and leaving the tab cancel it
+(`flute.join_cancel`); with nothing to join from (an empty tune, after a rest or a breath, the cap) the key is faded. A
+join to the same note is a tie, drawn as a tie at a bar line is and played as one sound, so a dotted quarter can be
+written as a quarter tied to an eighth. Play drops the gap before a joined note and glides into it
+(`FluteTonePlayer.glide`: the pitch moves phase-continuous, the level held); a key pressed over a held key keeps its
+short dip, since a smooth change there would sound joined without being written joined. The staff draws every arc in
+one layer over the row (`SlurLayer`), placed from the row's layout as the walking animal is; a slur passes under the
+heads and ties between its ends (`StaffGeometry.slurCurve`) but never comes within `SLUR_PILL_AIR` of the pills, which
+win under the lowest notes. Listen to me, in both levels: a note joined to another letter that starts after a gap, or
+after a stop at least `ListenRun.SLUR_STOP_DROP` (0.25, 15 dB) deep, is ✂️ (`StepMark.TONGUED`) with "✂️ Join them, no
+tongue" until the next note is judged; never after a wrong note, which already broke the join. The depth lies between a
+child's breath dip (about 10 dB) and a tongue in a dry room; the tracker's own `STOP_DROP` (7 dB) hears breath dips too,
+which is why `Onset.fresh` alone is not a tongue (`NoteOnsetTracker.Result.stopDrop`), and a tongue in a ringing room
+may keep its star, the safe side. The depth is measured under the quieter side of the stop, the note before or the note
+now sounding (the final review: against the note before alone, a joined note 9 dB softer turned a breath's 10 dB dip
+into 0.28 and ✂️; `ListenPathTest`, "a softer joined note after a breath-sized dip is no tongue"), and `flute.heard`
+logs it (`stopDrop`). A length sign wins the mark over ✂️ and ✂️ over an arrow; in Exam the whole note's
+pitch keeps ✂️. The line ranks under ✋ and under the live pitch line while the note sounds, over the marked arrow,
+"Too short" and "Check your fingers". A tie, or a slur to the same letter in another octave (Listen to me hears a letter
+in any octave, so not that step), is one note (`Joins.lastHeardWith`): walked across all its notes on their clicks, the
+animal stepping onto the second (`animalX`), its length theirs together, both pills the same mark, no ✂️ inside it (a
+breath dips like a tongue), never ✋ when it ends the tune. An octave slur broken by a real gap after its first note
+sounded its own length is not "too short" on two notes held their length (the final review): its first note earns its
+own mark and the later one ✂️ with the join line (`ListenRun.breakSlur`, `TuneCheck.earnBroken`), a gap being a tongue;
+let go before that, or a tie broken so (one written sound), it is ⏳ as any note let go too early. Notes not joined are not checked for tonguing. Rules
+`slurCheck` and `slurStopDrop`; `Replay.BEFORE` has `slurCheck` 0, and all 80 recordings replayed exactly as before.
+The Croatian line is to be checked with a flute teacher. Tests: `JoinsTest`, `TuneWriterTest`, `PlayStepsTest`,
+`SustainedToneSynthTest`, `NoteOnsetTrackerTest` (the stop's depth), `TuneCheckTest` and `ListenRunTest` (ties, ✂️),
+`ListenPathTest` (legato on sound), `StaffGeometryTest` (the slur, the animal on a tie), `FluteViewModelTest` (the key,
+the cancels, the glide), `FluteScreenTest` (the key, the words, the arcs' pixels on the emulator).
+
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
-length, added: false at the cap, per note ended), `flute.rest` (heldMs, length, added, per rest
+length, added: false at the cap, joined: joined to the note before, since 2026-11-16, per note ended), `flute.join`
+(waiting: true when the ⌒ key set a join, false when its second tap cancelled one or there was nothing to join from;
+since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, play, listen, book, speed or leave: a waiting join
+dropped; since 2026-11-16), `flute.rest` (heldMs, length, added, per rest
 ended), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pressed again within
 `HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
 or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
@@ -685,7 +733,8 @@ not `level`, which a debug build's session log stamps on every line), `flute.lev
 writtenMs, cents: a note's mark changed after it was given; since 2026-11-16), `flute.heard` (index, expected,
 heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
 retry, ignored or wrong, per new note the tracker reports: the pitch, at the onset), `flute.held` (index, heldMs:
-the note sounded long enough and earned its mark; since 2026-11-11; mark: first_try, retry, high or low, and cents: the
+the note sounded long enough and earned its mark; since 2026-11-11; mark: first_try, retry, high or low (or tongued,
+since 2026-11-16), and cents: the
 median of its readings off the written pitch, since 2026-11-14), `flute.short` (index, heldMs, needMs: it
 stopped before that, "⏳ Too short, hold longer"; faded: it had faded away first, "Maybe out of air?"; since 2026-11-13;
 mark: short when the run moved on, none when it waited, since 2026-11-14),
@@ -697,7 +746,7 @@ tuner's summary fields plus gate, expected and hearing: the line that says wheth
 passed the gate at all, and since 2026-11-10, in `faint`, how many frames had a clear pitch but were under the
 level of a flute at the phone), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
 (stars, retries, when the last note is earned; since 2026-11-14 also high, low and short, the marks of each kind (and
-long, since 2026-11-16), and
+long and tongued, since 2026-11-16), and
 bpm, pairs, knob and speed: the child's speed, the note pairs it rests on, the knob's, and whether the line about it
 shows), `flute.listen_stop` (reason: pill, key, erase, leave, speed or book, so every `flute.listen` has a closing line,
 or a `flute.level` with restarted true when the run started again at another level before its first note;

@@ -3,9 +3,12 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.Bars
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepPart
+import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import org.junit.Assert.assertEquals
@@ -171,5 +174,87 @@ class StaffGeometryTest {
         val reach = StaffGeometry.BEAT_WIDTH / 2 + StaffGeometry.PITCH_ARROW_X + StaffGeometry.PITCH_ARROW_SIZE / 2
         assertTrue(reach <= StaffGeometry.BEAT_WIDTH + StaffGeometry.endPadding(running = true))
         assertEquals("writing keeps its end as it was", StaffGeometry.NOTES_END_PADDING, StaffGeometry.endPadding(running = false), 0f)
+    }
+
+    // ---- The walking animal on a tie (2026-11-16): Listen to me walks a tie as one note ----
+
+    @Test
+    fun `the animal walks onto the second note of a tie`() {
+        val tie = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(60, NoteLength.QUARTER, joined = true))
+        val apart = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(60, NoteLength.QUARTER))
+        val animal = StaffAnimal(index = 0, emoji = "🐇", flash = { 0f }, waiting = false, halfBeat = 2)
+        for ((tune, expectedStep) in listOf(tie to 1, apart to 0)) {
+            val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+            val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+            assertEquals(starts[expectedStep] + StaffGeometry.HEAD_X, animalX(animal, tune, lineMarks, starts)!!, 0.001f)
+        }
+    }
+
+    // ---- The slur (2026-11-16): under the heads, tilting with them, clear of the heads and ties between, above the pills ----
+
+    private val c1 = StaffGeometry.yOf(StaffNotes.positionOf(60))
+    private val d1 = StaffGeometry.yOf(StaffNotes.positionOf(62))
+    private val e1 = StaffGeometry.yOf(StaffNotes.positionOf(64))
+
+    /** The outer curve's y at [t]. */
+    private fun StaffGeometry.SlurCurve.y(t: Float): Float {
+        val u = 1 - t
+        return u * u * u * y0 + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * y1
+    }
+
+    private fun StaffGeometry.SlurCurve.x(t: Float): Float {
+        val u = 1 - t
+        return u * u * u * x0 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x1
+    }
+
+    /** The outer curve's y where it passes [x], sampled. */
+    private fun lowestAt(c: StaffGeometry.SlurCurve, x: Float): Float =
+        (0..1000).map { it / 1000f }.minBy { Math.abs(c.x(it) - x) }.let { c.y(it) }
+
+    private fun lowestOf(c: StaffGeometry.SlurCurve): Float = (0..1000).maxOf { c.y(it / 1000f) }
+
+    @Test
+    fun `a slur between notes at different heights tilts with them`() {
+        val c = StaffGeometry.slurCurve(14.5f, c1, 43.5f, d1, emptyList())
+        assertEquals(c1 + StaffGeometry.SLUR_END_DROP, c.y0, 0.001f)
+        assertEquals(d1 + StaffGeometry.SLUR_END_DROP, c.y1, 0.001f)
+        assertEquals(14.5f + StaffGeometry.SLUR_END_INSET, c.x0, 0.001f)
+        assertTrue("${c.c1y} > ${c.c2y}", c.c1y > c.c2y)
+        assertTrue("the belly lies under the line from end to end", lowestAt(c, 29f) > (c.y0 + c.y1) / 2 + StaffGeometry.SLUR_BELLY / 2)
+    }
+
+    @Test
+    fun `a slur clears the heads and ties between its ends`() {
+        val middle = 29f to c1 + StaffGeometry.HEAD_RY
+        val c = StaffGeometry.slurCurve(0f, e1, 58f, e1, listOf(middle))
+        assertTrue("${lowestAt(c, 29f)}", lowestAt(c, 29f) >= middle.second + StaffGeometry.SLUR_CLEAR - 0.5f)
+        val open = StaffGeometry.slurCurve(0f, e1, 58f, e1, emptyList())
+        assertTrue("nothing to clear: the plain belly", lowestAt(open, 29f) < middle.second)
+    }
+
+    @Test
+    fun `a slur under the lowest notes stays above the pills`() {
+        val c = StaffGeometry.slurCurve(14.5f, c1, 43.5f, d1, emptyList())
+        assertTrue("${lowestOf(c)}", lowestOf(c) + StaffGeometry.SLUR_THICKNESS < StaffGeometry.NAMES_TOP)
+        val tie = 29f to c1 + (StaffGeometry.TIE_START + StaffGeometry.TIE_CONTROL) / 2 + StaffGeometry.TIE_WIDTH / 2
+        val over = StaffGeometry.slurCurve(14.5f, c1, 72.5f, c1, listOf(tie))
+        assertTrue("${lowestOf(over)}", lowestOf(over) < StaffGeometry.NAMES_TOP)
+    }
+
+    @Test
+    fun `the waiting arc fits the room after the newest note`() {
+        // The staff scrolls its newest note to the end: the arc after it has the rest of its beat and the end padding.
+        val room = StaffGeometry.BEAT_WIDTH - StaffGeometry.HEAD_X + StaffGeometry.NOTES_END_PADDING
+        assertTrue("${StaffGeometry.WAITING_ARC_LENGTH} in $room", StaffGeometry.SLUR_END_INSET + StaffGeometry.WAITING_ARC_LENGTH <= room)
+    }
+
+    @Test
+    fun `a steep slur clearing a tie under c1 never reaches the pills`() {
+        // The final review of 2026-11-16: c¹ tied to c¹ slurred to c³ reached 194.7 dp, the cap checking only its middle.
+        val c3 = StaffGeometry.yOf(StaffNotes.positionOf(84))
+        val tie = 29f to c1 + (StaffGeometry.TIE_START + StaffGeometry.TIE_CONTROL) / 2 + StaffGeometry.TIE_WIDTH / 2
+        val steep = StaffGeometry.slurCurve(14.5f, c1, 72.5f, c3, listOf(tie))
+        // The cap samples the curve: a tenth of a dp past the air between samples is nothing against 2 dp of it.
+        assertTrue("${lowestOf(steep)}", lowestOf(steep) <= StaffGeometry.NAMES_TOP - StaffGeometry.SLUR_PILL_AIR + 0.1f)
     }
 }

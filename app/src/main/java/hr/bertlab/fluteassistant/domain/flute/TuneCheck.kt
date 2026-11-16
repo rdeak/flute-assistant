@@ -9,17 +9,21 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
  * What a note earned in "Your turn": a star for the first try, a faint star when a wrong note was heard for it first
  * (or a written repeat the phone could not hear), and since 2026-11-14 ("feedback, not stars") a sign in the star's
  * place for the right fingering played off: [HIGH] too high, [LOW] too low, [SHORT] let go before it was long enough,
- * and since 2026-11-16 [LONG] held past its written length (a mark given and then changed, [TuneCheck.remark]).
- * A sign says more than the faint star, so a step that stumbled and was then played off keeps the sign.
+ * and since 2026-11-16 [LONG] held past its written length (a mark given and then changed, [TuneCheck.remark]) and
+ * [TONGUED], ✂️, a note written joined to a note of another letter started with the tongue (legato).
+ * A sign says more than the faint star, so a step that stumbled and was then played off keeps the sign; a length sign
+ * says more than ✂️, and ✂️ more than an arrow.
  */
-enum class StepMark { FIRST_TRY, RETRY, HIGH, LOW, SHORT, LONG }
+enum class StepMark { FIRST_TRY, RETRY, HIGH, LOW, SHORT, LONG, TONGUED }
 
 /** What became of one heard note: it was the waited-on note (first try, or after a stumble), a tail of the last one, or wrong. */
 enum class Verdict { RIGHT, RETRY, IGNORED, WRONG }
 
 /**
  * Checks the child's tune note by note as the flute hears them. It waits on one [TuneNote] of
- * [tune] at a time ([index]; rests and breaths are passed over) and judges each note heard
+ * [tune] at a time ([index]; rests and breaths are passed over, and a note joined to its own letter
+ * before it, a tie or an octave slur, is heard with that one: one step, both notes given its mark,
+ * [Joins.lastHeardWith], since 2026-11-16) and judges each note heard
  * against it, pitch only and in any octave (the same letter: a beginner overblows into the
  * octave above, and the detector itself speaks the lower octave at an onset). A right pitch
  * does not earn the step by itself: [ListenRun] times how long it sounds and calls [earn] once
@@ -113,7 +117,7 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
                 after = nextNoteFrom(after + 1)
             }
             if (after != null && isNote(heard, lockHz, (tune[after] as TuneNote).midi)) {
-                for (repeat in repeats) earned[repeat] = StepMark.RETRY
+                for (repeat in repeats) mark(repeat, StepMark.RETRY)
                 forgiven = repeats
                 stumbled = false
                 current = after
@@ -137,10 +141,28 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
     fun earn(remark: StepMark? = null): StepMark {
         val current = checkNotNull(index) { "no step is waited on" }
         val mark = remark ?: star
-        earned[current] = mark
-        previous = (tune[current] as TuneNote).midi
+        mark(current, mark)
+        val last = Joins.lastHeardWith(tune, current)
+        previous = (tune[last] as TuneNote).midi
         stumbled = false
-        index = nextNoteFrom(current + 1)
+        index = nextNoteFrom(last + 1)
+        return mark
+    }
+
+    /**
+     * The step waited on, an octave slur heard as one note ([Joins.lastHeardWith]), was broken by a gap after its first
+     * note sounded its own length (since 2026-11-16, the final review): its first note earns [remark] or its star, every
+     * later note of it [StepMark.TONGUED] (a gap is a tongue), and the check moves past them all. Returns the first's.
+     */
+    fun earnBroken(remark: StepMark? = null): StepMark {
+        val current = checkNotNull(index) { "no step is waited on" }
+        val mark = remark ?: star
+        val last = Joins.lastHeardWith(tune, current)
+        earned[current] = mark
+        for (step in current + 1..last) earned[step] = StepMark.TONGUED
+        previous = (tune[last] as TuneNote).midi
+        stumbled = false
+        index = nextNoteFrom(last + 1)
         return mark
     }
 
@@ -153,7 +175,12 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
      */
     fun remark(index: Int, mark: StepMark) {
         require(index in earned) { "step $index has no mark to change" }
-        earned[index] = mark
+        mark(index, mark)
+    }
+
+    /** Gives the step at [head] [mark], and every note heard as one with it (a tie, an octave slur: [Joins.lastHeardWith]). */
+    private fun mark(head: Int, mark: StepMark) {
+        for (step in head..Joins.lastHeardWith(tune, head)) earned[step] = mark
     }
 
     /** The step waited on was cut short: once it is played long enough it earns [StepMark.RETRY]. */
@@ -161,8 +188,9 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
         stumbled = true
     }
 
+    /** The next note from [start] that is waited on: a note joined to its own letter before it is heard with that one. */
     private fun nextNoteFrom(start: Int): Int? =
-        (start until tune.size).firstOrNull { tune[it] is TuneNote }
+        (start until tune.size).firstOrNull { tune[it] is TuneNote && !Joins.heardWithBefore(tune, it) }
 
     /**
      * Whether a note heard as [heard] (the tracker's nearest semitone), locked at [lockHz], is the written note

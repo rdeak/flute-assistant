@@ -209,7 +209,7 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
-            listOf("C6", "B5", "C5", "B4", "C4", "Rest", "Breathe", "Erase the last note").forEach { name ->
+            listOf("C6", "B5", "C5", "B4", "C4", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
                 assertInside(name, key(name).assertIsDisplayed(), shadow = 5.dp)
                 assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
                 assertNear("$each: $name's height", each.keyHeight.dp, height(key(name)))
@@ -250,6 +250,7 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
+            assertNear("$each: the join over F5", bounds(key("F5")).left, bounds(key("Join to the next note")).left, tolerance = 1f)
             assertNear("$each: the rest over G5", bounds(key("G5")).left, bounds(key("Rest")).left, tolerance = 1f)
             assertNear("$each: the breath over A5", bounds(key("A5")).left, bounds(key("Breathe")).left, tolerance = 1f)
             assertNear("$each: the sponge over B5", bounds(key("B5")).right, bounds(key("Erase the last note")).right, tolerance = 1f)
@@ -364,6 +365,7 @@ class FluteSidewaysTest {
                 "😮‍💨 Možda nema zraka? Udahni",
             state.value.copy(listening = Listening(index = 0, pitch = Pitch.HIGH)) to "⬇️ Malo niže",
             state.value.copy(listening = Listening(index = 0, pitch = Pitch.LOW)) to "⬆️ Malo više",
+            state.value.copy(listening = Listening(index = 0, tongued = true)) to "✂️ Poveži ih, bez jezika",
             state.value.copy(listening = Listening(index = 1, finishing = true, pace = Pace(64, 7, 100, true))) to "🐢 Sporije od 🐇",
             state.value.copy(listening = Listening(index = 1, finishing = true, pace = Pace(104, 7, 60, true))) to "🐇 Brže od 🐢",
         ).forEach { (next, advice) ->

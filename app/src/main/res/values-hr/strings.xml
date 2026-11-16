@@ -100,6 +100,7 @@
     <string name="advice_play_again">🔁 Stani, pa odsviraj opet</string>
     <string name="advice_hold_longer">⏳ Prekratko, drži dulje</string>
     <string name="advice_too_long">✋ Predugo, pusti ranije</string>
+    <string name="advice_join">✂️ Poveži ih, bez jezika</string>
     <string name="advice_out_of_air">😮‍💨 Možda nema zraka? Udahni</string>
     <string name="mic_permission_title">Smijem li slušati?</string>
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
@@ -171,6 +172,7 @@
     </plurals>
     <!-- Stanka, as music schools name a rest (cijela, polovinka, četvrtinka, osminka) -->
     <string name="flute_rest">Stanka</string>
+    <string name="flute_join">Spoji sa sljedećom notom</string>
     <string name="flute_breath">Udahni</string>
     <string name="flute_breath_here">Ovdje udahni</string>
     <string name="flute_time_signature">Mjera %1$d/%2$d</string>
@@ -192,6 +194,8 @@
     <string name="flute_mark_low">prenisko</string>
     <string name="flute_mark_short">prekratko</string>
     <string name="flute_mark_long">predugo</string>
+    <string name="flute_mark_tongued">jezikom, nije spojeno</string>
+    <string name="flute_note_joined">%1$s, spojeno s notom prije</string>
     <string name="flute_mark_heard">čujem %1$s</string>
     <string name="flute_listen_here">sviraj ovu</string>
     <string name="flute_play_prompt">🪈 Odsviraj %1$s</string>

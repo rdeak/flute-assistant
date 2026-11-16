@@ -120,6 +120,7 @@ fun FluteScreen(
             onRestReleased = viewModel::onRestReleased,
             onRestActivated = viewModel::onRestActivated,
             onBreath = viewModel::onBreath,
+            onJoin = viewModel::onJoin,
             onEraseLast = viewModel::eraseLast,
             onTogglePlayback = viewModel::togglePlayback,
             onYourTurn = {
@@ -158,6 +159,8 @@ class FluteActions(
     val onRestReleased: () -> Unit = {},
     val onRestActivated: () -> Unit = {},
     val onBreath: () -> Unit = {},
+    /** The ⌒ key: the next note is joined to the last one (since 2026-11-16). */
+    val onJoin: () -> Unit = {},
     val onEraseLast: () -> Unit = {},
     /** Play. */
     val onTogglePlayback: () -> Unit = {},
@@ -411,6 +414,7 @@ fun FluteContent(
                         pitch = state.pitch,
                         scale = staffScale,
                         listState = staffPlace,
+                        joinWaiting = state.joinWaiting,
                     )
                     SpeedKnob(
                         bpm = metronome.config.bpm,
@@ -442,6 +446,8 @@ fun FluteContent(
                     restLit = state.restLit,
                     eraseEnabled = !state.isEmpty,
                     actions = actions,
+                    joinWaiting = state.joinWaiting,
+                    joinEnabled = state.canJoin,
                     modifier = keysModifier,
                     keyHeight = keyHeight,
                     keyGap = keyGap,

@@ -437,4 +437,24 @@ class ReplayTest {
         log.writeText(log.readText().replace(" listenLevel=exam", " level=exam"))
         assertEquals(ListenLevel.EXAM, Replay.level(Session.load(dir)))
     }
+
+    // ---- Legato (2026-11-16): a joined note is recorded, and a session from before replays without the slur check ----
+
+    @Test
+    fun `a joined note is recorded and read back joined`() {
+        val joined = listOf(TuneNote(71, QUARTER), TuneNote(72, QUARTER, joined = true))
+        val session = Session.load(recorded(tune = joined))
+        assertEquals(joined, session.tune)
+        val report = Replay.report(session)
+        assertTrue(report, report.lines().any { it.startsWith("tune: ") && it.contains("1:⌒72/QUARTER") })
+    }
+
+    @Test
+    fun `a session with no slurCheck in its rules replays without the slur check`() {
+        val dir = recorded()
+        assertTrue(Replay.recordedRunRules(Session.load(dir)).slurCheck)
+        val log = File(dir, "session.log")
+        log.writeText(log.readText().replace(Regex(" (slurCheck|slurStopDrop)=[^ \n]*"), ""))
+        assertFalse(Replay.recordedRunRules(Session.load(dir)).slurCheck)
+    }
 }

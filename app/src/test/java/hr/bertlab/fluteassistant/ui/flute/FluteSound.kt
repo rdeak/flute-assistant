@@ -85,6 +85,67 @@ object FluteSound {
     }
 
     /**
+     * A line of notes on one breath (2026-11-16, legato): after 500 ms of the room, one tone stepping through [notes]
+     * (MIDI, ms), its phase going on, swelling in over 30 ms and stopping over 10 ms at the end; at each change of note
+     * the air stops for [changeStopMs] (a tongue, with 10 ms ramps either side), or without a stop the tone dips
+     * [changeDipDb] (a breath or the fingers moving: 20 ms at full depth, 10 ms ramps in dB either side), or neither (a
+     * clean slur); then 400 ms of the room. The room and the breath noise as in [sound], at [toneDb], [roomDb], [rt60]
+     * and [floorDb]; [notesDb], when given, is each note's own level in place of [toneDb], and [dipAfterMs] moves the
+     * dip that far after the change, onto the new note.
+     */
+    fun line(
+        notes: List<Pair<Int, Int>>,
+        changeStopMs: Int = 0,
+        changeDipDb: Double = 0.0,
+        toneDb: Double = -22.0,
+        roomDb: Double = -10.0,
+        rt60: Double = 0.4,
+        floorDb: Double = -50.0,
+        notesDb: List<Double>? = null,
+        dipAfterMs: Int = 0,
+    ): DoubleArray {
+        val leadMs = 500
+        val total = (leadMs + notes.sumOf { it.second } + 400) * rate / 1000
+        val dry = DoubleArray(total)
+        val start = leadMs * rate / 1000
+        var at = start
+        var phase = 0.0
+        val changes = mutableListOf<Int>()
+        for ((n, note) in notes.withIndex()) {
+            if (n > 0) changes += at
+            val f = NoteMath.midiToFrequency(note.first)
+            val amp = 10.0.pow((notesDb?.get(n) ?: toneDb) / 20.0)
+            repeat(note.second * rate / 1000) {
+                phase += 2 * PI * f / rate
+                dry[at++] = amp * (sin(phase) + 0.32 * sin(2 * phase) + 0.13 * sin(3 * phase) + 0.05 * sin(4 * phase)) / 1.5
+            }
+        }
+        val end = at
+        val ramp = 0.010 * rate
+        val stopHalf = changeStopMs * rate / 2000.0
+        for (i in start until end) {
+            var env = min(1.0, (i - start) / (0.030 * rate)) * min(1.0, (end - i) / ramp)
+            for (c in changes) {
+                val d = Math.abs(i - c - if (changeStopMs > 0) 0 else dipAfterMs * rate / 1000).toDouble()
+                env *= when {
+                    changeStopMs > 0 -> ((d - stopHalf) / ramp).coerceIn(0.0, 1.0)
+                    changeDipDb > 0 -> 10.0.pow(-changeDipDb * (1.0 - ((d - ramp) / ramp).coerceIn(0.0, 1.0)) / 20.0)
+                    else -> 1.0
+                }
+            }
+            dry[i] *= env
+        }
+        val wet = reverb(dry, roomDb, rt60)
+        val noise = Random(7)
+        var lp = 0.0
+        val floor = 10.0.pow(floorDb / 20.0) / 0.229
+        return DoubleArray(total) { i ->
+            lp = 0.9 * lp + 0.1 * noise.nextGaussian()
+            wet[i] + floor * lp
+        }
+    }
+
+    /**
      * A flute-ish tone: the fundamental with weaker harmonics, a 30 ms swell, a 10 ms stop,
      * wobbling [wobbleDb] either way at 5 Hz, drifting by [sagCents] and fading by [fadeDb] over
      * its length.

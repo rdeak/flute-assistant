@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -32,8 +34,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -42,6 +46,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -77,8 +82,13 @@ val FluteKeysMinHeight: Dp = (KeyHeight + KeyDepth) * 3 + KeyRowGap * 2
 /** The breath, rest and erase emoji, in dp so a large font scale cannot push the breath emoji out of a 40 dp key. */
 private const val SIGN_EMOJI_DP = 24f
 
-/** The plain keys at the end of the top row: breath, rest, erase. */
-private const val SignKeyCount = 3
+/** The plain keys at the end of the top row: join, rest, breath, erase. */
+private const val SignKeyCount = 4
+
+/** The ⌒ key's picture: the staff's own slur ([slurPath]), from (2, 3) to (28, 3) dp in a box this size. */
+private val JoinPictureWidth = 30.dp
+private val JoinPictureHeight = 16.dp
+private val JoinPicture by lazy { slurPath(StaffGeometry.slurCurve(1f, 3f - StaffGeometry.SLUR_END_DROP, 29f, 3f - StaffGeometry.SLUR_END_DROP, emptyList())) }
 
 private const val SPONGE_EMOJI = "\uD83E\uDDFD" // sponge
 
@@ -96,10 +106,12 @@ private const val EraseRepeatMs = 120L
  * on the canvas unless the phone is on its side, and the three rows sit centred in the height they
  * are given. A key's width comes from the width given, less [keyGap] between each two keys.
  *
- * At the end of the top row, apart from c3 with the rest of the row empty between, stand three
- * plain keys, each one note key wide and over a note key of the row below (g2, a2, h2), so a tool is
- * never bigger than a note and a slip off c3 lands on nothing (since 2026-11-05; before that they
- * were two keys wide each and filled the row): the rest key (💤), held like a note key ([FluteActions.onRestPressed],
+ * At the end of the top row, apart from c3 with two empty columns between, stand four plain keys,
+ * each one note key wide and over a note key of the row below (f2, g2, a2, h2), so a tool is never
+ * bigger than a note and a slip off c3 lands on nothing (since 2026-11-05; before that they were two
+ * keys wide each and filled the row): the join key (⌒, since 2026-11-16, at the user's request, the
+ * picture the slur it draws), which calls [FluteActions.onJoin] as the finger goes down, stays down
+ * while [joinWaiting] and is faded and inert unless [joinEnabled]; the rest key (💤), held like a note key ([FluteActions.onRestPressed],
  * [FluteActions.onRestReleased], [FluteActions.onRestActivated]) and sunk while [restLit], the breath key (😮‍💨), which calls
  * [FluteActions.onBreath] as the finger goes down (the rest before the breath since 2026-11-05, at the user's
  * request; the other way round before), and the erase key (🧽), which calls [FluteActions.onEraseLast] as the
@@ -116,6 +128,8 @@ fun FluteKeys(
     modifier: Modifier = Modifier,
     keyHeight: Dp = KeyHeight,
     keyGap: Dp = KeyGap,
+    joinWaiting: Boolean = false,
+    joinEnabled: Boolean = false,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
     val rows = remember { StaffNotes.ALL.groupBy { Math.floorDiv(it, 12) }.toSortedMap().values.reversed() }
@@ -155,14 +169,22 @@ fun FluteKeys(
                         )
                     }
                     if (row.size < keysPerRow) {
-                        // The short top row: c3, the empty middle, then the rest, the breath and the
-                        // erase key, each one note key wide. The middle is as wide as the key columns
-                        // it covers, so the row measures as the full rows do and the three stand over
-                        // the last three keys of the row below, the sponge ending where h2 does.
+                        // The short top row: c3, the empty middle, then the join, the rest, the breath
+                        // and the erase key, each one note key wide. The middle is as wide as the key
+                        // columns it covers, so the row measures as the full rows do and the four stand
+                        // over the last four keys of the row below, the sponge ending where h2 does.
                         val emptyColumns = keysPerRow - row.size - SignKeyCount
                         if (emptyColumns > 0) {
                             Spacer(Modifier.width(keyWidth * emptyColumns + keyGap * (emptyColumns - 1)))
                         }
+                        JoinKey(
+                            waiting = joinWaiting,
+                            enabled = joinEnabled,
+                            onJoin = actions.onJoin,
+                            modifier = Modifier
+                                .width(keyWidth)
+                                .fillMaxHeight(),
+                        )
                         RestKey(
                             lit = restLit,
                             onPress = actions.onRestPressed,
@@ -221,6 +243,38 @@ private fun RestKey(
                 },
             )
         },
+    )
+}
+
+/**
+ * The join key (since 2026-11-16): a plain key with the slur it draws, the staff's own crescent. A finger going down
+ * joins the next note to the last one, or cancels a join waiting ([FluteActions.onJoin]); while one waits the key stays
+ * down in its yellow ring and a screen reader hears it selected. Faded and inert with nothing to join from.
+ */
+@Composable
+private fun JoinKey(waiting: Boolean, enabled: Boolean, onJoin: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.flute_join)
+    val currentOnJoin by rememberUpdatedState(onJoin)
+    val ink = FluteTheme.colors.text
+    val active = enabled || waiting
+    SignKey(
+        label = label,
+        pressed = waiting,
+        onActivate = { currentOnJoin() },
+        enabled = active,
+        // Selected while a join waits; nothing said otherwise, so a screen reader does not hear "not selected" on every visit.
+        selected = if (waiting) true else null,
+        picture = {
+            Canvas(Modifier.size(JoinPictureWidth, JoinPictureHeight)) {
+                scale(density, pivot = Offset.Zero) {
+                    drawPath(JoinPicture, ink)
+                    drawPath(JoinPicture, ink, style = Stroke(1.5f, join = StrokeJoin.Round))
+                }
+            }
+        },
+        modifier = modifier.then(
+            if (active) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { currentOnJoin() }) } else Modifier,
+        ),
     )
 }
 
@@ -305,12 +359,14 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
  */
 @Composable
 private fun SignKey(
-    emoji: String,
     label: String,
     pressed: Boolean,
     onActivate: () -> Unit,
     modifier: Modifier = Modifier,
+    emoji: String? = null,
     enabled: Boolean = true,
+    selected: Boolean? = null,
+    picture: (@Composable () -> Unit)? = null,
 ) {
     val colors = FluteTheme.colors
     Box(
@@ -321,6 +377,7 @@ private fun SignKey(
                 role = Role.Button
                 contentDescription = label
                 if (!enabled) disabled()
+                if (selected != null) this.selected = selected
                 onClick {
                     if (enabled) onActivate()
                     enabled
@@ -329,7 +386,7 @@ private fun SignKey(
             .drawBehind { if (pressed) drawKeyRing() }
             .chunky(KeyShape, colors.raised, colors.outline, KeyDepth, pressed = pressed),
     ) {
-        Emoji(emoji, fontSize = emojiSizeFor(SIGN_EMOJI_DP))
+        if (picture != null) picture() else Emoji(checkNotNull(emoji), fontSize = emojiSizeFor(SIGN_EMOJI_DP))
     }
 }
 

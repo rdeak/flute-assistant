@@ -433,4 +433,60 @@ class NoteOnsetTrackerTest {
         assertEquals(NoteOnsetTracker.Onset(72, fresh = false), slurred.onset)
         assertEquals(ListenRules.LOCK_FRAMES - 1, slurred.leadFrames)
     }
+
+    // ---- How deep the stop before a restart fell (2026-11-16): the flute's slur check tells a tongue from a breath dip ----
+
+    @Test
+    fun `a tongued change to another note says how deep its stop fell`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(60, level = 0.7f) })
+        feed(tracker, listOf(pitched(60, level = 0.7f, minLevel = 0.2f)))
+        val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
+        assertEquals(0.5f, result.stopDrop!!, 0.001f)
+    }
+
+    @Test
+    fun `a slur and a start after a gap have no stop depth`() {
+        val slur = NoteOnsetTracker()
+        feed(slur, List(5) { pitched(60) })
+        val slurred = feed(slur, List(ListenRules.LOCK_FRAMES) { pitched(62) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = false), slurred.onset)
+        assertNull(slurred.stopDrop)
+        val gap = NoteOnsetTracker()
+        feed(gap, List(5) { pitched(60) })
+        feed(gap, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { silent })
+        val again = feed(gap, List(ListenRules.LOCK_FRAMES) { pitched(62) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), again.onset)
+        assertNull(again.stopDrop)
+    }
+
+    @Test
+    fun `a shallow dip at a change is a shallow stop`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(60, level = 0.7f) })
+        feed(tracker, listOf(pitched(60, level = 0.7f, minLevel = 0.52f)))
+        val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
+        assertEquals(0.18f, result.stopDrop!!, 0.001f)
+    }
+
+    @Test
+    fun `frames with no onset carry no stop depth`() {
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, List(5) { pitched(60, level = 0.7f) } + listOf(pitched(60, level = 0.7f, minLevel = 0.2f)))
+        assertTrue(results.all { it.stopDrop == null })
+    }
+
+    @Test
+    fun `a softer note after a breath-sized dip measures the dip, not the change of loudness`() {
+        // The final review of 2026-11-16: c at 0.80, a dip to 0.54, d at 0.70. Against c alone the stop is 0.26 deep,
+        // a tongue's depth; the dip under the quieter side, d, is 0.16, a breath's.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(60, level = 0.8f) })
+        feed(tracker, listOf(pitched(60, level = 0.8f, minLevel = 0.54f)))
+        val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
+        assertEquals(0.16f, result.stopDrop!!, 0.001f)
+    }
 }

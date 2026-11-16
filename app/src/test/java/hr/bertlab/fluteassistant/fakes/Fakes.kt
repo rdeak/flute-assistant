@@ -115,6 +115,8 @@ class FakeFluteTonePlayer : FluteTonePlayer {
     data class NoteOn(val frequencyHz: Double, val volume: Float)
 
     val notesOn = mutableListOf<NoteOn>()
+    /** The joined notes Play moved the voice to, with no new attack. */
+    val glides = mutableListOf<NoteOn>()
     var sounding: NoteOn? = null
     var offCount = 0
     var openCount = 0
@@ -129,6 +131,11 @@ class FakeFluteTonePlayer : FluteTonePlayer {
     override fun noteOn(frequencyHz: Double, volume: Float) {
         if (!isOpen) open()
         sounding = NoteOn(frequencyHz, volume).also { notesOn += it }
+    }
+
+    override fun glide(frequencyHz: Double, volume: Float) {
+        if (!isOpen) open()
+        sounding = NoteOn(frequencyHz, volume).also { glides += it }
     }
 
     override fun noteOff() {

@@ -119,6 +119,7 @@
          The note is already marked and the run has moved on, so the line is for the next notes: no "until the star". -->
     <string name="advice_hold_longer">⏳ Too short, hold longer</string>
     <string name="advice_too_long">✋ Too long, let go sooner</string>
+    <string name="advice_join">✂️ Join them, no tongue</string>
     <string name="advice_out_of_air">😮‍💨 Maybe out of air? Big breath first</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
@@ -208,6 +209,7 @@
     <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->
     <string name="flute_rest">Rest</string>
     <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
+    <string name="flute_join">Join to the next note</string>
     <string name="flute_breath">Breathe</string>
     <!-- Accessibility name of a breath sign on the staff -->
     <string name="flute_breath_here">Breathe here</string>
@@ -232,6 +234,8 @@
     <string name="flute_mark_low">too low</string>
     <string name="flute_mark_short">let go too early</string>
     <string name="flute_mark_long">held too long</string>
+    <string name="flute_mark_tongued">tongued, not joined</string>
+    <string name="flute_note_joined">%1$s, joined to the note before</string>
     <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
     <string name="flute_mark_heard">heard %1$s</string>
     <string name="flute_listen_here">play this one</string>

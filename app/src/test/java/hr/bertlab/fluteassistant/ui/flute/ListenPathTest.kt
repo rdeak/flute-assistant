@@ -8,6 +8,7 @@ import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
@@ -200,5 +201,52 @@ class ListenPathTest {
         assertEquals(exam.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.HIGH), exam.marks)
         val practice = ListenPath.run(sound, rate, quarters, Pulse(120), run = ListenLevel.PRACTICE.rules)
         assertEquals(practice.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), practice.marks)
+    }
+
+    // ---- Legato on sound (2026-11-16): b ⌒ c ⌒ d at 120 a minute, a quarter lasting 500 ms ----
+
+    private val slurred = listOf(TuneNote(71, NoteLength.QUARTER), TuneNote(72, NoteLength.QUARTER, joined = true), TuneNote(74, NoteLength.HALF, joined = true))
+    private val bcd = listOf(71 to 600, 72 to 600, 74 to 1200)
+
+    private fun slur(samples: DoubleArray, tune: List<TuneItem> = slurred) = ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(120))
+
+    @Test
+    fun `a slur played joined earns its stars`() {
+        val run = slur(FluteSound.line(bcd))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a slur tongued in a dry room earns the scissors`() {
+        val run = slur(FluteSound.line(bcd, changeStopMs = 50, roomDb = -20.0))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.TONGUED, 2 to StepMark.TONGUED), run.marks)
+    }
+
+    @Test
+    fun `a breath-sized dip at a slurred change is no tongue`() {
+        val run = slur(FluteSound.line(bcd, changeDipDb = 10.0))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a tie with a breath dip in it is one note with its star`() {
+        val tie = listOf(TuneNote(71, NoteLength.QUARTER), TuneNote(71, NoteLength.QUARTER, joined = true), TuneNote(72, NoteLength.HALF))
+        val run = slur(FluteSound.line(listOf(71 to 550, 71 to 550, 72 to 1200), changeDipDb = 10.0), tie)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `an octave slur played joined earns its star on both and no hand`() {
+        val octave = listOf(TuneNote(71, NoteLength.QUARTER), TuneNote(83, NoteLength.QUARTER, joined = true), TuneNote(72, NoteLength.HALF))
+        val run = slur(FluteSound.line(listOf(71 to 500, 83 to 500, 72 to 1200)), octave)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a softer joined note after a breath-sized dip is no tongue`() {
+        // The final review of 2026-11-16: c and d 9 dB under b, a 10 dB dip 30 ms after each change, a dry room. Measured
+        // against b alone the dip into c was 0.28 deep, a tongue's; under the quieter side it is 0.14, a breath's.
+        val run = slur(FluteSound.line(bcd, changeDipDb = 10.0, roomDb = -20.0, notesDb = listOf(-12.0, -21.0, -21.0), dipAfterMs = 30))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
     }
 }

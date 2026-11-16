@@ -32,6 +32,7 @@ internal fun writeFully(block: FloatArray, running: () -> Boolean, write: (Float
 /** What the UI asks of the flute voice; queued for the render thread, which applies them before each block. */
 internal sealed interface ToneCommand {
     data class On(val frequencyHz: Double, val amplitude: Float) : ToneCommand
+    data class Glide(val frequencyHz: Double, val amplitude: Float) : ToneCommand
     data object Off : ToneCommand
 }
 
@@ -86,6 +87,7 @@ internal class ToneRenderLoop(
         while (true) {
             when (val command = commands.poll() ?: return) {
                 is ToneCommand.On -> synth.noteOn(command.frequencyHz, command.amplitude)
+                is ToneCommand.Glide -> synth.glide(command.frequencyHz, command.amplitude)
                 ToneCommand.Off -> synth.noteOff()
             }
         }

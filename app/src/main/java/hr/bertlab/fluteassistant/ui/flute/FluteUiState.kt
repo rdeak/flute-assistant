@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
+import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
@@ -58,7 +59,12 @@ data class FluteUiState(
     val openBook: Int = 0,
     /** The shelf as last stored; the open entry may lag behind [tune], so the shelf draws [shelf]. */
     val books: List<Book> = List(Songbook.SIZE) { Book() },
+    /** The ⌒ key was tapped: the next note pressed will be joined to the last one (since 2026-11-16). */
+    val joinWaiting: Boolean = false,
 ) {
+    /** Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full. */
+    val canJoin: Boolean get() = Joins.canJoinAfter(tune)
+
     /** [books] with the open entry's tune replaced by [tune], the tune as the child sees it now. */
     val shelf: List<Book>
         get() = books.mapIndexed { index, book -> if (index == openBook) book.copy(tune = tune) else book }

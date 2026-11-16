@@ -1055,6 +1055,7 @@ class FluteViewModelTest {
         assertEquals(72, heard["heard"])
         assertEquals("right", heard["verdict"])
         assertEquals("an octave over the written c", 1200.0, heard["cents"] as Double, 0.01)
+        assertTrue("the stop's depth is logged, none after a gap", heard.fields.containsKey("stopDrop"))
     }
 
     @Test
@@ -1172,6 +1173,7 @@ class FluteViewModelTest {
         val done = logger.events("flute.listen_done").single()
         assertEquals(3, done["stars"])
         assertEquals(0, done["retries"])
+        assertEquals(0, done["tongued"])
         repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
         assertFalse(vm.current.isListening)
         assertFalse(vm.current.isRunning)
@@ -1871,5 +1873,131 @@ class FluteViewModelTest {
         vm.chooseLevel(ListenLevel.EXAM)
         runCurrent()
         assertEquals("the animal stands where it stood", pulse, vm.current.beatPulse)
+    }
+
+    // ---- The join key (2026-11-16): ⌒ joins the next note to the last one ----
+
+    @Test
+    fun `the join key joins the next note and is logged`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onJoin()
+        assertTrue(vm.current.joinWaiting)
+        assertEquals(true, logger.events("flute.join").single()["waiting"])
+        vm.tap(62, 500)
+        assertTrue((vm.current.tune[1] as TuneNote).joined)
+        assertTrue("saved joined", (settings.tune[1] as TuneNote).joined)
+        assertFalse(vm.current.joinWaiting)
+        assertEquals(listOf(false, true), logger.events("flute.note").map { it["joined"] })
+    }
+
+    @Test
+    fun `a second tap of the join key cancels it, and with nothing to join from it does nothing`() {
+        val vm = viewModel()
+        vm.onJoin()
+        assertFalse(vm.current.canJoin)
+        assertFalse(vm.current.joinWaiting)
+        vm.tap(60, 500)
+        assertTrue(vm.current.canJoin)
+        vm.onJoin()
+        vm.onJoin()
+        assertFalse(vm.current.joinWaiting)
+        assertEquals(listOf(false, true, false), logger.events("flute.join").map { it["waiting"] })
+    }
+
+    @Test
+    fun `the rest key and the breath cancel a waiting join`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onJoin()
+        vm.onRestPressed()
+        clock.now += 500
+        vm.onRestReleased()
+        assertFalse(vm.current.joinWaiting)
+        vm.tap(62, 500)
+        vm.onJoin()
+        vm.onBreath()
+        assertFalse(vm.current.joinWaiting)
+        assertEquals(listOf("rest", "breath"), logger.events("flute.join_cancel").map { it["reason"] })
+    }
+
+    @Test
+    fun `erase while a join waits only cancels it`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onJoin()
+        vm.eraseLast()
+        assertEquals(1, vm.current.tune.size)
+        assertFalse(vm.current.joinWaiting)
+        assertEquals("erase", logger.events("flute.join_cancel").single()["reason"])
+        assertTrue(logger.events("flute.erase").isEmpty())
+        vm.eraseLast()
+        assertTrue(vm.current.tune.isEmpty())
+    }
+
+    @Test
+    fun `a waiting join is cancelled by play, listening, a book, the speed panel and leaving the tab`() = runTest(dispatcher) {
+        val vm = viewModel()
+        val actions = listOf<Pair<String, FluteViewModel.() -> Unit>>(
+            "play" to { togglePlayback() },
+            "listen" to { startListening() },
+            "book" to { openShelf() },
+            "speed" to { openSpeed() },
+            "leave" to { leaveTab() },
+        )
+        for ((reason, act) in actions) {
+            vm.tap(60, 500)
+            vm.onJoin()
+            assertTrue(reason, vm.current.joinWaiting)
+            vm.act()
+            assertFalse(reason, vm.current.joinWaiting)
+            assertEquals(reason, logger.events("flute.join_cancel").last()["reason"])
+            vm.closeSpeed()
+            vm.enterTab()
+        }
+        assertTrue("no join was ever saved", settings.tune.none { it is TuneNote && it.joined })
+    }
+
+    @Test
+    fun `a join tapped while a key is held keeps the held note sounding`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.onKeyPressed(60)
+        vm.onJoin()
+        assertEquals(0, tonePlayer.offCount)
+        advanceTimeBy(800) // the held note grows: at 120 a minute a half note from 750 ms
+        clock.now += 800
+        assertEquals(HALF, vm.current.tune[0].length)
+        vm.onKeyPressed(62)
+        assertEquals(HALF, vm.current.tune[0].length)
+        assertTrue((vm.current.tune[1] as TuneNote).joined)
+    }
+
+    @Test
+    fun `play glides into a joined note and holds a tie`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onJoin()
+        vm.tap(62, 500)
+        vm.onJoin()
+        vm.tap(62, 500)
+        tonePlayer.notesOn.clear()
+        val offs = tonePlayer.offCount
+        vm.togglePlayback()
+        advanceTimeBy(1400) // three quarters of 500 ms; the last one ends 80 ms before 1500
+        assertEquals(listOf(on(60)), tonePlayer.notesOn)
+        assertEquals(listOf(on(62)), tonePlayer.glides)
+        assertEquals("no gap before a joined note", offs, tonePlayer.offCount)
+        advanceTimeBy(100)
+        assertEquals(offs + 1, tonePlayer.offCount)
+    }
+
+    @Test
+    fun `a microphone refused cancels a waiting join, as listening would`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onJoin()
+        vm.onMicResult(granted = false)
+        assertFalse(vm.current.joinWaiting)
+        assertEquals("listen", logger.events("flute.join_cancel").single()["reason"])
     }
 }

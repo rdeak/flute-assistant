@@ -14,6 +14,7 @@ import org.junit.Test
 class TuneCheckTest {
 
     private fun q(midi: Int) = TuneNote(midi, NoteLength.QUARTER)
+    private fun j(midi: Int) = TuneNote(midi, NoteLength.QUARTER, joined = true)
 
     /** The frequency of [midi] [cents] off it: where a note locked. */
     private fun hz(midi: Int, cents: Double) = NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0)
@@ -296,5 +297,47 @@ class TuneCheckTest {
         assertEquals(StepMark.FIRST_TRY, check.star)
         check.judge(60, fresh = true)
         assertEquals(StepMark.RETRY, check.star)
+    }
+
+    // ---- A tie, or a slur to the same letter in another octave, is one step (2026-11-16) ----
+
+    @Test
+    fun `a tie is one step, earning it marks both notes`() {
+        val check = TuneCheck(listOf(q(60), j(60), q(62)))
+        assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+        check.earn()
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), check.marks)
+        assertEquals(2, check.index)
+    }
+
+    @Test
+    fun `an octave slur is one step, and a changed mark changes both`() {
+        val check = TuneCheck(listOf(q(60), j(72), q(62)))
+        check.judge(60, fresh = true)
+        check.earn()
+        assertEquals(72, check.previous)
+        assertEquals(2, check.index)
+        check.remark(0, StepMark.LONG)
+        assertEquals(mapOf(0 to StepMark.LONG, 1 to StepMark.LONG), check.marks)
+    }
+
+    @Test
+    fun `a written repeat after a tie still needs a fresh start`() {
+        val check = TuneCheck(listOf(q(60), j(60), q(60)))
+        check.judge(60, fresh = true)
+        check.earn()
+        assertEquals("waits on the written repeat after the tie", 2, check.index)
+        assertEquals(Verdict.IGNORED, check.judge(60, fresh = false))
+        assertEquals(Verdict.RIGHT, check.judge(60, fresh = true))
+    }
+
+    @Test
+    fun `an octave slur broken by a gap gives its first note its mark and the later one the scissors`() {
+        val check = TuneCheck(listOf(q(60), j(72), q(62)))
+        check.judge(60, fresh = true)
+        assertEquals(StepMark.FIRST_TRY, check.earnBroken())
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.TONGUED), check.marks)
+        assertEquals(72, check.previous)
+        assertEquals(2, check.index)
     }
 }

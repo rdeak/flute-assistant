@@ -84,7 +84,11 @@ class FileSessionRecorder(
         line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
         tune.forEachIndexed { index, item ->
             when (item) {
-                is TuneNote -> line(s, "session.tune", "index" to index, "note" to item.midi, "length" to item.length)
+                is TuneNote -> {
+                    // A note joined to the one before says so (since 2026-11-16); older lines have no such field.
+                    val joined = if (item.joined) arrayOf("joined" to true) else emptyArray()
+                    line(s, "session.tune", "index" to index, "note" to item.midi, "length" to item.length, *joined)
+                }
                 is TuneRest -> line(s, "session.tune", "index" to index, "rest" to item.length)
                 TuneBreath -> line(s, "session.tune", "index" to index, "breath" to true)
             }

@@ -8,8 +8,9 @@ change that part). The songbook is in `SONGBOOK.md`.
 
 - `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `Tune` (lengths, the
   stored string, `playSteps` for Play), `TuneWriter` (a key held makes a note: growth, the rejoin
-  window, the cap, breath, erase), `Bars` (how the staff writes bars and ties), `TuneCheck` and
-  `ListenRun` ("Your turn"), `Songbook`.
+  window, the cap, breath, the join, erase), `Bars` (how the staff writes bars and ties), `Joins` (runs of
+  joined notes: the arcs, and what Listen to me hears as one note), `TuneCheck` and `ListenRun` ("Your
+  turn"), `Songbook`.
 - `domain/listen/`: what the microphone's frames become (`NoteOnsetTracker`, `HearingTracker`,
   `ListenRules`), shared with the tuner (`../tuner/CLAUDE.md`).
 - `FluteViewModel`: gives the rules the clock, the sound, the microphone, the storage and the log.
@@ -97,6 +98,19 @@ change that part). The songbook is in `SONGBOOK.md`.
   final only when its sound ends, its pitch read over the whole note (a star may become an arrow and
   back). A mark that changes after it was given is `ListenRun.Step.changed` / `ListenFrame.changed`.
   Change the numbers only from recorded sessions (sweeps of `tuneCents`, `lengthSlack`, `longSlack`).
+- Legato (the user, 2026-11-16: "legato is next thing child has learned and has notes with it"; spec
+  `docs/superpowers/specs/2026-11-16-flute-legato-design.md`, `DESIGN.md`, "Legato"): the ⌒ key, left of 💤, joins the
+  next note pressed to the last one (`TuneNote.joined`, stored as a third field `s`), one tap per pair; a tap while a
+  key is held joins the held note and must not end it. A second tap, 💤, 😮‍💨, 🧽 (it cancels and erases nothing), Play,
+  Listen to me, the book, the speed panel and leaving the tab cancel a waiting join; it is never saved. Faded with
+  nothing to join from. A join to the same note is a tie: one sound in Play, one note to Listen to me, as is a slur to
+  the same letter in another octave (`Joins.lastHeardWith`). Play has no gap before a joined note and glides into it.
+  In both levels a note joined to another letter that starts after a gap or a stop at least `ListenRun.SLUR_STOP_DROP`
+  deep gets ✂️ (`StepMark.TONGUED`) and "✂️ Join them, no tongue"; never after a wrong note; notes not joined are not
+  checked for tonguing. The depth is measured under the quieter side of the stop (a softer joined note must not make a
+  breath's dip a tongue's). An octave slur broken by a gap after its first note's own length: that note's own mark and
+  ✂️ on the other, never ⏳ on both. Marks in order: ⏳/✋, ✂️, ⬇️/⬆️, faint ⭐, ⭐. Change the depth only from recorded sessions
+  (sweeps of `slurStopDrop`; `slurCheck` turns it off).
 - A finished run played at another animal's speed than the knob's says so in one line, "🐢 Slower
   than the 🐇", the child's animal first (`Pace`, rules `paceMinPairs` 6 and `paceOff` 15%); its
   screen stays as the run ended, the microphone closed, until Stop. No other summary.
@@ -112,6 +126,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 | Key presses, the rejoin window, the rest key, Play | the same paragraph, from "`FluteViewModel` (Activity-scoped" |
 | The keys; the speed knob and its panel | "The keys", "The speed knob and its panel" |
 | Your turn: the listening rules, the length rule and the walk, the loudness floor, the heard-note bubble, the advice, the room under the stage | "Your turn" |
+| The ⌒ key, slurs and ties on the staff and in Play, ✂️ | "Legato" |
 | The running staff, the walking animal, the marks row | "While the tune runs" |
 | A phone on its side; a tablet | "Sideways", "Tablets" |
 | Books and the shelf | `SONGBOOK.md` |
@@ -126,7 +141,7 @@ the cable and never goes into git (the repository is public).
 ## Tests
 
 - Rules, on the JVM with no dispatcher: `TuneWriterTest`, `ListenRunTest`, `PlayStepsTest`,
-  `TuneTest`, `BarsTest`, `TuneCheckTest`, `SongbookTest`, `StaffGeometryTest`.
+  `TuneTest`, `BarsTest`, `TuneCheckTest`, `SongbookTest`, `StaffGeometryTest`, `JoinsTest`.
 - `ListenPathTest`: synthetic flute sound through the real detector and `ListenRun` (the emulator
   has no microphone).
 - `FluteViewModelTest`: the wiring, the saving and the log lines.

@@ -17,6 +17,12 @@ interface FluteTonePlayer {
     /** Sounds [frequencyHz] at [volume] (0..1) until [noteOff]; while a note sounds, the new one takes over. */
     fun noteOn(frequencyHz: Double, volume: Float)
 
+    /**
+     * Moves the sounding note to [frequencyHz] with no fade and no new attack (a note joined to the one before, since
+     * 2026-11-16); with nothing sounding it starts it at [volume], as [noteOn].
+     */
+    fun glide(frequencyHz: Double, volume: Float)
+
     /** Fades the sounding note out; safe to call when nothing sounds. */
     fun noteOff()
 

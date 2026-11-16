@@ -122,9 +122,20 @@ class NoteOnsetTracker(
      * frame that did not count or that showed that note going on, so a tongued restart starts at its
      * onset and a slur starts after the last frame of the note before. 0 when no note began.
      * [lockHz] is the pitch the note locked at, the median that named it (how far it lies from a
-     * written note says whether a wrong one was a near miss); null when no note began.
+     * written note says whether a wrong one was a near miss); null when no note began. [stopDrop]: on a frame whose
+     * onset came by a restart after a stop ([noticeStop]), how deep the stop fell under the quieter of its two sides:
+     * the lower of the note's recent level when the stop was first heard and this frame's quietest stretch, less the
+     * stop's quietest stretch (since 2026-11-16: the flute's slur check tells a tongue from a breath dip by it; measured
+     * against the note before alone, a softer note after it made a breath's dip a tongue's); null on every other frame,
+     * an onset after a gap included.
      */
-    data class Result(val decision: FrameDecision, val onset: Onset?, val leadFrames: Int = 0, val lockHz: Double? = null)
+    data class Result(
+        val decision: FrameDecision,
+        val onset: Onset?,
+        val leadFrames: Int = 0,
+        val lockHz: Double? = null,
+        val stopDrop: Float? = null,
+    )
 
     /**
      * A note that began: its MIDI, and whether it was a [fresh] start after a gap (nothing was
@@ -174,6 +185,8 @@ class NoteOnsetTracker(
     private var stopAge = -1
     /** The quietest stretch of the stop pending, which the tone must rise [RESTART_RISE] over. */
     private var stopFloor = 0f
+    /** The note's recent level when the stop pending was first heard: how deep it fell is this less [stopFloor]. */
+    private var stopRecent = 0f
 
     fun onFrame(frame: PitchFrame): Result {
         noticeStop(frame)
@@ -218,7 +231,9 @@ class NoteOnsetTracker(
         }
         sounding = identified
         ageStop()
-        return Result(FrameDecision.SHOWN, onset, lead, lockHz = median.takeIf { onset != null })
+        // Under the quieter side: a joined note softer than the one before must not turn a breath's dip into a tongue's.
+        val stopDrop = if (onset != null && restarted) minOf(stopRecent, frame.minLevel) - stopFloor else null
+        return Result(FrameDecision.SHOWN, onset, lead, lockHz = median.takeIf { onset != null }, stopDrop = stopDrop)
     }
 
     /**
@@ -264,6 +279,7 @@ class NoteOnsetTracker(
         if (sounding == null || framesSinceOnset < rules.attackFrames || recentLevels.isEmpty()) return
         val recentMean = recentLevels.sum() / recentLevels.size
         if (frame.minLevel < recentMean - rules.stopDrop) {
+            if (stopAge < 0) stopRecent = recentMean
             stopFloor = if (stopAge < 0) frame.minLevel else minOf(stopFloor, frame.minLevel)
             stopAge = 0
         }

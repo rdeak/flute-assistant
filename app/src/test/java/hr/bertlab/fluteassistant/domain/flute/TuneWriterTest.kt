@@ -133,4 +133,111 @@ class TuneWriterTest {
         assertTrue(writer.erase())
         assertEquals(listOf(TuneNote(60, EIGHTH)), writer.tune)
     }
+
+    // ---- The join key (2026-11-16): ⌒ joins the next note to the last one, one tap per pair ----
+
+    @Test
+    fun `the join key joins the next note to the last one`() {
+        tap(60, at = 0, heldMs = 500)
+        assertTrue(writer.join())
+        assertTrue(writer.joinWaiting)
+        tap(62, at = 1000, heldMs = 500)
+        assertEquals(TuneNote(62, QUARTER, joined = true), writer.tune[1])
+        assertFalse(writer.joinWaiting)
+        tap(64, at = 2000, heldMs = 500)
+        assertFalse("one tap joins one pair", (writer.tune[2] as TuneNote).joined)
+    }
+
+    @Test
+    fun `a second tap cancels the join`() {
+        tap(60, at = 0, heldMs = 500)
+        assertTrue(writer.join())
+        assertFalse(writer.join())
+        assertFalse(writer.joinWaiting)
+        tap(62, at = 1000, heldMs = 500)
+        assertFalse((writer.tune[1] as TuneNote).joined)
+    }
+
+    @Test
+    fun `the rest key cancels a waiting join`() {
+        tap(60, at = 0, heldMs = 500)
+        writer.join()
+        tap(null, at = 1000, heldMs = 500)
+        assertFalse(writer.joinWaiting)
+        tap(62, at = 2000, heldMs = 500)
+        assertFalse((writer.tune[2] as TuneNote).joined)
+    }
+
+    @Test
+    fun `the breath cancels a waiting join`() {
+        tap(60, at = 0, heldMs = 500)
+        writer.join()
+        writer.breath()
+        assertFalse(writer.joinWaiting)
+    }
+
+    @Test
+    fun `erase while a join waits cancels the join and erases nothing, the next erase erases`() {
+        tap(60, at = 0, heldMs = 500)
+        writer.join()
+        assertTrue(writer.erase())
+        assertEquals(1, writer.tune.size)
+        assertFalse(writer.joinWaiting)
+        assertTrue(writer.erase())
+        assertTrue(writer.tune.isEmpty())
+    }
+
+    @Test
+    fun `nothing to join from refuses the key`() {
+        assertFalse(writer.canJoin)
+        assertFalse(writer.join())
+        assertFalse(writer.joinWaiting)
+        tap(60, at = 0, heldMs = 500)
+        writer.breath()
+        assertFalse(writer.canJoin)
+        assertFalse(writer.join())
+        tap(null, at = 1000, heldMs = 500)
+        assertFalse(writer.join())
+    }
+
+    @Test
+    fun `a join while a key is held joins the held note to the next`() {
+        writer.press(60, 0, pulse)
+        assertTrue(writer.join())
+        writer.press(62, 300, pulse) // ends 60
+        assertEquals(TuneNote(60, EIGHTH), writer.tune[0])
+        assertEquals(TuneNote(62, EIGHTH, joined = true), writer.tune[1])
+    }
+
+    @Test
+    fun `a join ends the rejoin window, so the same key again is a tie of two notes`() {
+        tap(60, at = 0, heldMs = 400)
+        writer.join()
+        writer.press(60, 420, pulse) // 20 ms after the release: inside HOLD_REJOIN_MS, but the join came between
+        assertEquals(2, writer.tune.size)
+        assertEquals(TuneNote(60, EIGHTH, joined = true), writer.tune[1])
+    }
+
+    @Test
+    fun `cancelJoin says whether a join waited, and another book drops it`() {
+        tap(60, at = 0, heldMs = 500)
+        writer.join()
+        assertTrue(writer.cancelJoin())
+        assertFalse(writer.cancelJoin())
+        writer.join()
+        writer.open(emptyList())
+        assertFalse(writer.joinWaiting)
+    }
+
+    @Test
+    fun `a key that bounces while a join waits keeps the join for the next note`() {
+        // The final review of 2026-11-16: a touch screen reporting one hold as two (HOLD_REJOIN_MS) spent the join.
+        writer.press(60, 0, pulse)
+        writer.join()
+        writer.release(300)
+        writer.press(60, 320, pulse) // the same hold going on
+        assertTrue(writer.joinWaiting)
+        writer.press(62, 800, pulse)
+        assertTrue((writer.tune[1] as TuneNote).joined)
+    }
 }

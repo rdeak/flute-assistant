@@ -19,8 +19,10 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -73,6 +75,8 @@ import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
+import hr.bertlab.fluteassistant.ui.theme.LightFluteColors
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -80,7 +84,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -99,6 +102,7 @@ class FluteScreenTest {
     private var erases = 0
     private val restEvents = mutableListOf<String>()
     private var breaths = 0
+    private var joins = 0
     private var chosenBpm: Int? = null
     private var chosenSignature: TimeSignature? = null
     private var speedOpens = 0
@@ -143,6 +147,7 @@ class FluteScreenTest {
                             onRestReleased = { restEvents += "release" },
                             onRestActivated = { restEvents += "activate" },
                             onBreath = { breaths++ },
+                            onJoin = { joins++ },
                             onTogglePlayback = { playToggles++ },
                             onEraseLast = { erases++ },
                             onBpmChange = { bpm ->
@@ -315,6 +320,7 @@ class FluteScreenTest {
             Listening(index = 0, walk = short, faded = true) to "😮‍💨 Možda nema zraka? Udahni",
             Listening(index = 0, pitch = Pitch.HIGH) to "⬇️ Malo niže",
             Listening(index = 0, wrong = WrongNote(0, 64)) to "👀 Provjeri prste",
+            Listening(index = 0, tongued = true) to "✂️ Poveži ih, bez jezika",
         )
         state = mutableStateOf(FluteUiState(tune = twoNotes, listening = lines.first().first))
         compose.setContent {
@@ -1319,5 +1325,101 @@ class FluteScreenTest {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 1, remark = StepMark.LONG), marks = mapOf(0 to StepMark.LONG)), Locale("hr"))
         compose.onNodeWithText("✋ Predugo, pusti ranije").assertIsDisplayed()
         compose.onNodeWithContentDescription("c1, 1 doba, predugo").assertExists()
+    }
+
+    // ---- Legato (2026-11-16): the slur, a joined note's words, ✂️ ----
+
+    private val slurred = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER, joined = true), TuneNote(64, NoteLength.QUARTER))
+
+    @Test
+    fun a_joined_note_is_described_as_joined() {
+        show(FluteUiState(tune = slurred))
+        compose.onNodeWithContentDescription("D4, 1 beat, joined to the note before").assertExists()
+        compose.onNodeWithContentDescription("E4, 1 beat").assertExists()
+    }
+
+    @Test
+    fun a_tongued_mark_is_described() {
+        show(FluteUiState(tune = slurred, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.TONGUED)))
+        compose.onNodeWithContentDescription("D4, 1 beat, joined to the note before, tongued, not joined").assertExists()
+    }
+
+    @Test
+    fun a_joined_note_is_described_in_croatian() {
+        show(FluteUiState(tune = slurred, marks = mapOf(1 to StepMark.TONGUED)), locale = Locale("hr"))
+        compose.onNodeWithContentDescription(", spojeno s notom prije, jezikom, nije spojeno", substring = true).assertExists()
+    }
+
+    /** Ink pixels of the staff in the box [x0]..[x1] by [y0]..[y1], in dp from the tune row's left and the staff's top. */
+    private fun inkIn(row: PixelMap, x0: Float, x1: Float, y0: Float, y1: Float): Int {
+        val d = compose.density
+        val ink = LightFluteColors.text
+        var count = 0
+        for (x in with(d) { x0.dp.roundToPx() } until with(d) { x1.dp.roundToPx() }) {
+            for (y in with(d) { y0.dp.roundToPx() } until with(d) { y1.dp.roundToPx() }) if (row[x, y].near(ink)) count++
+        }
+        return count
+    }
+
+    @Test
+    fun slurs_and_the_waiting_arc_are_drawn() {
+        needsDevice()
+        show(FluteUiState(tune = slurred))
+        val row = compose.onNodeWithContentDescription("Your tune, 3 notes").captureToImage().toPixelMap()
+        // The first head stands NOTES_START - NOTES_CLIP + HEAD_X into the row, a beat (29 dp) apart; c¹ at 165, d¹ at 156.
+        val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
+        val beat = StaffGeometry.BEAT_WIDTH
+        assertTrue("a slur under c and d", inkIn(row, first + 6, first + beat - 6, 171f, 186f) > 0)
+        assertEquals("nothing under d and e, not joined", 0, inkIn(row, first + beat + 6, first + 2 * beat - 6, 162f, 180f))
+        state.value = state.value.copy(joinWaiting = true)
+        val waiting = compose.onNodeWithContentDescription("Your tune, 3 notes").captureToImage().toPixelMap()
+        assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 6, first + 2 * beat + 26, 152f, 168f) > 0)
+    }
+
+    // ---- The ⌒ key (2026-11-16): left of 💤, faded with nothing to join, down while a join waits ----
+
+    @Test
+    fun the_join_key_stands_left_of_the_rest_key() {
+        show(FluteUiState())
+        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
+        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
+        val f5 = compose.onNodeWithContentDescription("F5").getBoundsInRoot()
+        val join = compose.onNodeWithContentDescription("Join to the next note").getBoundsInRoot()
+        val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
+        assertTrue("$join should sit in C6's row $c6", abs((join.top - c6.top).value) <= 1f && abs((join.bottom - c6.bottom).value) <= 1f)
+        assertTrue("$join should be one key wide", abs((join.width - c5.width).value) <= 1f)
+        assertTrue("$join should stand over F5 $f5", abs((join.left - f5.left).value) <= 1f)
+        assertTrue("$join should come just before Rest $rest", join.right < rest.left && rest.left - join.right < c5.width / 2)
+        assertTrue("two empty columns still beside C6", join.left - c6.right > c5.width * 2)
+    }
+
+    @Test
+    fun the_join_key_is_faded_with_nothing_to_join_and_selected_while_a_join_waits() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Join to the next note").assertIsNotEnabled()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER)))
+        // No "not selected" for a screen reader while no join waits: the key says selected only while one does.
+        compose.onNodeWithContentDescription("Join to the next note").assertIsEnabled()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        state.value = state.value.copy(joinWaiting = true)
+        compose.onNodeWithContentDescription("Join to the next note").assertIsSelected()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.QUARTER)), joinWaiting = false)
+        compose.onNodeWithContentDescription("Join to the next note").assertIsNotEnabled()
+    }
+
+    @Test
+    fun tapping_the_join_key_reports_it() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        compose.onNodeWithContentDescription("Join to the next note").performTouchInput { down(center) }
+        assertEquals("on the finger going down", 1, joins)
+        compose.onNodeWithContentDescription("Join to the next note").performTouchInput { up() }
+        compose.onNodeWithContentDescription("Join to the next note").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(2, joins)
+    }
+
+    @Test
+    fun the_join_key_is_named_for_a_screen_reader_in_croatian() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))), Locale("hr"))
+        compose.onNodeWithContentDescription("Spoji sa sljedećom notom").assertExists()
     }
 }

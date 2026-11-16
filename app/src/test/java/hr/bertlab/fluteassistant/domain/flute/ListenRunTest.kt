@@ -30,6 +30,7 @@ class ListenRunTest {
 
     private fun q(midi: Int) = TuneNote(midi, QUARTER)
     private fun h(midi: Int) = TuneNote(midi, HALF)
+    private fun j(midi: Int) = TuneNote(midi, QUARTER, joined = true)
     /** The rule of before 2026-11-11, pitch only: every note is long enough at its onset. */
     private fun pitchOnly(tune: List<TuneItem>) = ListenRun(tune, Pulse(60), run = ListenRun.Rules.PITCH_ONLY)
 
@@ -1034,6 +1035,7 @@ class ListenRunTest {
                 "restartCuts" to "0", "graceFrames" to "2", "walkRests" to "1",
                 "highCents" to "75.0", "tuneCents" to "25.0", "tuneFrames" to "3", "shortMovesOn" to "1",
                 "paceMinPairs" to "6", "paceOff" to "0.15", "longSlack" to "1.5", "wholeNote" to "0",
+                "slurCheck" to "1", "slurStopDrop" to "0.25",
             ),
             ListenRun.Rules().fields(),
         )
@@ -1041,6 +1043,7 @@ class ListenRunTest {
             setOf(
                 "repeatAdviceFrames", "finishFrames", "lengthSlack", "maxNeedMs", "restartCuts", "graceFrames", "walkRests",
                 "highCents", "tuneCents", "tuneFrames", "shortMovesOn", "paceMinPairs", "paceOff", "longSlack", "wholeNote",
+                "slurCheck", "slurStopDrop",
             ),
             ListenRun.Rules.NAMES,
         )
@@ -1451,7 +1454,8 @@ class ListenRunTest {
 
     @Test
     fun `the two new rules are written down last and can be moved`() {
-        assertEquals(listOf("longSlack" to "1.5", "wholeNote" to "0"), ListenRun.Rules().fields().takeLast(2))
+        // Written after them since 2026-11-16: the slur rules (`the slur rules are named rules`).
+        assertEquals(listOf("longSlack" to "1.5", "wholeNote" to "0"), ListenRun.Rules().fields().dropLast(2).takeLast(2))
         assertEquals(0.5, ListenRun.Rules().with("longSlack", 0.5).longSlack, 0.0)
         assertTrue(ListenRun.Rules().with("wholeNote", 1.0).wholeNote)
         assertEquals(Double.POSITIVE_INFINITY, ListenRun.Rules.PITCH_ONLY.longSlack, 0.0)
@@ -1683,5 +1687,247 @@ class ListenRunTest {
         assertTrue("the pop was heard as a note", popped.any { it.row.onset?.midi == 79 })
         assertTrue(popped.none { it.heard?.verdict == Verdict.RIGHT || it.heard?.verdict == Verdict.WRONG })
         assertEquals(StepMark.LONG, run.marks[0])
+    }
+
+    // ---- A tie, or a slur to the same letter in another octave, is one note to Listen to me (2026-11-16) ----
+
+    @Test
+    fun `a tie is walked as one note across both`() {
+        val run = timed(q(60), j(60), q(62))
+        run.begin(60)
+        run.hold(60, after(1100.0))
+        assertTrue("the tie needs both its beats less the slack", run.marks.isEmpty())
+        assertEquals(2, run.listening.walk?.halfBeat) // the click at 1000 ms, on the tie's second note
+        run.hold(60, after(1600.0) - after(1100.0))
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), run.marks)
+        assertEquals(2, run.listening.index)
+    }
+
+    @Test
+    fun `an octave slur played joined is one note and the first is never too long`() {
+        val run = practice(q(60), j(72), q(62))
+        run.begin(60)
+        run.hold(60, after(900.0))
+        run.begin(72)
+        run.hold(72, after(900.0))
+        run.stop()
+        run.begin(62)
+        assertEquals(StepMark.FIRST_TRY, run.marks[0])
+        assertEquals(StepMark.FIRST_TRY, run.marks[1])
+    }
+
+    @Test
+    fun `a tie that ends the tune is never too long and the run finishes`() {
+        val run = practice(q(60), j(60))
+        run.begin(60)
+        run.hold(60, after(4000.0))
+        run.stop()
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), run.marks)
+        assertTrue(run.isOver)
+    }
+
+    // ---- ✂️, a joined note started with the tongue (2026-11-16): a gap, or a stop as deep as a tongue ----
+
+    /** A stop at the end of [from] (one frame, its quietest stretch at [minLevel]), then [to] locks: a tongue at 0.2. */
+    private fun ListenRun.tongueTo(from: Int, to: Int, minLevel: Float = 0.2f) {
+        onFrame(pitched(from, minLevel = minLevel))
+        begin(to)
+    }
+
+    @Test
+    fun `a joined note started with the tongue earns the scissors and the line`() {
+        val run = timed(q(60), j(62), q(64))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.tongueTo(60, 62)
+        assertTrue(run.listening.tongued)
+        assertEquals(TunerAdvice.JOIN, run.listening.advice)
+        run.hold(62, after(800.0))
+        assertEquals(StepMark.TONGUED, run.marks[1])
+        assertEquals(TunerAdvice.JOIN, run.listening.advice)
+    }
+
+    @Test
+    fun `a joined note played joined, or after a breath-sized dip, earns its star`() {
+        val slur = timed(q(60), j(62))
+        slur.begin(60)
+        slur.hold(60, after(800.0))
+        slur.begin(62)
+        slur.hold(62, after(800.0))
+        assertEquals(StepMark.FIRST_TRY, slur.marks[1])
+        val dip = timed(q(60), j(62))
+        dip.begin(60)
+        dip.hold(60, after(800.0))
+        dip.tongueTo(60, 62, minLevel = 0.52f)
+        assertFalse(dip.listening.tongued)
+        dip.hold(62, after(800.0))
+        assertEquals(StepMark.FIRST_TRY, dip.marks[1])
+    }
+
+    @Test
+    fun `a joined note after a gap earns the scissors, a note not joined never does`() {
+        val joined = timed(q(60), j(62))
+        joined.begin(60)
+        joined.hold(60, after(800.0))
+        joined.stop()
+        joined.begin(62)
+        joined.hold(62, after(800.0))
+        assertEquals(StepMark.TONGUED, joined.marks[1])
+        val apart = timed(q(60), q(62))
+        apart.begin(60)
+        apart.hold(60, after(800.0))
+        apart.tongueTo(60, 62)
+        apart.hold(62, after(800.0))
+        assertEquals(StepMark.FIRST_TRY, apart.marks[1])
+    }
+
+    @Test
+    fun `no scissors after a wrong note, nor with the rule off`() {
+        val wrong = timed(q(60), j(62))
+        wrong.begin(60)
+        wrong.hold(60, after(800.0))
+        wrong.stop()
+        wrong.begin(65)
+        wrong.stop()
+        wrong.begin(62)
+        wrong.hold(62, after(800.0))
+        assertEquals(StepMark.RETRY, wrong.marks[1])
+        val off = ListenRun(listOf(q(60), j(62)), Pulse(60), run = halfBeatSlack.copy(slurCheck = false))
+        off.begin(60)
+        off.hold(60, after(800.0))
+        off.tongueTo(60, 62)
+        off.hold(62, after(800.0))
+        assertEquals(StepMark.FIRST_TRY, off.marks[1])
+    }
+
+    @Test
+    fun `cut short, the hourglass wins and the line still says join`() {
+        val run = timed(q(60), j(62), q(64))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.tongueTo(60, 62)
+        run.hold(62, 2)
+        run.stop()
+        assertEquals(StepMark.SHORT, run.marks[1])
+        assertEquals(TunerAdvice.JOIN, run.listening.advice)
+    }
+
+    @Test
+    fun `held too long, the scissors become the hand`() {
+        val run = practice(q(60), j(62), q(64))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.tongueTo(60, 62)
+        run.hold(62, after(2600.0))
+        assertEquals(StepMark.LONG, run.marks[1])
+        assertEquals(TunerAdvice.TOO_LONG, run.listening.advice)
+    }
+
+    @Test
+    fun `in exam a tongued note keeps its scissors when its whole pitch is read`() {
+        val run = exam(q(60), j(62), q(64))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.tongueTo(60, 62)
+        run.sound(62, 900.0, cents = 40.0)
+        run.stop()
+        assertEquals(StepMark.TONGUED, run.marks[1])
+    }
+
+    @Test
+    fun `while the tongued note sounds off its pitch the tuning line comes first`() {
+        val run = timed(q(60), j(62))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.tongueTo(60, 62)
+        run.sound(62, 300.0, cents = 40.0)
+        assertEquals(TunerAdvice.TOO_HIGH, run.listening.advice)
+    }
+
+    @Test
+    fun `the next note judged ends the line`() {
+        val run = timed(q(60), j(62), q(64))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.tongueTo(60, 62)
+        run.hold(62, after(800.0))
+        run.stop()
+        run.begin(64)
+        assertFalse(run.listening.tongued)
+        assertEquals(TunerAdvice.NONE, run.listening.advice)
+    }
+
+    @Test
+    fun `the slur rules are named rules`() {
+        val rules = ListenRun.Rules()
+        assertEquals(listOf("slurCheck" to "1", "slurStopDrop" to "0.25"), rules.fields().takeLast(2))
+        assertEquals(false, rules.with("slurCheck", 0.0).slurCheck)
+        assertEquals(0.4, rules.with("slurStopDrop", 0.4).slurStopDrop, 0.0)
+        assertTrue(ListenLevel.EXAM.rules.slurCheck)
+    }
+
+    @Test
+    fun `a joined note softer than the one before earns its star after a breath-sized dip, or with no dip at all`() {
+        // The final review of 2026-11-16: the stop was measured against the louder note before, so a softer joined note
+        // turned a breath's dip, or no dip, into a tongue's depth.
+        val dip = timed(q(60), j(62))
+        List(ListenRules.LOCK_FRAMES + after(800.0)) { dip.onFrame(pitched(60, level = 0.8f)) }
+        dip.onFrame(pitched(60, level = 0.8f, minLevel = 0.54f))
+        List(ListenRules.LOCK_FRAMES + after(800.0)) { dip.onFrame(pitched(62, level = 0.7f)) }
+        assertEquals(StepMark.FIRST_TRY, dip.marks[1])
+        val swell = timed(q(60), j(62))
+        List(ListenRules.LOCK_FRAMES + after(800.0)) { swell.onFrame(pitched(60, level = 0.85f)) }
+        listOf(0.58f, 0.66f, 0.74f).forEach { swell.onFrame(pitched(62, level = it)) }
+        List(after(800.0)) { swell.onFrame(pitched(62, level = 0.74f)) }
+        assertEquals(StepMark.FIRST_TRY, swell.marks[1])
+        val tongue = timed(q(60), j(62))
+        List(ListenRules.LOCK_FRAMES + after(800.0)) { tongue.onFrame(pitched(60, level = 0.8f)) }
+        tongue.onFrame(pitched(60, level = 0.8f, minLevel = 0.2f))
+        List(ListenRules.LOCK_FRAMES + after(800.0)) { tongue.onFrame(pitched(62, level = 0.6f)) }
+        assertEquals("a real tongue into a softer note is still one", StepMark.TONGUED, tongue.marks[1])
+    }
+
+    // An octave slur broken by a real gap (the final review of 2026-11-16): not "too short" on two notes held their length.
+
+    @Test
+    fun `an octave slur broken by a gap after its first note's beat earns its star and the scissors`() {
+        val run = practice(q(60), j(72), q(62))
+        run.begin(60)
+        run.hold(60, after(950.0))
+        run.stop()
+        assertEquals(StepMark.FIRST_TRY, run.marks[0])
+        assertEquals(StepMark.TONGUED, run.marks[1])
+        assertEquals(TunerAdvice.JOIN, run.listening.advice)
+        run.begin(72)
+        run.hold(72, after(950.0))
+        assertNull("the c² after the gap is the slur's own, not a wrong note", run.listening.wrong)
+        run.stop()
+        run.begin(62)
+        run.hold(62, after(800.0))
+        assertEquals(StepMark.FIRST_TRY, run.marks[2])
+    }
+
+    @Test
+    fun `an octave slur let go before its first note's beat, and a tie broken by a gap, are still too short`() {
+        val early = practice(q(60), j(72), q(62))
+        early.begin(60)
+        early.hold(60, 1)
+        early.stop()
+        assertEquals(mapOf(0 to StepMark.SHORT, 1 to StepMark.SHORT), early.marks)
+        val tie = practice(q(60), j(60), q(62))
+        tie.begin(60)
+        tie.hold(60, after(950.0))
+        tie.stop()
+        assertEquals("a tie is one written sound", mapOf(0 to StepMark.SHORT, 1 to StepMark.SHORT), tie.marks)
+    }
+
+    @Test
+    fun `the heard note carries how deep the stop before it fell`() {
+        val run = timed(q(60), j(62))
+        run.begin(60)
+        run.hold(60, after(800.0))
+        run.onFrame(pitched(60, minLevel = 0.2f))
+        val onset = List(ListenRules.LOCK_FRAMES) { run.onFrame(pitched(62)) }.last()
+        assertEquals(0.5f, onset.heard?.stopDrop!!, 0.001f)
     }
 }

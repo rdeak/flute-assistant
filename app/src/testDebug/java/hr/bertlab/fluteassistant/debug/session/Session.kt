@@ -81,7 +81,11 @@ class Session(
                         TimeSignature.entries.first { it.label == f.getValue("time") },
                     )
                     "session.tune" -> tune[f.getValue("index").toInt()] = when {
-                        f["note"] != null -> TuneNote(f.getValue("note").toInt(), NoteLength.valueOf(f.getValue("length")))
+                        f["note"] != null -> TuneNote(
+                            f.getValue("note").toInt(),
+                            NoteLength.valueOf(f.getValue("length")),
+                            joined = f["joined"] == "true",
+                        )
                         f["rest"] != null -> TuneRest(NoteLength.valueOf(f.getValue("rest")))
                         else -> TuneBreath
                     }

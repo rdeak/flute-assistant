@@ -131,4 +131,12 @@ class LabelsTest {
         assertEquals("✋ Too long, let go sooner", en.getString(TunerAdvice.TOO_LONG.labelRes()!!))
         assertEquals("✋ Predugo, pusti ranije", hr.getString(TunerAdvice.TOO_LONG.labelRes()!!))
     }
+
+    @Test
+    fun the_join_line_reads_in_both_languages() {
+        val en = resources(Locale.ENGLISH)
+        val hr = resources(Locale("hr"))
+        assertEquals("✂️ Join them, no tongue", en.getString(TunerAdvice.JOIN.labelRes()!!))
+        assertEquals("✂️ Poveži ih, bez jezika", hr.getString(TunerAdvice.JOIN.labelRes()!!))
+    }
 }

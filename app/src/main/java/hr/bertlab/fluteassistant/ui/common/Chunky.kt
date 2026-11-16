@@ -269,3 +269,4 @@ const val SHORT_EMOJI = "⏳" // hourglass: hold it longer
 
 /** The sign of a note held past its written length (since 2026-11-16, the user's pick "3A"), drawn as the others. */
 const val LONG_EMOJI = "✋" // raised hand: let go sooner
+const val TONGUED_EMOJI = "✂️" // scissors: a joined note started with the tongue (since 2026-11-16)

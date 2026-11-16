@@ -83,6 +83,7 @@ object Replay {
         "shortMovesOn" to 0.0, // 2026-11-14: a note let go too early was waited on
         "longSlack" to Double.POSITIVE_INFINITY, // 2026-11-16: no note was too long
         "wholeNote" to 0.0, // 2026-11-16: a mark was final once the note was long enough
+        "slurCheck" to 0.0, // 2026-11-16: no slur check, a joined note tongued kept its star
     )
 
     /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */
@@ -218,7 +219,7 @@ object Replay {
             if (changed) " ${step.row.changed?.let { "${it.index}:${it.mark}" } ?: "-"}" else ""
 
     private fun spell(item: hr.bertlab.fluteassistant.domain.flute.TuneItem) = when (item) {
-        is TuneNote -> "${item.midi}/${item.length}"
+        is TuneNote -> "${if (item.joined) "⌒" else ""}${item.midi}/${item.length}"
         is TuneRest -> "rest/${item.length}"
         TuneBreath -> "breath"
     }

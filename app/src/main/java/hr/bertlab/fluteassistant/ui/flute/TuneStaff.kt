@@ -52,10 +52,13 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.DrawStyle
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -78,6 +81,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.Bars
+import hr.bertlab.fluteassistant.domain.flute.JoinArc
+import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Pitch
@@ -93,13 +98,14 @@ import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
 import hr.bertlab.fluteassistant.ui.common.HIGH_EMOJI
+import hr.bertlab.fluteassistant.ui.common.LONG_EMOJI
 import hr.bertlab.fluteassistant.ui.common.LOW_EMOJI
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.RETRY_STAR_ALPHA
-import hr.bertlab.fluteassistant.ui.common.LONG_EMOJI
 import hr.bertlab.fluteassistant.ui.common.SHORT_EMOJI
 import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
+import hr.bertlab.fluteassistant.ui.common.TONGUED_EMOJI
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
@@ -227,6 +233,7 @@ fun TuneStaff(
     pitch: Pitch? = null,
     scale: Float = 1f,
     listState: LazyListState = rememberLazyListState(),
+    joinWaiting: Boolean = false,
 ) {
     val colors = FluteTheme.colors
     val ink = StaffInk(line = colors.text, outline = colors.outline, card = colors.card, rest = colors.mutedText)
@@ -256,7 +263,7 @@ fun TuneStaff(
             if (tune.isEmpty()) {
                 EmptyHint()
             } else {
-                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, pitch, ink, measurer, listState)
+                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, pitch, ink, measurer, listState, joinWaiting)
             }
         }
     }
@@ -380,6 +387,7 @@ private fun TuneMarks(
     ink: StaffInk,
     measurer: TextMeasurer,
     listState: LazyListState,
+    joinWaiting: Boolean,
 ) {
     val s = LocalStaffScale.current
     val notes = tune.count { it is TuneNote }
@@ -395,7 +403,7 @@ private fun TuneMarks(
     // Where the walking animal stands along the row, and how far on the staff scrolls for it to stay in the row:
     // 0 while it is in view, so its hops inside the row scroll nothing (a staff the child dragged back stays until
     // the next note, as before).
-    val animalX = animal?.let { animalX(it, lineMarks, starts) }
+    val animalX = animal?.let { animalX(it, tune, lineMarks, starts) }
     val follow = animalX?.takeIf { rowWidth > 0f }?.let { StaffGeometry.followScroll(starts[target], it, rowWidth, s) } ?: 0f
     // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
     LaunchedEffect(target, lineMarks, follow) {
@@ -440,15 +448,172 @@ private fun TuneMarks(
                 }
             }
         }
+        SlurLayer(tune, lineMarks, starts, listState, joinWaiting, ink)
         if (animal != null && animalX != null) WalkingAnimal(animal, animalX, starts, listState)
     }
 }
 
+/** Where a step's pieces stand along the row, in dp at rest from its first mark: each piece's head and its pill's middle. */
+private class StepPlace(val heads: List<Float>, val pills: List<Float>)
+
+private fun stepPlaces(lineMarks: List<LineMark>, starts: List<Float>): Map<Int, StepPlace> =
+    lineMarks.withIndex().filter { it.value is LineMark.Step }.associate { (at, mark) ->
+        val heads = mutableListOf<Float>()
+        val pills = mutableListOf<Float>()
+        var x = starts[at]
+        for (part in (mark as LineMark.Step).parts) {
+            if (part is StepPart.Length) {
+                heads += x + HEAD_X
+                pills += x + slotWidth(part.length) / 2
+            }
+            x += partWidth(part)
+        }
+        mark.index to StepPlace(heads, pills)
+    }
+
+/**
+ * The arcs over joined notes (since 2026-11-16, the ⌒ key, [Joins.arcs]): a slur under the heads in ink, a crescent
+ * ([StaffGeometry.slurCurve]) passing under the heads and ties between its ends, with one muted arc under the name pills
+ * of its notes, as a tie's pills are joined; a tie between two notes of one pitch drawn as the ties inside a note are;
+ * and, while [joinWaiting], a dashed half arc running on from the last note, on the staff and under its pill. One layer
+ * over the row, placed from the row's own layout at every frame as [WalkingAnimal] is, so an arc whose first note has
+ * scrolled away is still drawn, and clipped at the row's sides only.
+ */
+@Composable
+private fun SlurLayer(tune: List<TuneItem>, lineMarks: List<LineMark>, starts: List<Float>, listState: LazyListState, joinWaiting: Boolean, ink: StaffInk) {
+    val arcs = remember(tune) { Joins.arcs(tune) }
+    val waitingOn = (tune.lastOrNull() as? TuneNote)?.takeIf { joinWaiting }
+    if (arcs.isEmpty() && waitingOn == null) return
+    val s = LocalStaffScale.current
+    val muted = FluteTheme.colors.mutedText
+    // Built once per tune and look, not on every frame the row scrolls or the animal hops.
+    val drawings = remember(tune, lineMarks, starts, waitingOn, ink.line, muted) {
+        val places = stepPlaces(lineMarks, starts)
+        arcs.flatMap { joinArc(it, tune, places, ink.line, muted) } +
+            (waitingOn?.let { note -> places[tune.lastIndex]?.let { waitingArc(it, note, ink.line, muted) } } ?: emptyList())
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .drawBehind {
+                val info = listState.layoutInfo
+                val first = info.visibleItemsInfo.firstOrNull() ?: return@drawBehind
+                val firstStart = starts.getOrNull(first.index) ?: return@drawBehind
+                // The first item shown is the reference, as for the walking animal.
+                val origin = info.beforeContentPadding + first.offset - firstStart * s * density
+                clipRect(top = -size.height, bottom = size.height * 2) {
+                    translate(left = origin) {
+                        scale(density * s, pivot = Offset.Zero) {
+                            for (drawing in drawings) drawPath(drawing.path, drawing.color, style = drawing.style)
+                        }
+                    }
+                }
+            },
+    )
+}
+
+/** The y of a note's head on the staff. */
+private fun headY(note: TuneNote): Float = yOf(StaffNotes.positionOf(note.midi))
+
+/** The top of the arcs under the name pills, as a tie's pills have them. */
+private const val PILL_ARC_TOP = StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT + StaffGeometry.PILL_TIE_GAP
+
+/** One stroke or fill of the slur layer, in dp, made once and drawn on every frame. */
+private class ArcDrawing(val path: Path, val color: Color, val style: DrawStyle = Fill)
+
+private fun pillArc(from: Float, to: Float, color: Color) = ArcDrawing(
+    Path().apply {
+        moveTo(from + 3f, PILL_ARC_TOP)
+        quadraticTo((from + to) / 2, PILL_ARC_TOP + StaffGeometry.PILL_TIE_DIP * 2, to - 3f, PILL_ARC_TOP)
+    },
+    color,
+    Stroke(2f, cap = StrokeCap.Round),
+)
+
+/** What one arc of [Joins.arcs] draws, in dp: a slur and its arc under the pills, or a tie between two steps of one note. */
+private fun joinArc(arc: JoinArc, tune: List<TuneItem>, places: Map<Int, StepPlace>, ink: Color, muted: Color): List<ArcDrawing> {
+    val from = places[arc.from] ?: return emptyList()
+    val to = places[arc.to] ?: return emptyList()
+    val first = tune[arc.from] as TuneNote
+    val last = tune[arc.to] as TuneNote
+    if (arc.tie) {
+        val a = from.heads.last()
+        val b = to.heads.first()
+        val y = headY(first)
+        val tie = ArcDrawing(
+            Path().apply {
+                moveTo(a + StaffGeometry.TIE_INSET, y + StaffGeometry.TIE_START)
+                quadraticTo((a + b) / 2, y + StaffGeometry.TIE_CONTROL, b - StaffGeometry.TIE_INSET, y + StaffGeometry.TIE_START)
+            },
+            noteColor(first.midi),
+            Stroke(StaffGeometry.TIE_WIDTH, cap = StrokeCap.Round),
+        )
+        return listOf(tie, pillArc(from.pills.last(), to.pills.first(), muted))
+    }
+    // Everything between the slur's two end heads it must pass under: the other heads, and the ties under them.
+    val tieLow = (StaffGeometry.TIE_START + StaffGeometry.TIE_CONTROL) / 2 + StaffGeometry.TIE_WIDTH / 2
+    val clear = mutableListOf<Pair<Float, Float>>()
+    for (index in arc.from..arc.to) {
+        val note = tune[index] as TuneNote
+        val place = places[index] ?: continue
+        val y = headY(note)
+        place.heads.forEachIndexed { k, x ->
+            val end = (index == arc.from && k == 0) || (index == arc.to && k == place.heads.lastIndex)
+            if (!end) clear += x to y + StaffGeometry.HEAD_RY
+        }
+        place.heads.zipWithNext().forEach { (a, b) -> clear += (a + b) / 2 to y + tieLow }
+        val next = places[index + 1]
+        if (index < arc.to && next != null && (tune[index + 1] as TuneNote).midi == note.midi) {
+            clear += (place.heads.last() + next.heads.first()) / 2 to y + tieLow
+        }
+    }
+    val curve = StaffGeometry.slurCurve(from.heads.first(), headY(first), to.heads.last(), headY(last), clear)
+    return listOf(ArcDrawing(slurPath(curve), ink), pillArc(from.pills.first(), to.pills.last(), muted))
+}
+
+/** What the join waiting for its next note draws: a dashed half arc running on from the last note's head, and from under its pill. */
+private fun waitingArc(place: StepPlace, note: TuneNote, ink: Color, muted: Color): List<ArcDrawing> {
+    val dashes = PathEffect.dashPathEffect(floatArrayOf(3f, 4f))
+    val x = place.heads.last() + StaffGeometry.SLUR_END_INSET
+    val y = headY(note) + StaffGeometry.SLUR_END_DROP
+    val staff = ArcDrawing(
+        Path().apply {
+            val l = StaffGeometry.WAITING_ARC_LENGTH
+            moveTo(x, y)
+            cubicTo(x + l * 0.3f, y + 7f, x + l * 0.7f, y + 8f, x + l, y + 6f)
+        },
+        ink,
+        Stroke(2.2f, cap = StrokeCap.Round, pathEffect = dashes),
+    )
+    val pill = place.pills.last() + 3f
+    val pills = ArcDrawing(
+        Path().apply {
+            val l = StaffGeometry.WAITING_ARC_LENGTH - 2f
+            moveTo(pill, PILL_ARC_TOP)
+            quadraticTo(pill + l * 0.45f, PILL_ARC_TOP + 8f, pill + l, PILL_ARC_TOP + 6f)
+        },
+        muted,
+        Stroke(2f, cap = StrokeCap.Round, pathEffect = dashes),
+    )
+    return listOf(staff, pills)
+}
+
 /** Where [animal] stands along the row, in dp at rest from its first mark ([starts]); null when its step is not on the line. */
-private fun animalX(animal: StaffAnimal, lineMarks: List<LineMark>, starts: List<Float>): Float? {
-    val step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == animal.index }
+internal fun animalX(animal: StaffAnimal, tune: List<TuneItem>, lineMarks: List<LineMark>, starts: List<Float>): Float? {
+    var step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == animal.index }
     if (step < 0) return null
-    return starts[step] + StaffGeometry.beatX((lineMarks[step] as LineMark.Step).parts, animal.halfBeat)
+    var halfBeat = animal.halfBeat
+    // Listen to me walks a tie (or an octave slur) as one note: past its first note the animal goes on onto the next.
+    while (true) {
+        val index = (lineMarks[step] as LineMark.Step).index
+        val length = tune[index].length?.halfBeats ?: 0
+        if (halfBeat < length || !Joins.heardWithBefore(tune, index + 1)) break
+        val next = lineMarks.indexOfFirst { it is LineMark.Step && it.index == index + 1 }
+        if (next < 0) break
+        halfBeat -= length
+        step = next
+    }
+    return starts[step] + StaffGeometry.beatX((lineMarks[step] as LineMark.Step).parts, halfBeat)
 }
 
 /**
@@ -534,7 +699,9 @@ private fun StepMark(
 ) {
     val s = LocalStaffScale.current
     val name = when (item) {
-        is TuneNote -> lengthDescription(noteLabel(item.midi), item.length)
+        is TuneNote -> lengthDescription(noteLabel(item.midi), item.length).let {
+            if (item.joined) stringResource(R.string.flute_note_joined, it) else it
+        }
         is TuneRest -> lengthDescription(stringResource(R.string.flute_rest), item.length)
         TuneBreath -> stringResource(R.string.flute_breath_here)
     }
@@ -547,6 +714,7 @@ private fun StepMark(
         mark == StepMark.LOW -> stringResource(R.string.flute_mark_low)
         mark == StepMark.SHORT -> stringResource(R.string.flute_mark_short)
         mark == StepMark.LONG -> stringResource(R.string.flute_mark_long)
+        mark == StepMark.TONGUED -> stringResource(R.string.flute_mark_tongued)
         else -> null
     }
     val description = if (earned == null) name else "$name, $earned"
@@ -596,6 +764,7 @@ private fun MarkRow(mark: StepMark?, heard: Int?, heardNow: Int?, pitch: Pitch?,
             mark == StepMark.LOW -> Emoji(LOW_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.SHORT -> Emoji(SHORT_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.LONG -> Emoji(LONG_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            mark == StepMark.TONGUED -> Emoji(TONGUED_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.RETRY -> Emoji(
                 STAR_EMOJI,
                 fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s),

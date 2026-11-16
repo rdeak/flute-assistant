@@ -152,6 +152,8 @@ tab's CLAUDE.md; these rules hold on all of them:
 - Added at the user's request (2026-11-16): the level of Listen to me, 🎵 Practice or 🎓 Exam, chosen in
   the listening room until the run's first note is judged, never on the writing screen
   (`ui/flute/CLAUDE.md`, "Two levels").
+- Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
+  pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than

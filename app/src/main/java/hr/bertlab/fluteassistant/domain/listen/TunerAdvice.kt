@@ -27,6 +27,8 @@ enum class TunerAdvice {
     TOO_LOW,
     /** The flute's only: a note held past its written length, marked too long (since 2026-11-16). */
     TOO_LONG,
+    /** The flute's only: a note written joined to the one before, started with the tongue (since 2026-11-16). */
+    JOIN,
     /** The tuner's only: the tuning note chosen and played flat, so the head joint goes in a little. */
     HEAD_JOINT_IN,
     /** The tuner's only: the tuning note chosen and played sharp, so the head joint comes out a little. */
