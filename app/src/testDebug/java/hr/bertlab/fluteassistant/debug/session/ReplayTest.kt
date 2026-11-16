@@ -406,4 +406,35 @@ class ReplayTest {
         assertEquals(3, Replay.sweep(session, "longSlack:1,1.5,100").lines().count { it.startsWith("longSlack=") })
         assertEquals(2, Replay.sweep(session, "wholeNote:0,1").lines().count { it.startsWith("wholeNote=") })
     }
+
+    @Test
+    fun `an exam session is compared with exam's rules of today and swept as exam`() {
+        // 20 cents high: in tune for Practice, the down arrow in Exam.
+        val sharp = FluteSound.render(FluteSound.sound(gapsMs = 50, cents = 20.0))
+        val session = Session.load(recorded(samples = sharp, run = ListenLevel.EXAM.rules, level = ListenLevel.EXAM))
+        assertEquals(ListenLevel.EXAM, Replay.level(session))
+        val report = Replay.report(session)
+        assertFalse(report, report.contains("today's rules differ"))
+        val exam = ListenPath.run(session.frames, tune, session.pulse, run = ListenLevel.EXAM.rules).marks
+        assertTrue(exam.toString(), StepMark.HIGH in exam.values)
+        val line = Replay.sweep(session, "tuneCents:15").lines().single { it.startsWith("tuneCents=15") }
+        assertTrue(line, line.endsWith("marks=" + Session.spell(exam)))
+    }
+
+    @Test
+    fun `a session without a level was practice`() {
+        val dir = recorded()
+        val log = File(dir, "session.log")
+        log.writeText(log.readText().replace(" listenLevel=practice", ""))
+        assertEquals(ListenLevel.PRACTICE, Replay.level(Session.load(dir)))
+    }
+
+    @Test
+    fun `a session whose start line says level, as the first build of the levels wrote it, keeps its level`() {
+        // Build d2d5ff2 wrote `level=exam` on session.start before the field became listenLevel (the log's stamp has a `level` too).
+        val dir = recorded(run = ListenLevel.EXAM.rules, level = ListenLevel.EXAM)
+        val log = File(dir, "session.log")
+        log.writeText(log.readText().replace(" listenLevel=exam", " level=exam"))
+        assertEquals(ListenLevel.EXAM, Replay.level(Session.load(dir)))
+    }
 }

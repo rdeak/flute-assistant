@@ -373,7 +373,7 @@ fun FluteContent(
             val prompt = state.promptMidi?.let { playPrompt(it) } ?: state.pace?.let { speedLine(it) }
             // 🎵 Practice or 🎓 Exam, until the run's first note is judged (2026-11-16).
             val level: (@Composable (Boolean) -> Unit)? = if (state.choosesLevel) {
-                { stacked -> LevelChoice(state.level, actions.onLevelChosen, stacked) }
+                { stacked -> LevelChoice(state.level, actions.onLevelChosen, stacked, compact = stacked && SidewaysGeometry.isShort(maxHeight.value)) }
             } else {
                 null
             }
@@ -566,7 +566,7 @@ private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?, level: (@C
  * pictures); [stacked] in a phone on its side's column.
  */
 @Composable
-private fun LevelChoice(level: ListenLevel, onChoose: (ListenLevel) -> Unit, stacked: Boolean) {
+private fun LevelChoice(level: ListenLevel, onChoose: (ListenLevel) -> Unit, stacked: Boolean, compact: Boolean = false) {
     ModeChoice(
         entries = ListenLevel.entries,
         selected = level,
@@ -575,6 +575,7 @@ private fun LevelChoice(level: ListenLevel, onChoose: (ListenLevel) -> Unit, sta
         emojiOf = { it.emoji },
         labelResOf = { it.labelRes() },
         stacked = stacked,
+        compact = compact,
     )
 }
 

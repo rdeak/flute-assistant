@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
+import kotlin.math.roundToInt
 
 /**
  * Chunky pills on top of a tab, side by side and as wide as each other, one per entry: an
@@ -36,7 +37,8 @@ import hr.bertlab.fluteassistant.ui.theme.Sun
  * entry's word as a string resource (`@StringRes` does not apply to a function, and lint says so).
  *
  * [stacked] (the flute's level in a phone on its side's narrow column, since 2026-11-16) stands the pills one over
- * the other, each as wide as the group and [StackedPillHeight] tall, the picture and the word smaller.
+ * the other, each as wide as the group and [StackedPillHeight] tall, the picture and the word smaller; [compact] (a
+ * short phone's column, where the line, the pair and Stop must share 360 dp) makes them [CompactPillHeight] tall.
  */
 @Composable
 fun <T> ModeChoice(
@@ -48,6 +50,7 @@ fun <T> ModeChoice(
     labelResOf: (T) -> Int,
     modifier: Modifier = Modifier,
     stacked: Boolean = false,
+    compact: Boolean = false,
 ) {
     val group = modifier
         .fillMaxWidth()
@@ -58,6 +61,9 @@ fun <T> ModeChoice(
     // 360 dp phone): a cut word is worse than a small one. The floor is in dp, as one in sp doubles at the largest text.
     val wordStyle = MaterialTheme.typography.titleLarge.let { if (stacked) it.copy(fontSize = StackedWordSize) else it }
     val wordFloor = with(LocalDensity.current) { PillWordFloor.toSp() }
+    // A stacked pill's picture is sized in dp, as the app's pictures are: grown with large text it took the narrow
+    // column's pill and left the word a few dp (2026-11-16, at twice the text on a 640 x 360 phone).
+    val stackedEmoji = with(LocalDensity.current) { StackedEmojiSize.toSp().value.roundToInt() }
     val pills: @Composable (Modifier) -> Unit = { pill ->
         entries.forEach { entry ->
             val isSelected = entry == selected
@@ -74,7 +80,7 @@ fun <T> ModeChoice(
                     horizontalArrangement = Arrangement.spacedBy(if (stacked) 6.dp else 10.dp),
                     modifier = if (stacked) Modifier.padding(horizontal = 6.dp) else Modifier,
                 ) {
-                    if (emoji.isNotEmpty()) Emoji(emoji, fontSize = if (stacked) 20 else 26)
+                    if (emoji.isNotEmpty()) Emoji(emoji, fontSize = if (stacked) stackedEmoji else 26)
                     Text(
                         text = stringResource(labelResOf(entry)),
                         style = wordStyle,
@@ -86,8 +92,8 @@ fun <T> ModeChoice(
         }
     }
     if (stacked) {
-        Column(modifier = group, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            pills(Modifier.fillMaxWidth().height(StackedPillHeight))
+        Column(modifier = group, verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
+            pills(Modifier.fillMaxWidth().height(if (compact) CompactPillHeight else StackedPillHeight))
         }
     } else {
         Row(modifier = group, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -96,8 +102,10 @@ fun <T> ModeChoice(
     }
 }
 
-/** A stacked pill's height, and its word's largest size (the mockup's, `level-icons-v4.html`). */
+/** A stacked pill's height, and its word's largest size (the mockup's, `level-icons-v4.html`); a compact one's. */
 private val StackedPillHeight = 52.dp
+private val CompactPillHeight = 44.dp
+private val StackedEmojiSize = 20.dp
 private val StackedWordSize = 17.sp
 
 /** The least a pill's word shrinks to. */

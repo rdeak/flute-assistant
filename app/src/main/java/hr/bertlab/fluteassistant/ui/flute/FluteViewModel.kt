@@ -37,7 +37,6 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,7 +89,8 @@ import javax.inject.Inject
  * one's index), `flute.book_open` (from, to, notes: the steps in the book opened, bpm and time:
  * what the metronome must be set to, none for an empty book, which leaves it alone) and
  * `flute.shelf_close` (book, when the open book was picked again and nothing changed); while
- * listening, `flute.listen` (notes, level: practice or exam), `flute.level` (level, restarted: the run on started
+ * listening, `flute.listen` (notes, listenLevel: practice or exam; not `level`, which the session recorder stamps on
+ * every line), `flute.level` (listenLevel, restarted: the run on started
  * again under it, since nothing of it was judged yet), `flute.heard` (index, expected, heard, fresh, verdict:
  * right, retry, ignored or wrong: the pitch, at the note's onset; cents: where it locked, from
  * the expected note), `flute.held` (index, heldMs: the note became long enough and earned its
@@ -298,27 +298,33 @@ class FluteViewModel @Inject constructor(
         if (level == current.level) return
         settings.saveListenLevel(level)
         _state.update { it.copy(level = level) }
+        // A run starting again already (its first choice closed it and the new one has not begun) takes this level too.
+        val pending = current.isListening && run == null && listenJob != null
         val restart = current.isListening && current.choosesLevel && run != null
-        logger.d(LogTags.FLUTE, "flute.level", "level" to level.name.lowercase(), "restarted" to restart)
+        logger.d(LogTags.FLUTE, "flute.level", "listenLevel" to level.name.lowercase(), "restarted" to (restart || pending))
         if (!restart) return
         val old = listenJob
+        old?.cancel() // now, so a Stop before the new run begins leaves no microphone open
         closeRun() // frames still on their way are dropped: there is no run to judge them
         listenJob = viewModelScope.launch {
-            old?.cancelAndJoin() // the microphone is closed before it opens again
-            beginRun()
+            old?.join() // the microphone is closed before it opens again
+            beginRun(hop = false)
             listen()
         }
     }
 
-    /** A new run of the tune at the level in force; its session opens first, so the flute.listen line and the first hop are in it. */
-    private fun beginRun() {
+    /**
+     * A new run of the tune at the level in force; its session opens first, so the flute.listen line and the first hop are
+     * in it. The animal lands on the first note, or on a rest that opens the tune, with a hop; not when the run starts again
+     * at another level ([hop] false), where it stands already: never twice in one place.
+     */
+    private fun beginRun(hop: Boolean = true) {
         val level = _state.value.level
         val run = ListenRun(writer.tune, pulse(), floor = roomFloor, run = level.rules).also { this.run = it }
         listenSummary.reset()
-        // The animal lands on the first note, or on a rest that opens the tune, with a hop.
-        _state.update { it.copy(listening = run.listening, marks = emptyMap(), beatPulse = it.beatPulse + 1) }
+        _state.update { it.copy(listening = run.listening, marks = emptyMap(), beatPulse = if (hop) it.beatPulse + 1 else it.beatPulse) }
         recorder.start(writer.tune, pulse(), roomFloor, level)
-        logger.d(LogTags.FLUTE, "flute.listen", "notes" to writer.tune.count { it is TuneNote }, "level" to level.name.lowercase())
+        logger.d(LogTags.FLUTE, "flute.listen", "notes" to writer.tune.count { it is TuneNote }, "listenLevel" to level.name.lowercase())
     }
 
     /** Hears the microphone until the job is cancelled; a failure ends the listening. */

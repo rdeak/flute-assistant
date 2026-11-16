@@ -1770,7 +1770,7 @@ class FluteViewModelTest {
         val vm = listeningViewModel()
         assertEquals(ListenLevel.EXAM, recorder.started.single().level)
         assertEquals(ListenLevel.EXAM, vm.current.level)
-        assertEquals("exam", logger.events("flute.listen").single()["level"])
+        assertEquals("exam", logger.events("flute.listen").single()["listenLevel"])
     }
 
     @Test
@@ -1780,7 +1780,7 @@ class FluteViewModelTest {
         assertEquals(ListenLevel.EXAM, settings.listenLevel)
         assertEquals(ListenLevel.EXAM, vm.current.level)
         val said = logger.events("flute.level").single()
-        assertEquals("exam", said["level"])
+        assertEquals("exam", said["listenLevel"])
         assertEquals(false, said["restarted"])
         vm.chooseLevel(ListenLevel.EXAM)
         assertEquals(1, logger.events("flute.level").size)
@@ -1839,5 +1839,37 @@ class FluteViewModelTest {
         repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
         assertEquals(mapOf(0 to StepMark.HIGH), recorder.ended.last())
         assertEquals(StepMark.HIGH, vm.current.marks[0])
+    }
+
+    @Test
+    fun `a stop while the run starts again closes the microphone`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        assertEquals(1, engine.frames.subscriptionCount.value)
+        vm.chooseLevel(ListenLevel.EXAM)
+        vm.stopRun() // before the new run began
+        runCurrent()
+        assertEquals("the microphone is still open", 0, engine.frames.subscriptionCount.value)
+        assertNull(vm.current.listening)
+    }
+
+    @Test
+    fun `a second choice while the run starts again is the one it starts with`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        vm.chooseLevel(ListenLevel.EXAM)
+        vm.chooseLevel(ListenLevel.PRACTICE)
+        runCurrent()
+        assertEquals(listOf(ListenLevel.PRACTICE, ListenLevel.PRACTICE), recorder.started.map { it.level })
+        assertEquals(listOf(true, true), logger.events("flute.level").map { it["restarted"] })
+        assertEquals(1, engine.frames.subscriptionCount.value)
+        assertEquals(ListenLevel.PRACTICE, vm.current.level)
+    }
+
+    @Test
+    fun `starting again at another level does not hop the animal`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        val pulse = vm.current.beatPulse
+        vm.chooseLevel(ListenLevel.EXAM)
+        runCurrent()
+        assertEquals("the animal stands where it stood", pulse, vm.current.beatPulse)
     }
 }

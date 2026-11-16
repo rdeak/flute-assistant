@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pulse
@@ -28,13 +29,13 @@ class PinnedSessionTest {
     private val tune: List<TuneItem> = listOf(TuneNote(71, QUARTER), TuneNote(71, QUARTER), TuneNote(71, HALF))
 
     /** A synthetic session under [folder]/sessions, named [name], with [pin] as its pin line when given. */
-    private fun session(name: String, pin: String?): File {
-        val samples = FluteSound.render(FluteSound.sound(gapsMs = 50))
+    private fun session(name: String, pin: String?, cents: Double = 0.0, level: ListenLevel = ListenLevel.PRACTICE): File {
+        val samples = FluteSound.render(FluteSound.sound(gapsMs = 50, cents = cents))
         val hop = AudioRecordTunerEngine.HOP_SIZE
-        val run = ListenPath.run(samples, FluteSound.RATE, tune, Pulse(90))
+        val run = ListenPath.run(samples, FluteSound.RATE, tune, Pulse(90), run = level.rules)
         val root = folder.newFolder(name)
         val r = FileSessionRecorder(root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, Pulse(90), floor = null)
+        r.start(tune, Pulse(90), floor = null, level = level)
         r.opened(FluteSound.RATE, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
@@ -87,5 +88,12 @@ class PinnedSessionTest {
     fun `no folder or an empty one is nothing to check`() {
         assertEquals(emptyList<String>(), RecordedSessions.check(File(folder.root, "nowhere")))
         assertEquals(emptyList<String>(), RecordedSessions.check(folder.newFolder("empty")))
+    }
+
+    @Test
+    fun `a session recorded in exam is checked by exam's rules`() {
+        // 20 cents high: in tune for Practice, the down arrow in Exam (2026-11-16).
+        session("exam", pin = "0:HIGH,1:HIGH,2:HIGH", cents = 20.0, level = ListenLevel.EXAM)
+        assertEquals(emptyList<String>(), RecordedSessions.check(File(folder.root, "pinned")))
     }
 }

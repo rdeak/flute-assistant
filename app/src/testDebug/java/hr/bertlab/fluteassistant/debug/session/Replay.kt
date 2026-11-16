@@ -89,6 +89,16 @@ object Replay {
     private fun <R> recorded(session: Session, today: R, names: Set<String>, with: R.(String, Double) -> R): R =
         names.fold(today) { rules, name -> (session.rules[name]?.toDouble() ?: BEFORE[name])?.let { rules.with(name, it) } ?: rules }
 
+    /**
+     * The level the child chose for [session] (`listenLevel` on its start line, since 2026-11-16; `level` in the first build
+     * of the levels, d2d5ff2, whose start line, unstamped, was unambiguous); a session without either was Practice. Its
+     * rules are the run's "today" for the session: what the report compares with, a sweep moves, a pin is checked by.
+     */
+    fun level(session: Session): ListenLevel {
+        val name = session.facts["listenLevel"] ?: session.facts["level"]
+        return ListenLevel.entries.firstOrNull { it.name.lowercase(Locale.ROOT) == name } ?: ListenLevel.PRACTICE
+    }
+
     /** The tracker's rules the phone ran [session] under. */
     fun recordedRules(session: Session): NoteOnsetTracker.Rules =
         recorded(session, NoteOnsetTracker.Rules(), NoteOnsetTracker.Rules.NAMES, NoteOnsetTracker.Rules::with)
@@ -143,7 +153,7 @@ object Replay {
             }
         }
         val today = NoteOnsetTracker.Rules()
-        val todayRun = ListenRun.Rules()
+        val todayRun = level(session).rules // the child's level: an Exam session is compared with Exam's rules of today
         if (today != rules || todayRun != run) {
             val then = fields(rules, run).toMap()
             val changed = fields(today, todayRun).filter { (name, value) -> then[name] != value }
@@ -169,7 +179,8 @@ object Replay {
     /**
      * One line per value of the rule named in [spec], a tracker's (`stopDrop:0.08,0.12,0.5`) or the run's own
      * (`lengthSlack:0.5,1,2` in half beats, `maxNeedMs:2000,3000,4000`): what was heard and the marks earned, at
-     * the session's pulse, the other rules at today's values. The audio is detected once for all of them.
+     * the session's pulse, the other rules at today's values of the session's level ([level]). The audio is detected
+     * once for all of them.
      */
     fun sweep(session: Session, spec: String): String {
         require(':' in spec) { "a sweep is <rule>:<value>,<value>,...: $spec" }
@@ -183,7 +194,7 @@ object Replay {
                 session.frames, session.tune, session.pulse,
                 rules = if (ofRun) NoteOnsetTracker.Rules() else NoteOnsetTracker.Rules().with(name, value),
                 floor = session.floor,
-                run = if (ofRun) ListenRun.Rules().with(name, value) else ListenRun.Rules(),
+                run = if (ofRun) level(session).rules.with(name, value) else level(session).rules,
             )
             out.appendLine("$name=${number(value)} heard=${run.heard.joinToString(",") { it.onset.midi.toString() }} marks=${Session.spell(run.marks)}")
         }

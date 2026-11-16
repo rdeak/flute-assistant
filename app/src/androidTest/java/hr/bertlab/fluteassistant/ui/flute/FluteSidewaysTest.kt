@@ -13,6 +13,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -370,6 +372,8 @@ class FluteSidewaysTest {
             word(advice).assertIsDisplayed()
             assertWholeWords(advice)
             assertTrue("the advice runs into Stop", bounds(word(advice)).bottom <= bounds(word("Stani")).top)
+            // With the level's pair in the column too (no note judged yet), Stop keeps its own height: a column squeezes its last child.
+            assertNear("$fontScale, \"$advice\": Stop's height", 104.dp, height(compose.onNode(hasClickAction() and hasText("Stani"))))
             assertInside("the advice", word(advice))
         }
     }
@@ -883,6 +887,9 @@ class FluteSidewaysTest {
         val exam = bounds(word("Exam").assertIsDisplayed())
         val stop = bounds(word("Stop"))
         assertTrue("Practice ($practice) stands over Exam ($exam)", practice.bottom <= exam.top)
+        // Under the line, as drawn (level-icons-v4.html), not floating halfway down the column.
+        val line = bounds(word("🪈 Play C4"))
+        assertTrue("the pair ($practice) stands just under the line ($line)", practice.top >= line.bottom && practice.top - line.bottom <= 16.dp)
         assertTrue("Exam ends at ${exam.bottom}, Stop starts at ${stop.top}", exam.bottom <= stop.top)
         for ((what, b) in listOf("Practice" to practice, "Exam" to exam)) {
             assertTrue("$what ($b) is inside the column of Stop ($stop)", b.left >= stop.left - SLACK && b.right <= stop.right + SLACK)
@@ -899,6 +906,21 @@ class FluteSidewaysTest {
         val group = bounds(compose.onNodeWithContentDescription("Razina").assertIsDisplayed())
         assertTrue("the pair ends at ${group.bottom}, Stop starts at ${bounds(word("Stani")).top}", group.bottom <= bounds(word("Stani")).top)
         assertInside("the pair", compose.onNodeWithContentDescription("Razina"))
+    }
+
+    /** At the largest text the stacked words shrink with their line, not to the floor (a fixed line height would not fit 52 dp). */
+    @Test
+    fun the_level_words_stay_readable_at_the_largest_text() {
+        phone = Phone(640, 360)
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"), fontScale = 2.0f)
+        for (text in listOf("Vježba", "Ispit")) {
+            assertWholeWords(text)
+            // The picture is sized in dp and does not grow with the text, so the word keeps about its size at normal text:
+            // its line at least half its pill (0.58 with the picture in dp; 0.39 when the picture grew with the text).
+            val word = height(compose.onNodeWithText(text, useUnmergedTree = true))
+            val pill = height(word(text))
+            assertTrue("\"$text\" is $word tall in a pill $pill tall: the picture took the word's room", word >= pill * 0.5f)
+        }
     }
 
     @Test

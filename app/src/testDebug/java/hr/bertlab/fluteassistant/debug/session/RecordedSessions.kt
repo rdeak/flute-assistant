@@ -20,7 +20,8 @@ object RecordedSessions {
             try {
                 val session = Session.load(folder)
                 val pin = session.pin ?: return@mapNotNull "${folder.name}: no pin line in session.log (pin marks=0:FIRST_TRY,...)"
-                val run = ListenPath.run(session.frames, session.tune, session.pulse, floor = session.floor)
+                // Today's rules of the level the child chose (Practice for a session from before the levels).
+                val run = ListenPath.run(session.frames, session.tune, session.pulse, floor = session.floor, run = Replay.level(session).rules)
                 if (run.marks == pin) null
                 else "${folder.name}: pin ${Session.spell(pin)} but replay ${Session.spell(run.marks)}"
             } catch (e: Exception) {

@@ -101,13 +101,15 @@ data class FluteUiState(
 
     /**
      * Whether the child may still choose the level of the run on (since 2026-11-16): until its first note is judged,
-     * right or wrong. No mark, no wrong note, not finishing, no speed line, and no walk but an opening rest's.
+     * right or wrong. No mark, no wrong note, not finishing, no speed line, and no walk but an opening rest's; and the line
+     * is the prompt or the room's own advice ("Come closer", "Play one long, clear note"), never one about a note played,
+     * which cannot stand before a note is judged and would not leave the pair and Stop room in a short phone's column.
      */
     val choosesLevel: Boolean
         get() {
             val run = listening ?: return false
             return marks.isEmpty() && run.wrong == null && !run.finishing && run.pace == null &&
-                (run.walk == null || run.walk.phase == Walk.Phase.REST)
+                (run.walk == null || run.walk.phase == Walk.Phase.REST) && run.advice in BEFORE_A_NOTE
         }
 
     /** The note key drawn pressed: the playing note's, else the held key. */
@@ -161,3 +163,6 @@ data class FluteUiState(
     /** The one line under the staff while listening ([Listening.advice]); nothing otherwise. */
     val advice: TunerAdvice get() = listening?.advice ?: TunerAdvice.NONE
 }
+
+/** The lines that can stand before a run's first note is judged: the prompt's (none of its own), and the room's. */
+private val BEFORE_A_NOTE = setOf(TunerAdvice.NONE, TunerAdvice.COME_CLOSER, TunerAdvice.CLEAR_NOTE)

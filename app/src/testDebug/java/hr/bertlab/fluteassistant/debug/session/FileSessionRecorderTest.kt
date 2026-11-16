@@ -79,7 +79,7 @@ class FileSessionRecorderTest {
         r.end(emptyMap())
         val lines = lines(sessions().single())
         val start = lines[0]
-        assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345 level=practice"))
+        assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345 listenLevel=practice"))
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
@@ -355,7 +355,7 @@ class FileSessionRecorderTest {
         r.start(tune, pulse, floor = null, level = ListenLevel.EXAM)
         r.end(emptyMap())
         val lines = lines(sessions().single())
-        assertTrue(lines[0], lines[0].endsWith(" level=exam"))
+        assertTrue(lines[0], lines[0].endsWith(" listenLevel=exam"))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
         assertEquals("15.0", rules["tuneCents"])
         assertEquals("1.0", rules["lengthSlack"])

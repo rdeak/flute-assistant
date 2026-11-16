@@ -20,7 +20,7 @@ walked off its pitch (`pitch`: HIGH, LOW or empty, since 2026-11-14) and a mark 
 frame (`changed`: `<index>:<MARK>` or empty, since 2026-11-16: ✋ held too long, or Exam's whole-note pitch); what the
 phone actually did) and `session.log` (the app's log format:
 `session.start` with the app, device, the floor the tracker still held from the run before and the child's level
-(`level=practice|exam`, since 2026-11-16), `session.rules` with every threshold in force (the tracker's constants and
+(`listenLevel=practice|exam`, since 2026-11-16; a session without it was Practice), `session.rules` with every threshold in force (the tracker's constants and
 the level's run rules, `ListenLevel.rules`), `session.pulse`, one
 `session.tune` per item, `session.audio` when the microphone opened, then every log line the app
 wrote while the run was open stamped `frame=<rows written before it> tag=<its tag> level=<d|i|w|e>`,
@@ -93,7 +93,8 @@ has it compared too: the frame a note was earned or cut short on; one that recor
 on, ✋ and a mark drawn higher: changed after it was given; ♪ is a right pitch beginning a note). `replay.txt` also has
 an `exam:` part: what Exam's rules make of the same sound, with each frame a mark changed on. Where
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
-hear in the same sound. A sweep changes one of today's rules. The detector is not part of the rules:
+hear in the same sound; "today's" run rules are those of the session's level (`Replay.level`: Practice for a session
+without `listenLevel`), and so are a sweep's and a pinned session's. A sweep changes one of today's rules. The detector is not part of the rules:
 sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a
 frame or two whatever the rules, and sessions from before its fix of 2026-11-14 (a dip still falling
 where the search ends gives no pitch) differ on the frames where a voice read as the lowest pitch

@@ -50,7 +50,8 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   nothing open it is the phone's and leaves the app. A new panel gets a `BackHandler` and a test
   with `BackKey` (androidTest): `DESIGN.md`, "The phone's Back".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
-- `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both.
+- `ModeChoice` is shared by the tuner's modes, the notes tab's games and the flute's level (Practice and Exam, since
+  2026-11-16; `stacked` and `compact` in a phone on its side's column): change it for all three.
   `FingeringDiagram` is shared by the tuner and the flute's listening room, and `AdviceLine` by
   both too (it also takes the flute's "Play B4"): the same.
 - **A test of a fit compares bounds.** `assertIsDisplayed` does not prove one: what spills past a

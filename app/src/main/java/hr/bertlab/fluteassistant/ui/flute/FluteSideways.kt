@@ -127,9 +127,12 @@ internal fun FluteRunningSideways(
     SidewaysPage(
         modifier = modifier,
         column = {
-            if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
-            // The level's pair, one over the other, between the line and Stop until the first note is judged (2026-11-16).
-            level?.invoke()
+            // The line and, until the first note is judged, the level's pair under it (2026-11-16): one child of the
+            // column, so the column keeps the line at its top and Stop at its bottom, and the pair stands under the line.
+            Column(verticalArrangement = Arrangement.spacedBy(LevelGap)) {
+                if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
+                level?.invoke()
+            }
             SidewaysActionButton(
                 icon = AppIcons.Stop,
                 text = stringResource(R.string.stop),
@@ -171,3 +174,6 @@ internal fun FluteSpeedSideways(
         MetronomeStageSideways(metronome, wheel, onBpmChange, onTimeSignatureChange, card)
     }
 }
+
+/** The room between the line and the level's pair in the running column. */
+private val LevelGap = 8.dp

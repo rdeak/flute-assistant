@@ -99,8 +99,9 @@ data class Walk(val index: Int, val halfBeat: Int, val phase: Phase) {
  * guesses the air ran out; false again once a note is walked.
  * @property pitch which way the note walked sounds off its written pitch while it is not yet long enough (since
  * 2026-11-14): the arrow beside its bubble and the tuner's line; null in tune, and once it is long enough.
- * @property remark the sign the step marked last earned ([StepMark.HIGH], [StepMark.LOW], [StepMark.SHORT]), whose line
- * stays until the next note is judged, right or wrong, so there is time to read it; null when it earned a star.
+ * @property remark the sign the step marked last earned ([StepMark.HIGH], [StepMark.LOW], [StepMark.SHORT], and since
+ * 2026-11-16 [StepMark.LONG], or the arrow its whole note earned in Exam), whose line stays until the next note is judged,
+ * right or wrong, so there is time to read it; null when it earned a star.
  * @property pace the child's speed, once the run is over, when it was another animal's than the knob's ([Pace.speaks]):
  * the one line the ended run's screen shows until it is closed.
  */
@@ -125,7 +126,8 @@ data class Listening(
 
     /**
      * The one line under the staff: stop and play it again when a written repeat is held on
-     * instead, else come closer or play one clear note when the sound stays unclear, else a little
+     * instead, else come closer or play one clear note when the sound stays unclear, else let go
+     * sooner for the step marked last held too long (since 2026-11-16), else a little
      * lower or higher while the note walked sounds off its pitch or after the step marked last
      * earned an arrow (since 2026-11-14, the tuner's own words), else hold it longer while a note
      * cut short waits to be played again (since 2026-11-11), else check the fingers while a wrong
@@ -184,6 +186,11 @@ data class Listening(
  * The last note earned does not end the run at once: it goes on ([Listening.finishing]) until
  * that note's sound ends or [Rules.finishFrames] pass, and then [isOver]; with a rest after it, the
  * run is over once that rest is walked.
+ *
+ * Since 2026-11-16 (the levels, [ListenLevel]) a note's mark may change after it was given, while its sound goes on (its
+ * tail, [OpenNote]): it becomes [StepMark.LONG] the moment its sound runs more than [Rules.longSlack] half beats past its
+ * written length (never the tune's last note), and with [Rules.wholeNote] (Exam) its pitch is read over the whole note
+ * when the sound ends, another note is judged or the run ends. The frame says so ([Step.changed], [ListenFrame.changed]).
  *
  * Pure Kotlin. The flute's view model feeds it the microphone, and the tests and the replay of a
  * recorded session feed it audio, so all three hear a run by the same rules. [rules] and [floor]

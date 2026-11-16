@@ -246,5 +246,9 @@ class FluteUiStateTest {
         assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, wrong = WrongNote(0, 62))).choosesLevel)
         assertFalse(FluteUiState(tune = tune, listening = Listening(index = 1), marks = mapOf(0 to StepMark.FIRST_TRY)).choosesLevel)
         assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, finishing = true)).choosesLevel)
+        // Lines that speak of a note already played never stand with the pair: only the prompt and the room's own advice.
+        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, repeatHeld = true)).choosesLevel)
+        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, pitch = Pitch.HIGH)).choosesLevel)
+        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)).choosesLevel)
     }
 }

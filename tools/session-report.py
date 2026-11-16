@@ -447,6 +447,9 @@ def build(session, folder):
     for k in ("at", "app", "code", "device", "sdk", "floor"):
         if k in facts:
             p("<span>%s <b>%s</b></span>" % (k, html.escape(facts[k])))
+    # The child's level (since 2026-11-16); a session without it was Practice.
+    # `level` in the first build of the levels (d2d5ff2), whose start line was not stamped.
+    p("<span>level <b>%s</b></span>" % html.escape(facts.get("listenLevel") or facts.get("level") or "practice (before the levels)"))
     if session["pulse"]:
         p("<span>pulse <b>%s at %s</b></span>" % (html.escape(session["pulse"].get("time", "")), html.escape(session["pulse"].get("bpm", ""))))
     if session["pin"] is not None:

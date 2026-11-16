@@ -679,8 +679,8 @@ shelf), `flute.book_open` (from, to, notes, bpm, time: `to` is the book opened a
 rests and breaths counted, `bpm` and `time` what the metronome was set to, `none` when an empty
 book left it alone) and `flute.shelf_close` (book, when the open book was picked again and nothing
 changed), so every `flute.shelf_open` has a closing line but for a tab left with the shelf open;
-for Your turn, `flute.listen` (notes: how many there are to check; level: practice or exam, since 2026-11-16),
-`flute.level` (level, restarted: the run on started again under it, since nothing of it was judged yet; since
+for Your turn, `flute.listen` (notes: how many there are to check; listenLevel: practice or exam, since 2026-11-16,
+not `level`, which a debug build's session log stamps on every line), `flute.level` (listenLevel, restarted: the run on started again under it, since nothing of it was judged yet; since
 2026-11-16), `flute.changed` (index, mark: long or, in Exam, the whole note's high, low, first_try or retry; soundedMs,
 writtenMs, cents: a note's mark changed after it was given; since 2026-11-16), `flute.heard` (index, expected,
 heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
@@ -699,7 +699,8 @@ level of a flute at the phone), `flute.hearing` (hearing, levelMean, when it cha
 (stars, retries, when the last note is earned; since 2026-11-14 also high, low and short, the marks of each kind (and
 long, since 2026-11-16), and
 bpm, pairs, knob and speed: the child's speed, the note pairs it rests on, the knob's, and whether the line about it
-shows), `flute.listen_stop` (reason: pill, key, erase, leave, speed or book, so every `flute.listen` has a closing line;
+shows), `flute.listen_stop` (reason: pill, key, erase, leave, speed or book, so every `flute.listen` has a closing line,
+or a `flute.level` with restarted true when the run started again at another level before its first note;
 over: the run had ended and only its screen with the speed line stood, since 2026-11-14), `flute.listen_error` (message, when
 the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the
 microphone on this tab). The engine's `mic.open` / `mic.close` stay under `FA.Tuner`. A debug

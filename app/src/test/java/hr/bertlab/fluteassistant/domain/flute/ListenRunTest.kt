@@ -1674,4 +1674,14 @@ class ListenRunTest {
         practice.quiet(300.0)
         assertEquals(StepMark.FIRST_TRY, practice.marks[0])
     }
+
+    @Test
+    fun `an octave pop inside a long note does not start its time again`() {
+        val run = practice(q(67), q(69))
+        run.sound(67, 900.0)
+        val popped = run.sound(79, 200.0) + run.sound(67, 1100.0) // up an octave and back: the same note going on
+        assertTrue("the pop was heard as a note", popped.any { it.row.onset?.midi == 79 })
+        assertTrue(popped.none { it.heard?.verdict == Verdict.RIGHT || it.heard?.verdict == Verdict.WRONG })
+        assertEquals(StepMark.LONG, run.marks[0])
+    }
 }
