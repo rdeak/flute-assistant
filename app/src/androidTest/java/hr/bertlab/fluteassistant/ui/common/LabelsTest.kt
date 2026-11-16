@@ -42,7 +42,7 @@ class LabelsTest {
         // English: scientific pitch notation. Croatian musicians use the German names (H for
         // B, B for B flat) and the music-school octaves (c1 is middle C).
         assertEquals("B4", noteLabel(resources(Locale.ENGLISH), 71))
-        assertEquals("A♯4", noteLabel(resources(Locale.ENGLISH), 70))
+        assertEquals("B♭4", noteLabel(resources(Locale.ENGLISH), 70))
         assertEquals("C4", noteLabel(resources(Locale.ENGLISH), 60))
         assertEquals("C7", noteLabel(resources(Locale.ENGLISH), 96))
         assertEquals("h1", noteLabel(resources(Locale("hr")), 71))
@@ -65,7 +65,7 @@ class LabelsTest {
 
     @Test
     fun the_octave_figure_splits_off_for_raising() {
-        assertEquals("A♯" to "4", noteLabelParts(resources(Locale.ENGLISH), 70))
+        assertEquals("B♭" to "4", noteLabelParts(resources(Locale.ENGLISH), 70))
         assertEquals("c" to "1", noteLabelParts(resources(Locale("hr")), 60))
         assertEquals("h" to "", noteLabelParts(resources(Locale("hr")), 59))
         assertEquals("C" to "1", noteLabelParts(resources(Locale("hr")), 24))
@@ -76,7 +76,7 @@ class LabelsTest {
         assertEquals(NoteLetterColors[0], noteColor(60)) // C4
         assertEquals(NoteLetterColors[0], noteColor(61)) // C♯4
         assertEquals(NoteLetterColors[0], noteColor(84)) // C6, any octave
-        assertEquals(NoteLetterColors[5], noteColor(70)) // A♯4, B flat in Croatian
+        assertEquals(NoteLetterColors[6], noteColor(70)) // B♭4 (b1 in Croatian), on B since 2026-11-16
         assertEquals(NoteLetterColors[6], noteColor(71)) // B4, H in Croatian
     }
 
@@ -138,5 +138,21 @@ class LabelsTest {
         val hr = resources(Locale("hr"))
         assertEquals("✂️ Join them, no tongue", en.getString(TunerAdvice.JOIN.labelRes()!!))
         assertEquals("✂️ Poveži ih, bez jezika", hr.getString(TunerAdvice.JOIN.labelRes()!!))
+    }
+
+    @Test
+    fun the_black_notes_are_spelled_as_flute_music_writes_them() {
+        // Since 2026-11-16 (sharps and flats on the flute): one spelling for the app, C♯ E♭ F♯ G♯ B♭.
+        val en = resources(Locale.ENGLISH)
+        val hr = resources(Locale("hr"))
+        assertEquals(listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4"), listOf(61, 63, 66, 68, 70).map { noteLabel(en, it) })
+        assertEquals(listOf("cis1", "es1", "fis1", "gis1", "b1", "h1"), listOf(61, 63, 66, 68, 70, 71).map { noteLabel(hr, it) })
+    }
+
+    @Test
+    fun a_black_note_takes_its_own_letters_colour() {
+        for ((black, white) in listOf(61 to 60, 63 to 64, 66 to 65, 68 to 67, 70 to 71)) {
+            assertEquals("$black", noteColor(white), noteColor(black))
+        }
     }
 }

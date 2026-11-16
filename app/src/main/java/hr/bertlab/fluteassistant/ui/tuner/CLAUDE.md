@@ -97,6 +97,10 @@ count at all, so the room's voices are not judged (`FrameDecision.FAINT`; the tu
 its ring may show a quiet note); a tongued stop is heard in `PitchFrame.minLevel`; and a drift past
 the halfway point that switches the sounding note after `SWITCH_FRAMES` (a long note sagging as
 the breath runs out) is no new note, since nobody played one, where the tuner's ring simply moves.
+Since 2026-11-16 the tracker also measures a step from the note it hears sounding, not only from the
+written pitch (`Rules.stepFromSounding`), so a semitone slurred on a flute off its pitch is a new note
+and not drift (`ui/flute/DESIGN.md`, "Sharps and flats"); that is the flute's rule, and the ring's own
+copy of `identify` in `TunerViewModel` has none and needs none.
 All are read against `flute.heard` and `flute.listen_summary` on a phone and pinned by
 `ListenPathTest` on synthetic sound. Since 2026-11-05 the tracker takes every threshold it
 applies as a `Rules` value whose defaults are the constants (`NoteOnsetTracker.Rules`, with
@@ -127,7 +131,8 @@ Moved here from the root CLAUDE.md on 2026-11-05.
 The tuner has the two mode pills on top ("Which?" / "Tune"), then a stage with the pitch window
 (since 2026-10-24, replacing a face meter): a dashed home ring holding the note to play on a dotted
 up-down guide, and the child's sound as a bubble floating above it when too high and below when too
-low, with an arrow pointing home; another note shows as that note filled in its colour, in tune the
+low, with an arrow pointing home; another note shows as that note filled in its colour (a black note in its
+letter's, named as the whole app names it since 2026-11-16, E♭ and B♭ rather than D♯ and A♯, `NoteSpelling`), in tune the
 bubble fills, sits in the ring and gets a tick and sparkles, and in "Which?" silence the ring is
 grey with "…". In "Tune" the window sits between ‹ › with a "Hear" pill under it (spec:
 `docs/superpowers/specs/2026-10-22-tuner-target-note-design.md`); then the fingering for the ring's

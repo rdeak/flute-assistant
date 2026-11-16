@@ -91,7 +91,7 @@ object FluteSound {
      * [changeDipDb] (a breath or the fingers moving: 20 ms at full depth, 10 ms ramps in dB either side), or neither (a
      * clean slur); then 400 ms of the room. The room and the breath noise as in [sound], at [toneDb], [roomDb], [rt60]
      * and [floorDb]; [notesDb], when given, is each note's own level in place of [toneDb], and [dipAfterMs] moves the
-     * dip that far after the change, onto the new note.
+     * dip that far after the change, onto the new note; every note is [cents] off its pitch (a flute blown high or low).
      */
     fun line(
         notes: List<Pair<Int, Int>>,
@@ -103,6 +103,7 @@ object FluteSound {
         floorDb: Double = -50.0,
         notesDb: List<Double>? = null,
         dipAfterMs: Int = 0,
+        cents: Double = 0.0,
     ): DoubleArray {
         val leadMs = 500
         val total = (leadMs + notes.sumOf { it.second } + 400) * rate / 1000
@@ -113,7 +114,7 @@ object FluteSound {
         val changes = mutableListOf<Int>()
         for ((n, note) in notes.withIndex()) {
             if (n > 0) changes += at
-            val f = NoteMath.midiToFrequency(note.first)
+            val f = NoteMath.midiToFrequency(note.first) * 2.0.pow(cents / 1200.0)
             val amp = 10.0.pow((notesDb?.get(n) ?: toneDb) / 20.0)
             repeat(note.second * rate / 1000) {
                 phase += 2 * PI * f / rate

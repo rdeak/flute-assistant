@@ -1930,4 +1930,75 @@ class ListenRunTest {
         val onset = List(ListenRules.LOCK_FRAMES) { run.onFrame(pitched(62)) }.last()
         assertEquals(0.5f, onset.heard?.stopDrop!!, 0.001f)
     }
+
+    // ---- Black notes (2026-11-16): the rules judge by semitone already; these pin it ----
+
+    @Test
+    fun `a written f sharp is right when f sharp is heard, and f played for it is wrong`() {
+        val right = practice(q(66))
+        repeat(30) { right.onFrame(pitched(66)) }
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), right.marks)
+        for (cents in listOf(0.0, 40.0)) {
+            val wrong = practice(q(66))
+            repeat(30) { wrong.onFrame(pitched(65, cents = cents)) }
+            assertTrue("F at $cents cents", wrong.marks.isEmpty())
+            assertEquals("F at $cents cents", TunerAdvice.CHECK_FINGERS, wrong.listening.advice)
+        }
+    }
+
+    @Test
+    fun `a known limit, a forgotten sharp on a flute sixty cents sharp reads as f sharp played low`() {
+        // Spec section 6: pitch alone cannot tell an F blown 60 cents sharp from an F♯ blown 40 flat. No rule is added.
+        val run = practice(q(66))
+        repeat(30) { run.onFrame(pitched(65, cents = 60.0)) }
+        assertEquals(mapOf(0 to StepMark.LOW), run.marks)
+        assertEquals(TunerAdvice.TOO_LOW, run.listening.advice)
+    }
+
+    @Test
+    fun `an f a little sharp is an f with the down arrow, and a full f sharp for it is wrong`() {
+        val sharp = practice(q(65))
+        repeat(30) { sharp.onFrame(pitched(65, cents = 40.0)) }
+        assertEquals(mapOf(0 to StepMark.HIGH), sharp.marks)
+        val wrong = practice(q(65))
+        repeat(30) { wrong.onFrame(pitched(66)) }
+        assertTrue(wrong.marks.isEmpty())
+        assertEquals(TunerAdvice.CHECK_FINGERS, wrong.listening.advice)
+    }
+
+    // ---- A slurred semitone on a flute off its pitch (2026-11-16): heard, and each note marked for how it sounded ----
+
+    private fun ListenRun.play(midi: Int, cents: Double) = repeat(ListenRules.LOCK_FRAMES + after(800.0)) { onFrame(pitched(midi, cents = cents)) }
+
+    @Test
+    fun `g slurred to f sharp forty cents sharp earns both marks`() {
+        val run = timed(q(67), j(66))
+        run.play(67, 40.0)
+        run.play(66, 40.0)
+        assertEquals(mapOf(0 to StepMark.HIGH, 1 to StepMark.HIGH), run.marks)
+    }
+
+    @Test
+    fun `f slurred to f sharp thirty-five cents flat earns both marks`() {
+        val run = timed(q(65), j(66))
+        run.play(65, -35.0)
+        run.play(66, -35.0)
+        assertEquals(mapOf(0 to StepMark.LOW, 1 to StepMark.LOW), run.marks)
+    }
+
+    @Test
+    fun `c slurred to b forty cents sharp earns both marks`() {
+        val run = timed(q(72), j(71))
+        run.play(72, 40.0)
+        run.play(71, 40.0)
+        assertEquals(mapOf(0 to StepMark.HIGH, 1 to StepMark.HIGH), run.marks)
+    }
+
+    @Test
+    fun `with the rule off the second note is never heard`() {
+        val run = ListenRun(listOf(q(67), j(66)), Pulse(60), rules = NoteOnsetTracker.Rules(stepFromSounding = false), run = halfBeatSlack)
+        run.play(67, 40.0)
+        run.play(66, 40.0)
+        assertNull(run.marks[1])
+    }
 }

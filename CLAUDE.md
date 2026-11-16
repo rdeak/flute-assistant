@@ -123,7 +123,8 @@ read the part the CLAUDE.md names before you change that part.
 Every user-visible string is a resource in both `values/strings.xml` and
 `values-hr/strings.xml`. Domain enums stay language-free; `ui/common/Labels.kt` maps them to
 string resources and builds note names from the `note_names` array (Croatian uses the German
-H / B convention). Croatian copy addresses the child in the informal singular.
+H / B convention). One spelling everywhere since 2026-11-16 (`domain/tuner/NoteSpelling`): C♯ E♭ F♯ G♯ B♭
+(cis es fis gis b), a sharp on the letter below and a flat on the letter above, in that letter's colour. Croatian copy addresses the child in the informal singular.
 
 ### Kid-friendly UI constraint
 
@@ -154,6 +155,8 @@ tab's CLAUDE.md; these rules hold on all of them:
   (`ui/flute/CLAUDE.md`, "Two levels").
 - Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
   pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
+- Added at the user's request (2026-11-16): the flute's black keys, C♯ E♭ F♯ G♯ B♭ in both octaves, in piano
+  rows that scroll under the top row (`ui/flute/CLAUDE.md`, "Sharps and flats").
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than

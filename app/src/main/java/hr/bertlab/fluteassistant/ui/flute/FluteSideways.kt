@@ -42,20 +42,20 @@ import hr.bertlab.fluteassistant.ui.theme.ActionStop
  * the pieces, the same ones upright shows, and these only say where they stand.
  */
 
-/** Between the keys and the two big buttons, as `SidewaysGeometry.keyHeight` counts it. */
+/** Between the keys and the two big buttons, as `SidewaysGeometry.keysRoom` counts it. */
 private val KeysToButtons = SidewaysGeometry.MARGIN.dp
 
-/** The keys' column's own least height: the page's least, less the margins above and below it. */
-private val KeysColumnMinHeight = (SidewaysGeometry.WRITING_MIN_HEIGHT - 2 * SidewaysGeometry.MARGIN).dp
+/** The keys' column's own least height: the keys' least room and the buttons under them (299). */
+private val KeysColumnMinHeight = (KeysGeometry.MIN_HEIGHT + SidewaysGeometry.UNDER_KEYS).dp
 
 /**
  * Writing a tune: the staff's card, which takes all the width the keys leave, and the keys with Play
  * and Listen to me under them. There is no right column here: beside the keys it left the staff about
  * three beats at 800 dp wide (`fit-v2.html`), so the two buttons went under the keys, in upright's
- * order, leaving a child nothing to relearn. [keys] is handed its modifier, the key height and the
- * gap between the keys, from the window's size; the staff stays at rest scale. Below
- * [SidewaysGeometry.WRITING_MIN_HEIGHT], shorter than any phone it was drawn for, the keys would
- * overflow onto Play, so the column of keys and buttons scrolls instead, as upright's tab does.
+ * order, leaving a child nothing to relearn. [keys] is handed its modifier, the largest key ([KeysGeometry.SIDEWAYS_MAX])
+ * and the gap between the keys, from the window's size; the staff stays at rest scale. Where the keys' room
+ * ([SidewaysGeometry.keysRoom]) is under their least ([KeysGeometry.MIN_HEIGHT]), shorter than any phone it was drawn
+ * for, the column of keys and buttons scrolls instead, as upright's tab does.
  */
 @Composable
 internal fun FluteWritingSideways(
@@ -67,8 +67,7 @@ internal fun FluteWritingSideways(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = SidewaysGeometry.MARGIN.dp
         val contentWidth = maxWidth.value
-        val keyHeight = SidewaysGeometry.keyHeight(maxHeight.value).dp
-        val keysFit = maxHeight.value >= SidewaysGeometry.WRITING_MIN_HEIGHT
+        val keysFit = SidewaysGeometry.keysRoom(maxHeight.value) >= KeysGeometry.MIN_HEIGHT
         // A tablet gives the staff more of the room: a zoomed tab has height to spare, and a tune wants the width.
         val zoom = LocalTabZoom.current
         val keysWidth = if (zoom > 1f) TabletGeometry.sidewaysKeys(zoom) else SidewaysGeometry.keysWidth(contentWidth)
@@ -96,7 +95,7 @@ internal fun FluteWritingSideways(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    keyHeight,
+                    KeysGeometry.SIDEWAYS_MAX.dp,
                     SidewaysGeometry.keyGap(contentWidth).dp,
                 )
                 buttons(Modifier)

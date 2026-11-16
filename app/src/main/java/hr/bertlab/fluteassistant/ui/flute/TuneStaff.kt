@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.Bars
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.flute.JoinArc
 import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.LineMark
@@ -95,6 +96,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
 import hr.bertlab.fluteassistant.ui.common.HIGH_EMOJI
@@ -433,6 +435,7 @@ private fun TuneMarks(
                         StepMark(
                             item = tune[mark.index],
                             parts = mark.parts,
+                            sign = mark.sign,
                             lit = mark.index == litIndex,
                             growing = mark.index == heldIndex,
                             mark = marks[mark.index],
@@ -454,21 +457,25 @@ private fun TuneMarks(
 }
 
 /** Where a step's pieces stand along the row, in dp at rest from its first mark: each piece's head and its pill's middle. */
-private class StepPlace(val heads: List<Float>, val pills: List<Float>)
+internal class StepPlace(val heads: List<Float>, val pills: List<Float>, val signed: Boolean = false)
 
-private fun stepPlaces(lineMarks: List<LineMark>, starts: List<Float>): Map<Int, StepPlace> =
+internal fun stepPlaces(lineMarks: List<LineMark>, starts: List<Float>): Map<Int, StepPlace> =
     lineMarks.withIndex().filter { it.value is LineMark.Step }.associate { (at, mark) ->
         val heads = mutableListOf<Float>()
         val pills = mutableListOf<Float>()
+        val step = mark as LineMark.Step
         var x = starts[at]
-        for (part in (mark as LineMark.Step).parts) {
+        var extra = StaffGeometry.signRoom(step) // a sign's room: the heads after it, the first pill as much wider
+        for (part in step.parts) {
             if (part is StepPart.Length) {
-                heads += x + HEAD_X
-                pills += x + slotWidth(part.length) / 2
+                heads += x + extra + HEAD_X // past the first piece, x already holds the room
+                pills += x + (slotWidth(part.length) + extra) / 2
+                x += extra
+                extra = 0f
             }
             x += partWidth(part)
         }
-        mark.index to StepPlace(heads, pills)
+        mark.index to StepPlace(heads, pills, signed = step.sign != null)
     }
 
 /**
@@ -513,7 +520,7 @@ private fun SlurLayer(tune: List<TuneItem>, lineMarks: List<LineMark>, starts: L
 }
 
 /** The y of a note's head on the staff. */
-private fun headY(note: TuneNote): Float = yOf(StaffNotes.positionOf(note.midi))
+private fun headY(note: TuneNote): Float = yOf(FluteNotes.positionOf(note.midi))
 
 /** The top of the arcs under the name pills, as a tie's pills have them. */
 private const val PILL_ARC_TOP = StaffGeometry.NAMES_TOP + StaffGeometry.PILL_HEIGHT + StaffGeometry.PILL_TIE_GAP
@@ -550,6 +557,15 @@ private fun joinArc(arc: JoinArc, tune: List<TuneItem>, places: Map<Int, StepPla
         )
         return listOf(tie, pillArc(from.pills.last(), to.pills.first(), muted))
     }
+    return listOf(ArcDrawing(slurPath(slurFor(arc, tune, places)), ink), pillArc(from.pills.first(), to.pills.last(), muted))
+}
+
+/** The slur of [arc] (not a tie), from its first note's head to its last's, passing under what lies between. */
+internal fun slurFor(arc: JoinArc, tune: List<TuneItem>, places: Map<Int, StepPlace>): StaffGeometry.SlurCurve {
+    val from = places.getValue(arc.from)
+    val to = places.getValue(arc.to)
+    val first = tune[arc.from] as TuneNote
+    val last = tune[arc.to] as TuneNote
     // Everything between the slur's two end heads it must pass under: the other heads, and the ties under them.
     val tieLow = (StaffGeometry.TIE_START + StaffGeometry.TIE_CONTROL) / 2 + StaffGeometry.TIE_WIDTH / 2
     val clear = mutableListOf<Pair<Float, Float>>()
@@ -562,13 +578,19 @@ private fun joinArc(arc: JoinArc, tune: List<TuneItem>, places: Map<Int, StepPla
             if (!end) clear += x to y + StaffGeometry.HEAD_RY
         }
         place.heads.zipWithNext().forEach { (a, b) -> clear += (a + b) / 2 to y + tieLow }
+        // A sign before a head the slur reaches, its foot cleared by SIGN_SLUR_AIR rather than a head's SLUR_CLEAR
+        // (the final review's look: a slur coming down onto F♯ ran through its sharp). The first note's sign is behind it.
+        if (place.signed && index != arc.from) {
+            val sign = place.heads.first() - StaffGeometry.SIGN_X
+            val foot = y + StaffGeometry.SIGN_BELOW - StaffGeometry.SLUR_CLEAR + StaffGeometry.SIGN_SLUR_AIR
+            for (x in listOf(sign - StaffGeometry.SIGN_HALF_WIDTH + 2f, sign + StaffGeometry.SIGN_HALF_WIDTH - 2f)) clear += x to foot
+        }
         val next = places[index + 1]
         if (index < arc.to && next != null && (tune[index + 1] as TuneNote).midi == note.midi) {
             clear += (place.heads.last() + next.heads.first()) / 2 to y + tieLow
         }
     }
-    val curve = StaffGeometry.slurCurve(from.heads.first(), headY(first), to.heads.last(), headY(last), clear)
-    return listOf(ArcDrawing(slurPath(curve), ink), pillArc(from.pills.first(), to.pills.last(), muted))
+    return StaffGeometry.slurCurve(from.heads.first(), headY(first), to.heads.last(), headY(last), clear)
 }
 
 /** What the join waiting for its next note draws: a dashed half arc running on from the last note's head, and from under its pill. */
@@ -613,7 +635,8 @@ internal fun animalX(animal: StaffAnimal, tune: List<TuneItem>, lineMarks: List<
         halfBeat -= length
         step = next
     }
-    return starts[step] + StaffGeometry.beatX((lineMarks[step] as LineMark.Step).parts, halfBeat)
+    val mark = lineMarks[step] as LineMark.Step
+    return starts[step] + StaffGeometry.signRoom(mark) + StaffGeometry.beatX(mark.parts, halfBeat)
 }
 
 /**
@@ -688,6 +711,7 @@ private fun lengthDescription(name: String, length: NoteLength): String = when (
 private fun StepMark(
     item: TuneItem,
     parts: List<StepPart>,
+    sign: Accidental?,
     lit: Boolean,
     growing: Boolean,
     mark: StepMark?,
@@ -718,7 +742,9 @@ private fun StepMark(
         else -> null
     }
     val description = if (earned == null) name else "$name, $earned"
-    val width = parts.fold(0f) { sum, part -> sum + partWidth(part) }
+    // A sign (♯ ♭ ♮, since 2026-11-16) takes its room before the first head; everything after it moves right by it.
+    val room = if (sign != null) StaffGeometry.ACCIDENTAL_ROOM else 0f
+    val width = room + parts.fold(0f) { sum, part -> sum + partWidth(part) }
     Box(
         modifier = Modifier
             .zIndex(if (lit || growing) -1f else 0f)
@@ -726,12 +752,12 @@ private fun StepMark(
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
                 scale(density * s, pivot = Offset.Zero) {
-                    drawStep(item, parts, lit, growing, width, ink)
+                    drawStep(item, parts, lit, growing, width, ink, room, sign)
                 }
             },
     ) {
-        NameRow(item, parts, lit, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
-        MarkRow(mark, heard, heardNow, pitch, waiting, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
+        NameRow(item, parts, lit, room, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
+        MarkRow(mark, heard, heardNow, pitch, waiting, Modifier.offset(x = (room * s).dp, y = (StaffGeometry.MARKS_TOP * s).dp))
     }
 }
 
@@ -856,19 +882,22 @@ private fun ListeningBubble() {
  * pills tied under them.
  */
 @Composable
-private fun NameRow(item: TuneItem, parts: List<StepPart>, lit: Boolean, modifier: Modifier = Modifier) {
+private fun NameRow(item: TuneItem, parts: List<StepPart>, lit: Boolean, room: Float, modifier: Modifier = Modifier) {
     val s = LocalStaffScale.current
     val colors = FluteTheme.colors
     val tied = item is TuneNote && parts.count { it is StepPart.Length } > 1
     Row(
         modifier = modifier
             .height((StaffGeometry.PILL_HEIGHT * s).dp)
-            .then(if (tied) Modifier.drawBehind { scale(density * s, pivot = Offset.Zero) { drawPillTies(parts, colors.mutedText) } } else Modifier),
+            .then(if (tied) Modifier.drawBehind { scale(density * s, pivot = Offset.Zero) { drawPillTies(parts, colors.mutedText, room) } } else Modifier),
     ) {
-        for (part in parts) {
+        val first = parts.indexOfFirst { it is StepPart.Length }
+        for ((at, part) in parts.withIndex()) {
+            // The first pill is as much wider as the sign's room, so the name with its sign fits under sign and head.
+            val extra = if (at == first) room else 0f
             when (part) {
-                is StepPart.Length -> Box(Modifier.width((slotWidth(part.length) * s).dp).fillMaxHeight()) {
-                    NamePill(item, part.length, lit, Modifier.padding(start = (StaffGeometry.PILL_GAP / 2 * s).dp))
+                is StepPart.Length -> Box(Modifier.width(((slotWidth(part.length) + extra) * s).dp).fillMaxHeight()) {
+                    NamePill(item, part.length, lit, Modifier.padding(start = (StaffGeometry.PILL_GAP / 2 * s).dp), extra)
                 }
                 LineMark.BarLine -> Box(Modifier.width((BAR_SLOT * s).dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
                     PillBarLine()
@@ -880,14 +909,14 @@ private fun NameRow(item: TuneItem, parts: List<StepPart>, lit: Boolean, modifie
 
 /** One pill: the note's name in its letter's colour, or 💤 on grey for a rest. */
 @Composable
-private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier: Modifier = Modifier) {
+private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier: Modifier = Modifier, extra: Float = 0f) {
     val s = LocalStaffScale.current
     val colors = FluteTheme.colors
     val shape = RoundedCornerShape((StaffGeometry.PILL_RADIUS * s).dp)
     val fill = (item as? TuneNote)?.let { noteColor(it.midi) } ?: colors.track
     Box(
         modifier = modifier
-            .size(((slotWidth(length) - StaffGeometry.PILL_GAP) * s).dp, (StaffGeometry.PILL_HEIGHT * s).dp)
+            .size(((slotWidth(length) + extra - StaffGeometry.PILL_GAP) * s).dp, (StaffGeometry.PILL_HEIGHT * s).dp)
             .drawBehind { if (lit) drawPillRing(s) }
             .clip(shape)
             .background(fill)
@@ -897,7 +926,7 @@ private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier:
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .width(((StaffGeometry.BEAT_WIDTH - StaffGeometry.PILL_GAP) * s).dp)
+                .width(((StaffGeometry.BEAT_WIDTH + extra - StaffGeometry.PILL_GAP) * s).dp)
                 .fillMaxHeight()
                 .padding(horizontal = OutlineWidth), // inside the outline, so the octave figure never meets it
         ) {
@@ -942,11 +971,16 @@ private fun DrawScope.drawPillRing(s: Float) {
 }
 
 /** The ties between the pills of one note, in dp: an arc under them from each pill's middle to the next one's. */
-private fun DrawScope.drawPillTies(parts: List<StepPart>, color: Color) {
+private fun DrawScope.drawPillTies(parts: List<StepPart>, color: Color, room: Float = 0f) {
     val middles = mutableListOf<Float>()
     var x = 0f
+    var extra = room // the first pill is wider by a sign's room
     for (part in parts) {
-        if (part is StepPart.Length) middles += x + slotWidth(part.length) / 2
+        if (part is StepPart.Length) {
+            middles += x + (slotWidth(part.length) + extra) / 2
+            x += extra
+            extra = 0f
+        }
         x += partWidth(part)
     }
     val top = StaffGeometry.PILL_HEIGHT + StaffGeometry.PILL_TIE_GAP
@@ -970,6 +1004,8 @@ private fun DrawScope.drawStep(
     growing: Boolean,
     width: Float,
     ink: StaffInk,
+    room: Float = 0f,
+    sign: Accidental? = null,
 ) {
     if (growing) {
         drawRoundRect(
@@ -980,7 +1016,7 @@ private fun DrawScope.drawStep(
         )
     }
     val pieces = mutableListOf<Pair<Float, NoteLength>>() // each piece's head centre and length
-    var x = 0f
+    var x = room // a sign's room first
     for (part in parts) {
         if (part is StepPart.Length) pieces += x + HEAD_X to part.length
         else drawLine(ink.line, Offset(x + BAR_SLOT / 2, TOP_LINE_Y), Offset(x + BAR_SLOT / 2, BOTTOM_LINE_Y), BAR_LINE_WIDTH)
@@ -988,10 +1024,11 @@ private fun DrawScope.drawStep(
     }
     when (item) {
         is TuneNote -> {
-            val position = StaffNotes.positionOf(item.midi)
+            val position = FluteNotes.positionOf(item.midi) // a black note on its letter's place
             if (lit) pieces.forEach { (cx, _) -> drawCircle(Sun, StaffGeometry.LIT_RADIUS, Offset(cx, yOf(position))) }
-            pieces.forEach { (cx, length) -> drawNote(cx, item.midi, position, length, ink) }
+            pieces.forEachIndexed { at, (cx, length) -> drawNote(cx, item.midi, position, length, ink, signed = at == 0 && sign != null) }
             drawTies(pieces.map { it.first }, yOf(position), noteColor(item.midi))
+            if (sign != null) drawSign(sign, room + HEAD_X - StaffGeometry.SIGN_X, yOf(position), ink.line)
         }
         is TuneRest -> {
             if (lit) pieces.forEach { (cx, _) -> drawCircle(Sun, StaffGeometry.REST_LIT_RADIUS, Offset(cx, MIDDLE_LINE_Y)) }
@@ -1007,11 +1044,11 @@ private fun DrawScope.drawStep(
  * half and a dotted half, a wider ring for a whole note) with a thin edge, a stem up on the right
  * (none for a whole note), a flag on an eighth and a dot on a dotted half.
  */
-private fun DrawScope.drawNote(cx: Float, midi: Int, position: Int, length: NoteLength, ink: StaffInk) {
+private fun DrawScope.drawNote(cx: Float, midi: Int, position: Int, length: NoteLength, ink: StaffInk, signed: Boolean = false) {
     val y = yOf(position)
     for (ledger in StaffNotes.ledgerLinesFor(position)) {
         val ly = yOf(ledger)
-        drawLine(ink.line, Offset(cx - StaffGeometry.LEDGER_HALF, ly), Offset(cx + StaffGeometry.LEDGER_HALF, ly), StaffGeometry.LINE_WIDTH)
+        drawLine(ink.line, Offset(cx - StaffGeometry.ledgerLeft(signed), ly), Offset(cx + StaffGeometry.LEDGER_HALF, ly), StaffGeometry.LINE_WIDTH)
     }
     val color = noteColor(midi)
     if (length != NoteLength.WHOLE) {

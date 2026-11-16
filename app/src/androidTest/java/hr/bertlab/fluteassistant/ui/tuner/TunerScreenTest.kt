@@ -114,7 +114,7 @@ class TunerScreenTest {
 
     @Test
     fun identify_mode_keeps_the_ring_through_a_drift() {
-        // Sixty cents above A4: the nearest note is A♯4, but the ring has not moved yet.
+        // Sixty cents above A4: the nearest note is B♭4, but the ring has not moved yet.
         show(listening(455.4, mode = TunerMode.IDENTIFY).copy(identifiedMidi = 69))
         compose.onNodeWithContentDescription("Your sound is A4 but a little high. Go down").assertIsDisplayed()
         compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()

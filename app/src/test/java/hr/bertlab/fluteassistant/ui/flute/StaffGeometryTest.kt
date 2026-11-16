@@ -4,12 +4,15 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.Bars
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
+import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -257,4 +260,95 @@ class StaffGeometryTest {
         // The cap samples the curve: a tenth of a dp past the air between samples is nothing against 2 dp of it.
         assertTrue("${lowestOf(steep)}", lowestOf(steep) <= StaffGeometry.NAMES_TOP - StaffGeometry.SLUR_PILL_AIR + 0.1f)
     }
+
+    // ---- Signs before the notes (2026-11-16, sharps and flats): ten dp more room, the sign inside it ----
+
+    @Test
+    fun `a step with a sign takes ten dp more room`() {
+        val plain = LineMark.Step(0, listOf(StepPart.Length(NoteLength.QUARTER)))
+        assertEquals(StaffGeometry.markWidth(plain) + 10f, StaffGeometry.markWidth(plain.copy(sign = Accidental.SHARP)), 0.001f)
+        assertEquals(StaffGeometry.markWidth(plain) + 10f, StaffGeometry.markWidth(plain.copy(sign = Accidental.NATURAL)), 0.001f)
+        assertEquals(0f, StaffGeometry.signRoom(plain), 0.001f)
+    }
+
+    @Test
+    fun `the sign lies inside its own step's room`() =
+        assertTrue(StaffGeometry.ACCIDENTAL_ROOM + StaffGeometry.HEAD_X - StaffGeometry.SIGN_X - StaffGeometry.SIGN_HALF_WIDTH >= 0f)
+
+    @Test
+    fun `the animal stands over a signed note's head, after its room`() {
+        val tune = listOf(TuneNote(65, NoteLength.QUARTER), TuneNote(66, NoteLength.QUARTER))
+        val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+        val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+        val animal = StaffAnimal(index = 1, emoji = "🐇", flash = { 0f }, waiting = false, halfBeat = 0)
+        assertEquals(starts[1] + 10f + StaffGeometry.HEAD_X, animalX(animal, tune, lineMarks, starts)!!, 0.001f)
+    }
+
+    /**
+     * The slur layer's places (the final review, 2026-11-16): a signed note split at a bar line has its sign's room once,
+     * before its first head, as `drawStep` draws it; its later heads stand where an unsigned split note's do, moved by the
+     * room alone. Counted twice, a slur or the waiting arc ending on its second head hung 10 dp past it.
+     */
+    @Test
+    fun `a split signed note's heads in the slur layer stand where they are drawn`() {
+        fun headsOf(last: Int): List<Float> {
+            val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER), TuneNote(last, NoteLength.HALF))
+            val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+            val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+            return stepPlaces(lineMarks, starts).getValue(3).heads
+        }
+        val plain = headsOf(65)
+        val signed = headsOf(66)
+        assertEquals(2, signed.size)
+        assertEquals(plain[0] + StaffGeometry.ACCIDENTAL_ROOM, signed[0], 0.001f)
+        assertEquals(plain[1] + StaffGeometry.ACCIDENTAL_ROOM, signed[1], 0.001f)
+    }
+
+    /** A ledger line beside a sign starts clear of it (the final review): it ran 3 dp into C♯4's sharp. */
+    @Test
+    fun `a ledger line beside a sign starts clear of it, and still shows left of the head`() {
+        assertEquals(StaffGeometry.LEDGER_HALF, StaffGeometry.ledgerLeft(signed = false), 0.001f)
+        assertTrue(StaffGeometry.ledgerLeft(signed = true) <= StaffGeometry.SIGN_X - StaffGeometry.SIGN_HALF_WIDTH - 1f)
+        assertTrue(StaffGeometry.ledgerLeft(signed = true) > StaffGeometry.HEAD_RX)
+    }
+
+    /**
+     * A slur passes under the signs of the notes it reaches, as under their heads (the final review's look, 2026-11-16: it
+     * ran through the foot of C♯4's sharp): the sign's ink reaches [StaffGeometry.SIGN_BELOW] under its head's centre.
+     */
+    private fun assertTheSlurClearsTheSign(vararg midis: Int, signed: Int) {
+        val tune = midis.mapIndexed { k, midi -> TuneNote(midi, NoteLength.EIGHTH, joined = k > 0) }
+        val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+        val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+        val places = stepPlaces(lineMarks, starts)
+        val curve = slurFor(Joins.arcs(tune).single(), tune, places)
+        val sign = places.getValue(signed).heads.first() - StaffGeometry.SIGN_X
+        val foot = StaffGeometry.yOf(FluteNotes.positionOf(midis[signed])) + StaffGeometry.SIGN_BELOW
+        for (x in listOf(sign - 3f, sign, sign + 3f)) {
+            assertTrue("under the sign at $x: ${lowestAt(curve, x)} against its foot $foot", lowestAt(curve, x) >= foot + 1f)
+        }
+    }
+
+    @Test
+    fun `a slur passes under the sign of a note inside it`() = assertTheSlurClearsTheSign(64, 66, 67, signed = 1)
+
+    @Test
+    fun `a slur passes under the sign of the note it ends on`() = assertTheSlurClearsTheSign(71, 73, signed = 1)
+
+    @Test
+    fun `a slur clears the sign of every black note, inside it, at its end and coming down onto it`() {
+        val misses = mutableListOf<String>()
+        for (black in listOf(61, 63, 66, 68, 70, 73, 75, 78, 80, 82)) {
+            val runs = listOf("inside" to intArrayOf(black - 1, black, black + 1), "at its end" to intArrayOf(black - 1, black), "coming down" to intArrayOf(black + 3, black))
+            for ((how, midis) in runs) {
+                try {
+                    assertTheSlurClearsTheSign(*midis, signed = 1)
+                } catch (e: AssertionError) {
+                    misses += "$how $black: ${e.message}"
+                }
+            }
+        }
+        assertTrue(misses.joinToString("\n"), misses.isEmpty())
+    }
+
 }

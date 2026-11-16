@@ -69,6 +69,7 @@ class NoteOnsetTracker(
         val restartRise: Float = RESTART_RISE,
         val restartFrames: Int = RESTART_FRAMES,
         val minLevel: Float = MIN_LEVEL,
+        val stepFromSounding: Boolean = true,
     ) {
         /** Name and value of every rule, in declaration order, the value as Kotlin prints it. */
         fun fields(): List<Pair<String, String>> = listOf(
@@ -78,7 +79,7 @@ class NoteOnsetTracker(
             "gapLevelRatio" to gapLevelRatio.toString(), "floorMargin" to floorMargin.toString(), "floorRise" to floorRise.toString(),
             "recentFrames" to recentFrames.toString(), "attackFrames" to attackFrames.toString(), "stopDrop" to stopDrop.toString(),
             "restartRise" to restartRise.toString(), "restartFrames" to restartFrames.toString(),
-            "minLevel" to minLevel.toString(),
+            "minLevel" to minLevel.toString(), "stepFromSounding" to if (stepFromSounding) "1" else "0",
         )
 
         /** These rules with the one named [name] set to [value] (rounded for a frame count); an unknown name is refused. */
@@ -103,6 +104,7 @@ class NoteOnsetTracker(
                 "restartRise" -> copy(restartRise = f)
                 "restartFrames" -> copy(restartFrames = n)
                 "minLevel" -> copy(minLevel = f)
+                "stepFromSounding" -> copy(stepFromSounding = value != 0.0)
                 else -> throw IllegalArgumentException("no rule named $name")
             }
         }
@@ -162,6 +164,13 @@ class NoteOnsetTracker(
      */
     var floor: Float? = floor
         private set
+    /**
+     * Where the sounding note was sounding: the median on the last frame whose median named it (since 2026-11-16). A move
+     * measured from here as well as from the note's written pitch ([Rules.stepFromSounding]) is how a slurred semitone on
+     * a flute blown sharp or flat is heard: G 40 cents sharp to F♯ 40 cents sharp lies 60 cents from G but 100 from
+     * where G sounded. Null between notes.
+     */
+    private var soundingHz: Double? = null
     /** Shown frames in a row whose note is a neighbour of [sounding] within reach; see [identify]. */
     private var driftFrames = 0
     /** Whether the last [identify] moved [sounding] by a drift rather than a clear step or a fresh start. */
@@ -257,6 +266,7 @@ class NoteOnsetTracker(
     /** Back to silence: no note sounding, nothing remembered of it (the room's floor is kept). */
     fun reset() {
         sounding = null
+        soundingHz = null
         recent.clear()
         gap = 0
         unheard = 0
@@ -321,7 +331,9 @@ class NoteOnsetTracker(
 
     /**
      * The note [heard] (the median's nearest note) becomes the sounding note at once when nothing
-     * was sounding, when it is the sounding note, or when it is a clear step away; a drift that has
+     * was sounding, when it is the sounding note, or when it is a clear step away: further than
+     * [ListenRules.NEAR_CENTS] from the sounding note's written pitch or, with [Rules.stepFromSounding],
+     * from where it was sounding ([soundingHz]: a slurred semitone on a flute off pitch); a drift that has
      * only passed the halfway point to a neighbour waits for [ListenRules.SWITCH_FRAMES] shown
      * frames in a row, one frame back on the sounding note starting the count again.
      */
@@ -330,16 +342,20 @@ class NoteOnsetTracker(
         drifted = false
         if (current == null || heard == current) {
             driftFrames = 0
+            soundingHz = median
             return heard
         }
         val reach = abs(NoteMath.centsBetween(median, current))
-        if (reach > rules.nearCents) {
+        val fromSounding = soundingHz?.takeIf { rules.stepFromSounding }?.let { abs(1200.0 * log2(median / it)) } ?: 0.0
+        if (reach > rules.nearCents || fromSounding > rules.nearCents) {
             driftFrames = 0
+            soundingHz = median
             return heard
         }
         if (++driftFrames >= rules.switchFrames) {
             driftFrames = 0
             drifted = true
+            soundingHz = median
             return heard
         }
         return current

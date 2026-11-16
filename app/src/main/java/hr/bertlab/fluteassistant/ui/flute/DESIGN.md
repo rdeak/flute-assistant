@@ -45,7 +45,8 @@ The time between presses is not recorded (a child hunting for the next key would
 halting): a silence is only ever a rest the child put there. The stored string
 (`"60:2,r:2,b,67:4,69:2:s"`: a note's MIDI or `r` for a rest, then half beats, and `b` for a breath; a third field `s`
 on a note joined to the one before since 2026-11-16, "Legato";
-`decode` is lenient and ignores a third field, `sanitize` keeps only `StaffNotes.ALL` notes and
+`decode` is lenient and ignores a third field, `sanitize` keeps only the flute's notes (`FluteNotes.ALL`, every semitone
+from C4 to C6 since 2026-11-16; the white notes of `StaffNotes.ALL` before) and
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
 snapped (never under 300), converted at the stored tempo; since 2026-11-04 the tune is one of the
 songbook's six books (`SONGBOOK.md`), each stored as `"<bpm>;<time signature name>;<that string>"` under
@@ -91,10 +92,11 @@ grows. Text on the staff (the time signature, the emoji) is measured at a fixed 
 stays in the staff at any font scale. The staff with its names is `TuneStaffHeight` (241 dp, the staff 175) at every tune, so
 the keys never move; c³'s stem (87 dp above the top line) may reach 12 dp into the stage's padding
 and c¹'s ring and tie 8 dp into the gap above the names, which `StaffGeometryTest` checks for
-every height; with the names the stage fits a 412 x 915 phone without scrolling. The tab needs 642 dp
-upright (`FitsHeight` in `FluteScreen.kt`: the stage, three key rows, the Play row, their gaps and the
-column's padding), and whatever a phone has over that goes over and under the keys, so that Stop
-stands where Play was; under it the keys keep their least height and the tab scrolls. Until 2026-11-10
+every height; with the names the stage fits a 412 x 915 phone without scrolling. The tab needs 628 dp
+upright (`FitsHeight` in `FluteScreen.kt`: the stage, the keys' least room, the Play row, their gaps and the
+column's padding; 642 with three rows of keys until 2026-11-16, "Sharps and flats"), and whatever a phone has
+over that goes to the keys, so that Stop stands where Play was; under it the keys keep their least room and the
+tab scrolls. Until 2026-11-10
 `FitsHeight` counted 664, so the user's Galaxy A55, whose three navigation buttons leave the tab 653 dp
 (the emulator's Medium Phone leaves 709), was laid out as a phone too short: the blocks at their least
 gaps, the spare height under the Play row and Stop 100 dp over Play's place. Where the
@@ -156,8 +158,10 @@ end of the Play row), and Play and Your turn share the Play row's width. It is f
 tune is empty, and its gesture is attached only while it is enabled, so a hold that empties the tune
 stops repeating and lets the key up.
 
-The keys (`FluteKeys.kt`): the fifteen keys in three octave rows, highest on top, each in its
-letter's colour, a key sounding for as long as it is held. At the end of the top row, a clear gap
+The keys (`FluteKeys.kt`): since 2026-11-16 the 25 keys from C4 to C6 with every sharp and flat, in a top row that
+stays and four piano rows that scroll under it ("Sharps and flats" below); before that the fifteen white keys in three
+octave rows, highest on top. Each is in its letter's colour, a key sounding for as long as it is held. At the end of
+the top row, a clear gap
 after c³, stand a 💤 rest key, a 😮‍💨 breath key and a 🧽 erase key, icon only (in that order since
 2026-11-05, the user's "swap order of rest and breath button", the breath first before; the same day
 each became one note key wide, standing over g², a² and h² with the row empty between c³ and them,
@@ -709,13 +713,76 @@ The Croatian line is to be checked with a flute teacher. Tests: `JoinsTest`, `Tu
 `ListenPathTest` (legato on sound), `StaffGeometryTest` (the slur, the animal on a tie), `FluteViewModelTest` (the key,
 the cancels, the glide), `FluteScreenTest` (the key, the words, the arcs' pixels on the emulator).
 
+Sharps and flats (2026-11-16; spec `docs/superpowers/specs/2026-11-16-flute-more-notes-design.md`, plan
+`docs/superpowers/plans/2026-11-16-flute-more-notes.md`, both local). While legato was designed the user offered: "if legato
+requires additional button reduce space with notes make them scrollable in that area that way we can also add even more
+notes to the app"; the child's music has F♯ and B♭ (The Fife Book), on a concert flute (the user: "concert flute"). Of
+the note sets the user picked A, every semitone from C4 to C6 (25, `FluteNotes`); of three layouts from true-size
+mockups (`.superpowers/brainstorm/32231-1794842274/content/keys.html`) A, piano rows that scroll; of three ways to tell a
+press from a scroll A ("let's try with A"). One spelling for the whole app (`NoteSpelling`, Claude's call): C♯ E♭ F♯ G♯
+B♭, as beginners' flute music writes them (cis es fis gis b), a sharp on the letter below and a flat on the letter above,
+in that letter's colour, so the tuner and the notes game now say E♭ and B♭ where they said D♯ and A♯; the notes game
+keeps its fifteen white notes. The keys: the top row stays as it was (C6, ⌒ 💤 😮‍💨 🧽); under it, 12 dp lower, four
+rows scroll as one (`ScrollingRows`), the C5 octave's black keys, its white keys, the C4 octave's black keys and its
+white keys, 8 dp apart, opening at the bottom, where a beginner plays most. A black key is as wide as a white key and
+centred on the gap between its two (none between E and F, or B and C), 48 dp to the white key's 58, its name shrinking
+to fit; every row stands on one grid of whole pixels (`KeysGrid`), so the black keys and the tools stand exactly over
+their columns. While the rows can scroll and are not at their top, their top 22 dp fades into the page, and a 4 dp
+thumb in the border colour, 2 dp right of them, shows where the view is, so the child sees there is more above even
+when the edge falls in a gap. A held key's yellow ring, which reaches 5 dp below its row, is drawn by the rows over
+their viewport: the scroll would cut it, and on the C4 row it lies wholly below the row. The place lasts through a turn
+and a run (`KeysPlace`, beside `staffPlace`), and rows left at their bottom go back to it when their height shrinks
+(on a turn from a phone on its side, upright, the C4 row slid out of view: a `ScrollState` keeps its bottom only when
+the rows grow). The review of the spec (four findings, taken with "ok") set the sizes: never a white key under 58 dp or
+a black one under 48, and spare height shows more rows before it grows keys (`KeysGeometry`); once all five fit (331 dp
+at 58) the keys grow together to fill the room, up to 58 on a phone upright, 72 on a zoomed tab upright, 88 on its
+side, and grown keys give up a pixel or two so that five rows that fit never scroll (each part rounds to whole pixels
+on its own: the 10-inch tablet on its side scrolled by 2 px on the emulator). The keys' least room is the top row and
+the C4 octave's two rows, 199 dp (213 for three rows), so `FitsHeight` is 628. The final review of the same day found
+the rows took every touch while Android's stretch at their end relaxed, so a key tapped right after a flick to the C5
+octave made no sound: the rows have no stretch (`overscrollEffect = null`; `FluteScreenTest`, on the emulator, where the
+stretch is). A press from a scroll (the user's A):
+in the rows almost every spot is a key, so a press sounds at once as ever, and if the rows take the finger for a scroll
+within `SCROLL_DECIDE_MS` (150 ms) the press was a scroll: the sound stops and the press is taken back
+(`TuneWriter.takeBack`, `FluteViewModel.onKeyScrolled`), so the tune, the stored book, the marks of the last run, a
+waiting join and the rejoin window are as they were, and `flute.press_scrolled` is logged instead of `flute.note`. A key
+held past the 150 ms is a note and the rows stand still under it until every key is up; a finger landing on a key while
+another is down is a note at once, as that press ended the other's hold and could not give it back (C6 and 💤 count,
+held, since the final review); rows that fit do not scroll at all, so a drag on a key there is a press as on the top row.
+Where the rows stood at their bottom is saved with their scroll, so a restore (a language switch) keeps rows a child left
+at their top. The costs, accepted: a blip of sound when a
+scroll starts on a key, a tap whose finger slides past the slop inside the 150 ms writes nothing, a drag begun after
+resting on a key writes a note and scrolls nothing. The 150 is to be set from a phone test with the child, by the ms and
+dy `flute.press_scrolled` carries. On the staff (Claude's calls, from `staff.html`): a black note sits on its letter's
+place (`FluteNotes.positionOf`) with its own ♯ or ♭, and a white note whose place carried a ♯ or ♭ earlier in the bar
+gets a ♮ (`Bars`, the bar is the one the note's first piece starts in; a rest or a breath changes nothing; the next bar
+starts clean); a signed step is `ACCIDENTAL_ROOM` (10 dp) wider, the sign centred `SIGN_X` (17 dp) left of the head
+(`StaffSigns.kt`), and the pill under it as much wider, so the name with its sign fits. After the final review: the slur
+layer counts the room once (a split signed note's later heads stood 10 dp right of where they are drawn, and a slur or tie
+from them hung past the head); a ledger line beside a sign starts a dp right of it (`StaffGeometry.ledgerLeft`; it ran 3 dp
+into C♯4's sharp); and a slur passes under the foot of a sign it reaches (`SIGN_BELOW` 12, with `SIGN_SLUR_AIR` 1.5 rather
+than a head's 4, so it dips under and does not sag), as one coming down onto F♯ ran through its sharp at every pitch. A
+sign right after the time signature has about 3.4 dp of air before its figure, left as it is. The tracker (the review's first
+finding): a semitone slurred on a flute off its pitch read as drift, G⌒F♯ on a flute 40 cents sharp leaving F♯ unheard
+and G ✋, because a step was measured from the written note's pitch only; now it is measured from the note heard
+sounding as well (`NoteOnsetTracker.Rules.stepFromSounding`, `Replay.BEFORE` 0), and all 80 recordings replay exactly as
+before with it off and on. A known limit, pinned and left: F fingered for F♯ on a flute 60 cents sharp sounds nearer F♯
+and reads as F♯ played low, ⬆️ (in tune and at +40 it is a wrong note); pitch alone cannot tell them apart. Tests:
+`NoteSpellingTest`, `FluteNotesTest`, `BarsTest` (the signs), `TuneWriterTest` (a press taken back), `NoteOnsetTrackerTest`,
+`ListenRunTest` and `ListenPathTest` (semitone slurs, the limit), `KeysGeometryTest`, `StaffGeometryTest`,
+`FluteViewModelTest` (the take-back's wiring), `FluteScreenTest` (the keys, the rows and their place, the drag rule,
+the signs' pixels on the emulator), `FluteSidewaysTest` and `FluteTabletTest` (the sizes).
+
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, joined: joined to the note before, since 2026-11-16, per note ended), `flute.join`
 (waiting: true when the ⌒ key set a join, false when its second tap cancelled one or there was nothing to join from;
 since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, play, listen, book, speed or leave: a waiting join
 dropped; since 2026-11-16), `flute.rest` (heldMs, length, added, per rest
-ended), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pressed again within
+ended), `flute.press_scrolled` (midi, ms, dy: a press on a key in the scrolling rows taken back because the rows took
+the finger for a scroll ms after it landed, dy dp from where it landed; since 2026-11-16, in place of its
+`flute.note`; a press that had gone on with a note let go a moment before logs its `flute.rejoin` first, and taken
+back it leaves that note as it was let go, which no line says again), `flute.rejoin` (midi, `none` for the rest, gapMs: a key let go of and pressed again within
 `HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
 or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
 rests, bpm, time), `flute.play_done`, `flute.stop`
@@ -769,15 +836,19 @@ speed panel's `TempoWheelState` live above the branch, so an open panel or shelf
 
 - **Writing** (`FluteWritingSideways`; mockup `fit-v2.html`, the user's pick: the same keys as upright):
   the rail, the staff's card, then the keys with Play and Listen to me under them. There is no right
-  column, so no `SidewaysPage`: beside the keys it left the staff about three beats. The three key rows
-  keep their upright order and contents (the rest, breath and sponge keys on top). Keys are 48 wide and
-  `SidewaysGeometry.keyHeight` tall (85 at 411, 68 at 360, never under upright's 58) with gaps of 6 and
-  12 (`FluteKeys(keyHeight, keyGap)`); under 630 dp of content they are 40 wide with 4 dp gaps, which is
+  column, so no `SidewaysPage`: beside the keys it left the staff about three beats. The key rows
+  keep their upright order and contents (the join, rest, breath and sponge keys on top). Keys are 48 wide; since
+  2026-11-16 they are sized by `KeysGeometry` in the room `SidewaysGeometry.keysRoom` leaves (295 at 411, 244 at
+  360): 58 and 48 dp tall with the rows scrolling, as no phone fits all five rows (the top row, the C5 white row and
+  the C4 octave show at 411, the top row, the C4 octave and half the C5 white row at 360); until then three rows
+  grew to fill it (`SidewaysGeometry.keyHeight`, 85 at 411, 68 at 360). The gaps are 6 (`FluteKeys(maxKeyHeight,
+  keyGap)`, the largest key `KeysGeometry.SIDEWAYS_MAX`, 88); under 630 dp of content they are 40 wide with 4 dp gaps, which is
   what upright gives on a phone that narrow. Play (left) and Listen to me share the keys' width, 84
   tall, in upright's order. The card takes the width left: 427 dp at 915, 11 beats at rest scale
   (upright shows 9), 8 beats at 800, 5 at 640, with the staff centred in its height; the knob and the book
-  keep their corners. Under `WRITING_MIN_HEIGHT` (329 dp, shorter than any phone it was drawn for) the keys'
-  column scrolls like upright's tab instead of overflowing onto Play. The empty staff's hint (`EmptyHint`)
+  keep their corners. Where the keys' room is under their least (`KeysGeometry.MIN_HEIGHT`, a window under 315 dp;
+  329, `WRITING_MIN_HEIGHT`, with three rows) the keys' column scrolls like upright's tab instead of overflowing onto
+  Play. The empty staff's hint (`EmptyHint`)
   may take two lines sideways: at 640 it is about 92 dp wide and one line was cut.
 - **Running, Play or Your turn** (`FluteRunningSideways`; the worst case, `frame.html` option A): the keys
   and the two buttons go as upright, the rail stays, and the card widens to leave the right column (683 dp
@@ -815,9 +886,13 @@ speed panel's `TempoWheelState` live above the branch, so an open panel or shelf
 ## Tablets
 
 The one tab that adjusts anything on top of a tablet's zoom (`ui/DESIGN.md`, "Tablets"; spec
-`2026-11-06-tablet-design.md`), and only while `LocalTabZoom` is over 1. Upright the keys take a third of
-what the height spares over `FitsHeight`, from 58 up to 72 (`TabletGeometry.uprightKeyHeight`), about 104 dp
-on a 10-inch tablet: the phone's 58 left a band of nothing either side of them. Sideways, writing, the keys'
+`2026-11-06-tablet-design.md`), and only while `LocalTabZoom` is over 1. Upright the keys may grow to 72
+(`KeysGeometry.TABLET_UPRIGHT_MAX`), but since 2026-11-16 spare height shows more key rows before it grows keys, and
+upright no tablet fits all five, so they are 58 and the rows scroll (a 10-inch tablet shows four rows and most of the
+fifth); until then three rows took a third of what the height spared each, from 58 up to 72
+(`TabletGeometry.uprightKeyHeight`), as the phone's 58 left a band of nothing either side of them. On its side a
+tablet fits all five rows, and the keys grow together to fill the room (about 75 dp, up to 88), nothing scrolling.
+Sideways, writing, the keys'
 column is 336 rather than 372 and the resting staff 0.91 rather than 1 (`TabletGeometry.sidewaysKeys`,
 `sidewaysStaffScale`), so that about 13 quarter notes show with their bar lines, against about 10; the staff
 is still 1.3 times a phone's at 10 inches and 1.02 at 8, and a barely zoomed window keeps a phone's real sizes. The running staff keeps `runningStaffScale`. A tune

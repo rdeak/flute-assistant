@@ -84,6 +84,7 @@ object Replay {
         "longSlack" to Double.POSITIVE_INFINITY, // 2026-11-16: no note was too long
         "wholeNote" to 0.0, // 2026-11-16: a mark was final once the note was long enough
         "slurCheck" to 0.0, // 2026-11-16: no slur check, a joined note tongued kept its star
+        "stepFromSounding" to 0.0, // 2026-11-16: a move was a step only when far from the sounding note's written pitch
     )
 
     /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */

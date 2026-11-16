@@ -117,7 +117,7 @@ class FluteViewModelTest {
 
     @Test
     fun `a stored tune is restored and sanitized`() {
-        settings.tune = listOf(TuneNote(60, HALF), TuneNote(61, QUARTER), TuneNote(84, WHOLE))
+        settings.tune = listOf(TuneNote(60, HALF), TuneNote(85, QUARTER), TuneNote(84, WHOLE))
         val vm = viewModel()
         assertEquals(listOf(TuneNote(60, HALF), TuneNote(84, WHOLE)), vm.current.tune)
     }
@@ -251,7 +251,7 @@ class FluteViewModelTest {
     @Test
     fun `a press outside the keys is ignored`() {
         val vm = viewModel()
-        vm.onKeyPressed(61)
+        vm.onKeyPressed(85) // above C6; since 2026-11-16 C♯4 (61) is a key
         assertTrue(tonePlayer.notesOn.isEmpty())
         assertTrue(vm.current.tune.isEmpty())
     }
@@ -1440,7 +1440,7 @@ class FluteViewModelTest {
 
     @Test
     fun `a book opened is sanitized like the one opened at creation`() {
-        settings.books[1] = Book(listOf(TuneNote(60, HALF), TuneNote(61, QUARTER), TuneNote(84, WHOLE)))
+        settings.books[1] = Book(listOf(TuneNote(60, HALF), TuneNote(85, QUARTER), TuneNote(84, WHOLE)))
         val vm = viewModel()
         vm.openBook(1)
         assertEquals(listOf(TuneNote(60, HALF), TuneNote(84, WHOLE)), vm.current.tune)
@@ -1999,5 +1999,65 @@ class FluteViewModelTest {
         vm.onMicResult(granted = false)
         assertFalse(vm.current.joinWaiting)
         assertEquals("listen", logger.events("flute.join_cancel").single()["reason"])
+    }
+
+    @Test
+    fun `a black key sounds, writes its note and saves it`() {
+        val vm = viewModel()
+        vm.tap(66, 500)
+        assertEquals(on(66), tonePlayer.notesOn.single())
+        assertEquals(listOf(TuneNote(66, QUARTER)), vm.current.tune)
+        assertEquals(listOf(TuneNote(66, QUARTER)), settings.tune)
+    }
+
+    // ---- A press that turned into a scroll (2026-11-16): taken back, nothing changes ----
+
+    @Test
+    fun `a press that turned into a scroll changes nothing`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60))
+        play(60)
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
+        val marks = vm.current.marks
+        assertEquals(mapOf(0 to StepMark.FIRST_TRY), marks)
+        assertFalse(vm.current.isListening)
+        val notes = logger.events("flute.note").size
+        vm.onKeyPressed(62)
+        vm.onKeyScrolled(62, 80, 30f)
+        assertEquals(listOf(q(60)), vm.current.tune)
+        assertEquals(listOf(q(60)), settings.tune)
+        assertEquals("the marks of the last Listen to me stay", marks, vm.current.marks)
+        assertNull(vm.current.held)
+        assertNull(tonePlayer.sounding)
+        val scrolled = logger.events("flute.press_scrolled").single()
+        assertEquals(62, scrolled["midi"])
+        assertEquals(80L, scrolled["ms"])
+        assertEquals(30f, scrolled["dy"])
+        assertEquals("no note line", notes, logger.events("flute.note").size)
+        advanceTimeBy(2000)
+        assertEquals(listOf(q(60)), vm.current.tune)
+    }
+
+    @Test
+    fun `a waiting join survives a press taken back`() {
+        val vm = viewModel()
+        vm.tap(60, 500)
+        vm.onJoin()
+        vm.onKeyPressed(62)
+        vm.onKeyScrolled(62, 80, 30f)
+        assertTrue(vm.current.joinWaiting)
+        vm.tap(64, 500)
+        assertTrue((vm.current.tune[1] as TuneNote).joined)
+    }
+
+    @Test
+    fun `a press that cannot be taken back is let go as a note`() {
+        val vm = viewModel()
+        vm.onKeyPressed(60)
+        clock.now += 300
+        vm.onKeyPressed(62)
+        vm.onKeyScrolled(62, 80, 30f)
+        assertEquals(2, vm.current.tune.size)
+        assertNull(vm.current.held)
+        assertTrue(logger.events("flute.press_scrolled").isEmpty())
     }
 }

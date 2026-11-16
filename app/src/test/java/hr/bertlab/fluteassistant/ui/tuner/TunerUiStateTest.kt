@@ -163,7 +163,7 @@ class TunerUiStatePitchWindowTest {
         assertEquals(67, TunerUiState(reading = null, targetMidi = 67, mode = TunerMode.TARGET).homeMidi)
         assertNull(TunerUiState(reading = null, targetMidi = 67, mode = TunerMode.IDENTIFY).homeMidi)
         assertEquals(69, TunerUiState(reading = offA4(0.0), targetMidi = 67, mode = TunerMode.IDENTIFY).homeMidi)
-        val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69) // nearest is A♯4
+        val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69) // nearest is B♭4
         assertEquals(69, held.homeMidi)
     }
 
@@ -172,7 +172,7 @@ class TunerUiStatePitchWindowTest {
         val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69)
         assertEquals(60.0, held.gaugeCents!!, 0.01)
         assertEquals(TuningStatus.HIGH, held.status)
-        assertEquals(-40.0, held.copy(identifiedMidi = null).gaugeCents!!, 0.01) // the reading's own note, A♯4
+        assertEquals(-40.0, held.copy(identifiedMidi = null).gaugeCents!!, 0.01) // the reading's own note, B♭4
     }
 
     @Test

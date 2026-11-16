@@ -240,4 +240,73 @@ class TuneWriterTest {
         writer.press(62, 800, pulse)
         assertTrue((writer.tune[1] as TuneNote).joined)
     }
+
+    // ---- A press taken back (2026-11-16): a finger that lands on a key and starts the rows scrolling wrote nothing ----
+
+    @Test
+    fun `a press taken back leaves the tune as it was`() {
+        tap(60, at = 0, heldMs = 500)
+        writer.press(62, 1000, pulse)
+        assertTrue(writer.takeBack())
+        assertEquals(listOf(TuneNote(60, QUARTER)), writer.tune)
+        assertNull(writer.held)
+    }
+
+    @Test
+    fun `a press taken back gives a waiting join back`() {
+        tap(60, at = 0, heldMs = 500)
+        writer.join()
+        writer.press(62, 1000, pulse)
+        writer.takeBack()
+        assertTrue(writer.joinWaiting)
+        writer.press(64, 2000, pulse)
+        assertTrue((writer.tune[1] as TuneNote).joined)
+    }
+
+    @Test
+    fun `a press taken back gives the rejoin window back`() {
+        writer.press(60, 0, pulse)
+        writer.release(300)
+        writer.press(62, 310, pulse)
+        writer.takeBack()
+        writer.press(60, 330, pulse) // 30 ms after 60 was let go: the same hold going on
+        assertEquals(1, writer.tune.size)
+    }
+
+    @Test
+    fun `a rejoining press taken back leaves the note as it was let go`() {
+        writer.press(60, 0, pulse)
+        writer.release(300)
+        writer.press(60, 320, pulse)
+        assertTrue(writer.takeBack())
+        assertEquals(listOf(TuneNote(60, EIGHTH)), writer.tune)
+        assertNull(writer.held)
+    }
+
+    @Test
+    fun `a press that ended another key's hold is not taken back`() {
+        writer.press(60, 0, pulse)
+        writer.press(62, 100, pulse)
+        assertFalse(writer.takeBack())
+        assertEquals(2, writer.tune.size)
+        assertEquals(62, writer.held?.midi)
+    }
+
+    @Test
+    fun `a press at the cap taken back changes nothing`() {
+        val full = List(Tune.MAX_NOTES) { TuneNote(60, QUARTER) }
+        writer.open(full)
+        writer.press(62, 1000, pulse)
+        assertTrue(writer.takeBack())
+        assertEquals(full, writer.tune)
+        assertNull(writer.held)
+    }
+
+    @Test
+    fun `nothing held, nothing to take back`() {
+        assertFalse(writer.takeBack())
+        tap(60, at = 0, heldMs = 500)
+        assertFalse(writer.takeBack())
+        assertEquals(listOf(TuneNote(60, QUARTER)), writer.tune)
+    }
 }

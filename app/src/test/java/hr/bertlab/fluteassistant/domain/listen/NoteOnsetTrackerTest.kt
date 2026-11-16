@@ -242,7 +242,8 @@ class NoteOnsetTrackerTest {
         assertEquals("0.12", fields["stopDrop"])
         assertEquals("70.0", fields["nearCents"])
         assertEquals("0.45", fields["minLevel"])
-        assertEquals(17, fields.size)
+        assertEquals("1", fields["stepFromSounding"]) // since 2026-11-16
+        assertEquals(18, fields.size)
     }
 
     @Test
@@ -488,5 +489,39 @@ class NoteOnsetTrackerTest {
         val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
         assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
         assertEquals(0.16f, result.stopDrop!!, 0.001f)
+    }
+
+    // ---- A slurred semitone on a flute off its pitch (2026-11-16, sharps and flats): a step measured from where the note sounded ----
+
+    @Test
+    fun `a slur to the next semitone on a flute forty cents sharp is a step`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(67, cents = 40.0) })
+        val step = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(66, cents = 40.0) }).last()
+        assertEquals(NoteOnsetTracker.Onset(66, fresh = false), step.onset)
+    }
+
+    @Test
+    fun `and up a semitone on a flute thirty-five cents flat`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(65, cents = -35.0) })
+        val step = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(66, cents = -35.0) }).last()
+        assertEquals(NoteOnsetTracker.Onset(66, fresh = false), step.onset)
+    }
+
+    @Test
+    fun `with the rule off it is a drift that begins no note`() {
+        val tracker = NoteOnsetTracker(NoteOnsetTracker.Rules(stepFromSounding = false))
+        feed(tracker, List(5) { pitched(67, cents = 40.0) })
+        val after = feed(tracker, List(20) { pitched(66, cents = 40.0) })
+        assertTrue(after.all { it.onset == null })
+        assertEquals(66, tracker.sounding)
+    }
+
+    @Test
+    fun `a long note sagging slowly past the halfway point is still one note`() {
+        val tracker = NoteOnsetTracker()
+        val frames = feed(tracker, List(25) { pitched(67, cents = -3.0 * it) }) // to 72 cents under
+        assertEquals(1, frames.count { it.onset != null })
     }
 }

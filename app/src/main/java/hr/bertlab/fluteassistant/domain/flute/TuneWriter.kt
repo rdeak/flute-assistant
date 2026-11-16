@@ -76,10 +76,17 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     private var pressedAt = 0L
     private var letGo: LetGo? = null
 
+    /** What the held key's press changed, while it may still be taken back ([takeBack]); null once it cannot be. */
+    private class BeforePress(val tune: List<TuneItem>, val letGo: LetGo?, val joinWaiting: Boolean)
+    private var beforePress: BeforePress? = null
+
     /** The key [midi] (null: the rest key) went down at [now], the metronome being at [pulse]. */
     fun press(midi: Int?, now: Long, pulse: Pulse): Press {
         val again = rejoinable(midi, now) // asked before a held key is ended: a press over a held key is a new note
+        val before = BeforePress(tune, letGo, joinWaiting)
         val ended = release(now)
+        // A press that ended another key's hold cannot be taken back: that hold could not be given back.
+        beforePress = before.takeIf { ended == null }
         letGo = null
         val joined = joinWaiting && midi != null
         // The rest key cancels a waiting join (a slur does not run over a rest); a note key spends it on the note it adds,
@@ -123,12 +130,29 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
      */
     fun release(now: Long, heldMs: Long = (now - pressedAt).coerceAtLeast(0)): Ended? {
         val key = held ?: return null
+        beforePress = null // let go: the press was a note
         val length = Tune.lengthOf(heldMs, pulse)
         grow(length)
         held = null
         letGo = LetGo(key, pressedAt, pulse, at = now, length = length)
         val joined = key.index?.let { (tune[it] as? TuneNote)?.joined } == true
         return Ended(key.midi, heldMs, length, added = key.index != null, joined = joined)
+    }
+
+    /**
+     * The key held now was pressed by mistake (since 2026-11-16: the finger began scrolling the keys): the tune, a waiting
+     * join and the window in which a key let go of goes on are as they were before its press, and no key is held. False,
+     * and nothing changes, when no key is held or its press ended another key's hold.
+     */
+    fun takeBack(): Boolean {
+        val before = beforePress ?: return false
+        if (held == null) return false
+        tune = before.tune
+        letGo = before.letGo
+        joinWaiting = before.joinWaiting
+        held = null
+        beforePress = null
+        return true
     }
 
     /** Something other than the finger acted on the tune: no press goes on with the key let go of before. */

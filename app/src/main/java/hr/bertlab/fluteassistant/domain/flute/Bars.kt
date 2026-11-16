@@ -4,14 +4,18 @@
 package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
 /** What the tune line draws, left to right ([Bars.write]). */
 sealed interface LineMark {
     /**
      * Step [index] of the tune, a note or a rest, written as [parts]: the lengths it is drawn in
-     * (tied, for a note) with a [BarLine] between two of them where it runs into the next bar.
+     * (tied, for a note) with a [BarLine] between two of them where it runs into the next bar. [sign]:
+     * what is drawn before its first piece (since 2026-11-16): a black note's own sharp or flat, or a
+     * natural on a white note whose place had a sharp or a flat earlier in the bar; null for none.
      */
-    data class Step(val index: Int, val parts: List<StepPart>) : LineMark
+    data class Step(val index: Int, val parts: List<StepPart>, val sign: Accidental? = null) : LineMark
 
     /** Step [index] of the tune, a breath: no time, so it never moves a bar line. */
     data class Breath(val index: Int) : LineMark
@@ -40,6 +44,8 @@ object Bars {
         val bar = halfBeatsPerBar(signature)
         val marks = mutableListOf<LineMark>()
         var position = 0 // half beats into the current bar
+        // The last sign on each staff place in the bar so far (sheet music's rule: a sharp holds to the bar's end).
+        val placeSigns = mutableMapOf<Int, Accidental>()
         for ((index, item) in tune.withIndex()) {
             val length = when (item) {
                 is TuneNote -> item.length
@@ -49,6 +55,7 @@ object Bars {
                     continue
                 }
             }
+            val sign = (item as? TuneNote)?.let { signFor(it.midi, placeSigns) }
             val parts = mutableListOf<StepPart>()
             var left = length.halfBeats
             var barFull = false
@@ -59,9 +66,12 @@ object Bars {
                 left -= taken
                 position += taken
                 barFull = position == bar
-                if (barFull) position = 0
+                if (barFull) {
+                    position = 0
+                    placeSigns.clear()
+                }
             }
-            marks += LineMark.Step(index, parts)
+            marks += LineMark.Step(index, parts, sign)
             if (barFull) marks += LineMark.BarLine
         }
         return marks
@@ -83,6 +93,18 @@ object Bars {
             if (mark is LineMark.Step && tune[mark.index] is TuneNote) return i
         }
         return lit
+    }
+
+    /**
+     * The sign of a note of [midi] written now in a bar whose places last carried [placeSigns], which it updates: a black
+     * note's own sharp or flat, always; a natural on a white note whose place last carried a sharp or a flat; else none.
+     */
+    private fun signFor(midi: Int, placeSigns: MutableMap<Int, Accidental>): Accidental? {
+        val place = FluteNotes.positionOf(midi)
+        val sign = NoteSpelling.signOf(midi)
+            ?: Accidental.NATURAL.takeIf { placeSigns[place] == Accidental.SHARP || placeSigns[place] == Accidental.FLAT }
+        if (sign != null) placeSigns[place] = sign
+        return sign
     }
 
     /** [halfBeats] as the longest lengths that fit, longest first: 5 is a half and an eighth. */

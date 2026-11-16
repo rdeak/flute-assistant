@@ -83,7 +83,8 @@ class FileSessionRecorderTest {
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(34, rules.size)
+        assertEquals(35, rules.size)
+        assertEquals("1", rules["stepFromSounding"])
         assertEquals("1.5", rules["longSlack"])
         assertEquals("0", rules["wholeNote"])
         assertEquals("1", rules["slurCheck"])

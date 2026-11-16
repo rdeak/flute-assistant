@@ -6,9 +6,11 @@ change that part). The songbook is in `SONGBOOK.md`.
 
 ## Where things are
 
-- `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `Tune` (lengths, the
+- `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `FluteNotes` (the flute's 25 notes,
+  C4 to C6, and its keys' rows), `Tune` (lengths, the
   stored string, `playSteps` for Play), `TuneWriter` (a key held makes a note: growth, the rejoin
-  window, the cap, breath, the join, erase), `Bars` (how the staff writes bars and ties), `Joins` (runs of
+  window, the cap, breath, the join, erase, a press taken back), `Bars` (how the staff writes bars, ties and
+  signs), `Joins` (runs of
   joined notes: the arcs, and what Listen to me hears as one note), `TuneCheck` and `ListenRun` ("Your
   turn"), `Songbook`.
 - `domain/listen/`: what the microphone's frames become (`NoteOnsetTracker`, `HearingTracker`,
@@ -16,13 +18,15 @@ change that part). The songbook is in `SONGBOOK.md`.
 - `FluteViewModel`: gives the rules the clock, the sound, the microphone, the storage and the log.
   `FluteUiState` has one part per way the tab can be: `held`, `playing`, `listening`.
 - `FluteContent(state, metronome, actions)` builds the tune, the keys and the Play row once, and
-  `FluteSideways.kt` only says where they stand. `TuneStaff` draws from `StaffGeometry` (plain dp).
+  `FluteSideways.kt` only says where they stand. `TuneStaff` draws from `StaffGeometry` (plain dp), its signs
+  from `StaffSigns.kt`; `FluteKeys` sizes from `KeysGeometry` (plain dp).
 - `audio/flute/`: the tone (`SustainedToneSynth`, `AudioTrackFluteTonePlayer`).
 
 ## Rules
 
 - Every write to the tune goes through `FluteViewModel.save()`: it stores the open book and clears
-  the marks of the last "Your turn".
+  the marks of the last "Your turn". The one exception is a press taken back (`onKeyScrolled`, since 2026-11-16):
+  it stores the book as it was before the press and gives the marks back, as if the press had never been.
 - The metronome's tempo and beat have one owner, `MetronomeSettings` (`domain/settings`): read its
   `config`, change it through `update`, and never keep a copy or go to `SettingsStore` for them.
   `FluteViewModel` and `MetronomeViewModel` never reference each other and no screen is handed
@@ -67,8 +71,9 @@ change that part). The songbook is in `SONGBOOK.md`.
   feel: `DESIGN.md`, "The room is not judged".
 - The engine's frames are buffered, never conflated: `NoteOnsetTracker` counts frames.
 - A turn of the phone stops nothing (`../CLAUDE.md`, "Rules"). `FluteKey` and `RestKey` release in a
-  `finally`, so a key held through a turn ends its note. `staffPlace` is created in `FluteContent`'s
-  writing and running branch, so the staff keeps its scroll through a turn, Play and Stop.
+  `finally`, so a key held through a turn ends its note. `staffPlace` and `keysPlace` are created in
+  `FluteContent`'s writing and running branch, so the staff and the key rows keep their scroll through a turn,
+  Play and Stop.
 - Text and emoji on the staff are sized in dp, so they stay in the staff at any text size.
 - The running staff keeps the note before the lit one at its left (`Bars.anchor`) and scrolls on only
   as far as the walking animal needs to stay in view (`StaffGeometry.followScroll`).
@@ -111,6 +116,27 @@ change that part). The songbook is in `SONGBOOK.md`.
   breath's dip a tongue's). An octave slur broken by a gap after its first note's own length: that note's own mark and
   ✂️ on the other, never ⏳ on both. Marks in order: ⏳/✋, ✂️, ⬇️/⬆️, faint ⭐, ⭐. Change the depth only from recorded sessions
   (sweeps of `slurStopDrop`; `slurCheck` turns it off).
+- Sharps and flats (the user, 2026-11-16: "if legato requires additional button reduce space with notes make them
+  scrollable in that area that way we can also add even more notes to the app"; spec
+  `docs/superpowers/specs/2026-11-16-flute-more-notes-design.md`, `DESIGN.md`, "Sharps and flats"): the flute's notes
+  are C4 to C6 in every semitone (`FluteNotes`, 25); the notes game keeps `StaffNotes`, the white notes, on purpose.
+  The keys (the user's layout A): the top row stays (C6, ⌒ 💤 😮‍💨 🧽); under it four rows scroll as one, the C5
+  octave's black keys, its white keys, the C4 octave's black keys, its white keys, opening at the bottom; rows left
+  at their bottom stay there when their height changes (`KeysPlace`). A black key is as wide as a white key, centred
+  on the gap between its two, in its letter's colour. Sizes (`KeysGeometry`): never a white key under 58 dp or a black
+  one under 48, and spare height shows more rows before it grows keys, up to 58 on a phone upright, 72 on a zoomed tab
+  upright, 88 on its side; the keys' least room is the top row and the C4 octave's two rows (199). A press on a key in
+  the rows sounds at once; if the rows take the finger for a scroll within `SCROLL_DECIDE_MS` (150) the press is taken
+  back (`TuneWriter.takeBack`, `flute.press_scrolled`): not the tune, the stored book, the marks of the last run, a
+  waiting join or the rejoin window changes. Held longer it is a note and the rows stand still until every key is up
+  (C6 and 💤 held count too); a press that ended another key's hold is never taken back. The rows have no stretch at
+  their ends (`overscrollEffect = null`): while one relaxes the rows take every touch, and a key tapped right after a
+  flick made no sound. Change the 150 only from a phone test with the child
+  (`flute.press_scrolled`'s ms and dy). The staff: a black note on its letter's place with its ♯ or ♭, and a ♮ on a
+  white note whose place carried a ♯ or ♭ earlier in the bar (`Bars`); a signed step is `ACCIDENTAL_ROOM` (10 dp)
+  wider. Listen to me keeps exact semitones; a semitone slurred on a flute off its pitch is a step, read from the
+  note heard sounding (`NoteOnsetTracker.Rules.stepFromSounding`); F fingered for F♯ on a flute 60 cents sharp reads
+  as F♯ played low, ⬆️ (pitch alone cannot tell them apart): a known limit, pinned in `ListenRunTest` and left.
 - A finished run played at another animal's speed than the knob's says so in one line, "🐢 Slower
   than the 🐇", the child's animal first (`Pace`, rules `paceMinPairs` 6 and `paceOff` 15%); its
   screen stays as the run ended, the microphone closed, until Stop. No other summary.
@@ -125,6 +151,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 | The staff's drawing, the names row, its sizes | the second paragraph ("The stage") |
 | Key presses, the rejoin window, the rest key, Play | the same paragraph, from "`FluteViewModel` (Activity-scoped" |
 | The keys; the speed knob and its panel | "The keys", "The speed knob and its panel" |
+| Sharps and flats: the black keys, their rows and scroll, the signs on the staff | "Sharps and flats" |
 | Your turn: the listening rules, the length rule and the walk, the loudness floor, the heard-note bubble, the advice, the room under the stage | "Your turn" |
 | The ⌒ key, slurs and ties on the staff and in Play, ✂️ | "Legato" |
 | The running staff, the walking animal, the marks row | "While the tune runs" |
@@ -141,7 +168,8 @@ the cable and never goes into git (the repository is public).
 ## Tests
 
 - Rules, on the JVM with no dispatcher: `TuneWriterTest`, `ListenRunTest`, `PlayStepsTest`,
-  `TuneTest`, `BarsTest`, `TuneCheckTest`, `SongbookTest`, `StaffGeometryTest`, `JoinsTest`.
+  `TuneTest`, `BarsTest`, `TuneCheckTest`, `SongbookTest`, `StaffGeometryTest`, `JoinsTest`, `FluteNotesTest`,
+  `KeysGeometryTest`, and `NoteSpellingTest` in `domain/tuner`.
 - `ListenPathTest`: synthetic flute sound through the real detector and `ListenRun` (the emulator
   has no microphone).
 - `FluteViewModelTest`: the wiring, the saving and the log lines.

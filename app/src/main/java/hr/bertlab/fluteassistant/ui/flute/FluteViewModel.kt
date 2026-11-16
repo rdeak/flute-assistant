@@ -13,6 +13,7 @@ import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
@@ -30,7 +31,6 @@ import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.settings.MetronomeSettings
 import hr.bertlab.fluteassistant.domain.settings.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
@@ -83,7 +83,8 @@ import javax.inject.Inject
  * Logs under [LogTags.FLUTE]: `flute.note` per note ended (midi, heldMs, length, added: false
  * at the cap, joined: joined to the note before), `flute.rest` per rest ended (heldMs, length, added), `flute.rejoin` (midi, none
  * for the rest, gapMs) when a key let go of goes on, `flute.breath` (added: false
- * at the cap or right after a breath), `flute.join` (waiting: true when the ⌒ key set a join, false when its
+ * at the cap or right after a breath), `flute.press_scrolled` (midi, ms, dy: a press taken back because the finger began
+ * scrolling the keys, since 2026-11-16), `flute.join` (waiting: true when the ⌒ key set a join, false when its
  * second tap cancelled one or there was nothing to join from), `flute.join_cancel` (reason: rest, breath, erase,
  * play, listen, book, speed or leave: a waiting join dropped), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
  * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left),
@@ -143,6 +144,8 @@ class FluteViewModel @Inject constructor(
     private var run: ListenRun? = null
     /** The room's own level as the last run left it, which the next one starts from. */
     private var roomFloor: Float? = null
+    /** The marks of the last Listen to me as they were before the key held now was pressed: a press taken back restores them. */
+    private var marksBeforePress: Map<Int, StepMark> = emptyMap()
     private val listenSummary = FrameSummary()
 
     /** The tab came on screen: open the output now so the first press is not late. */
@@ -161,7 +164,8 @@ class FluteViewModel @Inject constructor(
 
     /** A finger went down on the key of [midi]: sound it at once and add it to the tune, or go on with its note ([TuneWriter]). */
     fun onKeyPressed(midi: Int) {
-        if (midi !in StaffNotes.ALL) return
+        if (midi !in FluteNotes.ALL) return
+        marksBeforePress = _state.value.marks // a press taken back gives them back
         stopPlayback(reason = "key")
         stopListening(reason = "key")
         activationJob?.cancel()
@@ -175,6 +179,24 @@ class FluteViewModel @Inject constructor(
         if (midi != writer.held?.midi) return
         tonePlayer.noteOff()
         ended(writer.release(clock.nowMillis()))
+    }
+
+    /**
+     * The finger on the key of [midi] began scrolling the keys within [ms] of its press, [dy] dp from where it landed
+     * (since 2026-11-16): the press is taken back, the sound stopped and nothing else changes, not the tune, the stored
+     * book, the marks of the last Listen to me or a waiting join. A press that cannot be taken back (it ended another
+     * key's hold) is let go as a note.
+     */
+    fun onKeyScrolled(midi: Int, ms: Long, dy: Float) {
+        if (midi != writer.held?.midi) return
+        if (!writer.takeBack()) return onKeyReleased(midi)
+        tonePlayer.noteOff()
+        growJob?.cancel()
+        growJob = null
+        written()
+        _state.update { it.copy(marks = marksBeforePress) }
+        storeBook()
+        logger.d(LogTags.FLUTE, "flute.press_scrolled", "midi" to midi, "ms" to ms, "dy" to dy)
     }
 
     /** A screen reader activated the key of [midi]: sound it for one beat and add it, a quarter note. */
@@ -688,6 +710,11 @@ class FluteViewModel @Inject constructor(
      */
     private fun save() {
         if (_state.value.marks.isNotEmpty()) _state.update { it.copy(marks = emptyMap()) }
+        storeBook()
+    }
+
+    /** Stores the open book: the tune with the metronome's speed and beat. */
+    private fun storeBook() {
         val config = metronome.config.value
         settings.saveBook(_state.value.openBook, Book(writer.tune, config.bpm, config.timeSignature))
     }

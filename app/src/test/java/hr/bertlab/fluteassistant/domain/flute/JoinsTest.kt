@@ -63,4 +63,12 @@ class JoinsTest {
         assertFalse(Joins.canJoinAfter(List(Tune.MAX_NOTES) { q(60) }))
         assertTrue(Joins.canJoinAfter(listOf(q(60))))
     }
+
+    @Test
+    fun `black notes join by pitch class as the white ones do`() {
+        assertEquals(listOf(JoinArc(0, 1, tie = false)), Joins.arcs(listOf(q(65), j(66))))
+        assertTrue(Joins.joinsOtherLetter(listOf(q(65), j(66)), 1))
+        assertEquals(listOf(JoinArc(0, 1, tie = true)), Joins.arcs(listOf(q(66), j(66))))
+        assertTrue(Joins.heardWithBefore(listOf(q(66), j(78)), 1))
+    }
 }

@@ -249,4 +249,11 @@ class ListenPathTest {
         val run = slur(FluteSound.line(bcd, changeDipDb = 10.0, roomDb = -20.0, notesDb = listOf(-12.0, -21.0, -21.0), dipAfterMs = 30))
         assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
     }
+
+    @Test
+    fun `a slurred semitone forty cents sharp is heard on sound`() {
+        val tune = listOf(TuneNote(67, NoteLength.QUARTER), TuneNote(66, NoteLength.QUARTER, joined = true))
+        val run = ListenPath.run(FluteSound.render(FluteSound.line(listOf(67 to 600, 66 to 600), cents = 40.0)), rate, tune, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.HIGH, 1 to StepMark.HIGH), run.marks)
+    }
 }

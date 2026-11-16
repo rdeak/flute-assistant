@@ -55,26 +55,8 @@ internal object SidewaysGeometry {
     /** The room between the keys and the button row under them: the page's margin, as `FluteWritingSideways` spaces them. */
     private const val KEYS_TO_BUTTONS = MARGIN
 
-    /** The keys' three rows have two gaps between them, of upright's `KeyRowGap` (12). */
-    private const val KEY_ROW_GAPS = 12f * 2
-
-    /**
-     * What the keys' column spends besides the three rows' keys: the two margins, the button row
-     * under the keys, its gap and the gaps between the rows.
-     */
-    private const val KEYS_SPENT = MARGIN * 2 + KEYS_BUTTONS + KEYS_TO_BUTTONS + KEY_ROW_GAPS
-
-    /** Every key row has its own 5 dp shadow, which the mockup counted only once. */
-    private const val KEY_SHADOW = 5f
-    private const val KEY_HEIGHT_MIN = 58f
-    private const val KEY_HEIGHT_MAX = 88f
-
-    /**
-     * The window height under which writing cannot give its keys their least (three rows of
-     * [KEY_HEIGHT_MIN] and their shadows) and still have the buttons under them: 329. Under it the
-     * keys' column scrolls, as upright's tab does; the phones the layout was drawn for are all taller.
-     */
-    const val WRITING_MIN_HEIGHT = KEYS_SPENT + 3 * (KEY_HEIGHT_MIN + KEY_SHADOW)
+    /** What the keys' column spends under the keys: the button row and the room between them (100). */
+    const val UNDER_KEYS = KEYS_BUTTONS + KEYS_TO_BUTTONS
 
     private const val RING_MAX = 304f
 
@@ -165,9 +147,12 @@ internal object SidewaysGeometry {
 
     fun keyGap(contentWidth: Float): Float = if (contentWidth < NARROW_CONTENT) KEY_GAP_NARROW else KEY_GAP
 
-    /** A third of what the height leaves for the rows, less each row's shadow: 85 at 411, 68 at 360. */
-    fun keyHeight(height: Float): Float =
-        ((height - KEYS_SPENT) / 3 - KEY_SHADOW).coerceIn(KEY_HEIGHT_MIN, KEY_HEIGHT_MAX)
+    /**
+     * The keys' room in a window [height] tall: the height less the page's two margins, the button row and the room
+     * between them (295 at 411, 244 at 360). The flute's `KeysGeometry` sizes the keys in it (since 2026-11-16: they
+     * keep their least size and the rows scroll until all five fit; before, three rows grew to fill it, 85 dp at 411).
+     */
+    fun keysRoom(height: Float): Float = height - 2 * MARGIN - UNDER_KEYS
 
     /**
      * The running staff's scale: the upright one's 4/3 where the card's height allows it, below that

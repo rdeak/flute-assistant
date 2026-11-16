@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import kotlin.math.ceil
 import kotlin.math.roundToLong
 
@@ -175,12 +174,12 @@ object Tune {
     }
 
     /**
-     * Keeps only the notes the keys offer ([StaffNotes.ALL]), every rest, and a breath unless the
+     * Keeps only the notes the keys offer ([FluteNotes.ALL], black keys too since 2026-11-16), every rest, and a breath unless the
      * step before it is already one, then caps the count; last, a note's join is dropped where the
      * step before it is not a note (the first step, after a rest or a breath), so no slur hangs.
      */
     fun sanitize(items: List<TuneItem>): List<TuneItem> = items
-        .filter { it !is TuneNote || it.midi in StaffNotes.ALL }
+        .filter { it !is TuneNote || it.midi in FluteNotes.ALL }
         .fold(mutableListOf<TuneItem>()) { kept, item ->
             if (item != TuneBreath || kept.lastOrNull() != TuneBreath) kept += item
             kept

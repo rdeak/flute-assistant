@@ -19,6 +19,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -87,7 +88,7 @@ class FluteSidewaysTest {
         val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
         val keysWidth: Float get() = SidewaysGeometry.keysWidth(contentWidth)
         val keyGap: Float get() = SidewaysGeometry.keyGap(contentWidth)
-        val keyHeight: Float get() = SidewaysGeometry.keyHeight(height.toFloat())
+        val keyHeight: Float get() = KeysGeometry.whiteHeight(SidewaysGeometry.keysRoom(height.toFloat()), KeysGeometry.SIDEWAYS_MAX)
         val keyWidth: Float get() = (keysWidth - 6 * keyGap) / 7
         val column: Float get() = SidewaysGeometry.columnWidth(height.toFloat())
         val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
@@ -204,15 +205,29 @@ class FluteSidewaysTest {
         }
     }
 
+    /**
+     * Since 2026-11-16 (sharps and flats) the top row stays and four rows scroll under it, opening at the bottom: every
+     * phone shows the top row and the C4 octave's two rows whole, and a 411 dp tall one the C5 white row too. A white key
+     * is 58 dp and a black one 48 on all three, as the five rows fit none of them.
+     */
     @Test
-    fun writing_shows_every_key_and_both_buttons_on_every_phone() {
+    fun writing_shows_the_top_row_the_c4_octave_and_both_buttons_on_every_phone() {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
-            listOf("C6", "B5", "C5", "B4", "C4", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
+            assertNear("$each: a white key", 58.dp, each.keyHeight.dp)
+            listOf("C6", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
                 assertInside(name, key(name).assertIsDisplayed(), shadow = 5.dp)
                 assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
                 assertNear("$each: $name's height", each.keyHeight.dp, height(key(name)))
+            }
+            val rows = bounds(compose.onNodeWithTag(KEY_ROWS_TAG))
+            val whole = listOf("C♯4", "B♭4", "C4", "B4") + if (each.height > 400) listOf("C5", "B5") else emptyList()
+            whole.forEach { name ->
+                val b = bounds(key(name))
+                assertTrue("$each: $name $b should be whole inside the rows $rows", b.top >= rows.top - SLACK && b.bottom + 5.dp <= rows.bottom + SLACK)
+                assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
+                assertNear("$each: $name's height", if ('♯' in name || '♭' in name) 48.dp else 58.dp, height(key(name)))
             }
             listOf("Play", "Listen to me").forEach { name ->
                 assertInside(name, word(name).assertIsDisplayed(), shadow = 8.dp)
@@ -621,15 +636,16 @@ class FluteSidewaysTest {
     // ---- Writing below the least height ----
 
     /**
-     * Under 329 dp (the margins, the keys at their least, a gap and Play) the keys' column scrolls
-     * rather than let the key rows run past it onto Play: the top row would stand above the page's
-     * margin and the bottom one on Play. Both phones here are shorter than any the layout was drawn for.
+     * Under 315 dp (the margins, the keys at their least, a gap and Play; 329 with three rows of keys, until
+     * 2026-11-16) the keys' column scrolls rather than let the key rows run past it onto Play: the top row would
+     * stand above the page's margin and the bottom one on Play. Both phones here are shorter than any the layout
+     * was drawn for.
      */
     @Test
-    fun below_329_dp_tall_the_keys_scroll_and_stay_clear_of_play() {
-        phone = Phone(640, 320)
+    fun below_315_dp_tall_the_keys_scroll_and_stay_clear_of_play() {
+        phone = Phone(640, 310)
         show(FluteUiState(tune = twoNotes))
-        listOf(Phone(640, 320), Phone(640, 300)).forEach { each ->
+        listOf(Phone(640, 310), Phone(640, 300)).forEach { each ->
             on(each)
             val top = bounds(key("C6"))
             val bottom = bounds(key("C4"))
@@ -644,8 +660,8 @@ class FluteSidewaysTest {
 
     /** A little over the least height the keys and Play need, the column fits and does not scroll. */
     @Test
-    fun just_over_329_dp_tall_nothing_needs_to_scroll() {
-        phone = Phone(640, 340)
+    fun just_over_315_dp_tall_nothing_needs_to_scroll() {
+        phone = Phone(640, 325)
         show(FluteUiState(tune = twoNotes))
         assertInside("Play", word("Play").assertIsDisplayed(), shadow = 8.dp)
         assertInside("the top key", key("C6"), shadow = 5.dp)
@@ -692,6 +708,65 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = longTune))
         compose.waitForIdle()
         assertTheStaffNeverGoesBackToItsStart { state.value = FluteUiState(tune = longTune, playing = Playing(38)) }
+    }
+
+    // ---- The key rows keep their place through a real turn and a run (the final review, 2026-11-16) ----
+
+    /** The user's Galaxy A55 upright (its tab 653 dp tall), where the rows scroll in less room than on its side. */
+    private val a55Upright = Phone(504, 653)
+
+    private fun rowsBounds() = bounds(compose.onNodeWithTag(KEY_ROWS_TAG))
+
+    private fun assertRowsAtTheBottom(what: String) =
+        assertNear("$what: the C4 row ends at the rows' bottom", rowsBounds().bottom, bounds(key("C4")).bottom + 5.dp)
+
+    private fun assertRowsAtTheTop(what: String) = assertNear("$what: C♯5 at the rows' top", rowsBounds().top, bounds(key("C♯5")).top)
+
+    private fun turnTo(each: Phone, isSideways: Boolean) {
+        compose.runOnIdle {
+            phone = each
+            sideways = isSideways
+        }
+        compose.waitForIdle()
+    }
+
+    @Test
+    fun the_rows_keep_their_bottom_through_a_turn_each_way() {
+        show(FluteUiState(tune = twoNotes))
+        assertRowsAtTheBottom("on its side")
+        turnTo(a55Upright, isSideways = false)
+        assertRowsAtTheBottom("upright, the rows shorter")
+        turnTo(Phone(915, 411), isSideways = true)
+        assertRowsAtTheBottom("on its side again")
+    }
+
+    @Test
+    fun the_rows_keep_their_top_through_a_turn_each_way() {
+        show(FluteUiState(tune = twoNotes))
+        key("C♯5").performScrollTo()
+        assertRowsAtTheTop("on its side")
+        turnTo(a55Upright, isSideways = false)
+        assertRowsAtTheTop("upright")
+        turnTo(Phone(915, 411), isSideways = true)
+        assertRowsAtTheTop("on its side again")
+    }
+
+    @Test
+    fun the_rows_keep_their_place_through_a_run() {
+        phone = a55Upright
+        sideways = false
+        show(FluteUiState(tune = twoNotes))
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0))
+        compose.waitForIdle()
+        state.value = FluteUiState(tune = twoNotes)
+        compose.waitForIdle()
+        assertRowsAtTheBottom("after a run")
+        key("C♯5").performScrollTo()
+        state.value = FluteUiState(tune = twoNotes, playing = Playing(0))
+        compose.waitForIdle()
+        state.value = FluteUiState(tune = twoNotes)
+        compose.waitForIdle()
+        assertRowsAtTheTop("after a run")
     }
 
     // ---- The microphone card ----

@@ -23,7 +23,7 @@ import os
 import sys
 
 HOP = 2048
-NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+NOTE_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "G♯", "A", "B♭", "B"]  # the app's spelling (NoteSpelling)
 DECISIONS = ["SILENT", "LOW_PROBABILITY", "FAINT", "UNSTEADY", "SHOWN", "IGNORED"]
 MARK_GLYPH = {"right": "★", "retry": "☆", "wrong": "✕", "ignored": "·"}
 MARK_WORD = {"right": "right, a star", "retry": "right after a stumble, a faint star", "wrong": "wrong", "ignored": "ignored"}

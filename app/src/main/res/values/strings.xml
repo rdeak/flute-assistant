@@ -248,19 +248,19 @@
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>
-    <!-- Note names for the 12 pitch classes from C, using sharps. Localised: Croatian uses H and B. -->
+    <!-- Note names for the 12 pitch classes from C, in the app's one spelling (NoteSpelling, since 2026-11-16): C♯ E♭ F♯ G♯ B♭. Localised: Croatian uses H and B. -->
     <string-array name="note_names">
         <item>C</item>
         <item>C♯</item>
         <item>D</item>
-        <item>D♯</item>
+        <item>E♭</item>
         <item>E</item>
         <item>F</item>
         <item>F♯</item>
         <item>G</item>
         <item>G♯</item>
         <item>A</item>
-        <item>A♯</item>
+        <item>B♭</item>
         <item>B</item>
     </string-array>
 </resources>

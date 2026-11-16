@@ -54,7 +54,8 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   white cards (`Stage`) on sky blue, or navy in dark mode, with dynamic colour off; the tokens that
   change with the theme are `FluteColors` (read through `FluteTheme.colors`), the bright fills that
   never change are `Sun` (yellow = chosen), `Go` (the Sound switch), `Stop` and `NoteLetterColors`, one per letter,
-  which `noteColor(midi)` applies wherever a note appears (a sharp takes the letter below). Text on a
+  which `noteColor(midi)` applies wherever a note appears (a sharp takes the letter below, a flat the letter above:
+`NoteSpelling`, C♯ E♭ F♯ G♯ B♭ since 2026-11-16). Text on a
   bright fill is always `InkOnFill`, with one exception (2026-11-07): the notes tab's keys (picker and summary) sit on `noteTint`
   (`ui/common/Labels.kt`, the letter colour at 0.3 over the card colour), which in dark mode is a dark surface and
   not a bright fill, so a key's label takes `colors.text` there (`NoteKey`, `ui/notes/DESIGN.md`). Everything pressable is a `ChunkyButton` / `Modifier.chunky`

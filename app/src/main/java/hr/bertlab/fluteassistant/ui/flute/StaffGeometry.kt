@@ -211,9 +211,27 @@ internal object StaffGeometry {
         LineMark.BarLine -> BAR_SLOT
     }
 
-    /** The room one mark of the line takes: a step its pieces', a bar line [BAR_SLOT], a breath [BREATH_SLOT]. */
+    /**
+     * The room a sign takes before a note's head (since 2026-11-16, sharps and flats): a step with a sign
+     * ([LineMark.Step.sign], ♯ ♭ or ♮) is this much wider, everything in it after the sign moved right by it, so the sign
+     * never touches the note before. The sign's centre stands [SIGN_X] left of its head's centre, [SIGN_HALF_WIDTH] either side.
+     */
+    const val ACCIDENTAL_ROOM = 10f
+    const val SIGN_X = 17f
+    const val SIGN_HALF_WIDTH = 5.5f
+
+    /** How far under its head's centre a sign's ink reaches: the sharp's and the natural's right stem, 11, and its cap. */
+    const val SIGN_BELOW = 12f
+
+    /** The air a slur keeps under a sign's foot (a head's is [SLUR_CLEAR]): less, so a slur onto a sign does not sag. */
+    const val SIGN_SLUR_AIR = 1.5f
+
+    /** The room before [mark]'s first head: [ACCIDENTAL_ROOM] when it carries a sign, else none. */
+    fun signRoom(mark: LineMark.Step): Float = if (mark.sign != null) ACCIDENTAL_ROOM else 0f
+
+    /** The room one mark of the line takes: a step its pieces' and its sign's, a bar line [BAR_SLOT], a breath [BREATH_SLOT]. */
     fun markWidth(mark: LineMark): Float = when (mark) {
-        is LineMark.Step -> mark.parts.fold(0f) { sum, part -> sum + partWidth(part) }
+        is LineMark.Step -> signRoom(mark) + mark.parts.fold(0f) { sum, part -> sum + partWidth(part) }
         is LineMark.Breath -> BREATH_SLOT
         LineMark.BarLine -> BAR_SLOT
     }
@@ -282,6 +300,13 @@ internal object StaffGeometry {
 
     /** Half the length of a ledger line. */
     const val LEDGER_HALF = 14.5f
+
+    /**
+     * How far left of its head's centre a ledger line reaches: [LEDGER_HALF], or beside a sign a dp short of the sign's
+     * right edge, just past the head (the final review of 2026-11-16: it ran 3 dp into C♯4's sharp).
+     */
+    fun ledgerLeft(signed: Boolean): Float = if (signed) SIGN_X - SIGN_HALF_WIDTH - LEDGER_SIGN_AIR else LEDGER_HALF
+    private const val LEDGER_SIGN_AIR = 1f
 
     /** A dotted half's dot, right of the head. */
     const val DOT_X = 16.5f

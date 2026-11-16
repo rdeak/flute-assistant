@@ -121,6 +121,7 @@ fun FluteScreen(
             onRestActivated = viewModel::onRestActivated,
             onBreath = viewModel::onBreath,
             onJoin = viewModel::onJoin,
+            onKeyScrolled = viewModel::onKeyScrolled,
             onEraseLast = viewModel::eraseLast,
             onTogglePlayback = viewModel::togglePlayback,
             onYourTurn = {
@@ -159,6 +160,8 @@ class FluteActions(
     val onRestReleased: () -> Unit = {},
     val onRestActivated: () -> Unit = {},
     val onBreath: () -> Unit = {},
+    /** A press taken back: the finger on the key began scrolling the keys, after ms and dy dp (since 2026-11-16). */
+    val onKeyScrolled: (Int, Long, Float) -> Unit = { _, _, _ -> },
     /** The ⌒ key: the next note is joined to the last one (since 2026-11-16). */
     val onJoin: () -> Unit = {},
     val onEraseLast: () -> Unit = {},
@@ -191,10 +194,11 @@ private val PlayShadow = 8.dp
 /**
  * Everything below this height cannot hold the keys: the column's own padding (4 dp over, 16 under),
  * the stage (the staff with the names under it, in the stage's 16 dp padding, which holds its
- * border), three key rows and the Play row with its shadow, and the two gaps between them. It is
- * 642 dp, what the column measures; until 2026-11-10 it counted 22 dp more, so a phone that leaves
- * the tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too
- * short, its spare height under the Play row and Stop far over Play's place.
+ * border), the keys' least room (the top row and the C4 octave's two rows, [FluteKeysMinHeight]) and the
+ * Play row with its shadow, and the two gaps between them. It is 628 dp, what the column measures (642 with
+ * three rows of keys, until 2026-11-16); until 2026-11-10 it counted 22 dp more, so a phone that leaves the
+ * tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too short, its
+ * spare height under the Play row and Stop far over Play's place.
  */
 private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
     14.dp + FluteKeysMinHeight + 14.dp + PlayRowHeight + PlayShadow
@@ -369,7 +373,8 @@ fun FluteContent(
             }
         } else {
             val fits = maxHeight >= FitsHeight
-            val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
+            // The largest a key grows to upright: a phone's keys keep the canvas's 58 (KeysGeometry).
+            val uprightKeyMax = if (zoomed) KeysGeometry.TABLET_UPRIGHT_MAX.dp else KeyHeight
             val running = state.isRunning
             // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
             // Or, once a run ended at another animal's speed than the knob's, that one line until Stop (2026-11-14).
@@ -385,6 +390,8 @@ fun FluteContent(
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
             // out in places of their own, and a staff made anew at each swap would scroll in from its start.
             val staffPlace = rememberLazyListState()
+            // The key rows' scroll, here for the same reason: they come back where they were after a run and a turn.
+            val keysPlace = rememberKeysPlace()
             val staffScale = when {
                 !running -> if (sideways && zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f
                 sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT)
@@ -440,16 +447,17 @@ fun FluteContent(
                     )
                 }
             }
-            val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, keyHeight, keyGap ->
+            val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, maxKeyHeight, keyGap ->
                 FluteKeys(
                     litMidi = state.litMidi,
                     restLit = state.restLit,
                     eraseEnabled = !state.isEmpty,
                     actions = actions,
+                    place = keysPlace,
                     joinWaiting = state.joinWaiting,
                     joinEnabled = state.canJoin,
                     modifier = keysModifier,
-                    keyHeight = keyHeight,
+                    maxKeyHeight = maxKeyHeight,
                     keyGap = keyGap,
                 )
             }
@@ -528,7 +536,7 @@ fun FluteContent(
                             Modifier
                                 .fillMaxWidth()
                                 .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
-                            uprightKeyHeight,
+                            uprightKeyMax,
                             KeyGap,
                         )
                         playRow(Modifier)
