@@ -137,7 +137,8 @@ tab's CLAUDE.md; these rules hold on all of them:
 - Two numbers are meant to be there, keep them: the metronome's tempo figure (also in the flute's
   speed panel) and the time signature's figures on the flute's staff, the one number the user asked
   for on a main screen. The notes game's summary and Your turn show no number, and Your turn has no
-  summary.
+  summary, but for one line about speed when a finished run was played at another animal's speed than
+  the knob's ("🐢 Slower than the 🐇", 2026-11-14, `ui/flute/CLAUDE.md`).
 - The user rejected a wider layout (−/+ beside the ring, a ten-button signature scroller, flags in
   the content area) as too packed: keep the screens this sparse. The one agreed exception is the
   sideways layout (a phone on its side, 2026-11-05; spec

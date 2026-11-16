@@ -8,6 +8,8 @@ import android.content.res.Resources
 import android.os.LocaleList
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.playback.summary
@@ -90,5 +92,23 @@ class LabelsTest {
     fun other_system_languages_fall_back_to_english() {
         assertEquals("🔎 Find", resources(Locale.GERMAN).getString(NotesGame.FIND.labelRes()))
         assertEquals("👂 Hear", resources(Locale.FRENCH).getString(NotesGame.HEAR.labelRes()))
+    }
+
+    /** The words of "feedback, not stars" (2026-11-14), in both languages. */
+    @Test
+    fun the_feedback_words_speak_both_languages() {
+        val en = resources(Locale.ENGLISH)
+        val hr = resources(Locale("hr"))
+        assertEquals("⏳ Too short, hold longer", en.getString(R.string.advice_hold_longer))
+        assertEquals("⏳ Prekratko, drži dulje", hr.getString(R.string.advice_hold_longer))
+        assertEquals("🐢 Slower than the 🐇", en.getString(R.string.flute_speed_slower, "🐢", "🐇"))
+        assertEquals("🐢 Sporije od 🐇", hr.getString(R.string.flute_speed_slower, "🐢", "🐇"))
+        assertEquals("🐇 Faster than the 🐢", en.getString(R.string.flute_speed_faster, "🐇", "🐢"))
+        assertEquals("🐇 Brže od 🐢", hr.getString(R.string.flute_speed_faster, "🐇", "🐢"))
+        val marks = listOf(R.string.flute_mark_high, R.string.flute_mark_low, R.string.flute_mark_short)
+        assertEquals(listOf("too high", "too low", "let go too early"), marks.map(en::getString))
+        assertEquals(listOf("previsoko", "prenisko", "prekratko"), marks.map(hr::getString))
+        assertEquals("the tuner's own words", R.string.too_high, TunerAdvice.TOO_HIGH.labelRes())
+        assertEquals(R.string.too_low, TunerAdvice.TOO_LOW.labelRes())
     }
 }

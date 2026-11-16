@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
@@ -352,10 +354,13 @@ class FluteSidewaysTest {
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)) to "🎵 Odsviraj jedan dug, čist ton",
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)) to "📱 Dođi bliže mobitelu",
             state.value.copy(listening = Listening(index = 0, repeatHeld = true)) to "🔁 Stani, pa odsviraj opet",
-            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))) to "🌬️ Drži notu do ⭐",
+            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))) to "⏳ Prekratko, drži dulje",
             state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)) to
                 "😮‍💨 Možda nema zraka? Udahni",
-            state.value.copy(listening = Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true))) to "🍃 Možda previsoko? Nježniji zrak",
+            state.value.copy(listening = Listening(index = 0, pitch = Pitch.HIGH)) to "⬇️ Malo niže",
+            state.value.copy(listening = Listening(index = 0, pitch = Pitch.LOW)) to "⬆️ Malo više",
+            state.value.copy(listening = Listening(index = 1, finishing = true, pace = Pace(64, 7, 100, true))) to "🐢 Sporije od 🐇",
+            state.value.copy(listening = Listening(index = 1, finishing = true, pace = Pace(104, 7, 60, true))) to "🐇 Brže od 🐢",
         ).forEach { (next, advice) ->
             compose.runOnIdle { state.value = next }
             compose.waitForIdle()

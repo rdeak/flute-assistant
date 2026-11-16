@@ -91,11 +91,14 @@ import javax.inject.Inject
  * listening, `flute.listen` (notes), `flute.heard` (index, expected, heard, fresh, verdict:
  * right, retry, ignored or wrong: the pitch, at the note's onset; cents: where it locked, from
  * the expected note), `flute.held` (index, heldMs: the note became long enough and earned its
- * mark), `flute.short` (index, heldMs, needMs: it stopped before that; faded: it had faded away
- * first), `flute.repeat_forgiven` (index), `flute.listen_summary` every
+ * mark; mark: first_try, retry, high or low; cents: the median of its pitch off the written note),
+ * `flute.short` (index, heldMs, needMs: it stopped before that; faded: it had faded away first;
+ * mark: short when the run moved on, none when it waits), `flute.repeat_forgiven` (index), `flute.listen_summary` every
  * [ListenRules.SUMMARY_FRAMES] frames (the tuner's summary fields, gate, expected, hearing),
- * `flute.hearing` (hearing, levelMean) when it changes, `flute.listen_done` (stars, retries),
- * `flute.listen_stop` (reason: pill, key, erase, leave, speed or book), `flute.listen_error`
+ * `flute.hearing` (hearing, levelMean) when it changes, `flute.listen_done` (stars, retries, high,
+ * low, short: the marks of each kind; bpm, pairs, knob: the child's speed, the note pairs it rests
+ * on and the knob's; speed: whether the line about it shows), `flute.listen_stop` (reason: pill,
+ * key, erase, leave, speed or book; over: the run had ended and its screen stood), `flute.listen_error`
  * (message) and `flute.mic` (granted).
  */
 @HiltViewModel
@@ -424,20 +427,27 @@ class FluteViewModel @Inject constructor(
      */
     private fun stopListening(reason: String) {
         if (!_state.value.isListening) return
-        logger.d(LogTags.FLUTE, "flute.listen_stop", "reason" to reason) // before the session closes, so it is in it
+        // over: the run had ended and only its screen, with the speed line, still stood.
+        logger.d(LogTags.FLUTE, "flute.listen_stop", "reason" to reason, "over" to (run == null)) // before the session closes, so it is in it
         endListening()
     }
 
-    /** Closes the microphone and clears everything of the listening but the marks; no log line of its own. */
-    private fun endListening() {
+    /**
+     * Closes the microphone and clears everything of the listening but the marks; no log line of its own. With
+     * [keepScreen] (a finished run with a speed line, since 2026-11-14) the screen stays as the run ended until it is
+     * stopped, which then only clears it: the microphone, the recording and the room's floor are done with here.
+     */
+    private fun endListening(keepScreen: Boolean = false) {
         listenJob?.cancel()
         listenJob = null
         val shown = _state.value.listening
         if (listenSummary.frames > 0) logListenSummary(shown?.index, shown?.hearing ?: Hearing.CLEAR) // the last partial second
-        recorder.end(run?.marks.orEmpty())
-        roomFloor = run?.floor ?: roomFloor
+        run?.let {
+            recorder.end(it.marks)
+            roomFloor = it.floor ?: roomFloor
+        }
         run = null
-        _state.update { it.copy(listening = null) }
+        if (!keepScreen) _state.update { it.copy(listening = null) }
     }
 
     /** One microphone frame while listening: the run judges it, and this logs, shows and records what it made of it. */
@@ -460,9 +470,14 @@ class FluteViewModel @Inject constructor(
         }
         for (forgiven in step.forgiven) logger.d(LogTags.FLUTE, "flute.repeat_forgiven", "index" to forgiven)
         step.short?.let {
-            logger.d(LogTags.FLUTE, "flute.short", "index" to it.index, "heldMs" to it.heldMs, "needMs" to it.needMs, "faded" to it.faded)
+            logger.d(
+                LogTags.FLUTE, "flute.short",
+                "index" to it.index, "heldMs" to it.heldMs, "needMs" to it.needMs, "faded" to it.faded, "mark" to it.mark?.name?.lowercase(),
+            )
         }
-        step.held?.let { logger.d(LogTags.FLUTE, "flute.held", "index" to it.index, "heldMs" to it.heldMs) }
+        step.held?.let {
+            logger.d(LogTags.FLUTE, "flute.held", "index" to it.index, "heldMs" to it.heldMs, "mark" to it.mark?.name?.lowercase(), "cents" to it.cents)
+        }
         _state.update {
             // A step earned (or a repeat forgiven): its mark shows. The animal hops when the run says, to another
             // place: a click inside the note it walks, the next note, or back to the head of a note played again.
@@ -470,15 +485,21 @@ class FluteViewModel @Inject constructor(
             it.copy(listening = listening, marks = marks, beatPulse = if (step.hop) it.beatPulse + 1 else it.beatPulse)
         }
         if (step.done) {
+            val pace = step.pace
             logger.d(
                 LogTags.FLUTE,
                 "flute.listen_done",
                 "stars" to run.marks.count { it.value == StepMark.FIRST_TRY },
                 "retries" to run.marks.count { it.value == StepMark.RETRY },
+                "high" to run.marks.count { it.value == StepMark.HIGH },
+                "low" to run.marks.count { it.value == StepMark.LOW },
+                "short" to run.marks.count { it.value == StepMark.SHORT },
+                "bpm" to pace?.bpm, "pairs" to pace?.pairs, "knob" to pace?.knobBpm, "speed" to (pace?.speaks == true),
             )
         }
         recorder.frame(step.row)
-        if (run.isOver) endListening()
+        // A run that ended at another animal's speed keeps its screen, with that line, until it is stopped.
+        if (run.isOver) endListening(keepScreen = run.listening.pace != null)
     }
 
     /** `flute.listen_summary`, with the step waited on ([index]) and what the microphone makes of the sound. */

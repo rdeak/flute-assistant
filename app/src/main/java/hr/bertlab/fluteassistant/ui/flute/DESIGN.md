@@ -370,8 +370,9 @@ fallen under `ListenRun.FADE_RATIO`, 85%, of its own level; fewer than eight fra
 "maybe"; the Croatian is "Udahni" alone, to fit one line upright on a 360 dp phone at 1.3 times the text size: "Your turn: say why", spec `2026-11-13-flute-your-turn-why-lines-design.md`, the user's ask after the child
 "played it right" and was held back; the recordings of 2026-11-12 and 13 had 42 cuts stopped while strong and 3
 faded), and the
-run waits on that note until it is played again, from its head, and long enough, when it earns the faint star. The
-user chose this, "wait", over "mark and move on" (the short note gets the faint star and the next note moves the run
+run waits on that note until it is played again, from its head, and long enough, when it earns the faint star (until
+2026-11-14, `ListenRun.Rules.shortMovesOn` off; since then the note is marked ⏳ and the run moves on, "Feedback, not
+stars" below, at the user's own new pick). The user chose this, "wait", over "mark and move on" (the short note gets the faint star and the next note moves the run
 on) after seeing what the recordings would have done: every child there went on through the tune after a short note,
 so the run will often stop at the first long note until the child slows to the animal's pace, which is the lesson.
 Any other note heard while a note cut short waits shows in the live bubble but is no wrong note: the child went on,
@@ -457,9 +458,10 @@ line says "🪈 Play B4" / "🪈 Odsviraj h¹" (`flute_play_prompt`, the note wi
 a note was judged it says nothing, as before: the ring and the dots do, and a line changing under every note would
 pull the eye off the staff. After a wrong note the advice is "👀 Check your fingers" (`Listening.advice` gives
 `CHECK_FINGERS` while a wrong note stands, after the microphone's own advices and a held repeat, which keep their
-place), or, since 2026-11-13, for a wrong note one semitone above the written one that locked within `NEAR_CENTS`
-(70) of it, "🍃 Maybe too high? Gentler air" / "🍃 Možda previsoko? Nježniji zrak" (`WrongNote.tooHigh`,
-`TunerAdvice.TOO_HIGH`: the right fingers blown high sound like that, as the sharp flute of 2026-11-13 did on all 30
+place), or, from 2026-11-13 until 2026-11-14 (when such a note became the right note blown high, with the tuner's
+"⬇️ A little lower" and no fingering: "Feedback, not stars" below), for a wrong note one semitone above the written one
+that locked within `NEAR_CENTS` (70) of it, "🍃 Maybe too high? Gentler air" / "🍃 Možda previsoko? Nježniji zrak"
+(`WrongNote.tooHigh`, gone since, and `TunerAdvice.TOO_HIGH`: the right fingers blown high sound like that, as the sharp flute of 2026-11-13 did on all 30
 of its b's heard as c; a guess, so "maybe"; "gentler air" is the tuner's own phrase; no "too low", since on that
 flute an f-sharp fingered for g came out just under the g and would have blamed the air), and over either stands the fingering of the note that was wanted (`FluteUiState.fingeringMidi`, the tuner's
 `FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage), until the right note is played: the
@@ -471,6 +473,59 @@ stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the di
 from a music stand's distance its keys could not be read anyway. Tests: `ListenRunTest` (the advice and its order),
 `FluteUiStateTest` (the two values), `FluteScreenTest` ("The room under the stage") and `FluteSidewaysTest` (the line
 in the column, no fingering).
+
+Feedback, not stars (2026-11-14; spec `docs/superpowers/specs/2026-11-14-flute-your-turn-feedback-design.md`, plan
+`docs/superpowers/plans/2026-11-14-flute-your-turn-feedback.md`, both local). After the evening's 20 runs (`sessions/
+2026-11-14_*`) the user turned down counting sharp notes as right with: "child still learns how to play, it's not about
+making stars correct it's about giving right feedback how far it's from correct tone and cadence." What those runs
+showed: 25 of the 66 wrong marks were the right fingering blown 48 to 71 cents high and named the next note up (a B as
+C 19 times), and 12 more followed from them, the run waiting while the child played on (one run sat on note 15 for ten
+notes); a B 40 cents high earned a full star and one 52 cents high was "wrong", nothing between; whole runs sat in tune
+(B +1 to +9) and whole runs sharp (+40 to +53) on the same flute, one second apart, so the head joint could not fix
+it and only the child, told, can; and the child kept about 65 a minute with the knob on 60 and on 100. The user's
+picks, from questions and true-size mockups (`.superpowers/brainstorm/57720-1794689123/`): when the fingering is right
+and the playing is off, remark and move on (a wrong fingering still waits); for timing, the lengths as before plus one
+line about speed when the run ends; the sign instead of the star under the note ("2C": ⬇️ ⬆️ ⏳, a faint ⭐ only after a
+wrong note or for a repeat the phone could not hear); the hourglass for a note let go too early (the 🌬️ of the "Hold
+it" line is too pale at mark size, so the line took ⏳ too; on 2026-11-15 the user took the wording "⏳ Too short, hold
+longer" / "⏳ Prekratko, drži dulje": "Hold it until the ⭐" was untrue once the note is marked and the run has moved on,
+and a child who held the note again got nothing); and the speed line standing until Stop ("3A"). This
+overturns exact semitones (2026-11-13) and "a note cut short is played again" (2026-11-11). The rules, each a named
+rule a session records and a replay moves: a note the semitone above the written one, locked within 75 cents of it,
+is the written note blown high (`TuneCheck.HIGH_CENTS`, `highCents`; the 25 locked 48 to 71, one at 71.04, and no wrong
+mark lay between 75 and 100), in the nearest octave like the letter in any octave, and under the written note the
+semitone's 50 hold (an F sharp fingered for G sounded 52 to 72 under the G on 2026-11-13); a note walked is off its
+pitch beyond 25 cents (`ListenRun.TUNE_CENTS`, `tuneCents`: 46% of the evening's 265 right fingerings, 79 to 95% in the
+sharp runs and 0 to 4% in the in-tune ones; 70% at 15, 17% at 40), read from the median of its last five shown frames,
+the arrow starting where the note locked and moving after three readings in a row on another side (`TUNE_FRAMES`;
+without it 22 of the 265 flickered), and its mark is the arrow at the moment it is long enough (90% the same as the
+whole note's own reading); a note let go too early is marked ⏳ and the run moves on (`shortMovesOn`), the animal
+standing where it got to for the rest of its written time (`Walk.Phase.CUT`) and the note that cut it judged for the
+next step; the child's speed is the median time between the starts of two notes in a row, the second begun with no
+wrong note, per click of the knob written between them (rests included; a click is a quarter in x/4, an eighth in x/8,
+a half in x/2, so it compares with the knob's own number: the final review caught it counted in quarters, which made
+6/8 played in time "slower"), said only with 6 such pairs (`paceMinPairs`), another animal than the
+knob's and more than 15% off (`paceOff`). On the screen: the live bubble shows the written letter, never its
+neighbour's, with the arrow just right of it while the note sounds off (`PitchArrow`, `PITCH_ARROW_SIZE`); the line
+says the tuner's "⬇️ A little lower" / "⬆️ A little higher", and keeps saying it after the note is marked, until the next
+note is judged (`Listening.remark`); no fingering (the fingers were right). The tail of a note just earned that sounds
+as another letter (a B blown high is C to the tracker) is still that note's tail (`ListenRun`'s `tailOpen`): no C
+bubble under the next step, and a sharp B held into its written repeat asks to stop and play it again. When the run
+ends at another animal's speed its screen stays, the microphone closed and the session ended, with "🐢 Slower than the
+🐇" (the child's animal first; no past tense, which Croatian would give a gender) until Stop or anything else that ends
+a run (`flute.listen_stop` over=true). What the 20 runs make of it under today's rules: wrong marks 66 to 28, the
+semitone-above wrong notes 29 to 5 (each a B flat 113 to 135 cents over an A, a real wrong fingering), and the run
+that sat on note 15 earns 21 ⬇️. Under the rules they were recorded with all 72 sessions until then replay as before
+(`Replay.BEFORE`: `highCents` 0, `tuneCents` infinite, `shortMovesOn` 0; the eight of 5 and 7 November too). Whether
+a note in the band is the note going on or the next one is decided by its pitch (the final review of 2026-11-14): an
+onset that locked within `LOCK_CENTS` of where the walked note sounds (an octave pop, a breath dip of a b blown high)
+is the note going on, whatever is written next, and one that moved is the next note if that is its letter; and once a
+note is earned, the same note started again at its own pitch while its sound goes on is its tail (`TuneCheck.judge`'s
+`sameAsLast`), unless its written repeat is waited on, so a sharp b dipping before a written c never marks the c. While
+an ended run's speed line stands the phone may sleep (`FluteUiState.keepsScreenOn`), and a running row's end keeps room
+for the arrow beside the last note's bubble (`StaffGeometry.endPadding`). Tests: `TuneCheckTest`, `ListenRunTest` ("Feedback,
+not stars", "A note let go too early", "The speed of a finished run"), `ListenPathTest` (b's blown 60 high, a note 60
+under), `FluteUiStateTest`, `FluteViewModelTest`, `FluteScreenTest`, `FluteSidewaysTest`, `LabelsTest`, `ReplayTest`.
 
 The room is not judged (since 2026-11-10; `NoteOnsetTracker.MIN_LEVEL`, the rule `minLevel`). In the review of that
 day, on the user's phone, a run waited about twenty seconds before the first test note, and in that time the room
@@ -586,8 +641,10 @@ changed), so every `flute.shelf_open` has a closing line but for a tab left with
 for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard` (index, expected,
 heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
 retry, ignored or wrong, per new note the tracker reports: the pitch, at the onset), `flute.held` (index, heldMs:
-the note sounded long enough and earned its mark; since 2026-11-11), `flute.short` (index, heldMs, needMs: it
-stopped before that, "Hold it until the ⭐"; faded: it had faded away first, "Maybe out of air?"; since 2026-11-13),
+the note sounded long enough and earned its mark; since 2026-11-11; mark: first_try, retry, high or low, and cents: the
+median of its readings off the written pitch, since 2026-11-14), `flute.short` (index, heldMs, needMs: it
+stopped before that, "⏳ Too short, hold longer"; faded: it had faded away first, "Maybe out of air?"; since 2026-11-13;
+mark: short when the run moved on, none when it waited, since 2026-11-14),
 `flute.heard` also carries cents (where the note locked, from expected; since 2026-11-13), `flute.repeat_forgiven` (index: a
 written repeat of the note just judged passed over with a faint star because the note after it
 was heard, once per such step),
@@ -595,8 +652,10 @@ was heard, once per such step),
 tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
 passed the gate at all, and since 2026-11-10, in `faint`, how many frames had a clear pitch but were under the
 level of a flute at the phone), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
-(stars, retries, when the last note is earned), `flute.listen_stop` (reason: pill, key, erase,
-leave, speed or book, so every `flute.listen` has a closing line), `flute.listen_error` (message, when
+(stars, retries, when the last note is earned; since 2026-11-14 also high, low and short, the marks of each kind, and
+bpm, pairs, knob and speed: the child's speed, the note pairs it rests on, the knob's, and whether the line about it
+shows), `flute.listen_stop` (reason: pill, key, erase, leave, speed or book, so every `flute.listen` has a closing line;
+over: the run had ended and only its screen with the speed line stood, since 2026-11-14), `flute.listen_error` (message, when
 the microphone fails: listening ends cleanly) and `flute.mic` (granted, the phone's answer about the
 microphone on this tab). The engine's `mic.open` / `mic.close` stay under `FA.Tuner`. A debug
 build adds `session.open` (path: where this run's session folder is) and `session.error`

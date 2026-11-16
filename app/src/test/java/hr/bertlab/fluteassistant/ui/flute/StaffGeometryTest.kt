@@ -163,4 +163,13 @@ class StaffGeometryTest {
         // The first note's ring is not cut where the notes start to scroll.
         assertTrue(StaffGeometry.NOTES_START + StaffGeometry.HEAD_X - StaffGeometry.LIT_RADIUS >= StaffGeometry.NOTES_CLIP)
     }
+
+    @Test
+    fun `the arrow beside the last note's bubble stays inside a running row's end`() {
+        // The arrow stands right of the bubble, centred in the step's first beat; a one-beat step at the row's end leaves
+        // only the end padding past it (the emulator showed it cut to a sliver with the 4 dp of before, 2026-11-14).
+        val reach = StaffGeometry.BEAT_WIDTH / 2 + StaffGeometry.PITCH_ARROW_X + StaffGeometry.PITCH_ARROW_SIZE / 2
+        assertTrue(reach <= StaffGeometry.BEAT_WIDTH + StaffGeometry.endPadding(running = true))
+        assertEquals("writing keeps its end as it was", StaffGeometry.NOTES_END_PADDING, StaffGeometry.endPadding(running = false), 0f)
+    }
 }

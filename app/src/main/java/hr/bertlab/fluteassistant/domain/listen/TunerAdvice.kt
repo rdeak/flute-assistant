@@ -18,8 +18,13 @@ enum class TunerAdvice {
     HOLD_LONGER,
     /** The flute's only: a note faded away before it was long enough, a guess that the air ran out. */
     OUT_OF_AIR,
-    /** The flute's only: a wrong note just above the written one, a guess that it was blown too high. */
+    /**
+     * The flute's only: the right note sounding above its written pitch, or earning the down arrow (since 2026-11-14;
+     * from 2026-11-13 a wrong note just above the written one, a guess that it was blown too high).
+     */
     TOO_HIGH,
+    /** The flute's only: the right note sounding under its written pitch, or earning the up arrow (since 2026-11-14). */
+    TOO_LOW,
     /** The tuner's only: the tuning note chosen and played flat, so the head joint goes in a little. */
     HEAD_JOINT_IN,
     /** The tuner's only: the tuning note chosen and played sharp, so the head joint comes out a little. */

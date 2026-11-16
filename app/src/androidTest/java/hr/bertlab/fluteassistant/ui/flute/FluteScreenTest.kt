@@ -52,6 +52,8 @@ import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -302,9 +304,9 @@ class FluteScreenTest {
             Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR) to "🎵 Odsviraj jedan dug, čist ton",
             Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR) to "📱 Dođi bliže mobitelu",
             Listening(index = 0, repeatHeld = true) to "🔁 Stani, pa odsviraj opet",
-            Listening(index = 0, walk = short) to "🌬️ Drži notu do ⭐",
+            Listening(index = 0, walk = short) to "⏳ Prekratko, drži dulje",
             Listening(index = 0, walk = short, faded = true) to "😮‍💨 Možda nema zraka? Udahni",
-            Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true)) to "🍃 Možda previsoko? Nježniji zrak",
+            Listening(index = 0, pitch = Pitch.HIGH) to "⬇️ Malo niže",
             Listening(index = 0, wrong = WrongNote(0, 64)) to "👀 Provjeri prste",
         )
         state = mutableStateOf(FluteUiState(tune = twoNotes, listening = lines.first().first))
@@ -1172,11 +1174,11 @@ class FluteScreenTest {
     @Test
     fun a_note_cut_short_asks_to_hold_it_longer_with_no_fingering() {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))))
-        compose.onNodeWithText("🌬️ Hold it until the ⭐").assertIsDisplayed()
+        compose.onNodeWithText("⏳ Too short, hold longer").assertIsDisplayed()
         compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
         compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SOUNDING)))
-        compose.onNodeWithText("🌬️ Hold it until the ⭐").assertDoesNotExist()
+        compose.onNodeWithText("⏳ Too short, hold longer").assertDoesNotExist()
     }
 
     @Test
@@ -1187,26 +1189,58 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
         compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT)))
-        compose.onNodeWithText("🌬️ Drži notu do ⭐").assertIsDisplayed()
+        compose.onNodeWithText("⏳ Prekratko, drži dulje").assertIsDisplayed()
     }
 
-    /** The guesses say maybe (2026-11-13): out of air for a note that faded, too high for a near miss above, the fingering still shown. */
+    /** The guess says maybe (2026-11-13): out of air for a note that faded. A note blown high has the tuner's words, and no fingering: the fingers were right (2026-11-14). */
     @Test
     fun the_why_lines_say_maybe_in_both_languages() {
         val faded = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)
-        val high = Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true))
+        val high = Listening(index = 0, pitch = Pitch.HIGH)
         show(FluteUiState(tune = twoNotes, listening = faded))
         compose.onNodeWithText("😮‍💨 Maybe out of air? Big breath first").assertIsDisplayed()
         state.value = FluteUiState(tune = twoNotes, listening = high)
-        compose.onNodeWithText("🍃 Maybe too high? Gentler air").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Fingering for C4").assertIsDisplayed()
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist() // the fingers were right
     }
 
     @Test
     fun the_why_lines_speak_croatian() {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)), Locale("hr"))
         compose.onNodeWithText("😮‍💨 Možda nema zraka? Udahni").assertIsDisplayed()
-        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 61, tooHigh = true)))
-        compose.onNodeWithText("🍃 Možda previsoko? Nježniji zrak").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, pitch = Pitch.HIGH))
+        compose.onNodeWithText("⬇️ Malo niže").assertIsDisplayed()
+    }
+
+    // ---- Feedback, not stars (2026-11-14) ----
+
+    @Test
+    fun a_note_blown_high_or_low_has_the_tuners_words_and_no_fingering() {
+        val sounding = Walk(0, 0, Walk.Phase.SOUNDING)
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, heardNow = 60, pitch = Pitch.HIGH, walk = sounding)))
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering", substring = true).assertDoesNotExist()
+        state.value = state.value.copy(listening = Listening(index = 0, heardNow = 60, pitch = Pitch.LOW, walk = sounding))
+        compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_marks_say_what_each_note_was() {
+        val three = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER), TuneNote(69, NoteLength.QUARTER))
+        show(FluteUiState(tune = three, marks = mapOf(0 to StepMark.HIGH, 1 to StepMark.LOW, 2 to StepMark.SHORT)))
+        compose.onNodeWithContentDescription("C4, 1 beat, too high").assertExists()
+        compose.onNodeWithContentDescription("G4, 1 beat, too low").assertExists()
+        compose.onNodeWithContentDescription("A4, 1 beat, let go too early").assertExists()
+    }
+
+    @Test
+    fun an_ended_run_says_how_its_speed_was_and_waits_for_the_pill() {
+        val slower = Listening(index = 1, finishing = true, pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true))
+        show(FluteUiState(tune = twoNotes, listening = slower, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY)))
+        compose.onNodeWithText("🐢 Slower than the 🐇").assertIsDisplayed()
+        compose.onNodeWithText("Stop").assertIsDisplayed()
+        compose.onNodeWithContentDescription("play this one", substring = true).assertDoesNotExist()
+        state.value = state.value.copy(listening = slower.copy(pace = Pace(bpm = 104, pairs = 7, knobBpm = 60, speaks = true)))
+        compose.onNodeWithText("🐇 Faster than the 🐢").assertIsDisplayed()
     }
 }

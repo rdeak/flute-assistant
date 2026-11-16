@@ -115,9 +115,10 @@
     <string name="advice_gentler_air">🍃 Gentler air</string>
     <string name="advice_check_fingers">👀 Check your fingers</string>
     <string name="advice_play_again">🔁 Stop, then play it again</string>
-    <string name="advice_hold_longer">🌬️ Hold it until the ⭐</string>
+    <!-- The hourglass is the note's own mark when it was let go too early (2026-11-14): the line and the mark are one sign.
+         The note is already marked and the run has moved on, so the line is for the next notes: no "until the star". -->
+    <string name="advice_hold_longer">⏳ Too short, hold longer</string>
     <string name="advice_out_of_air">😮‍💨 Maybe out of air? Big breath first</string>
-    <string name="advice_too_high">🍃 Maybe too high? Gentler air</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
     <!-- The tuner when the microphone will not open or stops. The cause goes to the log, as a child can do nothing with it -->
@@ -221,11 +222,19 @@
     <!-- "Your turn": appended to a note's accessibility name on the flute staff while the flute listens or after it did -->
     <string name="flute_mark_first_try">got it</string>
     <string name="flute_mark_retry">got it after a retry</string>
+    <!-- The right note played off (2026-11-14): too high, too low, let go before it was long enough -->
+    <string name="flute_mark_high">too high</string>
+    <string name="flute_mark_low">too low</string>
+    <string name="flute_mark_short">let go too early</string>
     <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
     <string name="flute_mark_heard">heard %1$s</string>
     <string name="flute_listen_here">play this one</string>
     <!-- The line under the staff when "Listen to me" starts, until the first note is judged; the argument is the note waited on, e.g. "B4". The flute shows what the child does. -->
     <string name="flute_play_prompt">🪈 Play %1$s</string>
+    <!-- The line when a finished "Listen to me" was played at another speed than the knob's; the first argument is the
+         animal of the child's speed, the second the knob's, e.g. "🐢 Slower than the 🐇". No past tense: in Croatian it would need the child's gender. -->
+    <string name="flute_speed_slower">%1$s Slower than the %2$s</string>
+    <string name="flute_speed_faster">%1$s Faster than the %2$s</string>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>

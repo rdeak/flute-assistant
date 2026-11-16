@@ -67,6 +67,10 @@ internal object StaffGeometry {
     const val MARKS_TOP = NAMES_TOP + PILL_HEIGHT + MARKS_GAP
     const val MARKS_HEIGHT = 26f
     const val MARK_SIZE = 20f
+    /** The arrow beside the live bubble of a note sounding off its pitch (2026-11-14), smaller than a mark. */
+    const val PITCH_ARROW_SIZE = 12f
+    /** The arrow's middle, right of the bubble's middle: just past its edge, overlapping it by a dp as in the mockup. */
+    const val PITCH_ARROW_X = (MARKS_HEIGHT + PITCH_ARROW_SIZE) / 2 - 1
     const val TOTAL_HEIGHT = MARKS_TOP + MARKS_HEIGHT
 
     /** A tie between two pills of one note: [PILL_TIE_GAP] under them, dipping [PILL_TIE_DIP]. */
@@ -181,6 +185,13 @@ internal object StaffGeometry {
     const val NOTES_START = 62f
     const val NOTES_CLIP = 57f
     const val NOTES_END_PADDING = 4f
+
+    /**
+     * The room after the last step: [NOTES_END_PADDING], and while the tune runs also what the arrow beside a live bubble
+     * ([PITCH_ARROW_X]) reaches past a one-beat step, so on the last note of a long tune it is not cut at the row's end.
+     */
+    fun endPadding(running: Boolean): Float =
+        NOTES_END_PADDING + if (running) maxOf(0f, BEAT_WIDTH / 2 + PITCH_ARROW_X + PITCH_ARROW_SIZE / 2 - BEAT_WIDTH) else 0f
 
     /** Space per beat, as the canvas drew it; an eighth gets a quarter's, as half of it would crowd the heads. */
     const val BEAT_WIDTH = 29f

@@ -6,6 +6,8 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
@@ -85,6 +87,12 @@ data class FluteUiState(
     /** Whether the tune is running, by the phone (Play) or by the child (Your turn): the keys hide and the staff grows. */
     val isRunning: Boolean get() = isPlaying || isListening
 
+    /**
+     * Whether the phone must not time out on this tab: while the tune runs, but not while an ended run's speed line
+     * stands, the microphone closed (the phone may sleep, which leaves the tab and closes that screen).
+     */
+    val keepsScreenOn: Boolean get() = isRunning && pace == null
+
     /** Whether there is a note to check: rests and breaths alone give "Your turn" nothing to do. */
     val canListen: Boolean get() = tune.any { it is TuneNote }
 
@@ -102,7 +110,7 @@ data class FluteUiState(
      * one waited for, an earned note finishing its time, or a rest walked; none while the last note's sound ends),
      * else the held key's.
      */
-    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing }?.animalIndex ?: heldIndex
+    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing || it.pace != null }?.animalIndex ?: heldIndex
 
     /**
      * The step the knob's animal stands over while the tune runs: the playing step, else, listening, the note it
@@ -113,10 +121,12 @@ data class FluteUiState(
 
     /**
      * Whether the animal waits for the child to play the step it stands over: listening, not finishing, not on an
-     * earned note finishing its time (its star shows there) and not walking a rest (nothing is played there).
+     * earned note finishing its time (its star shows there), not on a note let go too early standing out its time (its
+     * hourglass shows there), not walking a rest (nothing is played there), and not on the ended run's screen.
      */
     val waiting: Boolean get() = listening?.let {
-        !it.finishing && it.index != null && it.walk?.phase != Walk.Phase.DONE && it.walk?.phase != Walk.Phase.REST
+        !it.finishing && it.index != null && it.pace == null &&
+            it.walk?.phase != Walk.Phase.DONE && it.walk?.phase != Walk.Phase.REST && it.walk?.phase != Walk.Phase.CUT
     } == true
 
     /** How many half beats into [animalIndex]'s step the animal stands: the last click's, in Play and in Your turn's walk; else the step's start. */
@@ -127,6 +137,12 @@ data class FluteUiState(
 
     /** The note the phone hears right now, a live bubble under the step waited on ([Listening.heardNow]). */
     val heardNow: Int? get() = listening?.heardNow
+
+    /** Which way the note walked sounds off its pitch: the arrow beside its bubble ([Listening.pitch]). */
+    val pitch: Pitch? get() = listening?.pitch
+
+    /** The child's speed when the run ended at another animal's than the knob's: the ended run's one line ([Listening.pace]). */
+    val pace: Pace? get() = listening?.pace
 
     /** The one line under the staff while listening ([Listening.advice]); nothing otherwise. */
     val advice: TunerAdvice get() = listening?.advice ?: TunerAdvice.NONE

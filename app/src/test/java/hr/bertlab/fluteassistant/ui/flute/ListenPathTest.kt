@@ -9,6 +9,7 @@ import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.Verdict
 import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import org.junit.Assert.assertEquals
@@ -145,13 +146,34 @@ class ListenPathTest {
     }
 
     @Test
-    fun `a note too short for a slow tempo is cut short and waited on`() {
+    fun `a note too short for a slow tempo gets the hourglass`() {
         // At 40 a minute a quarter needs 375 ms and the half note 1875: the quarters are long enough, and the 1500 ms
-        // note is cut short for the half note when its sound ends.
+        // note is let go too early for the half note when its sound ends.
         val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(40))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.SHORT), run.marks)
+    }
+
+    @Test
+    fun `under the rule before 2026-11-14 that note is cut short and waited on`() {
+        val waits = ListenRun.Rules(shortMovesOn = false)
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(40), run = waits)
         assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), run.marks)
         assertEquals(Walk.Phase.SHORT, run.steps.last().walk?.phase)
         assertEquals(2, run.steps.last().walk?.index)
+    }
+
+    @Test
+    fun `three b's blown 60 cents high are walked and each earns the down arrow`() {
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50, cents = 60.0)), rate, tune, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.HIGH, 1 to StepMark.HIGH, 2 to StepMark.HIGH), run.marks)
+    }
+
+    @Test
+    fun `a note 60 cents under the written one is a wrong note`() {
+        val cs = listOf(TuneNote(72, NoteLength.QUARTER), TuneNote(72, NoteLength.QUARTER), TuneNote(72, NoteLength.HALF))
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50, cents = 40.0)), rate, cs, Pulse(120))
+        assertTrue(run.heard.toString(), run.marks.isEmpty())
+        assertTrue(run.steps.any { it.row.verdict == Verdict.WRONG })
     }
 
     /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules], pitch only. */

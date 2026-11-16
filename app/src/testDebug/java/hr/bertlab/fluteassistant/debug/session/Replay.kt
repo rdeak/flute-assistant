@@ -31,12 +31,15 @@ object Replay {
      */
     data class Diff(val first: Int?, val count: Int, val trailing: Int)
 
-    /** [walk]: compare the walk too, which only a session that recorded it can ([Session.recordsWalk]). */
-    fun diff(phone: List<ListenPath.Step>, replay: List<ListenPath.Step>, walk: Boolean = false): Diff {
+    /**
+     * [walk]: compare the walk too, which only a session that recorded it can ([Session.recordsWalk]); [pitch]: the arrow
+     * of a note walked off its pitch too ([Session.recordsPitch]).
+     */
+    fun diff(phone: List<ListenPath.Step>, replay: List<ListenPath.Step>, walk: Boolean = false, pitch: Boolean = false): Diff {
         var first: Int? = null
         var count = 0
         for ((i, a) in phone.withIndex()) {
-            if (!same(a, replay.getOrNull(i), walk)) {
+            if (!same(a, replay.getOrNull(i), walk, pitch)) {
                 count++
                 if (first == null) first = a.frame
             }
@@ -44,9 +47,9 @@ object Replay {
         return Diff(first, count, maxOf(0, replay.size - phone.size))
     }
 
-    private fun same(a: ListenPath.Step, b: ListenPath.Step?, walk: Boolean): Boolean =
+    private fun same(a: ListenPath.Step, b: ListenPath.Step?, walk: Boolean, pitch: Boolean = false): Boolean =
         b != null && a.decision == b.decision && a.sounding == b.sounding && a.onset == b.onset && sameVerdict(a, b) &&
-            (!walk || a.walk == b.walk)
+            (!walk || a.walk == b.walk) && (!pitch || a.row.pitch == b.row.pitch)
 
     /**
      * The same verdict, or the "wrong" a phone logged until 2026-11-13 for a note heard while a note cut short waited,
@@ -67,6 +70,9 @@ object Replay {
         "restartCuts" to 1.0, // 2026-11-13: a gapless restart cut the note walked
         "graceFrames" to 2.0, // 2026-11-13: the tracker's onsetGapFrames, 2 in every recording
         "walkRests" to 0.0, // 2026-11-13: rests passed over, the animal jumped to the note after
+        "highCents" to 0.0, // 2026-11-14: the nearest semitone, no band above a written note
+        "tuneCents" to Double.POSITIVE_INFINITY, // 2026-11-14: no pitch remark, no arrow
+        "shortMovesOn" to 0.0, // 2026-11-14: a note let go too early was waited on
     )
 
     /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */
@@ -109,15 +115,16 @@ object Replay {
         for (step in replay.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
         out.appendLine("  marks=" + Session.spell(replay.marks))
         val walk = session.recordsWalk
-        val diff = diff(session.rows, replay.steps, walk)
+        val pitch = session.recordsPitch
+        val diff = diff(session.rows, replay.steps, walk, pitch)
         val trailing = if (diff.trailing > 0) " (${diff.trailing} hops after the last row)" else ""
         out.appendLine(if (diff.count == 0) "diff: none$trailing" else "diff: first=${diff.first} count=${diff.count}$trailing")
         if (diff.count > 0) {
             var shown = 0
             for ((i, a) in session.rows.withIndex()) {
                 val b = replay.steps.getOrNull(i)
-                if (same(a, b, walk)) continue
-                out.appendLine("  frame ${a.frame}: phone ${cells(a, walk)} / replay ${b?.let { cells(it, walk) } ?: "no hop"}")
+                if (same(a, b, walk, pitch)) continue
+                out.appendLine("  frame ${a.frame}: phone ${cells(a, walk, pitch)} / replay ${b?.let { cells(it, walk, pitch) } ?: "no hop"}")
                 if (++shown == 10) {
                     out.appendLine("  ...")
                     break
@@ -176,9 +183,10 @@ object Replay {
         )
     }
 
-    private fun cells(step: ListenPath.Step, walk: Boolean) =
+    private fun cells(step: ListenPath.Step, walk: Boolean, pitch: Boolean = false) =
         "${step.decision} ${step.sounding ?: "-"} ${step.onset?.let { if (it.fresh) "fresh" else "step" } ?: "-"} ${step.verdict?.name?.lowercase(Locale.ROOT) ?: "-"}" +
-            if (walk) " ${step.walk?.let { "${it.index}+${it.halfBeat} ${it.phase}" } ?: "-"}" else ""
+            (if (walk) " ${step.walk?.let { "${it.index}+${it.halfBeat} ${it.phase}" } ?: "-"}" else "") +
+            if (pitch) " ${step.row.pitch ?: "-"}" else ""
 
     private fun spell(item: hr.bertlab.fluteassistant.domain.flute.TuneItem) = when (item) {
         is TuneNote -> "${item.midi}/${item.length}"

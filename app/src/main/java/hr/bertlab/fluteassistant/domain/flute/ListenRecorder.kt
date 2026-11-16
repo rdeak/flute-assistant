@@ -32,6 +32,8 @@ data class ListenFrame(
     val hearing: Hearing,
     /** Where the animal was after the frame when it was not simply waiting ([Listening.walk]). */
     val walk: Walk? = null,
+    /** Which way the note walked sounded off its pitch after the frame ([Listening.pitch], since 2026-11-14). */
+    val pitch: Pitch? = null,
 )
 
 /**

@@ -52,6 +52,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
@@ -204,7 +205,8 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
  * and the whole screen scrolls.
  *
- * While the tune runs ([FluteUiState.isRunning]: Play, or Your turn with the microphone open) the
+ * While the tune runs ([FluteUiState.isRunning]: Play, or Your turn with the microphone open, or a
+ * Your turn that ended with its speed line, the microphone closed, until Stop) the
  * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]), so it
  * reads from a music stand at arm's length, with the knob's animal walking the staff at the knob's
  * height ([StaffAnimal]: over the playing step, hopping on to each beat's place on each click, or
@@ -360,7 +362,8 @@ fun FluteContent(
             val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
             val running = state.isRunning
             // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
-            val prompt = state.promptMidi?.let { playPrompt(it) }
+            // Or, once a run ended at another animal's speed than the knob's, that one line until Stop (2026-11-14).
+            val prompt = state.promptMidi?.let { playPrompt(it) } ?: state.pace?.let { speedLine(it) }
             // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
             BackHandler(enabled = running, onBack = actions.onStop)
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
@@ -392,6 +395,7 @@ fun FluteContent(
                         animal = animal,
                         wrong = state.wrong,
                         heardNow = state.heardNow,
+                        pitch = state.pitch,
                         scale = staffScale,
                         listState = staffPlace,
                     )
@@ -535,6 +539,12 @@ private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
         if (prompt != null) AdviceLine(prompt) else AdviceLine(state.advice)
     }
 }
+
+/** "🐢 Slower than the 🐇": the child's animal first, the knob's second (2026-11-14). */
+@Composable
+private fun speedLine(pace: Pace): AnnotatedString = AnnotatedString(
+    stringResource(if (pace.slower) R.string.flute_speed_slower else R.string.flute_speed_faster, pace.child.emoji, pace.knob.emoji),
+)
 
 /** "Play B4" for the note [midi], the words from `flute_play_prompt` and the note with its raised octave ([noteText]). */
 @Composable

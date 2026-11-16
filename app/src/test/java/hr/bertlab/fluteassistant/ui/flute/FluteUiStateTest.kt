@@ -6,6 +6,8 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
@@ -208,5 +210,27 @@ class FluteUiStateTest {
     fun `the prompt goes once the first note sounds`() {
         val sounding = FluteUiState(tune = lamb, listening = Listening(index = 1, walk = Walk(1, 0, Walk.Phase.SOUNDING)))
         assertNull(sounding.promptMidi)
+    }
+
+    @Test
+    fun `a note cut short and marked is not waited on, and an ended run rings nothing`() {
+        val cut = FluteUiState(tune = lamb, listening = Listening(index = 2, walk = Walk(1, 0, Walk.Phase.CUT)))
+        assertFalse(cut.waiting)
+        assertEquals("the animal stands on the note let go too early", 1, cut.animalIndex)
+        val pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true)
+        // A run whose last rest was walked: without the speed line its animal's step would be ringed.
+        val ended = FluteUiState(tune = lamb, listening = Listening(index = 3, walk = Walk(3, 0, Walk.Phase.REST), pace = pace))
+        assertNull(ended.litIndex)
+        assertFalse(ended.waiting)
+        assertEquals(pace, ended.pace)
+        assertEquals(Pitch.HIGH, FluteUiState(tune = lamb, listening = Listening(index = 1, pitch = Pitch.HIGH)).pitch)
+    }
+
+    @Test
+    fun `the screen stays awake while a tune runs, not while an ended run's speed line stands`() {
+        assertTrue(FluteUiState(tune = lamb, listening = Listening(index = 1)).keepsScreenOn)
+        val pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true)
+        assertFalse(FluteUiState(tune = lamb, listening = Listening(index = 3, finishing = true, pace = pace)).keepsScreenOn)
+        assertFalse(FluteUiState(tune = lamb).keepsScreenOn)
     }
 }

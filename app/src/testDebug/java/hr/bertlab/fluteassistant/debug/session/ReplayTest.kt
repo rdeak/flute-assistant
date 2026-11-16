@@ -8,6 +8,7 @@ import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
@@ -174,7 +175,32 @@ class ReplayTest {
         assertTrue(report, then.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
         assertTrue(report, report.contains("today's rules differ: lengthSlack=1.5 (recorded none) restartCuts=0 (recorded none)"))
         val now = report.substringAfter("today's rules").substringBefore("phone:")
-        assertTrue(report, now.contains("marks=0:FIRST_TRY,1:FIRST_TRY\n"))
+        assertTrue(report, now.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:SHORT\n"))
+    }
+
+    @Test
+    fun `a session from before the feedback rules replays with a short note waiting`() {
+        // At 40 a minute the half note's 1500 ms are too short: a build before 2026-11-14 waited on it.
+        val before = ListenRun.Rules(highCents = 0.0, tuneCents = Double.POSITIVE_INFINITY, shortMovesOn = false)
+        val dir = recorded(pulse = Pulse(40), run = before)
+        val log = File(dir, "session.log")
+        // As a build before 2026-11-14 wrote it: none of its rules named, and a table that ends at `phase`.
+        log.writeText(log.readText().replace(Regex(" (highCents|tuneCents|tuneFrames|shortMovesOn|paceMinPairs|paceOff)=[^ \n]*"), ""))
+        val csv = File(dir, "frames.csv")
+        csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',') } + "\n")
+        val session = Session.load(dir)
+        val run = Replay.recordedRunRules(session)
+        assertEquals("no band above a note", 0.0, run.highCents, 0.0)
+        assertEquals("no arrow", Double.POSITIVE_INFINITY, run.tuneCents, 0.0)
+        assertFalse("a short note waited", run.shortMovesOn)
+        assertFalse(session.recordsPitch)
+        assertTrue(session.rows.any { it.walk?.phase == Walk.Phase.SHORT })
+        val report = Replay.report(session)
+        val then = report.substringBefore("today's rules")
+        assertTrue(report, then.contains("diff: none"))
+        assertTrue(report, then.contains("marks=0:FIRST_TRY,1:FIRST_TRY\n"))
+        val now = report.substringAfter("today's rules").substringBefore("phone:")
+        assertTrue(report, now.contains("marks=0:FIRST_TRY,1:FIRST_TRY,2:SHORT\n"))
     }
 
     @Test
@@ -209,7 +235,7 @@ class ReplayTest {
         val lines = out.lines().filter { it.startsWith("maxNeedMs=") }
         assertEquals(out, 2, lines.size)
         assertTrue(lines[0], lines[0].startsWith("maxNeedMs=300 ") && lines[0].endsWith("marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
-        assertTrue(lines[1], lines[1].startsWith("maxNeedMs=3000 ") && lines[1].endsWith("marks=0:FIRST_TRY,1:FIRST_TRY"))
+        assertTrue(lines[1], lines[1].startsWith("maxNeedMs=3000 ") && lines[1].endsWith("marks=0:FIRST_TRY,1:FIRST_TRY,2:SHORT"))
     }
 
     // ---- The walk in a session (the review of 2026-11-11): read back, and part of the diff ----
@@ -227,8 +253,8 @@ class ReplayTest {
         // was earned on, or the hop the child saw, went another way than the replay's.
         val csv = File(dir, "frames.csv")
         val lines = csv.readLines().toMutableList()
-        val at = lines.indexOfFirst { it.endsWith(",SOUNDING") }
-        lines[at] = lines[at].removeSuffix("SOUNDING") + "SHORT"
+        val at = lines.indexOfFirst { it.contains(",SOUNDING,") } // the phase, before the arrow's cell
+        lines[at] = lines[at].replace(",SOUNDING,", ",SHORT,")
         csv.writeText(lines.joinToString("\n") + "\n")
         val altered = Session.load(dir)
         val report = Replay.report(altered)
@@ -291,5 +317,28 @@ class ReplayTest {
         val dir = recorded()
         File(dir, "session.log").appendText("pin marks=0:FIRST_TRY,1:RETRY,2:FIRST_TRY\n")
         assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY, 2 to StepMark.FIRST_TRY), Session.load(dir).pin)
+    }
+
+    // ---- The arrow a phone showed (2026-11-14) ----
+
+    @Test
+    fun `a session keeps the arrow it showed, and one from before has none to compare`() {
+        val dir = recorded()
+        assertTrue(Session.load(dir).recordsPitch)
+        val csv = File(dir, "frames.csv")
+        csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',') } + "\n") // as a build before 2026-11-14 wrote it
+        assertFalse(Session.load(dir).recordsPitch)
+        assertTrue(Replay.report(Session.load(dir)).contains("diff: none"))
+    }
+
+    @Test
+    fun `the arrow a phone showed is compared when the table has it`() {
+        val session = Session.load(recorded())
+        val replay = ListenPath.run(session.audio.samples, rate, tune, session.pulse).steps
+        val sounding = session.rows.indexOfFirst { it.row.walk?.phase == Walk.Phase.SOUNDING }
+        assertTrue(sounding >= 0)
+        val phone = session.rows.mapIndexed { i, step -> if (i == sounding) step.copy(row = step.row.copy(pitch = Pitch.LOW)) else step }
+        assertEquals(1, Replay.diff(phone, replay, pitch = true).count)
+        assertEquals(0, Replay.diff(phone, replay).count)
     }
 }

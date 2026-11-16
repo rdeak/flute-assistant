@@ -15,7 +15,8 @@ mono 32-bit float at the microphone's rate, from the first hop after it opened, 
 file is the newest hop of frame `k`), `frames.csv` (one row per frame the view model processed:
 frame, ms, f, p, level, minLevel, decision, sounding, onset `fresh`/`step`, verdict, the step
 waited on before the judgement and its note, heardNow, advice, repeatHeld, finishing, hearing,
-and the tracker's floor; what the phone actually did) and `session.log` (the app's log format:
+the tracker's floor, the walk (`walk,halfBeat,phase`, since 2026-11-11) and the arrow of a note
+walked off its pitch (`pitch`: HIGH, LOW or empty, since 2026-11-14); what the phone actually did) and `session.log` (the app's log format:
 `session.start` with the app, device and the floor the tracker still held from the run before,
 `session.rules` with every threshold in force read from the constants, `session.pulse`, one
 `session.tune` per item, `session.audio` when the microphone opened, then every log line the app
@@ -60,6 +61,10 @@ tools/pull-sessions.sh                                   # the phone's sessions 
                                                          # also -Psweep=restartCuts:0,1 (1: a restart with no gap cuts the
                                                          # note walked, the rule until 2026-11-13; a child's breath dips do that)
                                                          # also -Psweep=maxNeedMs:2000,3000,4000, the longest any note needs
+                                                         # also -Psweep=tuneCents:15,25,40 (cents off the written pitch a note
+                                                         # may sound and still be in tune, 25 since 2026-11-14: who gets an arrow)
+                                                         # and -Psweep=highCents:0,70,75 (how far above the written note its
+                                                         # semitone above is still that note blown high; 0 is the nearest semitone)
                                                          # (the run's own rules are ListenRun.Rules; a sweep names one of them
                                                          # or one of the tracker's, and detects the audio once for all values)
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
@@ -69,11 +74,15 @@ The replay that is compared with the phone runs under the rules the session was 
 `session.rules` line; a rule younger than the recording takes what the builds before it did, from one
 table for the tracker's rules and the run's, `Replay.BEFORE`: no `minLevel` before 2026-11-10, no length
 rule (`lengthSlack`, `maxNeedMs`) before 2026-11-11, `restartCuts` on, `graceFrames` 2 and
-`walkRests` off (rests passed over) before 2026-11-13; a new rule gets a line there), so a rule added since does not show up as a difference. A
+`walkRests` off (rests passed over) before 2026-11-13, and before 2026-11-14 ("feedback, not stars") `highCents` 0
+(the nearest semitone, no band above a written note), `tuneCents` infinite (no arrow) and `shortMovesOn` off (a note
+let go too early was waited on); a new rule gets a line there), so a rule added since does not show up as a difference. A
 "wrong" logged before 2026-11-13 for a note heard while a note cut short waited is today's "ignored"
 (only the word changed: `Replay.sameVerdict`). A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
-has it compared too: the frame a note was earned or cut short on. `report.html` draws those frames
-(★ or ☆ long enough, ✂ cut short; ♪ is a right pitch beginning a note). Where
+has it compared too: the frame a note was earned or cut short on; one that recorded the arrow (`pitch`, since
+2026-11-14) has that compared too. `report.html` draws those frames
+(★ or ☆ long enough, ⬇ ⬆ long enough but too high or too low, ✂ cut short and waited on, ⏳ let go too early and moved
+on; ♪ is a right pitch beginning a note). Where
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
 hear in the same sound. A sweep changes one of today's rules. The detector is not part of the rules:
 sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a

@@ -154,7 +154,7 @@ fun MainScreen(
     SystemBarsFollowTheme(dark)
 
     // A tune plays back untouched for up to a minute or two, and a child plays it back to the phone with both hands on the flute: the screen must not time out under either.
-    KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.isRunning)
+    KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.keepsScreenOn)
 
     // One-shot messages (audio unavailable) as a snackbar.
     val snackbarHostState = remember { SnackbarHostState() }

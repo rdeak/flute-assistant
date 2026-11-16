@@ -131,6 +131,7 @@ class FileSessionRecorder(
             frame.advice.takeUnless { it == TunerAdvice.NONE }?.name.orEmpty(), frame.repeatHeld.toString(), frame.finishing.toString(),
             frame.hearing.name, frame.floor?.let(::level).orEmpty(),
             frame.walk?.index?.toString().orEmpty(), frame.walk?.halfBeat?.toString().orEmpty(), frame.walk?.phase?.name.orEmpty(),
+            frame.pitch?.name.orEmpty(),
         )
         s.csv.write(cells.joinToString(","))
         s.csv.newLine()
@@ -221,8 +222,11 @@ class FileSessionRecorder(
         const val AUDIO = "audio.wav"
         const val FRAMES = "frames.csv"
         const val LOG = "session.log"
-        /** The frame table's columns; `walk,halfBeat,phase` since 2026-11-11 (older tables end at `floor`). */
-        const val HEADER = "frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase"
+        /**
+         * The frame table's columns; `walk,halfBeat,phase` since 2026-11-11 (older tables end at `floor`), `pitch` (the arrow
+         * of a note walked off its pitch: HIGH, LOW or empty) since 2026-11-14 (older tables end at `phase`).
+         */
+        const val HEADER = "frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch"
         /** The rate of an empty `audio.wav` when the microphone never opened. */
         const val DEFAULT_RATE = 48_000
     }

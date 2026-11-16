@@ -36,10 +36,13 @@ change that part). The songbook is in `SONGBOOK.md`.
   note starts; the metronome decides how long it lasts: a note counts once it has sounded its
   written length less three quarters of a beat (`ListenRun.LENGTH_SLACK`, the user's pick of
   2026-11-13) and at most 3 s (`MAX_NEED_MS`), both changed only from recorded sessions (sweeps of
-  `lengthSlack`, `maxNeedMs`), and one cut short is played again. Only a gap cuts a note: its own
+  `lengthSlack`, `maxNeedMs`). One let go too early gets ⏳ and the run moves on (since 2026-11-14,
+  `ListenRun.Rules.shortMovesOn`; it was played again before): the animal stands where it got to for the
+  rest of its written time, and the note that cut it is judged for the next step. Only a gap cuts a note: its own
   letter started again with no gap is the note going on (`ListenRun.Rules.restartCuts`: a child's
   breath dips like a tongued stop). The animal walks a note only while the child plays it and never hops twice in one
-  place; it moves in silence only on from a note that was long enough, through the rest of that note's
+  place; it moves in silence only on from a note that was long enough or let go too early (⏳, where it stands
+  still), through the rest of that note's
   written time and any rests after it (ringed and walked as in Play, `Walk.Phase.REST`,
   `ListenRun.Rules.walkRests`), to the head of the next note, where it waits; a note started during
   a rest counts at once. `ListenRun`'s own rules are
@@ -51,9 +54,12 @@ change that part). The songbook is in `SONGBOOK.md`.
   your fingers" until the right one (the user's pick of 2026-11-10). Not the fingering under every
   note, and no fingering on a phone on its side: `DESIGN.md`, "The room under the stage".
 - The line says why, in a few words with an emoji, and a guess says "maybe" (the user's ask of
-  2026-11-13): "Hold it until the ⭐" for a note stopped early, "Maybe out of air?" for one that faded
-  (`ListenRun.FADE_RATIO`), "Maybe too high?" for a wrong note just above the written one
-  (`WrongNote.tooHigh`, never "too low"). Only what the phone detects; a guess stated as fact is a bug.
+  2026-11-13): "⏳ Too short, hold longer" (⏳, the note's own mark; "Hold it until the ⭐" until the run moved
+  on, the user's wording of 2026-11-15) for a note let go too early, "Maybe out
+  of air?" for one that faded (`ListenRun.FADE_RATIO`). Only what the phone detects; a guess stated as
+  fact is a bug. Since 2026-11-14 a note off its pitch has the tuner's own words, "A little lower" or
+  "A little higher", while it sounds and after it is marked, until the next note is judged; never the
+  fingering (the fingers were right). "Maybe too high? Gentler air" is gone.
 - The room is not judged: a clear pitch under `NoteOnsetTracker.MIN_LEVEL` (0.45) is not a note
   (`FrameDecision.FAINT`) and can earn no mark; the child sees the dots and, after a second of it,
   "Come closer". Change the number only from recorded sessions (a sweep of `minLevel`), never by
@@ -65,8 +71,20 @@ change that part). The songbook is in `SONGBOOK.md`.
 - Text and emoji on the staff are sized in dp, so they stay in the staff at any text size.
 - The running staff keeps the note before the lit one at its left (`Bars.anchor`) and scrolls on only
   as far as the walking animal needs to stay in view (`StaffGeometry.followScroll`).
-- Your turn judges the nearest semitone. A sharp flute's B heard as C is the flute's tuning, not
-  a wider net: the user kept exact semitones on 2026-11-13 (`DESIGN.md`, "The first runs with the walk").
+- Feedback, not stars (the user, 2026-11-14: "it's about giving right feedback how far it's from
+  correct tone and cadence"; spec `docs/superpowers/specs/2026-11-14-flute-your-turn-feedback-design.md`,
+  `DESIGN.md`, "Feedback, not stars"). The right fingering played off gets a remark and the run moves on;
+  a wrong fingering still waits. A note up to 75 cents above the written one is the written note blown
+  high (`TuneCheck.HIGH_CENTS`, rule `highCents`); under it the semitone's 50 hold, so an F sharp
+  fingered for G stays wrong. Off pitch is beyond 25 cents (`ListenRun.TUNE_CENTS`, rule `tuneCents`):
+  an arrow beside the note's live bubble, which shows the written letter, and its mark is ⬇️ or ⬆️ in
+  the star's place, the arrow at the moment it is long enough. Marks: ⭐, faint ⭐ (after a wrong note,
+  or a repeat the phone could not hear), ⬇️, ⬆️, ⏳; a sign says more than the faint star. Change the
+  numbers only from recorded sessions (sweeps of `tuneCents`, `highCents`). This overturned exact
+  semitones (2026-11-13) and "a note cut short is played again" (2026-11-11).
+- A finished run played at another animal's speed than the knob's says so in one line, "🐢 Slower
+  than the 🐇", the child's animal first (`Pace`, rules `paceMinPairs` 6 and `paceOff` 15%); its
+  screen stays as the run ended, the microphone closed, until Stop. No other summary.
 - Log event names under `FA.Flute` are stable. They are listed in `FluteViewModel`'s comment, and
   with what each means in `DESIGN.md` ("Log events").
 

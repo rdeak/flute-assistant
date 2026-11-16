@@ -3,6 +3,8 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
+import hr.bertlab.fluteassistant.domain.tuner.NoteMath
+import kotlin.math.pow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -11,6 +13,9 @@ import org.junit.Test
 class TuneCheckTest {
 
     private fun q(midi: Int) = TuneNote(midi, NoteLength.QUARTER)
+
+    /** The frequency of [midi] [cents] off it: where a note locked. */
+    private fun hz(midi: Int, cents: Double) = NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0)
 
     @Test
     fun `waits on the first note, skipping rests and breaths, and on nothing in a tune without notes`() {
@@ -202,5 +207,75 @@ class TuneCheckTest {
         assertEquals(Verdict.IGNORED, check.judge(67, fresh = false, begun = true))
         assertEquals(Verdict.RETRY, check.judge(60, fresh = false, begun = true))
         assertEquals("not begun, the same step back is the first c's tail", Verdict.IGNORED, check.judge(60, fresh = false))
+    }
+
+    // Since 2026-11-14 ("feedback, not stars"): the right fingering blown high is the written note, and a step's mark
+    // says how it was played.
+
+    @Test
+    fun `a note up to 75 cents above the written one is the written note blown high`() {
+        val check = TuneCheck(listOf(q(71), q(69)))
+        assertEquals(Verdict.RIGHT, check.judge(72, fresh = true, lockHz = hz(71, 71.0))) // the highest of 2026-11-14 was 71.04
+        assertEquals(StepMark.HIGH, check.earn(StepMark.HIGH))
+        assertEquals(mapOf(0 to StepMark.HIGH), check.marks)
+    }
+
+    @Test
+    fun `a note 76 cents above, or with no pitch known, is another note`() {
+        val check = TuneCheck(listOf(q(71)))
+        assertEquals(Verdict.WRONG, check.judge(72, fresh = true, lockHz = hz(71, 76.0)))
+        assertEquals(Verdict.WRONG, check.judge(72, fresh = true))
+    }
+
+    @Test
+    fun `a note under the written one is another note however near`() {
+        // 2026-11-13: an f sharp fingered for g came out 52 to 72 cents under the g.
+        assertEquals(Verdict.WRONG, TuneCheck(listOf(q(67))).judge(66, fresh = true, lockHz = hz(67, -60.0)))
+    }
+
+    @Test
+    fun `with the band at nothing a note above is another note, as before 2026-11-14`() {
+        assertEquals(Verdict.WRONG, TuneCheck(listOf(q(71)), highCents = 0.0).judge(72, fresh = true, lockHz = hz(71, 60.0)))
+    }
+
+    @Test
+    fun `the note after unheard repeats, blown high, forgives them`() {
+        val check = TuneCheck(listOf(q(67), q(67), q(71)))
+        check.judge(67, fresh = true)
+        check.earn()
+        assertEquals(Verdict.RIGHT, check.judge(72, fresh = true, lockHz = hz(71, 57.0)))
+        assertEquals(listOf(1), check.forgiven)
+        assertEquals(2, check.index)
+    }
+
+    @Test
+    fun `the tail of a note blown high is ignored, in any octave`() {
+        val check = TuneCheck(listOf(q(71), q(69)))
+        check.judge(72, fresh = true, lockHz = hz(71, 60.0))
+        check.earn(StepMark.HIGH)
+        assertEquals(Verdict.IGNORED, check.judge(84, fresh = false, lockHz = hz(83, 60.0)))
+    }
+
+    @Test
+    fun `a slur up a semitone onto a note a little flat is that note`() {
+        val check = TuneCheck(listOf(q(71), q(72)))
+        check.judge(71, fresh = true)
+        check.earn()
+        assertEquals(Verdict.RIGHT, check.judge(72, fresh = false, lockHz = hz(72, -30.0)))
+    }
+
+    @Test
+    fun `a sign says more than the faint star`() {
+        val check = TuneCheck(listOf(q(60)))
+        check.judge(64, fresh = true) // a wrong note first
+        check.judge(60, fresh = true)
+        assertEquals(StepMark.SHORT, check.earn(StepMark.SHORT))
+    }
+
+    @Test
+    fun `cents from a written note are read in its nearest octave`() {
+        assertEquals(60.0, TuneCheck.centsFrom(hz(83, 60.0), 71), 1e-6)
+        assertEquals(-40.0, TuneCheck.centsFrom(hz(59, -40.0), 71), 1e-6)
+        assertEquals(-60.0, TuneCheck.centsFrom(hz(66, 40.0), 67), 1e-6)
     }
 }

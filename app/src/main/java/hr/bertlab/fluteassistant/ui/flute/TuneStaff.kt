@@ -80,6 +80,7 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.Bars
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -91,9 +92,12 @@ import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
+import hr.bertlab.fluteassistant.ui.common.HIGH_EMOJI
+import hr.bertlab.fluteassistant.ui.common.LOW_EMOJI
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.RETRY_STAR_ALPHA
+import hr.bertlab.fluteassistant.ui.common.SHORT_EMOJI
 import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.facingRight
@@ -219,6 +223,7 @@ fun TuneStaff(
     animal: StaffAnimal? = null,
     wrong: WrongNote? = null,
     heardNow: Int? = null,
+    pitch: Pitch? = null,
     scale: Float = 1f,
     listState: LazyListState = rememberLazyListState(),
 ) {
@@ -250,7 +255,7 @@ fun TuneStaff(
             if (tune.isEmpty()) {
                 EmptyHint()
             } else {
-                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, ink, measurer, listState)
+                TuneMarks(tune, litIndex, heldIndex, timeSignature, marks, animal, wrong, heardNow, pitch, ink, measurer, listState)
             }
         }
     }
@@ -370,6 +375,7 @@ private fun TuneMarks(
     animal: StaffAnimal?,
     wrong: WrongNote?,
     heardNow: Int?,
+    pitch: Pitch?,
     ink: StaffInk,
     measurer: TextMeasurer,
     listState: LazyListState,
@@ -408,7 +414,7 @@ private fun TuneMarks(
                 .semantics { contentDescription = description },
             contentPadding = PaddingValues(
                 start = ((StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP) * s).dp,
-                end = (StaffGeometry.NOTES_END_PADDING * s).dp,
+                end = (StaffGeometry.endPadding(running = animal != null) * s).dp,
             ),
         ) {
             items(lineMarks) { mark ->
@@ -424,6 +430,7 @@ private fun TuneMarks(
                             waiting = waiting,
                             heard = wrong?.takeIf { it.index == mark.index }?.midi,
                             heardNow = heardNow.takeIf { waiting },
+                            pitch = pitch.takeIf { waiting },
                             ink = ink,
                         )
                     }
@@ -521,6 +528,7 @@ private fun StepMark(
     waiting: Boolean,
     heard: Int?,
     heardNow: Int?,
+    pitch: Pitch?,
     ink: StaffInk,
 ) {
     val s = LocalStaffScale.current
@@ -534,6 +542,9 @@ private fun StepMark(
         waiting -> stringResource(R.string.flute_listen_here)
         mark == StepMark.FIRST_TRY -> stringResource(R.string.flute_mark_first_try)
         mark == StepMark.RETRY -> stringResource(R.string.flute_mark_retry)
+        mark == StepMark.HIGH -> stringResource(R.string.flute_mark_high)
+        mark == StepMark.LOW -> stringResource(R.string.flute_mark_low)
+        mark == StepMark.SHORT -> stringResource(R.string.flute_mark_short)
         else -> null
     }
     val description = if (earned == null) name else "$name, $earned"
@@ -550,7 +561,7 @@ private fun StepMark(
             },
     ) {
         NameRow(item, parts, lit, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
-        MarkRow(mark, heard, heardNow, waiting, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
+        MarkRow(mark, heard, heardNow, pitch, waiting, Modifier.offset(y = (StaffGeometry.MARKS_TOP * s).dp))
     }
 }
 
@@ -558,21 +569,30 @@ private fun StepMark(
  * The marks row of one step, in the first beat's room so what stands there stands under the head
  * and the name: under the step waited on, the note the phone hears right now ([heardNow]) as a
  * bubble, else the wrong note [heard] for it as a bubble, else, while [waiting] in silence, the
- * grey listening dots; otherwise the star the step earned ([mark], faint after a retry), else
- * nothing. Sized in dp like the staff's other text, so large text never pushes it out of the row.
+ * grey listening dots; otherwise the star the step earned ([mark], faint after a retry) or, since
+ * 2026-11-14, the sign in its place for the right note played off (too high, too low, let go too
+ * early), else nothing. A note sounding off its pitch ([pitch]) has its arrow just right of its
+ * bubble, over the next step's marks room, which is empty then; the bubble does not move. Sized in
+ * dp like the staff's other text, so large text never pushes it out of the row.
  */
 @Composable
-private fun MarkRow(mark: StepMark?, heard: Int?, heardNow: Int?, waiting: Boolean, modifier: Modifier = Modifier) {
+private fun MarkRow(mark: StepMark?, heard: Int?, heardNow: Int?, pitch: Pitch?, waiting: Boolean, modifier: Modifier = Modifier) {
     val s = LocalStaffScale.current
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.size((StaffGeometry.BEAT_WIDTH * s).dp, (StaffGeometry.MARKS_HEIGHT * s).dp),
     ) {
         when {
-            heardNow != null -> HeardBubble(heardNow)
+            heardNow != null -> {
+                HeardBubble(heardNow)
+                if (pitch != null) PitchArrow(pitch)
+            }
             heard != null -> HeardBubble(heard)
             waiting -> ListeningBubble()
             mark == StepMark.FIRST_TRY -> Emoji(STAR_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            mark == StepMark.HIGH -> Emoji(HIGH_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            mark == StepMark.LOW -> Emoji(LOW_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            mark == StepMark.SHORT -> Emoji(SHORT_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.RETRY -> Emoji(
                 STAR_EMOJI,
                 fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s),
@@ -613,6 +633,21 @@ private fun HeardBubble(midi: Int) {
             autoSize = TextAutoSize.StepBased(minFontSize = 9.sp, maxFontSize = (14 * s).sp),
         )
     }
+}
+
+/**
+ * The arrow beside the live bubble of the right note sounding off its pitch ([Pitch.HIGH]: down, a little lower), its
+ * middle just right of the bubble's edge, overlapping it by a dp as in the mockup the user picked from on 2026-11-14.
+ */
+@Composable
+private fun PitchArrow(pitch: Pitch) {
+    val s = LocalStaffScale.current
+    val x = StaffGeometry.PITCH_ARROW_X
+    Emoji(
+        if (pitch == Pitch.HIGH) HIGH_EMOJI else LOW_EMOJI,
+        fontSize = emojiSizeFor(StaffGeometry.PITCH_ARROW_SIZE * s),
+        modifier = Modifier.offset(x = (x * s).dp),
+    )
 }
 
 /**

@@ -7,6 +7,7 @@ import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -46,8 +47,8 @@ class FileSessionRecorderTest {
         decision: FrameDecision = FrameDecision.SHOWN, sounding: Int? = 71, onset: NoteOnsetTracker.Onset? = NoteOnsetTracker.Onset(71, fresh = true),
         floor: Float? = null, verdict: Verdict? = Verdict.RIGHT, waited: Int? = 0, expected: Int? = 71, heardNow: Int? = null,
         advice: TunerAdvice = TunerAdvice.NONE, repeatHeld: Boolean = false, finishing: Boolean = false, hearing: Hearing = Hearing.CLEAR,
-        walk: Walk? = null,
-    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing, walk)
+        walk: Walk? = null, pitch: Pitch? = null,
+    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing, walk, pitch)
 
     private fun sessions(root: File = folder.root) = File(root, "sessions").listFiles().orEmpty().sortedBy { it.name }
 
@@ -80,8 +81,14 @@ class FileSessionRecorderTest {
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(24, rules.size)
+        assertEquals(30, rules.size)
         assertEquals("1", rules["walkRests"])
+        assertEquals("75.0", rules["highCents"])
+        assertEquals("25.0", rules["tuneCents"])
+        assertEquals("3", rules["tuneFrames"])
+        assertEquals("1", rules["shortMovesOn"])
+        assertEquals("6", rules["paceMinPairs"])
+        assertEquals("0.15", rules["paceOff"])
         assertEquals("1.5", rules["lengthSlack"])
         assertEquals("0", rules["restartCuts"])
         assertEquals("2", rules["graceFrames"])
@@ -108,9 +115,9 @@ class FileSessionRecorderTest {
         r.frame(frame(f = null, p = 0.0, level = 0.05f, minLevel = 0.04f, decision = FrameDecision.SILENT, sounding = null, onset = null, floor = 0.05f, verdict = null, waited = 3, expected = 72, heardNow = 60, advice = TunerAdvice.COME_CLOSER, repeatHeld = true, finishing = true, hearing = Hearing.QUIET_UNCLEAR))
         r.end(emptyMap())
         val csv = File(sessions().single(), "frames.csv").readLines()
-        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase", csv[0])
-        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,,,,", csv[1])
-        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500,,,", csv[2])
+        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch", csv[0])
+        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,,,,,", csv[1])
+        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500,,,,", csv[2])
         assertEquals(3, csv.size)
     }
 
@@ -123,7 +130,18 @@ class FileSessionRecorderTest {
         r.end(emptyMap())
         val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
         assertEquals(listOf("HOLD_LONGER"), row.filter { it == "HOLD_LONGER" })
-        assertEquals(listOf("3", "2", "SHORT"), row.takeLast(3))
+        assertEquals(listOf("3", "2", "SHORT", ""), row.takeLast(4))
+    }
+
+    @Test
+    fun `a frame of a note sounding off its pitch keeps its arrow`() {
+        val r = recorder()
+        r.start(tune, pulse, floor = null)
+        r.opened(48_000, "MIC")
+        r.frame(frame(walk = Walk(0, 0, Walk.Phase.SOUNDING), advice = TunerAdvice.TOO_HIGH, pitch = Pitch.HIGH))
+        r.end(emptyMap())
+        val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
+        assertEquals(listOf("0", "0", "SOUNDING", "HIGH"), row.takeLast(4))
     }
 
     @Test

@@ -98,9 +98,8 @@
     <string name="advice_gentler_air">🍃 Nježniji zrak</string>
     <string name="advice_check_fingers">👀 Provjeri prste</string>
     <string name="advice_play_again">🔁 Stani, pa odsviraj opet</string>
-    <string name="advice_hold_longer">🌬️ Drži notu do ⭐</string>
+    <string name="advice_hold_longer">⏳ Prekratko, drži dulje</string>
     <string name="advice_out_of_air">😮‍💨 Možda nema zraka? Udahni</string>
-    <string name="advice_too_high">🍃 Možda previsoko? Nježniji zrak</string>
     <string name="mic_permission_title">Smijem li slušati?</string>
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
     <string name="mic_failed">Sada ne mogu slušati.</string>
@@ -185,9 +184,14 @@
     <string name="flute_note_half_beat">%1$s, pola dobe</string>
     <string name="flute_mark_first_try">pogodak</string>
     <string name="flute_mark_retry">pogodak iz drugog puta</string>
+    <string name="flute_mark_high">previsoko</string>
+    <string name="flute_mark_low">prenisko</string>
+    <string name="flute_mark_short">prekratko</string>
     <string name="flute_mark_heard">čujem %1$s</string>
     <string name="flute_listen_here">sviraj ovu</string>
     <string name="flute_play_prompt">🪈 Odsviraj %1$s</string>
+    <string name="flute_speed_slower">%1$s Sporije od %2$s</string>
+    <string name="flute_speed_faster">%1$s Brže od %2$s</string>
     <!-- Croatian music schools name octaves c1, c2, c3 (jednocrtna, dvocrtna, trocrtna), with
          the one-lined octave starting at middle C -->
     <bool name="note_octaves_helmholtz">true</bool>

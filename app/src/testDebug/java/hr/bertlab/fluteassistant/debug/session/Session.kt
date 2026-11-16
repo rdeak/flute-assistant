@@ -6,6 +6,7 @@ package hr.bertlab.fluteassistant.debug.session
 import hr.bertlab.fluteassistant.core.log.LogLine
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -46,6 +47,8 @@ class Session(
     val pulse: Pulse = Pulse(60),
     /** Whether `frames.csv` has the walk's columns (since 2026-11-11): only then do the [rows] say where the animal was. */
     val recordsWalk: Boolean = false,
+    /** Whether `frames.csv` has the `pitch` column (since 2026-11-14): only then do the [rows] say which arrow showed. */
+    val recordsPitch: Boolean = false,
 ) {
     /** The [audio] as the engine frames it, detected once however many rules it is then replayed under. */
     val frames: ListenPath.Frames by lazy { ListenPath.frames(audio.samples, audio.sampleRate) }
@@ -84,10 +87,10 @@ class Session(
                 }
             }
             val audio = WavFile.read(File(dir, FileSessionRecorder.AUDIO))
-            val (rows, recordsWalk) = rows(File(dir, FileSessionRecorder.FRAMES), audio.sampleRate)
+            val table = rows(File(dir, FileSessionRecorder.FRAMES), audio.sampleRate)
             return Session(
                 dir, tune.values.toList(), audio, floor,
-                rows, events, rules, facts, pin, pulse, recordsWalk,
+                table.rows, events, rules, facts, pin, pulse, table.recordsWalk, table.recordsPitch,
             )
         }
 
@@ -101,14 +104,21 @@ class Session(
         fun spell(marks: Map<Int, StepMark>): String =
             marks.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value.name}" }
 
-        /** The rows of [csv], and whether it has the walk's columns (a table from before 2026-11-11 ends at `floor`). */
-        private fun rows(csv: File, rate: Int): Pair<List<ListenPath.Step>, Boolean> {
-            if (!csv.isFile) return emptyList<ListenPath.Step>() to false // a pinned folder may keep only the audio and the log
+        /** A frame table read back: its rows, and which of the younger columns it has. */
+        private class Table(val rows: List<ListenPath.Step>, val recordsWalk: Boolean, val recordsPitch: Boolean)
+
+        /**
+         * The rows of [csv], and whether it has the walk's columns (a table from before 2026-11-11 ends at `floor`) and the
+         * arrow's (before 2026-11-14 it ends at `phase`).
+         */
+        private fun rows(csv: File, rate: Int): Table {
+            if (!csv.isFile) return Table(emptyList(), false, false) // a pinned folder may keep only the audio and the log
             val lines = csv.readLines().filter { it.isNotBlank() }
-            if (lines.isEmpty()) return emptyList<ListenPath.Step>() to false
+            if (lines.isEmpty()) return Table(emptyList(), false, false)
             val columns = lines.first().split(',').withIndex().associate { it.value to it.index }
             val recordsWalk = "phase" in columns
-            return lines.drop(1).map { line ->
+            val recordsPitch = "pitch" in columns
+            val rows = lines.drop(1).map { line ->
                 val cells = line.split(',')
                 fun cell(name: String) = cells.getOrNull(columns.getValue(name)).orEmpty()
                 val sounding = cell("sounding").toIntOrNull()
@@ -140,9 +150,11 @@ class Session(
                     finishing = cell("finishing").toBoolean(),
                     hearing = Hearing.entries.firstOrNull { it.name == cell("hearing") } ?: Hearing.CLEAR,
                     walk = walk,
+                    pitch = if (recordsPitch) cell("pitch").takeIf { it.isNotEmpty() }?.let(Pitch::valueOf) else null,
                 )
                 ListenPath.Step(cell("frame").toInt(), row)
-            } to recordsWalk
+            }
+            return Table(rows, recordsWalk, recordsPitch)
         }
     }
 }

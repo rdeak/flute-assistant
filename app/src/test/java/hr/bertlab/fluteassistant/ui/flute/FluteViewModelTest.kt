@@ -11,6 +11,7 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
+import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -1652,7 +1653,7 @@ class FluteViewModelTest {
     }
 
     @Test
-    fun `a note cut short logs flute short and keeps the marks empty`() = runTest(dispatcher) {
+    fun `a note let go too early logs flute short, shows its hourglass and the run goes on`() = runTest(dispatcher) {
         val vm = listeningViewModel(TuneNote(60, HALF), q(62))
         play(60)
         val short = logger.events("flute.short").single()
@@ -1660,9 +1661,10 @@ class FluteViewModelTest {
         assertEquals(625L, short["needMs"])
         assertEquals(false, short["faded"])
         assertTrue("$short", (short["heldMs"] as Long) < 625)
-        assertTrue(vm.current.marks.isEmpty())
+        assertEquals(mapOf(0 to StepMark.SHORT), vm.current.marks)
+        assertEquals("the run is on the next note", 1, vm.current.listening?.index)
         assertEquals(TunerAdvice.HOLD_LONGER, vm.current.advice)
-        assertEquals(0, vm.current.animalIndex)
+        assertEquals("the animal stands where it got to", 0, vm.current.animalIndex)
         assertNull(vm.current.fingeringMidi)
     }
 
@@ -1674,5 +1676,85 @@ class FluteViewModelTest {
         assertTrue(vm.current.marks.isEmpty())
         repeat(framesFor(1250.0) - framesFor(625.0)) { emit(pitched(60)) } // enough at 60
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), vm.current.marks)
+    }
+
+    // ---- Feedback, not stars (2026-11-14) ----
+
+    @Test
+    fun `a note blown high earns the down arrow and its reading is logged`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        repeat(quarterFrames) { emit(pitched(60, cents = 60.0)) }
+        assertEquals(mapOf(0 to StepMark.HIGH), vm.current.marks)
+        val held = logger.events("flute.held").single()
+        assertEquals("high", held["mark"])
+        assertEquals(60.0, held["cents"] as Double, 1.0)
+    }
+
+    @Test
+    fun `a note let go too early logs its hourglass`() = runTest(dispatcher) {
+        listeningViewModel(TuneNote(60, HALF), q(62))
+        play(60)
+        assertEquals("short", logger.events("flute.short").single()["mark"])
+    }
+
+    @Test
+    fun `a finished run at another animal's speed keeps its screen until the pill`() = runTest(dispatcher) {
+        val vm = listeningViewModel(*Array<TuneItem>(8) { q(if (it % 2 == 0) 60 else 62) })
+        repeat(8) { n ->
+            play(if (n % 2 == 0) 60 else 62)
+            repeat(22 - quarterFrames - NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) } // a note every 22 frames: 64 a minute
+        }
+        assertTrue("the screen stays", vm.current.isListening)
+        assertEquals(Pace(bpm = 64, pairs = 7, knobBpm = 120, speaks = true), vm.current.pace)
+        assertNull(vm.current.litIndex)
+        val done = logger.events("flute.listen_done").single()
+        assertEquals(64, done["bpm"])
+        assertEquals(7, done["pairs"])
+        assertEquals(120, done["knob"])
+        assertEquals(true, done["speed"])
+        assertEquals(8, done["stars"])
+        assertEquals("the run itself is over: the recorder ended once", 1, recorder.ended.size)
+        assertEquals("the microphone is closed", 0, engine.frames.subscriptionCount.value)
+        val held = vm.current
+        play(60) // nothing reaches a run: nothing changes
+        assertEquals(held, vm.current)
+        vm.stopRun()
+        assertFalse(vm.current.isListening)
+        assertEquals(8, vm.current.marks.size)
+        assertEquals(true, logger.events("flute.listen_stop").single()["over"])
+        assertEquals("closing the screen ends nothing twice", 1, recorder.ended.size)
+        vm.startListening()
+        runCurrent()
+        assertTrue(vm.current.isListening)
+        assertTrue(vm.current.marks.isEmpty())
+        assertNull(vm.current.pace)
+        assertEquals(2, engine.subscriptions)
+    }
+
+    @Test
+    fun `a finished run at the knob's own speed closes by itself as before`() = runTest(dispatcher) {
+        val vm = listeningViewModel(*Array<TuneItem>(8) { q(if (it % 2 == 0) 60 else 62) })
+        repeat(8) { n ->
+            play(if (n % 2 == 0) 60 else 62)
+            repeat(12 - quarterFrames - NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) } // 12 frames a note: 117 a minute, the rabbit
+        }
+        assertFalse(vm.current.isListening)
+        assertEquals(false, logger.events("flute.listen_done").single()["speed"])
+    }
+
+    @Test
+    fun `leaving the tab closes an ended run's screen`() = runTest(dispatcher) {
+        val vm = listeningViewModel(*Array<TuneItem>(8) { q(if (it % 2 == 0) 60 else 62) })
+        repeat(8) { n ->
+            play(if (n % 2 == 0) 60 else 62)
+            repeat(22 - quarterFrames - NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
+        }
+        assertTrue(vm.current.isListening)
+        vm.leaveTab()
+        assertFalse(vm.current.isListening)
+        val stop = logger.events("flute.listen_stop").single()
+        assertEquals("leave", stop["reason"])
+        assertEquals(true, stop["over"])
+        assertEquals(1, recorder.ended.size)
     }
 }

@@ -33,7 +33,7 @@ object FluteSound {
      * when given (a noisy inhale). The second note is at [secondDb] when given. Every note
      * wobbles by [wobbleDb] either way at 5 Hz; the last note sags by [sagCents] and fades by
      * [fadeDb] over its length; a burst of noise at [blinkDb] covers two frames in the middle of
-     * the first note.
+     * the first note. Every note is [cents] off the B (a flute blown high or low).
      */
     fun sound(
         gapsMs: Int,
@@ -47,6 +47,7 @@ object FluteSound {
         sagCents: Double = 0.0,
         fadeDb: Double = 0.0,
         blinkDb: Double? = null,
+        cents: Double = 0.0,
     ): DoubleArray {
         val leadMs = 500 // the room alone, as the child picks up the flute
         val noteMs = intArrayOf(400, 400, 1500)
@@ -57,7 +58,7 @@ object FluteSound {
         for ((n, ms) in noteMs.withIndex()) {
             starts[n] = at
             val db = if (n == 1) secondDb else toneDb
-            note(dry, at, ms, 10.0.pow(db / 20.0), wobbleDb, if (n == 2) sagCents else 0.0, if (n == 2) fadeDb else 0.0)
+            note(dry, at, ms, 10.0.pow(db / 20.0), wobbleDb, if (n == 2) sagCents else 0.0, if (n == 2) fadeDb else 0.0, cents)
             at += (ms + gapsMs) * rate / 1000
         }
         val wet = reverb(dry, roomDb, rt60)
@@ -88,11 +89,11 @@ object FluteSound {
      * wobbling [wobbleDb] either way at 5 Hz, drifting by [sagCents] and fading by [fadeDb] over
      * its length.
      */
-    private fun note(out: DoubleArray, at: Int, ms: Int, amp: Double, wobbleDb: Double, sagCents: Double, fadeDb: Double) {
+    private fun note(out: DoubleArray, at: Int, ms: Int, amp: Double, wobbleDb: Double, sagCents: Double, fadeDb: Double, cents: Double) {
         val n = ms * rate / 1000
         var phase = 0.0
         for (i in 0 until n) {
-            val f = NoteMath.midiToFrequency(71) * 2.0.pow(sagCents * i / n / 1200.0)
+            val f = NoteMath.midiToFrequency(71) * 2.0.pow((cents + sagCents * i / n) / 1200.0)
             phase += 2 * PI * f / rate
             val env = min(1.0, i / (0.030 * rate)) * min(1.0, (n - i) / (0.010 * rate))
             val loudness = 10.0.pow((wobbleDb * sin(2 * PI * 5 * i / rate) + fadeDb * i / n) / 20.0)
