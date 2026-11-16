@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.audio.TONE_VOLUME
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.DOTTED_HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
@@ -44,9 +45,11 @@ import hr.bertlab.fluteassistant.fakes.FakeSettingsStore
 import hr.bertlab.fluteassistant.fakes.FakeTunerEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -1141,15 +1144,16 @@ class FluteViewModelTest {
         val vm = listeningViewModel(q(60), q(60))
         sound(60)
         assertEquals(TunerAdvice.NONE, vm.current.advice)
-        // Counted from the end of the first note's written length: until then holding it is right.
+        // Counted from the end of the first note's written length. By then the note held on is too long (since 2026-11-16),
+        // which its line says until the repeat's line, which stands before it, and again once the child stops.
         while (vm.current.listening?.walk != null) emit(pitched(60))
         repeat(ListenRun.REPEAT_ADVICE_FRAMES - 1) { emit(pitched(60)) }
-        assertEquals(TunerAdvice.NONE, vm.current.advice)
+        assertEquals(TunerAdvice.TOO_LONG, vm.current.advice)
         emit(pitched(60))
         assertEquals(TunerAdvice.PLAY_AGAIN, vm.current.advice)
         assertEquals(1, vm.current.listening?.index)
         repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
-        assertEquals(TunerAdvice.NONE, vm.current.advice)
+        assertEquals(TunerAdvice.TOO_LONG, vm.current.advice)
         play(60) // started again: the repeat
         assertFalse(vm.current.isListening)
     }
@@ -1756,5 +1760,84 @@ class FluteViewModelTest {
         assertEquals("leave", stop["reason"])
         assertEquals(true, stop["over"])
         assertEquals(1, recorder.ended.size)
+    }
+
+    // Practice and Exam (2026-11-16): the level is read, saved and chosen before the first note is judged.
+
+    @Test
+    fun `the level is read from the settings and a run is judged by it`() = runTest(dispatcher) {
+        settings.listenLevel = ListenLevel.EXAM
+        val vm = listeningViewModel()
+        assertEquals(ListenLevel.EXAM, recorder.started.single().level)
+        assertEquals(ListenLevel.EXAM, vm.current.level)
+        assertEquals("exam", logger.events("flute.listen").single()["level"])
+    }
+
+    @Test
+    fun `choosing a level saves it and says so`() {
+        val vm = viewModel()
+        vm.chooseLevel(ListenLevel.EXAM)
+        assertEquals(ListenLevel.EXAM, settings.listenLevel)
+        assertEquals(ListenLevel.EXAM, vm.current.level)
+        val said = logger.events("flute.level").single()
+        assertEquals("exam", said["level"])
+        assertEquals(false, said["restarted"])
+        vm.chooseLevel(ListenLevel.EXAM)
+        assertEquals(1, logger.events("flute.level").size)
+    }
+
+    @Test
+    fun `a level chosen before the first note starts the run again`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        val states = mutableListOf<FluteUiState>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect { states += it } }
+        vm.chooseLevel(ListenLevel.EXAM)
+        runCurrent()
+        assertEquals(listOf(emptyMap<Int, StepMark>()), recorder.ended)
+        assertEquals(listOf(ListenLevel.PRACTICE, ListenLevel.EXAM), recorder.started.map { it.level })
+        assertTrue("the room never closed", states.none { it.listening == null })
+        assertTrue(vm.current.choosesLevel)
+        assertEquals(true, logger.events("flute.level").single()["restarted"])
+        play(60) // the new run hears the microphone, by Exam's rules: long enough for Practice, too short for Exam
+        assertEquals(StepMark.SHORT, vm.current.marks[0])
+    }
+
+    @Test
+    fun `a level chosen after a note was judged waits for the next run`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        play(60)
+        vm.chooseLevel(ListenLevel.EXAM)
+        runCurrent()
+        assertEquals(1, recorder.started.size)
+        assertEquals(ListenLevel.EXAM, settings.listenLevel)
+        assertEquals(false, logger.events("flute.level").single()["restarted"])
+        vm.stopRun()
+        vm.startListening()
+        runCurrent()
+        assertEquals(ListenLevel.EXAM, recorder.started.last().level)
+    }
+
+    @Test
+    fun `a mark that changes reaches the screen and the log`() = runTest(dispatcher) {
+        val vm = listeningViewModel(q(60), q(62))
+        repeat(framesFor(1200.0)) { emit(pitched(60)) } // a quarter at 120 lasts 500 ms, and Practice's room past it is 375
+        assertEquals(StepMark.LONG, vm.current.marks[0])
+        val changed = logger.events("flute.changed").single()
+        assertEquals(0, changed["index"])
+        assertEquals("long", changed["mark"])
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
+        play(62)
+        assertEquals(1, logger.events("flute.listen_done").single()["long"])
+    }
+
+    @Test
+    fun `the run's end hands the recorder the final marks`() = runTest(dispatcher) {
+        settings.listenLevel = ListenLevel.EXAM
+        val vm = listeningViewModel(q(60))
+        repeat(framesFor(600.0)) { emit(pitched(60)) }
+        repeat(framesFor(800.0)) { emit(pitched(60, cents = 30.0)) }
+        repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
+        assertEquals(mapOf(0 to StepMark.HIGH), recorder.ended.last())
+        assertEquals(StepMark.HIGH, vm.current.marks[0])
     }
 }

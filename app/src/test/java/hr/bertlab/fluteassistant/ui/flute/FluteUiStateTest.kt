@@ -15,6 +15,7 @@ import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import org.junit.Assert.assertEquals
@@ -232,5 +233,18 @@ class FluteUiStateTest {
         val pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true)
         assertFalse(FluteUiState(tune = lamb, listening = Listening(index = 3, finishing = true, pace = pace)).keepsScreenOn)
         assertFalse(FluteUiState(tune = lamb).keepsScreenOn)
+    }
+
+    @Test
+    fun `the level is chosen until the first note is judged`() {
+        val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+        assertFalse(FluteUiState(tune = tune).choosesLevel)
+        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 0)).choosesLevel)
+        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)).choosesLevel) // "Come closer" has the line
+        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 1, walk = Walk(0, 0, Walk.Phase.REST))).choosesLevel) // an opening rest
+        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SOUNDING))).choosesLevel)
+        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, wrong = WrongNote(0, 62))).choosesLevel)
+        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 1), marks = mapOf(0 to StepMark.FIRST_TRY)).choosesLevel)
+        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, finishing = true)).choosesLevel)
     }
 }

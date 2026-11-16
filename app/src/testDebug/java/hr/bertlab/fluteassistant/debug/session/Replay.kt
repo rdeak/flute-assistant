@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.debug.session
 
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -33,13 +34,20 @@ object Replay {
 
     /**
      * [walk]: compare the walk too, which only a session that recorded it can ([Session.recordsWalk]); [pitch]: the arrow
-     * of a note walked off its pitch too ([Session.recordsPitch]).
+     * of a note walked off its pitch too ([Session.recordsPitch]); [changed]: a mark already given that changed
+     * ([Session.recordsChanged], since 2026-11-16).
      */
-    fun diff(phone: List<ListenPath.Step>, replay: List<ListenPath.Step>, walk: Boolean = false, pitch: Boolean = false): Diff {
+    fun diff(
+        phone: List<ListenPath.Step>,
+        replay: List<ListenPath.Step>,
+        walk: Boolean = false,
+        pitch: Boolean = false,
+        changed: Boolean = false,
+    ): Diff {
         var first: Int? = null
         var count = 0
         for ((i, a) in phone.withIndex()) {
-            if (!same(a, replay.getOrNull(i), walk, pitch)) {
+            if (!same(a, replay.getOrNull(i), walk, pitch, changed)) {
                 count++
                 if (first == null) first = a.frame
             }
@@ -47,9 +55,9 @@ object Replay {
         return Diff(first, count, maxOf(0, replay.size - phone.size))
     }
 
-    private fun same(a: ListenPath.Step, b: ListenPath.Step?, walk: Boolean, pitch: Boolean = false): Boolean =
+    private fun same(a: ListenPath.Step, b: ListenPath.Step?, walk: Boolean, pitch: Boolean = false, changed: Boolean = false): Boolean =
         b != null && a.decision == b.decision && a.sounding == b.sounding && a.onset == b.onset && sameVerdict(a, b) &&
-            (!walk || a.walk == b.walk) && (!pitch || a.row.pitch == b.row.pitch)
+            (!walk || a.walk == b.walk) && (!pitch || a.row.pitch == b.row.pitch) && (!changed || a.row.changed == b.row.changed)
 
     /**
      * The same verdict, or the "wrong" a phone logged until 2026-11-13 for a note heard while a note cut short waited,
@@ -73,6 +81,8 @@ object Replay {
         "highCents" to 0.0, // 2026-11-14: the nearest semitone, no band above a written note
         "tuneCents" to Double.POSITIVE_INFINITY, // 2026-11-14: no pitch remark, no arrow
         "shortMovesOn" to 0.0, // 2026-11-14: a note let go too early was waited on
+        "longSlack" to Double.POSITIVE_INFINITY, // 2026-11-16: no note was too long
+        "wholeNote" to 0.0, // 2026-11-16: a mark was final once the note was long enough
     )
 
     /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */
@@ -116,15 +126,16 @@ object Replay {
         out.appendLine("  marks=" + Session.spell(replay.marks))
         val walk = session.recordsWalk
         val pitch = session.recordsPitch
-        val diff = diff(session.rows, replay.steps, walk, pitch)
+        val changed = session.recordsChanged
+        val diff = diff(session.rows, replay.steps, walk, pitch, changed)
         val trailing = if (diff.trailing > 0) " (${diff.trailing} hops after the last row)" else ""
         out.appendLine(if (diff.count == 0) "diff: none$trailing" else "diff: first=${diff.first} count=${diff.count}$trailing")
         if (diff.count > 0) {
             var shown = 0
             for ((i, a) in session.rows.withIndex()) {
                 val b = replay.steps.getOrNull(i)
-                if (same(a, b, walk, pitch)) continue
-                out.appendLine("  frame ${a.frame}: phone ${cells(a, walk, pitch)} / replay ${b?.let { cells(it, walk, pitch) } ?: "no hop"}")
+                if (same(a, b, walk, pitch, changed)) continue
+                out.appendLine("  frame ${a.frame}: phone ${cells(a, walk, pitch, changed)} / replay ${b?.let { cells(it, walk, pitch, changed) } ?: "no hop"}")
                 if (++shown == 10) {
                     out.appendLine("  ...")
                     break
@@ -142,6 +153,12 @@ object Replay {
             for (step in now.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
             out.appendLine("  marks=" + Session.spell(now.marks))
         }
+        // What Exam (2026-11-16) makes of the same sound, the tracker's rules today's.
+        out.appendLine("exam:")
+        val exam = ListenPath.run(session.frames, session.tune, session.pulse, today, session.floor, ListenLevel.EXAM.rules)
+        for (step in exam.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
+        for (step in exam.steps) step.row.changed?.let { out.appendLine("  frame=${step.frame} changed=${it.index}:${it.mark}") }
+        out.appendLine("  marks=" + Session.spell(exam.marks))
         out.appendLine("phone:")
         for (step in session.rows) if (step.onset != null) out.appendLine("  " + onset(step, rate))
         out.appendLine("events:")
@@ -183,10 +200,11 @@ object Replay {
         )
     }
 
-    private fun cells(step: ListenPath.Step, walk: Boolean, pitch: Boolean = false) =
+    private fun cells(step: ListenPath.Step, walk: Boolean, pitch: Boolean = false, changed: Boolean = false) =
         "${step.decision} ${step.sounding ?: "-"} ${step.onset?.let { if (it.fresh) "fresh" else "step" } ?: "-"} ${step.verdict?.name?.lowercase(Locale.ROOT) ?: "-"}" +
             (if (walk) " ${step.walk?.let { "${it.index}+${it.halfBeat} ${it.phase}" } ?: "-"}" else "") +
-            if (pitch) " ${step.row.pitch ?: "-"}" else ""
+            (if (pitch) " ${step.row.pitch ?: "-"}" else "") +
+            if (changed) " ${step.row.changed?.let { "${it.index}:${it.mark}" } ?: "-"}" else ""
 
     private fun spell(item: hr.bertlab.fluteassistant.domain.flute.TuneItem) = when (item) {
         is TuneNote -> "${item.midi}/${item.length}"

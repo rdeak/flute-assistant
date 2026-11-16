@@ -25,9 +25,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -50,6 +53,7 @@ import androidx.compose.ui.unit.width
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Pace
@@ -65,6 +69,7 @@ import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
@@ -102,6 +107,7 @@ class FluteScreenTest {
     private val chosenBooks = mutableListOf<Int>()
     private var yourTurns = 0
     private var stops = 0
+    private val levelsChosen = mutableListOf<ListenLevel>()
     private var micRequests = 0
     private var settingsOpens = 0
     private var micDismissals = 0
@@ -150,6 +156,7 @@ class FluteScreenTest {
                             onBookChosen = { chosenBooks += it },
                             onYourTurn = { yourTurns++ },
                             onStop = { stops++ },
+                            onLevelChosen = { levelsChosen += it },
                             onRequestMic = { micRequests++ },
                             onOpenSettings = { settingsOpens++ },
                             onMicDismiss = { micDismissals++ },
@@ -1242,5 +1249,75 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("play this one", substring = true).assertDoesNotExist()
         state.value = state.value.copy(listening = slower.copy(pace = Pace(bpm = 104, pairs = 7, knobBpm = 60, speaks = true)))
         compose.onNodeWithText("🐇 Faster than the 🐢").assertIsDisplayed()
+    }
+
+    // ---- Practice and Exam (2026-11-16): the pair in the listening room, and the hand under a note held too long ----
+
+    @Test
+    fun listening_offers_the_level_until_a_note_is_judged() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        compose.onNodeWithContentDescription("Level").assertIsDisplayed()
+        compose.onNodeWithText("Practice").assertIsSelected()
+        compose.onNodeWithText("Exam").assertIsNotSelected().performClick()
+        assertEquals(listOf(ListenLevel.EXAM), levelsChosen)
+        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1), marks = mapOf(0 to StepMark.FIRST_TRY)) }
+        compose.onNodeWithText("Practice").assertDoesNotExist()
+        compose.onNodeWithText("Exam").assertDoesNotExist()
+        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes) }
+        compose.onNodeWithText("Practice").assertDoesNotExist()
+    }
+
+    @Test
+    fun the_chosen_level_is_lit() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0), level = ListenLevel.EXAM))
+        compose.onNodeWithText("Exam").assertIsSelected()
+        compose.onNodeWithText("Practice").assertIsNotSelected()
+    }
+
+    /** The A55 leaves a tab 653 dp tall: the pair, the line and Stop all fit under the stage. */
+    @Test
+    fun the_level_pair_is_whole_above_stop_on_the_phone() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), height = 653.dp)
+        val group = compose.onNodeWithContentDescription("Level").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val stop = compose.onNodeWithText("Stop").getUnclippedBoundsInRoot()
+        assertTrue("the pair ends at ${group.bottom}, Stop starts at ${stop.top}", group.bottom <= stop.top)
+        val prompt = compose.onNodeWithText("🪈 Play C4").getUnclippedBoundsInRoot()
+        assertTrue("the pair stands under the prompt", group.top >= prompt.bottom)
+        for (word in listOf("Practice", "Exam")) assertWhole("653 dp tab", compose.onNodeWithText(word, useUnmergedTree = true))
+    }
+
+    @Test
+    fun the_level_words_fit_a_narrow_phone() {
+        state = mutableStateOf(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        val locale = mutableStateOf(Locale.ENGLISH)
+        compose.setContent {
+            LocaleProvider(locale.value) {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {
+                    Box(Modifier.width(360.dp)) {
+                        FluteContent(state = state.value, metronome = MetronomeUiState(), actions = FluteActions())
+                    }
+                }
+            }
+        }
+        for ((each, words) in listOf(Locale.ENGLISH to listOf("Practice", "Exam"), Locale("hr") to listOf("Vježba", "Ispit"))) {
+            compose.runOnIdle { locale.value = each }
+            compose.waitForIdle()
+            for (word in words) assertWhole("360 dp, $each", compose.onNodeWithText(word, useUnmergedTree = true), textScale = 1.3f)
+        }
+    }
+
+    @Test
+    fun a_note_held_too_long_shows_the_hand() {
+        show(FluteUiState(tune = twoNotes, marks = mapOf(0 to StepMark.LONG)))
+        compose.onNodeWithContentDescription("C4, 1 beat, held too long").assertExists()
+        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1, remark = StepMark.LONG), marks = mapOf(0 to StepMark.LONG)) }
+        compose.onNodeWithText("✋ Too long, let go sooner").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_note_held_too_long_says_so_in_croatian() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 1, remark = StepMark.LONG), marks = mapOf(0 to StepMark.LONG)), Locale("hr"))
+        compose.onNodeWithText("✋ Predugo, pusti ranije").assertIsDisplayed()
+        compose.onNodeWithContentDescription("c1, 1 doba, predugo").assertExists()
     }
 }

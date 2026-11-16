@@ -18,6 +18,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
@@ -42,6 +43,20 @@ fun NotesGame.labelRes(): Int = when (this) {
     NotesGame.FIND -> R.string.find_note
     NotesGame.HEAR -> R.string.hear_game
 }
+
+/** The level's word in its pill (since 2026-11-16); its picture is [emoji], drawn beside it. */
+@StringRes
+fun ListenLevel.labelRes(): Int = when (this) {
+    ListenLevel.PRACTICE -> R.string.flute_level_practice
+    ListenLevel.EXAM -> R.string.flute_level_exam
+}
+
+/** The level's picture, the user's pick of 2026-11-16: music for Practice, the graduation cap for Exam. */
+val ListenLevel.emoji: String
+    get() = when (this) {
+        ListenLevel.PRACTICE -> "🎵"
+        ListenLevel.EXAM -> "🎓"
+    }
 
 /** The animal's name, for a screen reader: the speed is never read as a number. */
 @StringRes
@@ -69,6 +84,7 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.OUT_OF_AIR -> R.string.advice_out_of_air
     TunerAdvice.TOO_HIGH -> R.string.too_high
     TunerAdvice.TOO_LOW -> R.string.too_low
+    TunerAdvice.TOO_LONG -> R.string.advice_too_long
     TunerAdvice.HEAD_JOINT_IN -> R.string.advice_head_joint_in
     TunerAdvice.HEAD_JOINT_OUT -> R.string.advice_head_joint_out
 }

@@ -149,6 +149,9 @@ tab's CLAUDE.md; these rules hold on all of them:
   sun with no words (`ui/DESIGN.md`). It is part of the frame like the flag, not a control on a tab.
 - Added at the user's request (2026-11-14): the tuner's 🔧 How? button in Tune mode and its four picture
   cards on tuning the flute (`ui/tuner/CLAUDE.md`, "How to tune").
+- Added at the user's request (2026-11-16): the level of Listen to me, 🎵 Practice or 🎓 Exam, chosen in
+  the listening room until the run's first note is judged, never on the writing screen
+  (`ui/flute/CLAUDE.md`, "Two levels").
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than

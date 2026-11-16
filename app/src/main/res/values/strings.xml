@@ -118,6 +118,7 @@
     <!-- The hourglass is the note's own mark when it was let go too early (2026-11-14): the line and the mark are one sign.
          The note is already marked and the run has moved on, so the line is for the next notes: no "until the star". -->
     <string name="advice_hold_longer">⏳ Too short, hold longer</string>
+    <string name="advice_too_long">✋ Too long, let go sooner</string>
     <string name="advice_out_of_air">😮‍💨 Maybe out of air? Big breath first</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
@@ -178,6 +179,10 @@
          playing the tune on a real flute and marks each note. Worded as the child speaking to the phone, like
          Croatian "Poslušaj me" (since 2026-11-04; it said "Your turn") -->
     <string name="flute_your_turn">Listen to me</string>
+    <!-- How closely Listen to me judges, the child's choice in the listening room (2026-11-16): a teacher's words for a test. -->
+    <string name="flute_level">Level</string>
+    <string name="flute_level_practice">Practice</string>
+    <string name="flute_level_exam">Exam</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
     <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->
@@ -226,6 +231,7 @@
     <string name="flute_mark_high">too high</string>
     <string name="flute_mark_low">too low</string>
     <string name="flute_mark_short">let go too early</string>
+    <string name="flute_mark_long">held too long</string>
     <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
     <string name="flute_mark_heard">heard %1$s</string>
     <string name="flute_listen_here">play this one</string>

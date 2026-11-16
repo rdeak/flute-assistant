@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogLine
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Pulse
@@ -49,6 +50,8 @@ class Session(
     val recordsWalk: Boolean = false,
     /** Whether `frames.csv` has the `pitch` column (since 2026-11-14): only then do the [rows] say which arrow showed. */
     val recordsPitch: Boolean = false,
+    /** Whether `frames.csv` has the `changed` column (since 2026-11-16): only then do the [rows] say which mark changed. */
+    val recordsChanged: Boolean = false,
 ) {
     /** The [audio] as the engine frames it, detected once however many rules it is then replayed under. */
     val frames: ListenPath.Frames by lazy { ListenPath.frames(audio.samples, audio.sampleRate) }
@@ -90,7 +93,7 @@ class Session(
             val table = rows(File(dir, FileSessionRecorder.FRAMES), audio.sampleRate)
             return Session(
                 dir, tune.values.toList(), audio, floor,
-                table.rows, events, rules, facts, pin, pulse, table.recordsWalk, table.recordsPitch,
+                table.rows, events, rules, facts, pin, pulse, table.recordsWalk, table.recordsPitch, table.recordsChanged,
             )
         }
 
@@ -105,7 +108,12 @@ class Session(
             marks.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value.name}" }
 
         /** A frame table read back: its rows, and which of the younger columns it has. */
-        private class Table(val rows: List<ListenPath.Step>, val recordsWalk: Boolean, val recordsPitch: Boolean)
+        private class Table(
+            val rows: List<ListenPath.Step>,
+            val recordsWalk: Boolean,
+            val recordsPitch: Boolean,
+            val recordsChanged: Boolean = false,
+        )
 
         /**
          * The rows of [csv], and whether it has the walk's columns (a table from before 2026-11-11 ends at `floor`) and the
@@ -118,6 +126,7 @@ class Session(
             val columns = lines.first().split(',').withIndex().associate { it.value to it.index }
             val recordsWalk = "phase" in columns
             val recordsPitch = "pitch" in columns
+            val recordsChanged = "changed" in columns
             val rows = lines.drop(1).map { line ->
                 val cells = line.split(',')
                 fun cell(name: String) = cells.getOrNull(columns.getValue(name)).orEmpty()
@@ -151,10 +160,14 @@ class Session(
                     hearing = Hearing.entries.firstOrNull { it.name == cell("hearing") } ?: Hearing.CLEAR,
                     walk = walk,
                     pitch = if (recordsPitch) cell("pitch").takeIf { it.isNotEmpty() }?.let(Pitch::valueOf) else null,
+                    changed = if (recordsChanged) cell("changed").takeIf { it.isNotEmpty() }?.let(::markChange) else null,
                 )
                 ListenPath.Step(cell("frame").toInt(), row)
             }
-            return Table(rows, recordsWalk, recordsPitch)
+            return Table(rows, recordsWalk, recordsPitch, recordsChanged)
         }
+
+        /** A `changed` cell, `<index>:<MARK>`. */
+        private fun markChange(cell: String) = MarkChange(cell.substringBefore(':').toInt(), StepMark.valueOf(cell.substringAfter(':')))
     }
 }

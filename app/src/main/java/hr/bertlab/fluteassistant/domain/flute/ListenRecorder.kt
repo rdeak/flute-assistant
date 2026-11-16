@@ -34,7 +34,12 @@ data class ListenFrame(
     val walk: Walk? = null,
     /** Which way the note walked sounded off its pitch after the frame ([Listening.pitch], since 2026-11-14). */
     val pitch: Pitch? = null,
+    /** A mark already given that changed on this frame (since 2026-11-16: held too long, or the whole note's pitch). */
+    val changed: MarkChange? = null,
 )
+
+/** The step at [index], already marked, is marked [mark] instead (since 2026-11-16). */
+data class MarkChange(val index: Int, val mark: StepMark)
 
 /**
  * Keeps a "Your turn" run for inspection afterwards: [start] when the child presses the button
@@ -45,13 +50,14 @@ data class ListenFrame(
  * keeps nothing.
  */
 interface ListenRecorder {
-    fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?)
+    /** A run begins at [level] (since 2026-11-16; [ListenLevel.PRACTICE] when a caller has none to say), whose rules it is judged by. */
+    fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel = ListenLevel.PRACTICE)
     fun frame(frame: ListenFrame)
     fun end(marks: Map<Int, StepMark>)
 
     /** Keeps nothing: the release build's recorder. */
     object None : ListenRecorder {
-        override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = Unit
+        override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel) = Unit
         override fun frame(frame: ListenFrame) = Unit
         override fun end(marks: Map<Int, StepMark>) = Unit
     }

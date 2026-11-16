@@ -112,7 +112,8 @@ internal fun FluteWritingSideways(
  * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`. [prompt], "Play B4" before the first note
  * of a "Your turn" is judged, stands where the advice does. The fingering a wrong note brings upright
  * does not show here: the column is 116 dp wide and the diagram would be about 17 dp tall; its line,
- * "Check your fingers", is one of the advices and does.
+ * "Check your fingers", is one of the advices and does. [level], the pair of Practice and Exam (2026-11-16), stands
+ * under the line until the run's first note is judged.
  */
 @Composable
 internal fun FluteRunningSideways(
@@ -121,11 +122,14 @@ internal fun FluteRunningSideways(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
     prompt: AnnotatedString? = null,
+    level: (@Composable () -> Unit)? = null,
 ) {
     SidewaysPage(
         modifier = modifier,
         column = {
             if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
+            // The level's pair, one over the other, between the line and Stop until the first note is judged (2026-11-16).
+            level?.invoke()
             SidewaysActionButton(
                 icon = AppIcons.Stop,
                 text = stringResource(R.string.stop),

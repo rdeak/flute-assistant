@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.core.content.edit
 import dagger.hilt.android.qualifiers.ApplicationContext
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
@@ -65,6 +66,11 @@ class SharedPreferencesSettingsStore @Inject constructor(
 
     override fun saveNotesGame(game: NotesGame) = prefs.edit { putString(KEY_NOTES_GAME, game.name) }
 
+    override fun loadListenLevel(): ListenLevel =
+        enumOrDefault(prefs.getString(KEY_LISTEN_LEVEL, null), ListenLevel.PRACTICE)
+
+    override fun saveListenLevel(level: ListenLevel) = prefs.edit { putString(KEY_LISTEN_LEVEL, level.name) }
+
     // Decoded leniently; decode only reads the set SharedPreferences returns, which must not be
     // touched.
     override fun loadNoteProgress(): NoteProgress =
@@ -118,6 +124,7 @@ class SharedPreferencesSettingsStore @Inject constructor(
         const val KEY_PRACTICE_NOTES = "practice_notes"
         const val KEY_NOTE_SOUND = "note_sound"
         const val KEY_NOTES_GAME = "notes_game"
+        const val KEY_LISTEN_LEVEL = "listen_level"
         const val KEY_NOTE_PROGRESS = "note_progress"
         const val KEY_OPEN_BOOK = "open_book"
         const val KEY_THEME = "theme"

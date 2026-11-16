@@ -470,7 +470,9 @@ the user chose it over the fingering under every note (the child would read the 
 the tune back shows nothing there. On a short screen, where the room is not spread by weight, it grows to hold the
 fingering and the tab scrolls. A phone on its side has the line alone, at the top of its column where the advice
 stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the diagram would be about 17 dp tall, and
-from a music stand's distance its keys could not be read anyway. Tests: `ListenRunTest` (the advice and its order),
+from a music stand's distance its keys could not be read anyway. Since 2026-11-16 the room also holds the level's pair,
+🎵 Practice and 🎓 Exam, under the prompt until the first note is judged ("Practice and Exam"), stacked in the column
+on a phone on its side. Tests: `ListenRunTest` (the advice and its order),
 `FluteUiStateTest` (the two values), `FluteScreenTest` ("The room under the stage") and `FluteSidewaysTest` (the line
 in the column, no fingering).
 
@@ -526,6 +528,45 @@ an ended run's speed line stands the phone may sleep (`FluteUiState.keepsScreenO
 for the arrow beside the last note's bubble (`StaffGeometry.endPadding`). Tests: `TuneCheckTest`, `ListenRunTest` ("Feedback,
 not stars", "A note let go too early", "The speed of a finished run"), `ListenPathTest` (b's blown 60 high, a note 60
 under), `FluteUiStateTest`, `FluteViewModelTest`, `FluteScreenTest`, `FluteSidewaysTest`, `LabelsTest`, `ReplayTest`.
+
+Practice and Exam (2026-11-16; spec `docs/superpowers/specs/2026-11-16-flute-listen-levels-design.md`, plan
+`docs/superpowers/plans/2026-11-16-flute-listen-levels.md`, both local). The child played on 2026-11-15 and found the
+rules very loose: a tone she heard as wrong got a star, and a note held too long was never told (those runs were lost:
+the app was reinstalled before they were pulled). The 70 runs of 12 to 14 November replayed under the rules then showed
+both: of 224 starred notes 22% lay 20 to 25 cents off over the whole note and 10% went past 25 after the star (a mark
+was final once the note was long enough), and 30 of 771 notes ran more than half a beat past their length with nothing
+said. The user: "at first users probably want to have loose rules but once user learn one expect more strict rule, to
+cover that add levels or skills that actually control gate". Against each run's own centre her notes lay within 10
+cents on 71%, 15 on 86%, 25 on 99%; one held note wobbles 12 to 15 by itself; the run as a whole sat 34 cents sharp.
+So two levels, not 25-20-10: Practice is the rules as they were, and Exam 15 cents, half a beat of room either way and
+a mark that follows the whole note; 10 is the tuner's "Perfect!" for one held note, beyond a child through a tune. The
+user's picks: the child sets the level (not the app by itself, nor an adult behind the logo), in the listening room
+under "Play B4" until the first note is judged ("1C"; not in the Play row, where "Listen to me" no longer fit a 360 dp
+phone, nor on its corner); Exam's mark follows the whole note and a note held too long gets a sign; then, on reading
+the spec, "on practice also check when held is too long", so ✋ is in both levels, three quarters of a beat over in
+Practice (the room the short rule gives the other way) and half a beat in Exam; ✋ with "Too long, let go sooner" /
+"Predugo, pusti ranije" (over 🛑 and ✂️). The words took four rounds of true-size mockups
+(`.superpowers/brainstorm/94099-1794824437/`): a single wordless picture button (a seedling and a tree, two faces, a
+target) was "still unclear this set skills expectations (loose / strict)", then "Gentle / Strict" and the marks
+"Good / Very good / Excellent" were passed over for "language that is used by flute teacher when they test skill":
+"Practice / Exam" (Vježba / Ispit), with 🎵 and 🎓 (the user combined two drawn sets), as both pills of the app's own
+`ModeChoice`, the chosen one lit. The rules, each a named rule a session records and a replay moves: `longSlack` (1.5
+in Practice, 1 in Exam; infinite before), `wholeNote` (Exam), and Exam's `tuneCents` 15 and `lengthSlack` 1
+(`ListenLevel.rules`). How: the note just earned stays open while its tail sounds (`ListenRun`'s `OpenNote`, with its
+own start and the last frame the tracker showed it: the walk's time is replaced by a rest or the next note), and its
+mark may change on a frame (`Step.changed`, the row's `changed`): ✋ the moment its sure time runs past the written
+length and the room, never for the tune's last note; in Exam, when it closes (silence, another note judged, or the
+run's end, read before the frame's row so the change is on it), the arrow if the median of every reading of the whole
+note lies beyond 15 cents, else the star it earned or would have (`TuneCheck.star`), and ✋ stays. A mark changed by
+silence keeps its line until the next note is judged; one changed because the next note was judged has none. A level
+chosen before the first judged note starts the run again at once (the session ended with no marks, the microphone
+closed and opened again so the new session has its own audio, the room never blanking); after that it waits for the
+next run. What the 70 runs make of it: Practice ✋ on 20 of 818 marks (15 half notes; 15 with the knob on 100 while the
+child played near 65: the speed line's message) and no other mark moved; Exam ★ 76 (Practice 206), ⬇️ 602, ⏳ 88, ✋ 24.
+Tests: `ListenRunTest` ("A note held too long", "Exam: the whole note", the levels' rules), `TuneCheckTest`,
+`ListenPathTest` (the hand and the drift on sound), `FluteUiStateTest`, `FluteViewModelTest`,
+`SharedPreferencesSettingsStoreTest`, `FluteScreenTest`, `FluteSidewaysTest`, `FluteTabletTest`, `LabelsTest`,
+`ReplayTest`, `FileSessionRecorderTest`.
 
 The room is not judged (since 2026-11-10; `NoteOnsetTracker.MIN_LEVEL`, the rule `minLevel`). In the review of that
 day, on the user's phone, a run waited about twenty seconds before the first test note, and in that time the room
@@ -638,7 +679,10 @@ shelf), `flute.book_open` (from, to, notes, bpm, time: `to` is the book opened a
 rests and breaths counted, `bpm` and `time` what the metronome was set to, `none` when an empty
 book left it alone) and `flute.shelf_close` (book, when the open book was picked again and nothing
 changed), so every `flute.shelf_open` has a closing line but for a tab left with the shelf open;
-for Your turn, `flute.listen` (notes: how many there are to check), `flute.heard` (index, expected,
+for Your turn, `flute.listen` (notes: how many there are to check; level: practice or exam, since 2026-11-16),
+`flute.level` (level, restarted: the run on started again under it, since nothing of it was judged yet; since
+2026-11-16), `flute.changed` (index, mark: long or, in Exam, the whole note's high, low, first_try or retry; soundedMs,
+writtenMs, cents: a note's mark changed after it was given; since 2026-11-16), `flute.heard` (index, expected,
 heard, fresh: whether the note began after a gap or a stop rather than by a step, verdict: right,
 retry, ignored or wrong, per new note the tracker reports: the pitch, at the onset), `flute.held` (index, heldMs:
 the note sounded long enough and earned its mark; since 2026-11-11; mark: first_try, retry, high or low, and cents: the
@@ -652,7 +696,8 @@ was heard, once per such step),
 tuner's summary fields plus gate, expected and hearing: the line that says whether a child's tone
 passed the gate at all, and since 2026-11-10, in `faint`, how many frames had a clear pitch but were under the
 level of a flute at the phone), `flute.hearing` (hearing, levelMean, when it changes), `flute.listen_done`
-(stars, retries, when the last note is earned; since 2026-11-14 also high, low and short, the marks of each kind, and
+(stars, retries, when the last note is earned; since 2026-11-14 also high, low and short, the marks of each kind (and
+long, since 2026-11-16), and
 bpm, pairs, knob and speed: the child's speed, the note pairs it rests on, the knob's, and whether the line about it
 shows), `flute.listen_stop` (reason: pill, key, erase, leave, speed or book, so every `flute.listen` has a closing line;
 over: the run had ended and only its screen with the speed line stood, since 2026-11-14), `flute.listen_error` (message, when

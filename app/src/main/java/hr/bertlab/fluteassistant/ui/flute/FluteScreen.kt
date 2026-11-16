@@ -52,6 +52,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
@@ -61,10 +62,13 @@ import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
+import hr.bertlab.fluteassistant.ui.common.ModeChoice
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
+import hr.bertlab.fluteassistant.ui.common.emoji
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
+import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeMinHeight
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeStage
@@ -122,6 +126,7 @@ fun FluteScreen(
                 if (micGranted()) viewModel.startListening() else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
             },
             onStop = viewModel::stopRun,
+            onLevelChosen = viewModel::chooseLevel,
             onBpmChange = viewModel::setBpm,
             onTimeSignatureChange = viewModel::setTimeSignature,
             onSpeedOpen = viewModel::openSpeed,
@@ -160,6 +165,8 @@ class FluteActions(
     val onYourTurn: () -> Unit = {},
     /** The one wide Stop while the tune runs. */
     val onStop: () -> Unit = {},
+    /** 🎵 Practice or 🎓 Exam, chosen in the listening room until the first note is judged (since 2026-11-16). */
+    val onLevelChosen: (ListenLevel) -> Unit = {},
     /** The speed panel's ring and beat buttons: they set the metronome's tempo and beat. */
     val onBpmChange: (Int) -> Unit = {},
     val onTimeSignatureChange: (TimeSignature) -> Unit = {},
@@ -364,6 +371,12 @@ fun FluteContent(
             // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
             // Or, once a run ended at another animal's speed than the knob's, that one line until Stop (2026-11-14).
             val prompt = state.promptMidi?.let { playPrompt(it) } ?: state.pace?.let { speedLine(it) }
+            // 🎵 Practice or 🎓 Exam, until the run's first note is judged (2026-11-16).
+            val level: (@Composable (Boolean) -> Unit)? = if (state.choosesLevel) {
+                { stacked -> LevelChoice(state.level, actions.onLevelChosen, stacked) }
+            } else {
+                null
+            }
             // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
             BackHandler(enabled = running, onBack = actions.onStop)
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
@@ -463,7 +476,13 @@ fun FluteContent(
             }
             if (sideways) {
                 if (running) {
-                    FluteRunningSideways(tune = tune, advice = state.advice, onStop = actions.onStop, prompt = prompt)
+                    FluteRunningSideways(
+                        tune = tune,
+                        advice = state.advice,
+                        onStop = actions.onStop,
+                        prompt = prompt,
+                        level = level?.let { { it(true) } },
+                    )
                 } else {
                     FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
                 }
@@ -487,7 +506,7 @@ fun FluteContent(
                                 .fillMaxWidth()
                                 .then(if (fits) Modifier.weight(1f) else Modifier.heightIn(min = AdviceLineHeight)),
                         ) {
-                            ListenRoom(state, prompt)
+                            ListenRoom(state, prompt, level = level?.let { { it(false) } })
                         }
                         BigActionButton(
                             icon = AppIcons.Stop,
@@ -524,7 +543,7 @@ fun FluteContent(
  * its column ([FluteRunningSideways]): the column is too narrow for the diagram.
  */
 @Composable
-private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
+private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?, level: (@Composable () -> Unit)? = null) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ListenRoomGap)) {
         state.fingeringMidi?.let { midi ->
             FingeringDiagram(
@@ -537,7 +556,26 @@ private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
             )
         }
         if (prompt != null) AdviceLine(prompt) else AdviceLine(state.advice)
+        level?.invoke()
     }
+}
+
+/**
+ * The level of the run on, 🎵 Practice or 🎓 Exam, the app's own pair of pills ([ModeChoice], the tuner's and the notes
+ * tab's): shown from the start of a run until its first note is judged (2026-11-16, the user's picks "1C" and the two
+ * pictures); [stacked] in a phone on its side's column.
+ */
+@Composable
+private fun LevelChoice(level: ListenLevel, onChoose: (ListenLevel) -> Unit, stacked: Boolean) {
+    ModeChoice(
+        entries = ListenLevel.entries,
+        selected = level,
+        onSelect = onChoose,
+        groupLabel = stringResource(R.string.flute_level),
+        emojiOf = { it.emoji },
+        labelResOf = { it.labelRes() },
+        stacked = stacked,
+    )
 }
 
 /** "🐢 Slower than the 🐇": the child's animal first, the knob's second (2026-11-14). */

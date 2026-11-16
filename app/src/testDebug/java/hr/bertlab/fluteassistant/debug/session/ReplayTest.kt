@@ -5,7 +5,9 @@ package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
+import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pitch
@@ -58,10 +60,12 @@ class ReplayTest {
         rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
         pulse: Pulse = Pulse(90),
         run: ListenRun.Rules = ListenRun.Rules(),
+        tune: List<TuneItem> = this.tune,
+        level: ListenLevel = ListenLevel.PRACTICE,
     ): File {
         val run = ListenPath.run(samples, rate, tune, pulse, rules, run = run)
         val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, pulse, floor = null)
+        r.start(tune, pulse, floor = null, level = level)
         r.opened(rate, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
@@ -148,7 +152,8 @@ class ReplayTest {
         assertEquals(out, 3, lines.size)
         assertTrue(lines[1], lines[1].startsWith("stopDrop=0.12 heard=71,71,71 marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
         // 0.5 cannot hear a tongued stop, and the gap rule cannot see 50 ms: the three notes are one, the child's "h1 h1 long h1" miss.
-        assertTrue(lines[2], lines[2].startsWith("stopDrop=0.5 heard=71 marks=0:FIRST_TRY"))
+        // That one note sounds 2.4 s on a quarter, held too long (since 2026-11-16).
+        assertTrue(lines[2], lines[2].startsWith("stopDrop=0.5 heard=71 marks=0:LONG"))
         assertFalse(lines[2].contains("1:FIRST_TRY"))
     }
 
@@ -187,7 +192,7 @@ class ReplayTest {
         // As a build before 2026-11-14 wrote it: none of its rules named, and a table that ends at `phase`.
         log.writeText(log.readText().replace(Regex(" (highCents|tuneCents|tuneFrames|shortMovesOn|paceMinPairs|paceOff)=[^ \n]*"), ""))
         val csv = File(dir, "frames.csv")
-        csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',') } + "\n")
+        csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',').substringBeforeLast(',') } + "\n") // pitch and changed
         val session = Session.load(dir)
         val run = Replay.recordedRunRules(session)
         assertEquals("no band above a note", 0.0, run.highCents, 0.0)
@@ -217,8 +222,9 @@ class ReplayTest {
         val lines = out.lines().filter { it.startsWith("lengthSlack=") }
         assertEquals(out, 2, lines.size)
         // 0: a quarter needs all of its 1000 ms. The tongued stops do not cut it ([ListenRun.Rules.restartCuts]): the
-        // three notes walk as one, which the third makes long enough for the first step, and nothing is left for the others.
-        assertTrue(lines[0], lines[0].startsWith("lengthSlack=0 heard=71,71,71 ") && lines[0].endsWith("marks=0:FIRST_TRY"))
+        // three notes walk as one, which the third makes long enough for the first step, and nothing is left for the others;
+        // that one note, 2.4 s on a quarter, is held too long (since 2026-11-16).
+        assertTrue(lines[0], lines[0].startsWith("lengthSlack=0 heard=71,71,71 ") && lines[0].endsWith("marks=0:LONG"))
         assertTrue(lines[1], lines[1].startsWith("lengthSlack=8 heard=71,71,71 marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY"))
     }
 
@@ -326,7 +332,8 @@ class ReplayTest {
         val dir = recorded()
         assertTrue(Session.load(dir).recordsPitch)
         val csv = File(dir, "frames.csv")
-        csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',') } + "\n") // as a build before 2026-11-14 wrote it
+        // As a build before 2026-11-14 wrote it: no pitch, and so no changed column after it either.
+        csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',').substringBeforeLast(',') } + "\n")
         assertFalse(Session.load(dir).recordsPitch)
         assertTrue(Replay.report(Session.load(dir)).contains("diff: none"))
     }
@@ -340,5 +347,63 @@ class ReplayTest {
         val phone = session.rows.mapIndexed { i, step -> if (i == sounding) step.copy(row = step.row.copy(pitch = Pitch.LOW)) else step }
         assertEquals(1, Replay.diff(phone, replay, pitch = true).count)
         assertEquals(0, Replay.diff(phone, replay).count)
+    }
+
+    // ---- Practice and Exam (2026-11-16): a mark that changes, the two new rules, Exam in the report ----
+
+    /** Four quarters at 120: the third of the sound's notes, 1500 ms, runs two beats past its 500 ms. */
+    private val quarters: List<TuneItem> = List(4) { TuneNote(71, QUARTER) }
+
+    @Test
+    fun `a session from before the levels loads and replays to its marks`() {
+        val dir = recorded(pulse = Pulse(120), tune = quarters, run = ListenRun.Rules(longSlack = Double.POSITIVE_INFINITY))
+        // As a build before the levels wrote it: no changed column, no longSlack nor wholeNote.
+        val csv = File(dir, "frames.csv")
+        csv.writeText(csv.readLines().joinToString("\n", postfix = "\n") { it.substringBeforeLast(',') })
+        val log = File(dir, "session.log")
+        log.writeText(log.readText().replace(Regex(" (longSlack|wholeNote)=[^ \n]*"), ""))
+        val session = Session.load(dir)
+        assertFalse(session.recordsChanged)
+        assertEquals(Double.POSITIVE_INFINITY, Replay.recordedRunRules(session).longSlack, 0.0)
+        assertFalse(Replay.recordedRunRules(session).wholeNote)
+        val report = Replay.report(session)
+        assertTrue(report, report.lines().any { it.startsWith("diff: none") })
+        assertTrue(report, report.contains("  marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY\n"))
+        assertTrue("today's rules hold the third note too long: $report", report.contains("  marks=0:FIRST_TRY,1:FIRST_TRY,2:LONG\n"))
+    }
+
+    @Test
+    fun `a session recorded in exam replays under exam's rules`() {
+        val session = Session.load(recorded(pulse = Pulse(120), tune = quarters, run = ListenLevel.EXAM.rules, level = ListenLevel.EXAM))
+        assertEquals(ListenLevel.EXAM.rules, Replay.recordedRunRules(session))
+        assertTrue(Replay.report(session).lines().any { it.startsWith("diff: none") })
+    }
+
+    @Test
+    fun `a changed mark is written down, read back and compared`() {
+        val session = Session.load(recorded(pulse = Pulse(120), tune = quarters))
+        assertTrue(session.recordsChanged)
+        val changed = session.rows.single { it.row.changed != null }
+        assertEquals(MarkChange(2, StepMark.LONG), changed.row.changed)
+        assertTrue(Replay.report(session).lines().any { it.startsWith("diff: none") })
+        val roomier = ListenPath.run(session.frames, quarters, session.pulse, run = ListenRun.Rules(longSlack = 100.0))
+        val diff = Replay.diff(session.rows, roomier.steps, walk = session.recordsWalk, pitch = session.recordsPitch, changed = session.recordsChanged)
+        assertEquals(changed.frame, diff.first)
+    }
+
+    @Test
+    fun `the report says what exam makes of the sound`() {
+        val report = Replay.report(Session.load(recorded(pulse = Pulse(120), tune = quarters)))
+        val lines = report.lines()
+        val exam = lines.indexOf("exam:")
+        assertTrue(report, exam > 0)
+        assertTrue(report, lines.drop(exam + 1).takeWhile { it.startsWith("  ") }.any { it.startsWith("  marks=") })
+    }
+
+    @Test
+    fun `the new rules can be swept`() {
+        val session = Session.load(recorded(pulse = Pulse(120), tune = quarters))
+        assertEquals(3, Replay.sweep(session, "longSlack:1,1.5,100").lines().count { it.startsWith("longSlack=") })
+        assertEquals(2, Replay.sweep(session, "wholeNote:0,1").lines().count { it.startsWith("wholeNote=") })
     }
 }

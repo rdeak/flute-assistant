@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Pitch
@@ -73,6 +74,7 @@ class FluteSidewaysTest {
     private var playToggles = 0
     private var yourTurns = 0
     private var stops = 0
+    private val levelsChosen = mutableListOf<ListenLevel>()
     private var micDismissals = 0
     private var speedOpens = 0
     private var speedDones = 0
@@ -113,6 +115,7 @@ class FluteSidewaysTest {
                             onBookChosen = { chosenBooks += it },
                             onYourTurn = { yourTurns++ },
                             onStop = { stops++ },
+                            onLevelChosen = { levelsChosen += it },
                             onMicDismiss = { micDismissals++ },
                         ),
                     )
@@ -869,5 +872,41 @@ class FluteSidewaysTest {
             assertWholeWords("👀 Check your fingers")
             compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
         }
+    }
+
+    // ---- Practice and Exam (2026-11-16): the pair in the running column, above Stop ----
+
+    @Test
+    fun the_level_pair_stands_in_the_column_above_stop() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        val practice = bounds(word("Practice").assertIsDisplayed())
+        val exam = bounds(word("Exam").assertIsDisplayed())
+        val stop = bounds(word("Stop"))
+        assertTrue("Practice ($practice) stands over Exam ($exam)", practice.bottom <= exam.top)
+        assertTrue("Exam ends at ${exam.bottom}, Stop starts at ${stop.top}", exam.bottom <= stop.top)
+        for ((what, b) in listOf("Practice" to practice, "Exam" to exam)) {
+            assertTrue("$what ($b) is inside the column of Stop ($stop)", b.left >= stop.left - SLACK && b.right <= stop.right + SLACK)
+        }
+        word("Exam").performClick()
+        assertEquals(listOf(ListenLevel.EXAM), levelsChosen)
+    }
+
+    @Test
+    fun the_level_words_are_whole_on_a_short_phone_in_croatian_at_large_text() {
+        phone = Phone(640, 360)
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"), fontScale = 1.5f)
+        for (text in listOf("Vježba", "Ispit", "🪈 Odsviraj c1")) assertWholeWords(text)
+        val group = bounds(compose.onNodeWithContentDescription("Razina").assertIsDisplayed())
+        assertTrue("the pair ends at ${group.bottom}, Stop starts at ${bounds(word("Stani")).top}", group.bottom <= bounds(word("Stani")).top)
+        assertInside("the pair", compose.onNodeWithContentDescription("Razina"))
+    }
+
+    @Test
+    fun the_level_words_are_whole_on_a_short_wide_phone() {
+        phone = Phone(800, 360)
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        for (text in listOf("Practice", "Exam", "🪈 Play C4")) assertWholeWords(text)
+        val group = bounds(compose.onNodeWithContentDescription("Level").assertIsDisplayed())
+        assertTrue("the pair ends at ${group.bottom}, Stop starts at ${bounds(word("Stop")).top}", group.bottom <= bounds(word("Stop")).top)
     }
 }

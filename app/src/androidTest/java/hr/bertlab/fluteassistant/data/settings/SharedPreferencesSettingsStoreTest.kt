@@ -9,6 +9,7 @@ import android.content.SharedPreferences
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
@@ -184,6 +185,16 @@ class SharedPreferencesSettingsStoreTest {
 
         assertTrue(raw.edit().putString("notes_game", "BANANA").commit())
         assertEquals(NotesGame.FIND, store().loadNotesGame())
+    }
+
+    @Test
+    fun listen_level_round_trips_and_an_unknown_name_is_practice() {
+        assertEquals(ListenLevel.PRACTICE, store().loadListenLevel())
+        store().saveListenLevel(ListenLevel.EXAM)
+        assertEquals(ListenLevel.EXAM, store().loadListenLevel())
+
+        assertTrue(raw.edit().putString("listen_level", "BANANA").commit())
+        assertEquals(ListenLevel.PRACTICE, store().loadListenLevel())
     }
 
     @Test

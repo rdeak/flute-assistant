@@ -5,6 +5,8 @@ package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
+import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pitch
@@ -47,8 +49,8 @@ class FileSessionRecorderTest {
         decision: FrameDecision = FrameDecision.SHOWN, sounding: Int? = 71, onset: NoteOnsetTracker.Onset? = NoteOnsetTracker.Onset(71, fresh = true),
         floor: Float? = null, verdict: Verdict? = Verdict.RIGHT, waited: Int? = 0, expected: Int? = 71, heardNow: Int? = null,
         advice: TunerAdvice = TunerAdvice.NONE, repeatHeld: Boolean = false, finishing: Boolean = false, hearing: Hearing = Hearing.CLEAR,
-        walk: Walk? = null, pitch: Pitch? = null,
-    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing, walk, pitch)
+        walk: Walk? = null, pitch: Pitch? = null, changed: MarkChange? = null,
+    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing, walk, pitch, changed)
 
     private fun sessions(root: File = folder.root) = File(root, "sessions").listFiles().orEmpty().sortedBy { it.name }
 
@@ -77,11 +79,13 @@ class FileSessionRecorderTest {
         r.end(emptyMap())
         val lines = lines(sessions().single())
         val start = lines[0]
-        assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345"))
+        assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345 level=practice"))
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(30, rules.size)
+        assertEquals(32, rules.size)
+        assertEquals("1.5", rules["longSlack"])
+        assertEquals("0", rules["wholeNote"])
         assertEquals("1", rules["walkRests"])
         assertEquals("75.0", rules["highCents"])
         assertEquals("25.0", rules["tuneCents"])
@@ -115,9 +119,9 @@ class FileSessionRecorderTest {
         r.frame(frame(f = null, p = 0.0, level = 0.05f, minLevel = 0.04f, decision = FrameDecision.SILENT, sounding = null, onset = null, floor = 0.05f, verdict = null, waited = 3, expected = 72, heardNow = 60, advice = TunerAdvice.COME_CLOSER, repeatHeld = true, finishing = true, hearing = Hearing.QUIET_UNCLEAR))
         r.end(emptyMap())
         val csv = File(sessions().single(), "frames.csv").readLines()
-        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch", csv[0])
-        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,,,,,", csv[1])
-        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500,,,,", csv[2])
+        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch,changed", csv[0])
+        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,,,,,,", csv[1])
+        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500,,,,,", csv[2])
         assertEquals(3, csv.size)
     }
 
@@ -130,7 +134,7 @@ class FileSessionRecorderTest {
         r.end(emptyMap())
         val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
         assertEquals(listOf("HOLD_LONGER"), row.filter { it == "HOLD_LONGER" })
-        assertEquals(listOf("3", "2", "SHORT", ""), row.takeLast(4))
+        assertEquals(listOf("3", "2", "SHORT", ""), row.dropLast(1).takeLast(4)) // the last cell is `changed`
     }
 
     @Test
@@ -141,7 +145,7 @@ class FileSessionRecorderTest {
         r.frame(frame(walk = Walk(0, 0, Walk.Phase.SOUNDING), advice = TunerAdvice.TOO_HIGH, pitch = Pitch.HIGH))
         r.end(emptyMap())
         val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
-        assertEquals(listOf("0", "0", "SOUNDING", "HIGH"), row.takeLast(4))
+        assertEquals(listOf("0", "0", "SOUNDING", "HIGH"), row.dropLast(1).takeLast(4)) // the last cell is `changed`
     }
 
     @Test
@@ -343,5 +347,32 @@ class FileSessionRecorderTest {
         assertEquals(2, dirs.size)
         assertEquals("session.end frames=1 marks=", lines(dirs[0]).last())
         assertEquals("session.end frames=0 marks=", lines(dirs[1]).last())
+    }
+
+    @Test
+    fun `a session started in exam writes its level and exam's rules`() {
+        val r = recorder()
+        r.start(tune, pulse, floor = null, level = ListenLevel.EXAM)
+        r.end(emptyMap())
+        val lines = lines(sessions().single())
+        assertTrue(lines[0], lines[0].endsWith(" level=exam"))
+        val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
+        assertEquals("15.0", rules["tuneCents"])
+        assertEquals("1.0", rules["lengthSlack"])
+        assertEquals("1.0", rules["longSlack"])
+        assertEquals("1", rules["wholeNote"])
+    }
+
+    @Test
+    fun `a mark that changed is the last cell of its row`() {
+        val r = recorder()
+        r.start(tune, pulse, floor = null)
+        r.frame(frame())
+        r.frame(frame(changed = MarkChange(0, StepMark.LONG)))
+        r.end(emptyMap())
+        val rows = File(sessions().single(), "frames.csv").readLines()
+        assertTrue(rows[0], rows[0].endsWith(",changed"))
+        assertTrue(rows[1], rows[1].endsWith(","))
+        assertTrue(rows[2], rows[2].endsWith(",0:LONG"))
     }
 }

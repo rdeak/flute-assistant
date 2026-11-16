@@ -18,6 +18,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.util.Locale
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 
 @RunWith(AndroidJUnit4::class)
 class LabelsTest {
@@ -110,5 +111,24 @@ class LabelsTest {
         assertEquals(listOf("previsoko", "prenisko", "prekratko"), marks.map(hr::getString))
         assertEquals("the tuner's own words", R.string.too_high, TunerAdvice.TOO_HIGH.labelRes())
         assertEquals(R.string.too_low, TunerAdvice.TOO_LOW.labelRes())
+    }
+
+    /** Practice and Exam (2026-11-16): the pair's words and pictures, the hand's line and its description, in both languages. */
+    @Test
+    fun the_levels_are_named_in_both_languages() {
+        val en = resources(Locale.ENGLISH)
+        val hr = resources(Locale("hr"))
+        assertEquals("Practice", en.getString(ListenLevel.PRACTICE.labelRes()))
+        assertEquals("Exam", en.getString(ListenLevel.EXAM.labelRes()))
+        assertEquals("Vježba", hr.getString(ListenLevel.PRACTICE.labelRes()))
+        assertEquals("Ispit", hr.getString(ListenLevel.EXAM.labelRes()))
+        assertEquals("🎵", ListenLevel.PRACTICE.emoji)
+        assertEquals("🎓", ListenLevel.EXAM.emoji)
+        assertEquals("Level", en.getString(R.string.flute_level))
+        assertEquals("Razina", hr.getString(R.string.flute_level))
+        assertEquals("held too long", en.getString(R.string.flute_mark_long))
+        assertEquals("predugo", hr.getString(R.string.flute_mark_long))
+        assertEquals("✋ Too long, let go sooner", en.getString(TunerAdvice.TOO_LONG.labelRes()!!))
+        assertEquals("✋ Predugo, pusti ranije", hr.getString(TunerAdvice.TOO_LONG.labelRes()!!))
     }
 }

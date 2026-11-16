@@ -11,7 +11,7 @@ import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
-import hr.bertlab.fluteassistant.domain.flute.ListenRun
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -66,7 +66,7 @@ class FileSessionRecorder(
     private val lock = Any()
     private var session: Session? = null
 
-    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = guarded {
+    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel) = guarded {
         session?.let { close(it, marks = emptyMap()) }
         val dir = newFolder()
         val log = File(dir, LOG).bufferedWriter()
@@ -76,10 +76,10 @@ class FileSessionRecorder(
         val at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).format(Date(now()))
         line(
             s, "session.start", "at" to at, "app" to facts.app, "code" to facts.code, "device" to facts.device,
-            "sdk" to facts.sdk, "floor" to floor?.let { level(it) },
+            "sdk" to facts.sdk, "floor" to floor?.let { level(it) }, "level" to level.name.lowercase(Locale.ROOT),
         )
-        // The app runs with both sets of rules at their defaults, which is what is written down.
-        val rules = NoteOnsetTracker.Rules().fields() + ListenRun.Rules().fields()
+        // The app runs with the tracker's rules at their defaults and the run's at the level's, which is what is written down.
+        val rules = NoteOnsetTracker.Rules().fields() + level.rules.fields()
         line(s, "session.rules", *rules.toTypedArray())
         line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
         tune.forEachIndexed { index, item ->
@@ -132,6 +132,7 @@ class FileSessionRecorder(
             frame.hearing.name, frame.floor?.let(::level).orEmpty(),
             frame.walk?.index?.toString().orEmpty(), frame.walk?.halfBeat?.toString().orEmpty(), frame.walk?.phase?.name.orEmpty(),
             frame.pitch?.name.orEmpty(),
+            frame.changed?.let { "${it.index}:${it.mark.name}" }.orEmpty(),
         )
         s.csv.write(cells.joinToString(","))
         s.csv.newLine()
@@ -224,9 +225,10 @@ class FileSessionRecorder(
         const val LOG = "session.log"
         /**
          * The frame table's columns; `walk,halfBeat,phase` since 2026-11-11 (older tables end at `floor`), `pitch` (the arrow
-         * of a note walked off its pitch: HIGH, LOW or empty) since 2026-11-14 (older tables end at `phase`).
+         * of a note walked off its pitch: HIGH, LOW or empty) since 2026-11-14 (older tables end at `phase`), `changed` (a
+         * mark already given that changed on the frame, `<index>:<MARK>`, else empty) since 2026-11-16 (older end at `pitch`).
          */
-        const val HEADER = "frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch"
+        const val HEADER = "frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch,changed"
         /** The rate of an empty `audio.wav` when the microphone never opened. */
         const val DEFAULT_RATE = 48_000
     }

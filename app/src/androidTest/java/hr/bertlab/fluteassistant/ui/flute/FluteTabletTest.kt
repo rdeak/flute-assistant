@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
@@ -21,6 +23,7 @@ import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.TabletHost
 import hr.bertlab.fluteassistant.ui.common.TabletSize
+import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -121,5 +124,17 @@ class FluteTabletTest {
 
     private companion object {
         const val TOLERANCE = 3f
+    }
+
+    @Test
+    fun the_level_pair_shows_on_a_tablet() {
+        show(TabletSize.TEN_UPRIGHT, FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
+        for (each in TabletSize.entries) {
+            on(each)
+            val group = bounds(compose.onNodeWithContentDescription("Level").assertIsDisplayed())
+            val stop = bounds(compose.onNodeWithText("Stop"))
+            assertTrue("$each: the pair ends at ${group.bottom}, Stop starts at ${stop.top}", group.bottom <= stop.top)
+            for (word in listOf("Practice", "Exam")) assertWhole("$each", compose.onNodeWithText(word, useUnmergedTree = true))
+        }
     }
 }

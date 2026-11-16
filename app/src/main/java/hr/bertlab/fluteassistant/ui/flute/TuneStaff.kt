@@ -97,6 +97,7 @@ import hr.bertlab.fluteassistant.ui.common.LOW_EMOJI
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.RETRY_STAR_ALPHA
+import hr.bertlab.fluteassistant.ui.common.LONG_EMOJI
 import hr.bertlab.fluteassistant.ui.common.SHORT_EMOJI
 import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
@@ -545,6 +546,7 @@ private fun StepMark(
         mark == StepMark.HIGH -> stringResource(R.string.flute_mark_high)
         mark == StepMark.LOW -> stringResource(R.string.flute_mark_low)
         mark == StepMark.SHORT -> stringResource(R.string.flute_mark_short)
+        mark == StepMark.LONG -> stringResource(R.string.flute_mark_long)
         else -> null
     }
     val description = if (earned == null) name else "$name, $earned"
@@ -593,6 +595,7 @@ private fun MarkRow(mark: StepMark?, heard: Int?, heardNow: Int?, pitch: Pitch?,
             mark == StepMark.HIGH -> Emoji(HIGH_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.LOW -> Emoji(LOW_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.SHORT -> Emoji(SHORT_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
+            mark == StepMark.LONG -> Emoji(LONG_EMOJI, fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s))
             mark == StepMark.RETRY -> Emoji(
                 STAR_EMOJI,
                 fontSize = emojiSizeFor(StaffGeometry.MARK_SIZE * s),

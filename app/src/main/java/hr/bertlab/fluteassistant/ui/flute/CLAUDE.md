@@ -79,9 +79,24 @@ change that part). The songbook is in `SONGBOOK.md`.
   fingered for G stays wrong. Off pitch is beyond 25 cents (`ListenRun.TUNE_CENTS`, rule `tuneCents`):
   an arrow beside the note's live bubble, which shows the written letter, and its mark is ⬇️ or ⬆️ in
   the star's place, the arrow at the moment it is long enough. Marks: ⭐, faint ⭐ (after a wrong note,
-  or a repeat the phone could not hear), ⬇️, ⬆️, ⏳; a sign says more than the faint star. Change the
-  numbers only from recorded sessions (sweeps of `tuneCents`, `highCents`). This overturned exact
-  semitones (2026-11-13) and "a note cut short is played again" (2026-11-11).
+  or a repeat the phone could not hear), ⬇️, ⬆️, ⏳, ✋ (held too long, since 2026-11-16); a sign says more
+  than the faint star, and a length sign more than an arrow. Change the numbers only from recorded
+  sessions (sweeps of `tuneCents`, `highCents`). This overturned exact semitones (2026-11-13) and "a note
+  cut short is played again" (2026-11-11).
+- Two levels, the child's choice (the user, 2026-11-16: "at first users probably want to have loose
+  rules but once user learn one expect more strict rule"; spec
+  `docs/superpowers/specs/2026-11-16-flute-listen-levels-design.md`, `DESIGN.md`, "Practice and Exam"):
+  🎵 Practice / Vježba and 🎓 Exam / Ispit, the app's own `ModeChoice` under "Play B4" in the listening
+  room, from a run's start until its first note is judged (`FluteUiState.choosesLevel`; on a phone on
+  its side stacked in the column above Stop); never on the writing screen. A change before the first
+  note starts the run again at once. Remembered (`SettingsStore.loadListenLevel`), Practice on a new
+  install. Each level is a preset of `ListenRun.Rules` (`ListenLevel.rules`): Practice is today's
+  numbers and `longSlack` 1.5; Exam `tuneCents` 15, `lengthSlack` 1, `longSlack` 1 and `wholeNote`. In
+  both a note whose sound runs more than `longSlack` half beats past its written length gets ✋ and "✋
+  Too long, let go sooner" at that moment, but never the tune's last note; in Exam a note's mark is
+  final only when its sound ends, its pitch read over the whole note (a star may become an arrow and
+  back). A mark that changes after it was given is `ListenRun.Step.changed` / `ListenFrame.changed`.
+  Change the numbers only from recorded sessions (sweeps of `tuneCents`, `lengthSlack`, `longSlack`).
 - A finished run played at another animal's speed than the knob's says so in one line, "🐢 Slower
   than the 🐇", the child's animal first (`Pace`, rules `paceMinPairs` 6 and `paceOff` 15%); its
   screen stays as the run ended, the microphone closed, until Stop. No other summary.

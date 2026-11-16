@@ -99,6 +99,7 @@
     <string name="advice_check_fingers">👀 Provjeri prste</string>
     <string name="advice_play_again">🔁 Stani, pa odsviraj opet</string>
     <string name="advice_hold_longer">⏳ Prekratko, drži dulje</string>
+    <string name="advice_too_long">✋ Predugo, pusti ranije</string>
     <string name="advice_out_of_air">😮‍💨 Možda nema zraka? Udahni</string>
     <string name="mic_permission_title">Smijem li slušati?</string>
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
@@ -147,6 +148,9 @@
          pratiti in music also means to accompany, and the phone stays silent -->
     <string name="flute_play">Odsviraj</string>
     <string name="flute_your_turn">Poslušaj me</string>
+    <string name="flute_level">Razina</string>
+    <string name="flute_level_practice">Vježba</string>
+    <string name="flute_level_exam">Ispit</string>
     <string name="flute_erase">Obriši zadnju notu</string>
     <string name="flute_keys">Tipke flaute</string>
     <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>
@@ -187,6 +191,7 @@
     <string name="flute_mark_high">previsoko</string>
     <string name="flute_mark_low">prenisko</string>
     <string name="flute_mark_short">prekratko</string>
+    <string name="flute_mark_long">predugo</string>
     <string name="flute_mark_heard">čujem %1$s</string>
     <string name="flute_listen_here">sviraj ovu</string>
     <string name="flute_play_prompt">🪈 Odsviraj %1$s</string>

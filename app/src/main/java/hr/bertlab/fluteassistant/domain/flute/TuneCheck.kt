@@ -8,10 +8,11 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 /**
  * What a note earned in "Your turn": a star for the first try, a faint star when a wrong note was heard for it first
  * (or a written repeat the phone could not hear), and since 2026-11-14 ("feedback, not stars") a sign in the star's
- * place for the right fingering played off: [HIGH] too high, [LOW] too low, [SHORT] let go before it was long enough.
+ * place for the right fingering played off: [HIGH] too high, [LOW] too low, [SHORT] let go before it was long enough,
+ * and since 2026-11-16 [LONG] held past its written length (a mark given and then changed, [TuneCheck.remark]).
  * A sign says more than the faint star, so a step that stumbled and was then played off keeps the sign.
  */
-enum class StepMark { FIRST_TRY, RETRY, HIGH, LOW, SHORT }
+enum class StepMark { FIRST_TRY, RETRY, HIGH, LOW, SHORT, LONG }
 
 /** What became of one heard note: it was the waited-on note (first try, or after a stumble), a tail of the last one, or wrong. */
 enum class Verdict { RIGHT, RETRY, IGNORED, WRONG }
@@ -135,12 +136,24 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
      */
     fun earn(remark: StepMark? = null): StepMark {
         val current = checkNotNull(index) { "no step is waited on" }
-        val mark = remark ?: if (stumbled) StepMark.RETRY else StepMark.FIRST_TRY
+        val mark = remark ?: star
         earned[current] = mark
         previous = (tune[current] as TuneNote).midi
         stumbled = false
         index = nextNoteFrom(current + 1)
         return mark
+    }
+
+    /** The star the step waited on would earn now: [StepMark.RETRY] after a stumble, else [StepMark.FIRST_TRY]. */
+    val star: StepMark get() = if (stumbled) StepMark.RETRY else StepMark.FIRST_TRY
+
+    /**
+     * The step at [index], already earned, is marked [mark] instead ([ListenRun] reads a note on after its mark: held
+     * too long, or its whole pitch). A step with no mark yet is refused.
+     */
+    fun remark(index: Int, mark: StepMark) {
+        require(index in earned) { "step $index has no mark to change" }
+        earned[index] = mark
     }
 
     /** The step waited on was cut short: once it is played long enough it earns [StepMark.RETRY]. */

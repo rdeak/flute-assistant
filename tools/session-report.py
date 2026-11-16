@@ -33,9 +33,11 @@ MARK_WORD = {"right": "right, a star", "retry": "right after a stumble, a faint 
 PITCH_GLYPH = {"right": "♪", "retry": "♪"}
 # a step's mark (session.end), as the star row and the walk's "long enough" draw it
 # since 2026-11-14 the right note played off earns a sign in the star's place: too high, too low, let go too early
-STAR_GLYPH = {"FIRST_TRY": "★", "RETRY": "☆", "HIGH": "⬇", "LOW": "⬆", "SHORT": "⏳"}
-STAR_COLOR = {"FIRST_TRY": "var(--good)", "RETRY": "var(--warn)", "HIGH": "var(--warn)", "LOW": "var(--warn)", "SHORT": "var(--critical)"}
-STAR_WORD = {"FIRST_TRY": "a star", "RETRY": "a faint star", "HIGH": "the down arrow, too high", "LOW": "the up arrow, too low"}
+# since 2026-11-16 a mark already given may change while the note goes on (the `changed` cell): held too long, or in
+# Exam the whole note's pitch
+STAR_GLYPH = {"FIRST_TRY": "★", "RETRY": "☆", "HIGH": "⬇", "LOW": "⬆", "SHORT": "⏳", "LONG": "✋"}
+STAR_COLOR = {"FIRST_TRY": "var(--good)", "RETRY": "var(--warn)", "HIGH": "var(--warn)", "LOW": "var(--warn)", "SHORT": "var(--critical)", "LONG": "var(--warn)"}
+STAR_WORD = {"FIRST_TRY": "a star", "RETRY": "a faint star", "HIGH": "the down arrow, too high", "LOW": "the up arrow, too low", "LONG": "the hand, held too long"}
 PITCH_WORD = {"right": "the right pitch: the note begins", "retry": "the right pitch after a stumble: the note begins"}
 
 
@@ -317,6 +319,8 @@ def build(session, folder):
     # cut off before its end line has no marks: there a step that stumbled first (a wrong note, a cut) is faint.
     stumbled = set()
     before = (None, None)
+    # Steps whose mark changed after it was given: their "long enough" shows the mark of that moment, not the end line's.
+    changed_steps = {(r.get("changed") or "").split(":")[0] for r in rows if r.get("changed")}
     for i, r in enumerate(rows):
         if r.get("verdict") == "wrong" and r.get("waited"):
             stumbled.add(r["waited"])
@@ -330,13 +334,19 @@ def build(session, folder):
                 # The arrow the phone showed on the frame before (the `pitch` cell, since 2026-11-14) is the note's mark;
                 # else the end line's mark, else a star.
                 arrow = (rows[i - 1].get("pitch") or "") if i > 0 else ""
-                mark = arrow if arrow in ("HIGH", "LOW") else marks.get(int(now[0])) or ("RETRY" if now[0] in stumbled else "FIRST_TRY")
+                given = None if now[0] in changed_steps else marks.get(int(now[0]))
+                mark = arrow if arrow in ("HIGH", "LOW") else given or ("RETRY" if now[0] in stumbled else "FIRST_TRY")
                 w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s was long enough: %s</title>%s</text>' % (x, y - 12, STAR_COLOR[mark], now[0], STAR_WORD.get(mark, mark), STAR_GLYPH[mark]))
             elif now[1] == "CUT":
                 w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was let go too early: the hourglass, and the run moved on</title>⏳</text>' % (x, y - 12, now[0]))
             else:
                 w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was cut short: hold it longer</title>✂</text>' % (x, y - 12, now[0]))
         before = now
+        if r.get("changed"):
+            step, _, mark = r["changed"].partition(":")
+            x = x_of(i + 1)
+            y = level_y(r)
+            w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s\'s mark changed: %s</title>%s</text>' % (x, y - 28, STAR_COLOR.get(mark, "var(--muted)"), step, html.escape(STAR_WORD.get(mark, mark)), STAR_GLYPH.get(mark, mark)))
 
     # lane B
     w('<text x="%d" y="%d" fill="var(--ink-2)" font-size="12" font-weight="600">Pitch</text>' % (left, b_top - 8))
@@ -449,12 +459,12 @@ def build(session, folder):
         color = STAR_COLOR.get(m, "var(--muted)")
         label = note_name(midi) if kind == "note" else ("rest" if kind == "rest" else "breath")
         p("<div class=\"step\"><span class=\"m\" style=\"color:%s\" title=\"%s\">%s</span><span class=\"n\">%s</span><span class=\"l\">%d %s</span></div>" % (color, html.escape(m or "no mark"), glyph, html.escape(label), i, html.escape(length.lower())))
-    p("</div><p class=\"note\">★ a star, first try; ☆ a faint star, after a stumble (a forgiven repeat too); ⬇ ⬆ the right note too high or too low; ⏳ let go too early; · no mark.</p></div>")
+    p("</div><p class=\"note\">★ a star, first try; ☆ a faint star, after a stumble (a forgiven repeat too); ⬇ ⬆ the right note too high or too low; ⏳ let go too early; ✋ held too long; · no mark.</p></div>")
     p("<h2>Timeline</h2><div class=\"card\"><div class=\"scroll\">%s<div id=\"tip\" class=\"tip\"></div></div>" % svg)
     p("<div class=\"legend\"><span><i style=\"background:var(--s1)\"></i>level</span><span><i style=\"background:var(--s2)\"></i>minLevel, the quietest stretch of the hop</span><span><i style=\"background:var(--muted)\"></i>floor the tracker holds</span><span><i class=\"wash\" style=\"background:var(--s1)\"></i>a note sounding</span><span><i class=\"dot\" style=\"background:var(--s1)\"></i>fresh onset</span><span><i class=\"dot\" style=\"border:2px solid var(--s1)\"></i>onset by a step</span><span>%s</span></div>" % ("♪ right pitch, the note begins &nbsp;★ long enough &nbsp;☆ long enough after a stumble &nbsp;✂ cut short &nbsp;✕ wrong &nbsp;· ignored" if has_walk else "★ right &nbsp;☆ retry &nbsp;✕ wrong &nbsp;· ignored"))
     p("<div class=\"legend\"><span><i class=\"dot\" style=\"background:var(--s1)\"></i>detected pitch (faint under the gate %.2f)</span><span><i style=\"background:var(--s3)\"></i>sounding note</span><span><i class=\"sw\" style=\"background:var(--band)\"></i>the note waited on</span></div>" % gate)
     p("<div class=\"legend\">" + "".join("<span><i class=\"sw\" style=\"background:%s\"></i>%s</span>" % (colors[d], d.replace("_", " ").lower()) for d in DECISIONS) + "</div>")
-    p("<div class=\"legend\"><span>♪ the right pitch: a note begins</span><span>★ ☆ long enough</span><span>⬇ ⬆ long enough, too high or too low</span><span>✂ cut short, waited on</span><span>⏳ let go too early, the run moved on</span></div>")
+    p("<div class=\"legend\"><span>♪ the right pitch: a note begins</span><span>★ ☆ long enough</span><span>⬇ ⬆ long enough, too high or too low</span><span>✂ cut short, waited on</span><span>⏳ let go too early, the run moved on</span><span>✋ held too long, and a mark drawn higher: changed after it was given</span></div>")
     p("</div>")
     p("<h2>Rules in force</h2><div class=\"card\"><div class=\"rules\">" + "".join("<span>%s <code>%s</code></span>" % (html.escape(k), html.escape(v)) for k, v in session["rules"].items()) + "</div></div>")
     p("<h2>Events</h2><div class=\"card\"><ul class=\"events\">")

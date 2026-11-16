@@ -13,6 +13,7 @@ import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
@@ -36,6 +37,7 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -88,15 +90,18 @@ import javax.inject.Inject
  * one's index), `flute.book_open` (from, to, notes: the steps in the book opened, bpm and time:
  * what the metronome must be set to, none for an empty book, which leaves it alone) and
  * `flute.shelf_close` (book, when the open book was picked again and nothing changed); while
- * listening, `flute.listen` (notes), `flute.heard` (index, expected, heard, fresh, verdict:
+ * listening, `flute.listen` (notes, level: practice or exam), `flute.level` (level, restarted: the run on started
+ * again under it, since nothing of it was judged yet), `flute.heard` (index, expected, heard, fresh, verdict:
  * right, retry, ignored or wrong: the pitch, at the note's onset; cents: where it locked, from
  * the expected note), `flute.held` (index, heldMs: the note became long enough and earned its
  * mark; mark: first_try, retry, high or low; cents: the median of its pitch off the written note),
  * `flute.short` (index, heldMs, needMs: it stopped before that; faded: it had faded away first;
- * mark: short when the run moved on, none when it waits), `flute.repeat_forgiven` (index), `flute.listen_summary` every
+ * mark: short when the run moved on, none when it waits), `flute.changed` (index, mark: long or, in Exam, the whole
+ * note's high, low, first_try or retry; soundedMs, writtenMs, cents: the mark of a note already marked changed, since
+ * 2026-11-16), `flute.repeat_forgiven` (index), `flute.listen_summary` every
  * [ListenRules.SUMMARY_FRAMES] frames (the tuner's summary fields, gate, expected, hearing),
  * `flute.hearing` (hearing, levelMean) when it changes, `flute.listen_done` (stars, retries, high,
- * low, short: the marks of each kind; bpm, pairs, knob: the child's speed, the note pairs it rests
+ * low, short, long: the marks of each kind; bpm, pairs, knob: the child's speed, the note pairs it rests
  * on and the knob's; speed: whether the line about it shows), `flute.listen_stop` (reason: pill,
  * key, erase, leave, speed or book; over: the run had ended and its screen stood), `flute.listen_error`
  * (message) and `flute.mic` (granted).
@@ -118,7 +123,9 @@ class FluteViewModel @Inject constructor(
     init {
         val shelf = settings.loadShelf()
         writer = TuneWriter(Tune.sanitize(shelf.books[shelf.open].tune))
-        _state = MutableStateFlow(FluteUiState(tune = writer.tune, openBook = shelf.open, books = shelf.books))
+        _state = MutableStateFlow(
+            FluteUiState(tune = writer.tune, openBook = shelf.open, books = shelf.books, level = settings.loadListenLevel()),
+        )
     }
 
     val state: StateFlow<FluteUiState> = _state.asStateFlow()
@@ -276,26 +283,57 @@ class FluteViewModel @Inject constructor(
         if (current.isPlaying || current.isListening || !current.canListen) return
         endHeld()
         activationJob?.cancel()
-        val run = ListenRun(writer.tune, pulse(), floor = roomFloor).also { this.run = it }
+        beginRun()
+        listenJob = viewModelScope.launch { listen() }
+    }
+
+    /**
+     * The child chooses how closely "Your turn" judges (since 2026-11-16): saved, and the next run is judged by it. While
+     * a run is on and no note of it was judged yet ([FluteUiState.choosesLevel]) that run starts again at once under the
+     * new level: its session ends with no marks and a new one opens, the microphone closes and opens again (so the new
+     * session has its own audio), and the room under the stage stays as it is meanwhile.
+     */
+    fun chooseLevel(level: ListenLevel) {
+        val current = _state.value
+        if (level == current.level) return
+        settings.saveListenLevel(level)
+        _state.update { it.copy(level = level) }
+        val restart = current.isListening && current.choosesLevel && run != null
+        logger.d(LogTags.FLUTE, "flute.level", "level" to level.name.lowercase(), "restarted" to restart)
+        if (!restart) return
+        val old = listenJob
+        closeRun() // frames still on their way are dropped: there is no run to judge them
+        listenJob = viewModelScope.launch {
+            old?.cancelAndJoin() // the microphone is closed before it opens again
+            beginRun()
+            listen()
+        }
+    }
+
+    /** A new run of the tune at the level in force; its session opens first, so the flute.listen line and the first hop are in it. */
+    private fun beginRun() {
+        val level = _state.value.level
+        val run = ListenRun(writer.tune, pulse(), floor = roomFloor, run = level.rules).also { this.run = it }
         listenSummary.reset()
         // The animal lands on the first note, or on a rest that opens the tune, with a hop.
         _state.update { it.copy(listening = run.listening, marks = emptyMap(), beatPulse = it.beatPulse + 1) }
-        // The session opens first, so the flute.listen line and the first hop are in it.
-        recorder.start(writer.tune, pulse(), roomFloor)
-        logger.d(LogTags.FLUTE, "flute.listen", "notes" to writer.tune.count { it is TuneNote })
-        listenJob = viewModelScope.launch {
-            try {
-                // Every frame, in order (the engine buffers, it does not conflate): the tracker
-                // counts frames, a gap being two in a row, and the main thread is busiest right
-                // after a judged note, when the staff scrolls and the animal hops, which is just
-                // when the next note's gap frames arrive.
-                engine.pitchFrames().collect(::onListenFrame)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                logger.w(LogTags.FLUTE, "flute.listen_error", "message" to e.message, error = e)
-                endListening()
-            }
+        recorder.start(writer.tune, pulse(), roomFloor, level)
+        logger.d(LogTags.FLUTE, "flute.listen", "notes" to writer.tune.count { it is TuneNote }, "level" to level.name.lowercase())
+    }
+
+    /** Hears the microphone until the job is cancelled; a failure ends the listening. */
+    private suspend fun listen() {
+        try {
+            // Every frame, in order (the engine buffers, it does not conflate): the tracker
+            // counts frames, a gap being two in a row, and the main thread is busiest right
+            // after a judged note, when the staff scrolls and the animal hops, which is just
+            // when the next note's gap frames arrive.
+            engine.pitchFrames().collect(::onListenFrame)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.w(LogTags.FLUTE, "flute.listen_error", "message" to e.message, error = e)
+            endListening()
         }
     }
 
@@ -427,8 +465,8 @@ class FluteViewModel @Inject constructor(
      */
     private fun stopListening(reason: String) {
         if (!_state.value.isListening) return
-        // over: the run had ended and only its screen, with the speed line, still stood.
-        logger.d(LogTags.FLUTE, "flute.listen_stop", "reason" to reason, "over" to (run == null)) // before the session closes, so it is in it
+        // over: the run had ended and only its screen, with the speed line, still stood (not a run starting again at another level).
+        logger.d(LogTags.FLUTE, "flute.listen_stop", "reason" to reason, "over" to (run == null && listenJob == null)) // before the session closes, so it is in it
         endListening()
     }
 
@@ -440,6 +478,12 @@ class FluteViewModel @Inject constructor(
     private fun endListening(keepScreen: Boolean = false) {
         listenJob?.cancel()
         listenJob = null
+        closeRun()
+        if (!keepScreen) _state.update { it.copy(listening = null) }
+    }
+
+    /** The run is done with: its last partial second logged, its session ended with its marks, the room's floor kept. The screen is left alone. */
+    private fun closeRun() {
         val shown = _state.value.listening
         if (listenSummary.frames > 0) logListenSummary(shown?.index, shown?.hearing ?: Hearing.CLEAR) // the last partial second
         run?.let {
@@ -447,7 +491,6 @@ class FluteViewModel @Inject constructor(
             roomFloor = it.floor ?: roomFloor
         }
         run = null
-        if (!keepScreen) _state.update { it.copy(listening = null) }
     }
 
     /** One microphone frame while listening: the run judges it, and this logs, shows and records what it made of it. */
@@ -478,10 +521,16 @@ class FluteViewModel @Inject constructor(
         step.held?.let {
             logger.d(LogTags.FLUTE, "flute.held", "index" to it.index, "heldMs" to it.heldMs, "mark" to it.mark?.name?.lowercase(), "cents" to it.cents)
         }
+        step.changed?.let {
+            logger.d(
+                LogTags.FLUTE, "flute.changed",
+                "index" to it.index, "mark" to it.mark.name.lowercase(), "soundedMs" to it.soundedMs, "writtenMs" to it.writtenMs, "cents" to it.cents,
+            )
+        }
         _state.update {
-            // A step earned (or a repeat forgiven): its mark shows. The animal hops when the run says, to another
-            // place: a click inside the note it walks, the next note, or back to the head of a note played again.
-            val marks = if (step.advanced || step.forgiven.isNotEmpty()) run.marks.toMap() else it.marks
+            // A step earned, a mark changed (or a repeat forgiven): its mark shows. The animal hops when the run says, to
+            // another place: a click inside the note it walks, the next note, or back to the head of a note played again.
+            val marks = if (step.advanced || step.changed != null || step.forgiven.isNotEmpty()) run.marks.toMap() else it.marks
             it.copy(listening = listening, marks = marks, beatPulse = if (step.hop) it.beatPulse + 1 else it.beatPulse)
         }
         if (step.done) {
@@ -494,6 +543,7 @@ class FluteViewModel @Inject constructor(
                 "high" to run.marks.count { it.value == StepMark.HIGH },
                 "low" to run.marks.count { it.value == StepMark.LOW },
                 "short" to run.marks.count { it.value == StepMark.SHORT },
+                "long" to run.marks.count { it.value == StepMark.LONG },
                 "bpm" to pace?.bpm, "pairs" to pace?.pairs, "knob" to pace?.knobBpm, "speed" to (pace?.speaks == true),
             )
         }

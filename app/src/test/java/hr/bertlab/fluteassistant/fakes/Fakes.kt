@@ -11,6 +11,7 @@ import hr.bertlab.fluteassistant.audio.tuner.ReferenceTonePlayer
 import hr.bertlab.fluteassistant.audio.tuner.TunerEngine
 import hr.bertlab.fluteassistant.core.MonotonicClock
 import hr.bertlab.fluteassistant.core.log.Logger
+import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
@@ -153,6 +154,7 @@ class FakeSettingsStore(
     var theme: ThemeChoice = ThemeChoice.SYSTEM,
     var notesGame: NotesGame = NotesGame.FIND,
     var noteProgress: NoteProgress = NoteProgress.EMPTY,
+    var listenLevel: ListenLevel = ListenLevel.PRACTICE,
 ) : SettingsStore {
     /** The tune of the open book, so a test can set or read it without going through the shelf. */
     var tune: List<TuneItem>
@@ -171,6 +173,8 @@ class FakeSettingsStore(
     override fun saveNoteSound(enabled: Boolean) { noteSound = enabled }
     override fun loadNotesGame() = notesGame
     override fun saveNotesGame(game: NotesGame) { notesGame = game }
+    override fun loadListenLevel() = listenLevel
+    override fun saveListenLevel(level: ListenLevel) { listenLevel = level }
     override fun loadNoteProgress() = noteProgress
     override fun saveNoteProgress(progress: NoteProgress) { noteProgress = progress }
     override fun loadShelf() = Shelf(openBook, books.toList())
@@ -210,7 +214,7 @@ class FakeLogger(var verbose: Boolean = false) : Logger {
 
 /** Remembers every call of the flute's session recorder; [onStart] and [onEnd] run first, so a test can look around at that moment. */
 class FakeListenRecorder : ListenRecorder {
-    data class Start(val tune: List<TuneItem>, val pulse: Pulse, val floor: Float?)
+    data class Start(val tune: List<TuneItem>, val pulse: Pulse, val floor: Float?, val level: ListenLevel)
 
     val started = mutableListOf<Start>()
     val frames = mutableListOf<ListenFrame>()
@@ -218,9 +222,9 @@ class FakeListenRecorder : ListenRecorder {
     var onStart: () -> Unit = {}
     var onEnd: () -> Unit = {}
 
-    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) {
+    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel) {
         onStart()
-        started += Start(tune, pulse, floor)
+        started += Start(tune, pulse, floor, level)
     }
 
     override fun frame(frame: ListenFrame) {

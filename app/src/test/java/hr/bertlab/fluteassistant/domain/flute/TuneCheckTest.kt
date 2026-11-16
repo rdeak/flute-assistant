@@ -7,6 +7,7 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlin.math.pow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -277,5 +278,23 @@ class TuneCheckTest {
         assertEquals(60.0, TuneCheck.centsFrom(hz(83, 60.0), 71), 1e-6)
         assertEquals(-40.0, TuneCheck.centsFrom(hz(59, -40.0), 71), 1e-6)
         assertEquals(-60.0, TuneCheck.centsFrom(hz(66, 40.0), 67), 1e-6)
+    }
+
+    @Test
+    fun `a mark already given can be changed, and only one that was given`() {
+        val check = TuneCheck(listOf(q(67), q(69)))
+        check.judge(67, fresh = true)
+        check.earn()
+        check.remark(0, StepMark.LONG)
+        assertEquals(mapOf(0 to StepMark.LONG), check.marks)
+        assertThrows(IllegalArgumentException::class.java) { check.remark(1, StepMark.LONG) }
+    }
+
+    @Test
+    fun `the star a step would earn is faint after a wrong note`() {
+        val check = TuneCheck(listOf(q(67)))
+        assertEquals(StepMark.FIRST_TRY, check.star)
+        check.judge(60, fresh = true)
+        assertEquals(StepMark.RETRY, check.star)
     }
 }
