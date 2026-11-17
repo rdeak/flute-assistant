@@ -24,9 +24,16 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   Activity-scoped so state and playback survive tab switches and that re-creation; a turn of the
   phone re-creates nothing (`configChanges` in the manifest, "Sideways" below);
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
-  when the notes tab is left, so the child always comes back to a zero score. `MainScreen` also
-  keeps the screen on (`ui/common/KeepScreenOn`) while the metronome plays, the tuner listens or
-  the flute's tune runs (Play, or "Your turn" listening). While the metronome plays, the bottom bar's 🥁 hops on every beat
+  when the notes tab is left, so the child always comes back to a zero score. The screen
+  neither dims nor locks while the app is in front (`ui/common/KeepScreenAwake`, the user's call on
+  2026-11-17: a child plays with both hands on the flute, often reading the staff from a stand). It
+  stays on while the phone sounds (the metronome, a tune played back, the tuner's reference note) or
+  hears a note (the tuner's reading, Your turn's `heardNow`), and for five minutes after that or after
+  the last touch, key or return to the front (`MainActivity.onUserInteraction` and `onResume`); then
+  the phone's own timeout takes over, so a phone left open still locks itself. A note heard counts, an
+  open microphone does not: the tuner listens whenever its tab is open and Your turn waits for its first
+  note without end. In the background the phone sleeps as usual. Before 2026-11-17 the screen stayed on
+  only while the metronome played, the tuner listened or the flute's tune ran. While the metronome plays, the bottom bar's 🥁 hops on every beat
   on every tab (since 2026-11-03: `TabBar` with `rememberBeatFlash` / `hopOnBeat` from
   `ui/common/BeatFlash.kt`, the same hop as the ring's animal), so a running drum is visible
   everywhere and one tap on it reaches Stop; a screen reader hears that tab as "Playing"

@@ -535,8 +535,9 @@ a note in the band is the note going on or the next one is decided by its pitch 
 onset that locked within `LOCK_CENTS` of where the walked note sounds (an octave pop, a breath dip of a b blown high)
 is the note going on, whatever is written next, and one that moved is the next note if that is its letter; and once a
 note is earned, the same note started again at its own pitch while its sound goes on is its tail (`TuneCheck.judge`'s
-`sameAsLast`), unless its written repeat is waited on, so a sharp b dipping before a written c never marks the c. While
-an ended run's speed line stands the phone may sleep (`FluteUiState.keepsScreenOn`), and a running row's end keeps room
+`sameAsLast`), unless its written repeat is waited on, so a sharp b dipping before a written c never marks the c. Five
+minutes after a run ends with no touch the phone may sleep (`ui/common/KeepScreenAwake`), which leaves the tab and
+closes its speed line, and a running row's end keeps room
 for the arrow beside the last note's bubble (`StaffGeometry.endPadding`). Tests: `TuneCheckTest`, `ListenRunTest` ("Feedback,
 not stars", "A note let go too early", "The speed of a finished run"), `ListenPathTest` (b's blown 60 high, a note 60
 under), `FluteUiStateTest`, `FluteViewModelTest`, `FluteScreenTest`, `FluteSidewaysTest`, `LabelsTest`, `ReplayTest`.

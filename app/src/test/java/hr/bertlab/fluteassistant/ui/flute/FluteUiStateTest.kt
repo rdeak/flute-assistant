@@ -227,12 +227,4 @@ class FluteUiStateTest {
         assertEquals(Pitch.HIGH, FluteUiState(tune = lamb, listening = Listening(index = 1, pitch = Pitch.HIGH)).pitch)
     }
 
-    @Test
-    fun `the screen stays awake while a tune runs, not while an ended run's speed line stands`() {
-        assertTrue(FluteUiState(tune = lamb, listening = Listening(index = 1)).keepsScreenOn)
-        val pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true)
-        assertFalse(FluteUiState(tune = lamb, listening = Listening(index = 3, finishing = true, pace = pace)).keepsScreenOn)
-        assertFalse(FluteUiState(tune = lamb).keepsScreenOn)
-    }
-
 }

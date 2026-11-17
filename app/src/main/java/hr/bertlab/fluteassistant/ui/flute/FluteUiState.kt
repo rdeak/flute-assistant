@@ -95,12 +95,6 @@ data class FluteUiState(
     /** Whether the tune is running, by the phone (Play) or by the child (Your turn): the keys hide and the staff grows. */
     val isRunning: Boolean get() = isPlaying || isListening
 
-    /**
-     * Whether the phone must not time out on this tab: while the tune runs, but not while an ended run's speed line
-     * stands, the microphone closed (the phone may sleep, which leaves the tab and closes that screen).
-     */
-    val keepsScreenOn: Boolean get() = isRunning && pace == null
-
     /** Whether there is a note to check: rests and breaths alone give "Your turn" nothing to do. */
     val canListen: Boolean get() = tune.any { it is TuneNote }
 
