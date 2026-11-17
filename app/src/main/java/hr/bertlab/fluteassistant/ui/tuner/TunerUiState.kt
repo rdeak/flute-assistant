@@ -60,6 +60,9 @@ data class TunerUiState(
             TunerMode.IDENTIFY -> reading?.let { identifiedMidi ?: it.midi }
         }
 
+    /** Whether the tab sounds or hears a note right now: the phone stays awake while it does (`KeepScreenAwake`). */
+    val isBusy: Boolean get() = isPlayingReference || reading != null
+
     /** What the pitch window and the status measure: cents from [homeMidi] (positive = sharp), or null in silence. */
     val gaugeCents: Double?
         get() {

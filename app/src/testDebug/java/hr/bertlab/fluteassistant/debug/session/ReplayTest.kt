@@ -196,7 +196,7 @@ class ReplayTest {
         assertEquals("no band above a note", 0.0, run.highCents, 0.0)
         assertEquals("no arrow", Double.POSITIVE_INFINITY, run.tuneCents, 0.0)
         assertFalse("a short note waited", run.shortMovesOn)
-        assertFalse(session.recordsPitch)
+        assertFalse(session.columns.pitch)
         assertTrue(session.rows.any { it.walk?.phase == Walk.Phase.SHORT })
         val report = Replay.report(session)
         val then = report.substringBefore("today's rules")
@@ -248,7 +248,7 @@ class ReplayTest {
     fun `the rows carry where the animal was, and a walk the phone and the replay disagree on is a difference`() {
         val dir = recorded()
         val session = Session.load(dir)
-        assertTrue(session.recordsWalk)
+        assertTrue(session.columns.walk)
         assertTrue(session.rows.any { it.walk?.phase == Walk.Phase.SOUNDING })
         assertTrue(session.rows.any { it.walk?.phase == Walk.Phase.DONE })
         assertTrue(Replay.report(session).contains("diff: none"))
@@ -281,7 +281,7 @@ class ReplayTest {
                 0, 60, 64, TunerAdvice.HOLD_LONGER, false, false, Hearing.CLEAR, walk,
             ),
         )
-        assertEquals(0, Replay.diff(listOf(step(Verdict.WRONG, short)), listOf(step(Verdict.IGNORED, short)), walk = true).count)
+        assertEquals(0, Replay.diff(listOf(step(Verdict.WRONG, short)), listOf(step(Verdict.IGNORED, short)), Columns(walk = true)).count)
         assertEquals("with no note cut short, wrong is wrong", 1, Replay.diff(listOf(step(Verdict.WRONG, null)), listOf(step(Verdict.IGNORED, null))).count)
     }
 
@@ -291,7 +291,7 @@ class ReplayTest {
         val csv = File(dir, "frames.csv")
         csv.writeText(csv.readLines().joinToString("\n") { it.split(',').dropLast(3).joinToString(",") } + "\n")
         val session = Session.load(dir)
-        assertFalse(session.recordsWalk)
+        assertFalse(session.columns.walk)
         assertTrue(session.rows.all { it.walk == null })
         assertTrue(Replay.report(session).contains("diff: none"))
     }
@@ -328,11 +328,11 @@ class ReplayTest {
     @Test
     fun `a session keeps the arrow it showed, and one from before has none to compare`() {
         val dir = recorded()
-        assertTrue(Session.load(dir).recordsPitch)
+        assertTrue(Session.load(dir).columns.pitch)
         val csv = File(dir, "frames.csv")
         // As a build before 2026-11-14 wrote it: no pitch, and so no changed column after it either.
         csv.writeText(csv.readLines().joinToString("\n") { it.substringBeforeLast(',').substringBeforeLast(',') } + "\n")
-        assertFalse(Session.load(dir).recordsPitch)
+        assertFalse(Session.load(dir).columns.pitch)
         assertTrue(Replay.report(Session.load(dir)).contains("diff: none"))
     }
 
@@ -343,7 +343,7 @@ class ReplayTest {
         val sounding = session.rows.indexOfFirst { it.row.walk?.phase == Walk.Phase.SOUNDING }
         assertTrue(sounding >= 0)
         val phone = session.rows.mapIndexed { i, step -> if (i == sounding) step.copy(row = step.row.copy(pitch = Pitch.LOW)) else step }
-        assertEquals(1, Replay.diff(phone, replay, pitch = true).count)
+        assertEquals(1, Replay.diff(phone, replay, Columns(pitch = true)).count)
         assertEquals(0, Replay.diff(phone, replay).count)
     }
 
@@ -361,7 +361,7 @@ class ReplayTest {
         val log = File(dir, "session.log")
         log.writeText(log.readText().replace(Regex(" (longSlack|wholeNote)=[^ \n]*"), ""))
         val session = Session.load(dir)
-        assertFalse(session.recordsChanged)
+        assertFalse(session.columns.changed)
         assertEquals(Double.POSITIVE_INFINITY, Replay.recordedRunRules(session).longSlack, 0.0)
         val report = Replay.report(session)
         assertTrue(report, report.lines().any { it.startsWith("diff: none") })
@@ -372,12 +372,12 @@ class ReplayTest {
     @Test
     fun `a changed mark is written down, read back and compared`() {
         val session = Session.load(recorded(pulse = Pulse(120), tune = quarters))
-        assertTrue(session.recordsChanged)
+        assertTrue(session.columns.changed)
         val changed = session.rows.single { it.row.changed != null }
         assertEquals(MarkChange(2, StepMark.LONG), changed.row.changed)
         assertTrue(Replay.report(session).lines().any { it.startsWith("diff: none") })
         val roomier = ListenPath.run(session.frames, quarters, session.pulse, run = ListenRun.Rules(longSlack = 100.0))
-        val diff = Replay.diff(session.rows, roomier.steps, walk = session.recordsWalk, pitch = session.recordsPitch, changed = session.recordsChanged)
+        val diff = Replay.diff(session.rows, roomier.steps, session.columns)
         assertEquals(changed.frame, diff.first)
     }
 

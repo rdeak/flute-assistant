@@ -30,4 +30,7 @@ object FluteNotes {
     fun signed(key: Int): Int? = listOf(key + 1, key - 1).firstOrNull {
         it in LOWEST..HIGHEST && NoteSpelling.signOf(it) != null && NoteSpelling.naturalOf(it) == key
     }
+
+    /** The note the white key [key] writes: itself, or its black note ([signed]) while the ♯♭ key waits ([signWaiting]); null when it has none then. */
+    fun written(key: Int, signWaiting: Boolean): Int? = if (signWaiting) signed(key) else key
 }

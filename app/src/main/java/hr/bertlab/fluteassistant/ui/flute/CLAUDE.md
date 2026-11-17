@@ -12,13 +12,14 @@ change that part). The songbook is in `SONGBOOK.md`.
   window, the cap, breath, the join, the sign, erase), `Bars` (how the staff writes bars, ties and
   signs), `Joins` (runs of
   joined notes: the arcs, and what Listen to me hears as one note), `TuneCheck` and `ListenRun` ("Your
-  turn"), `Songbook`.
+  turn"; what the screen shows of one is `Listening`, in `Listening.kt`), `Songbook`.
 - `domain/listen/`: what the microphone's frames become (`NoteOnsetTracker`, `HearingTracker`,
   `ListenRules`), shared with the tuner (`../tuner/CLAUDE.md`).
 - `FluteViewModel`: gives the rules the clock, the sound, the microphone, the storage and the log.
   `FluteUiState` has one part per way the tab can be: `held`, `playing`, `listening`.
 - `FluteContent(state, metronome, actions)` builds the tune, the keys and the Play row once, and
-  `FluteSideways.kt` only says where they stand. `TuneStaff` draws from `StaffGeometry` (plain dp), its signs
+  `FluteSideways.kt` only says where they stand. `TuneStaff` draws from `StaffGeometry` (plain dp; where a
+  step's heads, pills and bar lines stand is `StaffGeometry.layout`, the one place that knows a sign's room), its signs
   from `StaffSigns.kt`; `FluteKeys` draws the keys, the ♯♭ key with the staff's own signs.
 - `audio/flute/`: the tone (`SustainedToneSynth`, `AudioTrackFluteTonePlayer`).
 

@@ -33,7 +33,6 @@ interface SettingsStore {
     /** Which game the notes tab shows; [NotesGame.FIND] until the other one is chosen. */
     fun loadNotesGame(): NotesGame
     fun saveNotesGame(game: NotesGame)
-
     /** The sticker book: how well each note is known, decoded leniently (see NoteProgress). */
     fun loadNoteProgress(): NoteProgress
     fun saveNoteProgress(progress: NoteProgress)

@@ -34,7 +34,7 @@ data class ListenFrame(
     val walk: Walk? = null,
     /** Which way the note walked sounded off its pitch after the frame ([Listening.pitch], since 2026-11-14). */
     val pitch: Pitch? = null,
-    /** A mark already given that changed on this frame (since 2026-11-16: held too long, or the whole note's pitch). */
+    /** A mark already given that changed on this frame (since 2026-11-16: held too long). */
     val changed: MarkChange? = null,
 )
 

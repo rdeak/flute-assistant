@@ -15,8 +15,6 @@ enum class Accidental { SHARP, FLAT, NATURAL }
 object NoteSpelling {
     private val LETTER = intArrayOf(0, 0, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6)
     private val SIGN = arrayOf(null, Accidental.SHARP, null, Accidental.FLAT, null, null, Accidental.SHARP, null, Accidental.SHARP, null, Accidental.FLAT, null)
-    /** Semitones from each pitch class to the white note of its letter: −1 for a sharp, +1 for a flat. */
-    private val TO_NATURAL = intArrayOf(0, -1, 0, 1, 0, 0, -1, 0, -1, 0, 1, 0)
 
     /** The letter [midi] is written on: C = 0, D = 1, … B = 6. */
     fun letterOf(midi: Int): Int = LETTER[Math.floorMod(midi, 12)]
@@ -25,5 +23,9 @@ object NoteSpelling {
     fun signOf(midi: Int): Accidental? = SIGN[Math.floorMod(midi, 12)]
 
     /** The white note on [midi]'s letter, in its octave: E♭4 (63) is on E4 (64); a white note is its own. */
-    fun naturalOf(midi: Int): Int = midi + TO_NATURAL[Math.floorMod(midi, 12)]
+    fun naturalOf(midi: Int): Int = when (signOf(midi)) {
+        Accidental.SHARP -> midi - 1 // a sharp sits on the letter below
+        Accidental.FLAT -> midi + 1 // a flat on the letter above
+        else -> midi
+    }
 }

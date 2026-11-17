@@ -161,6 +161,7 @@ fun FluteKeys(
         val keyWidth = with(LocalDensity.current) {
             ((constraints.maxWidth - keyGap.roundToPx() * (keysPerRow - 1)) / keysPerRow).toDp()
         }
+        val key = Modifier.width(keyWidth).fillMaxHeight() // every key of every row: one column wide, as tall as its row
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -184,9 +185,7 @@ fun FluteKeys(
                             onPress = actions.onKeyPressed,
                             onRelease = actions.onKeyReleased,
                             onActivate = actions.onKeyActivated,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                     }
                     if (row.size < keysPerRow) {
@@ -197,9 +196,7 @@ fun FluteKeys(
                         SharpFlatKey(
                             waiting = signWaiting,
                             onSign = actions.onSign,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                         val emptyColumns = keysPerRow - row.size - SharpFlatKeyCount - ToolKeyCount
                         if (emptyColumns > 0) {
@@ -209,31 +206,23 @@ fun FluteKeys(
                             waiting = joinWaiting,
                             enabled = joinEnabled,
                             onJoin = actions.onJoin,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                         RestKey(
                             lit = restLit,
                             onPress = actions.onRestPressed,
                             onRelease = actions.onRestReleased,
                             onActivate = actions.onRestActivated,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                         BreathKey(
                             onBreath = actions.onBreath,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                         EraseKey(
                             enabled = eraseEnabled,
                             onErase = actions.onEraseLast,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                     }
                 }
@@ -255,7 +244,6 @@ private fun RestKey(
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnRelease by rememberUpdatedState(onRelease)
     ToolKey(
-        emoji = SLEEP_EMOJI,
         label = label,
         pressed = lit,
         onActivate = onActivate,
@@ -271,7 +259,7 @@ private fun RestKey(
                 },
             )
         },
-    )
+    ) { ToolEmoji(SLEEP_EMOJI) }
 }
 
 /**
@@ -281,29 +269,15 @@ private fun RestKey(
  */
 @Composable
 private fun JoinKey(waiting: Boolean, enabled: Boolean, onJoin: () -> Unit, modifier: Modifier = Modifier) {
-    val label = stringResource(R.string.flute_join)
-    val currentOnJoin by rememberUpdatedState(onJoin)
     val ink = FluteTheme.colors.text
-    val active = enabled || waiting
-    ToolKey(
-        label = label,
-        pressed = waiting,
-        onActivate = { currentOnJoin() },
-        enabled = active,
-        // Selected while a join waits; nothing said otherwise, so a screen reader does not hear "not selected" on every visit.
-        selected = if (waiting) true else null,
-        picture = {
-            Canvas(Modifier.size(JoinPictureWidth, JoinPictureHeight)) {
-                scale(density, pivot = Offset.Zero) {
-                    drawPath(JoinPicture, ink)
-                    drawPath(JoinPicture, ink, style = Stroke(1.5f, join = StrokeJoin.Round))
-                }
+    WaitingKey(stringResource(R.string.flute_join), waiting, onJoin, modifier, enabled) {
+        Canvas(Modifier.size(JoinPictureWidth, JoinPictureHeight)) {
+            scale(density, pivot = Offset.Zero) {
+                drawPath(JoinPicture, ink)
+                drawPath(JoinPicture, ink, style = Stroke(1.5f, join = StrokeJoin.Round))
             }
-        },
-        modifier = modifier.then(
-            if (active) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { currentOnJoin() }) } else Modifier,
-        ),
-    )
+        }
+    }
 }
 
 /**
@@ -313,24 +287,45 @@ private fun JoinKey(waiting: Boolean, enabled: Boolean, onJoin: () -> Unit, modi
  */
 @Composable
 private fun SharpFlatKey(waiting: Boolean, onSign: () -> Unit, modifier: Modifier = Modifier) {
-    val label = stringResource(R.string.flute_sign)
-    val currentOnSign by rememberUpdatedState(onSign)
     val ink = FluteTheme.colors.text
+    WaitingKey(stringResource(R.string.flute_sign), waiting, onSign, modifier) {
+        Canvas(Modifier.size(SharpFlatPictureWidth, SharpFlatPictureHeight)) {
+            scale(SHARP_FLAT_SCALE * density, pivot = Offset.Zero) {
+                drawSign(Accidental.SHARP, cx = 7f, y = 13f, color = ink)
+                drawSign(Accidental.FLAT, cx = 21f, y = 17f, color = ink)
+            }
+        }
+    }
+}
+
+/**
+ * A key that waits for the next note key, the ⌒ key and the ♯♭ key: a plain key with its [picture]. A finger going down
+ * calls [onTap], which sets it waiting or drops what waits; while it is [waiting] the key stays down in its yellow ring
+ * and a screen reader hears it selected. Faded and inert while not [enabled], unless it waits: a second tap must still
+ * drop it.
+ */
+@Composable
+private fun WaitingKey(
+    label: String,
+    waiting: Boolean,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    picture: @Composable () -> Unit,
+) {
+    val currentOnTap by rememberUpdatedState(onTap)
+    val active = enabled || waiting
     ToolKey(
         label = label,
         pressed = waiting,
-        onActivate = { currentOnSign() },
-        // Selected while a sign waits; nothing said otherwise, as the join key does.
+        onActivate = { currentOnTap() },
+        enabled = active,
+        // Selected while it waits; nothing said otherwise, so a screen reader does not hear "not selected" on every visit.
         selected = if (waiting) true else null,
-        picture = {
-            Canvas(Modifier.size(SharpFlatPictureWidth, SharpFlatPictureHeight)) {
-                scale(SHARP_FLAT_SCALE * density, pivot = Offset.Zero) {
-                    drawSign(Accidental.SHARP, cx = 7f, y = 13f, color = ink)
-                    drawSign(Accidental.FLAT, cx = 21f, y = 17f, color = ink)
-                }
-            }
-        },
-        modifier = modifier.pointerInput(Unit) { detectTapGestures(onPress = { currentOnSign() }) },
+        modifier = modifier.then(
+            if (active) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { currentOnTap() }) } else Modifier,
+        ),
+        content = picture,
     )
 }
 
@@ -341,7 +336,6 @@ private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
     val currentOnBreath by rememberUpdatedState(onBreath)
     var pressed by remember { mutableStateOf(false) }
     ToolKey(
-        emoji = BREATH_EMOJI,
         label = label,
         pressed = pressed,
         onActivate = onBreath,
@@ -358,7 +352,7 @@ private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
                 },
             )
         },
-    )
+    ) { ToolEmoji(BREATH_EMOJI) }
 }
 
 /**
@@ -374,7 +368,6 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
     val currentOnErase by rememberUpdatedState(onErase)
     var pressed by remember { mutableStateOf(false) }
     ToolKey(
-        emoji = SPONGE_EMOJI,
         label = label,
         pressed = pressed,
         onActivate = { currentOnErase() },
@@ -406,12 +399,12 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
                 Modifier
             },
         ),
-    )
+    ) { ToolEmoji(SPONGE_EMOJI) }
 }
 
 /**
- * A plain (not a note's colour) key showing [emoji], named [label] for a screen reader; sunk in a
- * yellow ring while [pressed]; faded, and refusing [onActivate], while [enabled] is false.
+ * A plain (not a note's colour) key showing [content] (an emoji, [ToolEmoji], or a drawn picture), named [label] for a
+ * screen reader; sunk in a yellow ring while [pressed]; faded, and refusing [onActivate], while [enabled] is false.
  */
 @Composable
 private fun ToolKey(
@@ -419,10 +412,9 @@ private fun ToolKey(
     pressed: Boolean,
     onActivate: () -> Unit,
     modifier: Modifier = Modifier,
-    emoji: String? = null,
     enabled: Boolean = true,
     selected: Boolean? = null,
-    picture: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
 ) {
     val colors = FluteTheme.colors
     Box(
@@ -442,9 +434,13 @@ private fun ToolKey(
             .drawBehind { if (pressed) drawKeyRing() }
             .chunky(KeyShape, colors.raised, colors.outline, KeyDepth, pressed = pressed),
     ) {
-        if (picture != null) picture() else Emoji(checkNotNull(emoji), fontSize = emojiSizeFor(TOOL_EMOJI_DP))
+        content()
     }
 }
+
+/** A tool key's emoji, at the size every tool key shows its own. */
+@Composable
+private fun ToolEmoji(emoji: String) = Emoji(emoji, fontSize = emojiSizeFor(TOOL_EMOJI_DP))
 
 /** The yellow ring around a pressed key, a little outside its outline. */
 private fun DrawScope.drawKeyRing() {
@@ -476,7 +472,7 @@ private fun FluteKey(
     onActivate: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val face = if (signWaiting) FluteNotes.signed(midi) else midi
+    val face = FluteNotes.written(midi, signWaiting)
     val writes = face != null
     val label = noteLabel(face ?: midi)
     val colors = FluteTheme.colors

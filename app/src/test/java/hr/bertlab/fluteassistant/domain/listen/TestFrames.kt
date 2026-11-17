@@ -24,7 +24,10 @@ object TestFrames {
         level: Float = 0.7f,
         minLevel: Float = level,
         hopMs: Double = PitchFrame.DEFAULT_HOP_MS,
-    ) = PitchFrame(NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0), probability, level, minLevel, hopMs)
+    ) = PitchFrame(hz(midi, cents), probability, level, minLevel, hopMs)
+
+    /** The frequency of [midi] [cents] off it. */
+    fun hz(midi: Int, cents: Double): Double = NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0)
 
     /** A frame of silence. */
     val silent = PitchFrame(null, 0.0, level = 0f)

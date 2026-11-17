@@ -237,6 +237,39 @@ internal object StaffGeometry {
     }
 
     /**
+     * Where the pieces of one step stand, in dp from the step's left: the room its sign takes before the first head
+     * ([room], none without a sign), the step's whole [width], each piece's head centre ([heads]), the middle of each
+     * piece's name pill ([pills]) and the middle of each bar line inside the step ([bars]).
+     */
+    class StepLayout(val room: Float, val width: Float, val heads: List<Float>, val pills: List<Float>, val bars: List<Float>)
+
+    /**
+     * The layout of [mark]: the one place that knows a sign's room stands before the first head, makes that piece's
+     * pill as much wider and moves everything after it right. The staff's drawing, the slurs over it and the ties
+     * under its pills all read it, so they cannot part.
+     */
+    fun layout(mark: LineMark.Step): StepLayout {
+        val heads = mutableListOf<Float>()
+        val pills = mutableListOf<Float>()
+        val bars = mutableListOf<Float>()
+        var x = 0f
+        var extra = signRoom(mark) // waits for the first piece: its head stands after it, its pill is as much wider
+        for (part in mark.parts) {
+            when (part) {
+                is StepPart.Length -> {
+                    heads += x + extra + HEAD_X
+                    pills += x + (slotWidth(part.length) + extra) / 2
+                    x += extra
+                    extra = 0f
+                }
+                LineMark.BarLine -> bars += x + extra + BAR_SLOT / 2
+            }
+            x += partWidth(part)
+        }
+        return StepLayout(signRoom(mark), markWidth(mark), heads, pills, bars)
+    }
+
+    /**
      * Where the running animal stands, from the left of a step written as [parts], [halfBeat] half
      * beats into it: over the head at 0, then half a beat's room ([BEAT_WIDTH] / 2) further for each
      * half beat, as each beat of a piece has its own room, so on every click it lands on a new place
@@ -328,6 +361,9 @@ internal object StaffGeometry {
     const val TIE_CONTROL = 22f
     const val TIE_WIDTH = 2f
 
+    /** How far under its heads' centre a tie's ink reaches: a quadratic dips halfway between its ends and its control point. */
+    const val TIE_LOW = (TIE_START + TIE_CONTROL) / 2 + TIE_WIDTH / 2
+
     /**
      * A slur (since 2026-11-16), always under the heads as the ties are, since every stem points up: its ends
      * [SLUR_END_INSET] inside the end heads' centres and [SLUR_END_DROP] under them, its belly [SLUR_BELLY] and a dp
@@ -376,9 +412,8 @@ internal object StaffGeometry {
         // Never within the air of the pills anywhere along the curve, a steep one's low end included.
         for (step in 1 until 50) {
             val t = step / 50f
-            val u = 1 - t
-            val chord = sy + (ey - sy) * (3 * u * u * t * 0.25f + 3 * u * t * t * 0.75f + t * t * t)
-            belly = minOf(belly, (NAMES_TOP - SLUR_PILL_AIR - chord) / (3 * t * u))
+            val chord = sy + (ey - sy) * xShare(t)
+            belly = minOf(belly, (NAMES_TOP - SLUR_PILL_AIR - chord) / (3 * t * (1 - t)))
         }
         val rise = (ey - sy) / 4
         return SlurCurve(sx, sy, sx + span / 4, sy + rise + belly, ex - span / 4, ey - rise + belly, ex, ey)
@@ -390,10 +425,15 @@ internal object StaffGeometry {
         var hi = 1f
         repeat(30) {
             val t = (lo + hi) / 2
-            val u = 1 - t
-            if (3 * u * u * t * 0.25f + 3 * u * t * t * 0.75f + t * t * t < along) lo = t else hi = t
+            if (xShare(t) < along) lo = t else hi = t
         }
         return (lo + hi) / 2
+    }
+
+    /** How far along from end to end the slur's x is at its parameter [t]: its points' x run 0, 1/4, 3/4, 1. */
+    private fun xShare(t: Float): Float {
+        val u = 1 - t
+        return 3 * u * u * t * 0.25f + 3 * u * t * t * 0.75f + t * t * t
     }
 
     /** The 😮‍💨 over a breath: where its centre sits, and how big. */
@@ -415,9 +455,7 @@ internal object StaffGeometry {
         val y = yOf(position)
         val ring = maxOf(LIT_RADIUS, WHOLE_RY + HEAD_EDGE)
         val stem = STEM_REACH + STEM_WIDTH / 2
-        // A quadratic tie dips halfway between its ends and its control point.
-        val tie = (TIE_START + TIE_CONTROL) / 2 + TIE_WIDTH / 2
         val ledgers = StaffNotes.ledgerLinesFor(position).map(::yOf)
-        return minOf(y - maxOf(ring, stem), ledgers.minOrNull() ?: y)..maxOf(y + maxOf(ring, tie), ledgers.maxOrNull() ?: y)
+        return minOf(y - maxOf(ring, stem), ledgers.minOrNull() ?: y)..maxOf(y + maxOf(ring, TIE_LOW), ledgers.maxOrNull() ?: y)
     }
 }

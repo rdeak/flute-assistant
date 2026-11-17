@@ -92,7 +92,8 @@ data object TuneBreath : TuneItem {
  * and [inside] lists, in order, the later ones and, for a note, its end a short gap
  * ([Tune.gapMs]) before the next step; a note the next note is joined to has no end, it goes on
  * into that note. [joined]: the step's note is joined to the one before (since 2026-11-16), so it
- * starts with no gap before it and no new attack, and a tie (the same note) is one sound.
+ * starts with no gap before it and no new attack; [tied]: joined to the same note, a tie, which is
+ * one sound going on.
  */
 data class PlayStep(
     val index: Int,
@@ -101,6 +102,7 @@ data class PlayStep(
     val clickAtStart: Boolean,
     val inside: List<Moment>,
     val joined: Boolean = false,
+    val tied: Boolean = false,
 ) {
     /** Something inside a step, [atMs] after its start: a click [halfBeat] half beats into it, or (null) the note's end. */
     data class Moment(val atMs: Long, val halfBeat: Int?)
@@ -166,9 +168,12 @@ object Tune {
             val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.halfBeatMs).roundToLong(), it) } +
                 listOfNotNull(if (item is TuneNote && !goesOn) PlayStep.Moment(duration - gapMs(duration), null) else null)
             startsAt += length.halfBeats
+            val note = item as? TuneNote
+            val joined = note?.joined == true
             PlayStep(
-                index, (item as? TuneNote)?.midi, duration, clickAtStart = clicks.firstOrNull() == 0, inside.sortedBy { it.atMs },
-                joined = (item as? TuneNote)?.joined == true,
+                index, note?.midi, duration, clickAtStart = clicks.firstOrNull() == 0, inside.sortedBy { it.atMs },
+                joined = joined,
+                tied = joined && (items.getOrNull(index - 1) as? TuneNote)?.midi == note?.midi,
             )
         }
     }

@@ -89,7 +89,7 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     private var letGo: LetGo? = null
 
     /** The note a press of the white key [key] writes now: [key], or its black note while the sign waits (null: none). */
-    fun writes(key: Int): Int? = if (signWaiting) FluteNotes.signed(key) else key
+    fun writes(key: Int): Int? = FluteNotes.written(key, signWaiting)
 
     /**
      * Whether a press of the white key [key] at [now] would be taken: a key that writes a note now ([writes]), or the
@@ -242,6 +242,9 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
          * near an ordinary tap; `flute.note`'s `heldMs` shows where a child's taps fall, and the number changes only from that.
          */
         val WRITING_PULSE: Pulse = Pulse(TempoBand.MAX_BPM, TimeSignature.FOUR_FOUR)
+
+        /** How long a key a screen reader activates is held for: one beat of the writing pace, a quarter note or rest. */
+        val TAP_MS: Long = Tune.durationMs(NoteLength.QUARTER, WRITING_PULSE)
 
         /**
          * A note key let go of and pressed again within this long is one hold, not two notes. A

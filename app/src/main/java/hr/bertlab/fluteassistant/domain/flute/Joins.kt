@@ -46,11 +46,7 @@ object Joins {
     fun canJoinAfter(tune: List<TuneItem>): Boolean = tune.lastOrNull() is TuneNote && tune.size < Tune.MAX_NOTES
 
     /** Whether the note at [index] is joined to a note of the same letter before it, in any octave: a tie, or an octave slur. */
-    fun heardWithBefore(tune: List<TuneItem>, index: Int): Boolean {
-        val note = tune.getOrNull(index) as? TuneNote ?: return false
-        val before = tune.getOrNull(index - 1) as? TuneNote ?: return false
-        return note.joined && TuneCheck.sameLetter(note.midi, before.midi)
-    }
+    fun heardWithBefore(tune: List<TuneItem>, index: Int): Boolean = joinedInLetter(tune, index) == true
 
     /** The last step of the notes heard as one that start at [head]: [head] itself when none is joined on in its letter. */
     fun lastHeardWith(tune: List<TuneItem>, head: Int): Int {
@@ -60,9 +56,12 @@ object Joins {
     }
 
     /** Whether the note at [index] is joined to a note of another letter before it: a slur Listen to me can hear. */
-    fun joinsOtherLetter(tune: List<TuneItem>, index: Int): Boolean {
-        val note = tune.getOrNull(index) as? TuneNote ?: return false
-        val before = tune.getOrNull(index - 1) as? TuneNote ?: return false
-        return note.joined && !TuneCheck.sameLetter(note.midi, before.midi)
+    fun joinsOtherLetter(tune: List<TuneItem>, index: Int): Boolean = joinedInLetter(tune, index) == false
+
+    /** Whether the note at [index], joined to the note before it, has that note's letter in any octave; null when it is not a note joined to a note. */
+    private fun joinedInLetter(tune: List<TuneItem>, index: Int): Boolean? {
+        val note = tune.getOrNull(index) as? TuneNote ?: return null
+        val before = tune.getOrNull(index - 1) as? TuneNote ?: return null
+        return if (note.joined) TuneCheck.sameLetter(note.midi, before.midi) else null
     }
 }

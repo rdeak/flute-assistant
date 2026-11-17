@@ -27,6 +27,13 @@ import java.io.File
 import java.util.Locale
 
 /**
+ * Which of the younger columns a session's `frames.csv` has, and so what its rows can be compared by: the [walk]'s
+ * (since 2026-11-11: where the animal was), the arrow's ([pitch], since 2026-11-14) and the [changed] mark's (since
+ * 2026-11-16). A table from before all three has none.
+ */
+data class Columns(val walk: Boolean = false, val pitch: Boolean = false, val changed: Boolean = false)
+
+/**
  * A recorded "Your turn" session read back from its folder ([FileSessionRecorder] wrote it): the
  * [tune] it checked, the [audio] the engine analysed, the room [floor] it started with, the
  * [rows] of `frames.csv` as [ListenPath.Step]s (what the phone did), the stamped [events] of its
@@ -46,12 +53,8 @@ class Session(
     val pin: Map<Int, StepMark>?,
     /** The metronome's pulse the tune was checked at (`session.pulse`); 60 in 4/4 when the log has none. */
     val pulse: Pulse = Pulse(60),
-    /** Whether `frames.csv` has the walk's columns (since 2026-11-11): only then do the [rows] say where the animal was. */
-    val recordsWalk: Boolean = false,
-    /** Whether `frames.csv` has the `pitch` column (since 2026-11-14): only then do the [rows] say which arrow showed. */
-    val recordsPitch: Boolean = false,
-    /** Whether `frames.csv` has the `changed` column (since 2026-11-16): only then do the [rows] say which mark changed. */
-    val recordsChanged: Boolean = false,
+    /** Which of the younger columns `frames.csv` has: only those do the [rows] say anything about. */
+    val columns: Columns = Columns(),
 ) {
     /** The [audio] as the engine frames it, detected once however many rules it is then replayed under. */
     val frames: ListenPath.Frames by lazy { ListenPath.frames(audio.samples, audio.sampleRate) }
@@ -97,7 +100,7 @@ class Session(
             val table = rows(File(dir, FileSessionRecorder.FRAMES), audio.sampleRate)
             return Session(
                 dir, tune.values.toList(), audio, floor,
-                table.rows, events, rules, facts, pin, pulse, table.recordsWalk, table.recordsPitch, table.recordsChanged,
+                table.rows, events, rules, facts, pin, pulse, table.columns,
             )
         }
 
@@ -112,30 +115,23 @@ class Session(
             marks.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value.name}" }
 
         /** A frame table read back: its rows, and which of the younger columns it has. */
-        private class Table(
-            val rows: List<ListenPath.Step>,
-            val recordsWalk: Boolean,
-            val recordsPitch: Boolean,
-            val recordsChanged: Boolean = false,
-        )
+        private class Table(val rows: List<ListenPath.Step>, val columns: Columns)
 
         /**
          * The rows of [csv], and whether it has the walk's columns (a table from before 2026-11-11 ends at `floor`) and the
          * arrow's (before 2026-11-14 it ends at `phase`).
          */
         private fun rows(csv: File, rate: Int): Table {
-            if (!csv.isFile) return Table(emptyList(), false, false) // a pinned folder may keep only the audio and the log
+            if (!csv.isFile) return Table(emptyList(), Columns()) // a pinned folder may keep only the audio and the log
             val lines = csv.readLines().filter { it.isNotBlank() }
-            if (lines.isEmpty()) return Table(emptyList(), false, false)
+            if (lines.isEmpty()) return Table(emptyList(), Columns())
             val columns = lines.first().split(',').withIndex().associate { it.value to it.index }
-            val recordsWalk = "phase" in columns
-            val recordsPitch = "pitch" in columns
-            val recordsChanged = "changed" in columns
+            val has = Columns(walk = "phase" in columns, pitch = "pitch" in columns, changed = "changed" in columns)
             val rows = lines.drop(1).map { line ->
                 val cells = line.split(',')
                 fun cell(name: String) = cells.getOrNull(columns.getValue(name)).orEmpty()
                 val sounding = cell("sounding").toIntOrNull()
-                val walk = if (recordsWalk && cell("phase").isNotEmpty()) {
+                val walk = if (has.walk && cell("phase").isNotEmpty()) {
                     Walk(cell("walk").toInt(), cell("halfBeat").toInt(), Walk.Phase.valueOf(cell("phase")))
                 } else {
                     null
@@ -163,12 +159,12 @@ class Session(
                     finishing = cell("finishing").toBoolean(),
                     hearing = Hearing.entries.firstOrNull { it.name == cell("hearing") } ?: Hearing.CLEAR,
                     walk = walk,
-                    pitch = if (recordsPitch) cell("pitch").takeIf { it.isNotEmpty() }?.let(Pitch::valueOf) else null,
-                    changed = if (recordsChanged) cell("changed").takeIf { it.isNotEmpty() }?.let(::markChange) else null,
+                    pitch = if (has.pitch) cell("pitch").takeIf { it.isNotEmpty() }?.let(Pitch::valueOf) else null,
+                    changed = if (has.changed) cell("changed").takeIf { it.isNotEmpty() }?.let(::markChange) else null,
                 )
                 ListenPath.Step(cell("frame").toInt(), row)
             }
-            return Table(rows, recordsWalk, recordsPitch, recordsChanged)
+            return Table(rows, has)
         }
 
         /** A `changed` cell, `<index>:<MARK>`. */

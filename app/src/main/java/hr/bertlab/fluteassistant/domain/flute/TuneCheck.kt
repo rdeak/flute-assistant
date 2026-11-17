@@ -99,7 +99,7 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
     fun judge(heard: Int, fresh: Boolean, begun: Boolean = false, lockHz: Double? = null, sameAsLast: Boolean = false): Verdict {
         forgiven = emptyList()
         var current = index ?: return Verdict.IGNORED
-        var expected = (tune[current] as TuneNote).midi
+        var expected = noteAt(current)
         val last = previous
         // The note just judged started again at its own pitch ([ListenRun]'s to say): its tail, unless a repeat is waited on.
         if (sameAsLast && last != null && !sameLetter(expected, last)) return Verdict.IGNORED
@@ -112,16 +112,16 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
         if (!isNote(heard, lockHz, expected) && last != null && sameLetter(expected, last) && !begun) {
             val repeats = mutableListOf<Int>()
             var after: Int? = current
-            while (after != null && sameLetter((tune[after] as TuneNote).midi, last)) {
+            while (after != null && sameLetter(noteAt(after), last)) {
                 repeats += after
                 after = nextNoteFrom(after + 1)
             }
-            if (after != null && isNote(heard, lockHz, (tune[after] as TuneNote).midi)) {
+            if (after != null && isNote(heard, lockHz, noteAt(after))) {
                 for (repeat in repeats) mark(repeat, StepMark.RETRY)
                 forgiven = repeats
                 stumbled = false
                 current = after
-                expected = (tune[current] as TuneNote).midi
+                expected = noteAt(current)
                 index = current
             }
         }
@@ -138,32 +138,27 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
      * [StepMark.RETRY] after a stumble, and the check moves to the next note. A [remark] ([StepMark.HIGH],
      * [StepMark.LOW], [StepMark.SHORT]: how the right note was played off, [ListenRun]'s to say) is the mark instead.
      */
-    fun earn(remark: StepMark? = null): StepMark {
-        val current = checkNotNull(index) { "no step is waited on" }
-        val mark = remark ?: star
-        mark(current, mark)
-        val last = Joins.lastHeardWith(tune, current)
-        previous = (tune[last] as TuneNote).midi
-        stumbled = false
-        index = nextNoteFrom(last + 1)
-        return mark
-    }
+    fun earn(remark: StepMark? = null): StepMark = (remark ?: star).also { earnAs(it, later = it) }
 
     /**
      * The step waited on, an octave slur heard as one note ([Joins.lastHeardWith]), was broken by a gap after its first
      * note sounded its own length (since 2026-11-16, the final review): its first note earns [remark] or its star, every
      * later note of it [StepMark.TONGUED] (a gap is a tongue), and the check moves past them all. Returns the first's.
      */
-    fun earnBroken(remark: StepMark? = null): StepMark {
+    fun earnBroken(remark: StepMark? = null): StepMark = (remark ?: star).also { earnAs(it, later = StepMark.TONGUED) }
+
+    /**
+     * The step waited on gets [mark] and the notes heard as one with it ([Joins.lastHeardWith]) get [later]; the check
+     * moves to the next note after them all.
+     */
+    private fun earnAs(mark: StepMark, later: StepMark) {
         val current = checkNotNull(index) { "no step is waited on" }
-        val mark = remark ?: star
         val last = Joins.lastHeardWith(tune, current)
         earned[current] = mark
-        for (step in current + 1..last) earned[step] = StepMark.TONGUED
-        previous = (tune[last] as TuneNote).midi
+        for (step in current + 1..last) earned[step] = later
+        previous = noteAt(last)
         stumbled = false
         index = nextNoteFrom(last + 1)
-        return mark
     }
 
     /** The star the step waited on would earn now: [StepMark.RETRY] after a stumble, else [StepMark.FIRST_TRY]. */
@@ -171,7 +166,7 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
 
     /**
      * The step at [index], already earned, is marked [mark] instead ([ListenRun] reads a note on after its mark: held
-     * too long, or its whole pitch). A step with no mark yet is refused.
+     * too long). A step with no mark yet is refused.
      */
     fun remark(index: Int, mark: StepMark) {
         require(index in earned) { "step $index has no mark to change" }
@@ -187,6 +182,8 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
     fun stumble() {
         stumbled = true
     }
+
+    private fun noteAt(index: Int): Int = (tune[index] as TuneNote).midi
 
     /** The next note from [start] that is waited on: a note joined to its own letter before it is heard with that one. */
     private fun nextNoteFrom(start: Int): Int? =

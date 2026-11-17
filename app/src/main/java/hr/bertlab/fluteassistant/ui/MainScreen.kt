@@ -156,11 +156,7 @@ fun MainScreen(
     SystemBarsFollowTheme(dark)
 
     // The phone stays awake while it sounds or hears a note, and for five minutes after that or after the last touch.
-    KeepScreenAwake(
-        busy = metronomeState.isPlaying || fluteState.isPlaying || tunerState.isPlayingReference ||
-            tunerState.reading != null || fluteState.listening?.heardNow != null,
-        interactions = interactions,
-    )
+    KeepScreenAwake(busy = metronomeState.isPlaying || fluteState.isBusy || tunerState.isBusy, interactions = interactions)
 
     // One-shot messages (audio unavailable) as a snackbar.
     val snackbarHostState = remember { SnackbarHostState() }

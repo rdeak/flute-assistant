@@ -523,7 +523,7 @@ knob's and more than 15% off (`paceOff`). On the screen: the live bubble shows t
 neighbour's, with the arrow just right of it while the note sounds off (`PitchArrow`, `PITCH_ARROW_SIZE`); the line
 says the tuner's "⬇️ A little lower" / "⬆️ A little higher", and keeps saying it after the note is marked, until the next
 note is judged (`Listening.remark`); no fingering (the fingers were right). The tail of a note just earned that sounds
-as another letter (a B blown high is C to the tracker) is still that note's tail (`ListenRun`'s `tailOpen`): no C
+as another letter (a B blown high is C to the tracker) is still that note's tail (`ListenRun`'s `open`): no C
 bubble under the next step, and a sharp B held into its written repeat asks to stop and play it again. When the run
 ends at another animal's speed its screen stays, the microphone closed and the session ended, with "🐢 Slower than the
 🐇" (the child's animal first; no past tense, which Croatian would give a gender) until Stop or anything else that ends
@@ -736,7 +736,8 @@ gets a ♮ (`Bars`, the bar is the one the note's first piece starts in; a rest 
 starts clean); a signed step is `ACCIDENTAL_ROOM` (10 dp) wider, the sign centred `SIGN_X` (17 dp) left of the head
 (`StaffSigns.kt`), and the pill under it as much wider, so the name with its sign fits. After the final review: the slur
 layer counts the room once (a split signed note's later heads stood 10 dp right of where they are drawn, and a slur or tie
-from them hung past the head); a ledger line beside a sign starts a dp right of it (`StaffGeometry.ledgerLeft`; it ran 3 dp
+from them hung past the head; since 2026-11-17 the step's drawing, the slur layer and the pills' ties all read one
+`StaffGeometry.layout`, so they cannot part again); a ledger line beside a sign starts a dp right of it (`StaffGeometry.ledgerLeft`; it ran 3 dp
 into C♯4's sharp); and a slur passes under the foot of a sign it reaches (`SIGN_BELOW` 12, with `SIGN_SLUR_AIR` 1.5 rather
 than a head's 4, so it dips under and does not sag), as one coming down onto F♯ ran through its sharp at every pitch. A
 sign right after the time signature has about 3.4 dp of air before its figure, left as it is. The tracker (the review's first

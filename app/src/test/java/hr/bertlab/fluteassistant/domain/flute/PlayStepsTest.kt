@@ -55,6 +55,7 @@ class PlayStepsTest {
         assertTrue(steps[0].inside.none { it.halfBeat == null })
         assertFalse(steps[0].joined)
         assertTrue(steps[1].joined)
+        assertFalse(steps[1].tied) // another note: it glides
         assertEquals(1000L - Tune.gapMs(1000L), steps[1].inside.single { it.halfBeat == null }.atMs)
     }
 
@@ -63,6 +64,7 @@ class PlayStepsTest {
         val steps = Tune.playSteps(listOf(TuneNote(60, QUARTER), TuneNote(60, QUARTER, joined = true)), Pulse(60))
         assertTrue(steps[0].inside.none { it.halfBeat == null })
         assertTrue(steps[1].joined)
+        assertTrue(steps[1].tied) // the same note: nothing starts
     }
 
     @Test

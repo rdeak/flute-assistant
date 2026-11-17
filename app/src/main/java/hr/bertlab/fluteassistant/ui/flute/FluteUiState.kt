@@ -14,7 +14,6 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 
@@ -112,7 +111,7 @@ data class FluteUiState(
      * one waited for, an earned note finishing its time, or a rest walked; none while the last note's sound ends),
      * else the held key's.
      */
-    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing || it.pace != null }?.animalIndex ?: heldIndex
+    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing || it.ended }?.animalIndex ?: heldIndex
 
     /**
      * The step the knob's animal stands over while the tune runs: the playing step, else, listening, the note it
@@ -121,15 +120,11 @@ data class FluteUiState(
      */
     val animalIndex: Int? get() = playing?.index ?: listening?.animalIndex
 
-    /**
-     * Whether the animal waits for the child to play the step it stands over: listening, not finishing, not on an
-     * earned note finishing its time (its star shows there), not on a note let go too early standing out its time (its
-     * hourglass shows there), not walking a rest (nothing is played there), and not on the ended run's screen.
-     */
-    val waiting: Boolean get() = listening?.let {
-        !it.finishing && it.index != null && it.pace == null &&
-            it.walk?.phase != Walk.Phase.DONE && it.walk?.phase != Walk.Phase.REST && it.walk?.phase != Walk.Phase.CUT
-    } == true
+    /** Whether the animal waits for the child to play the step it stands over ([Listening.waiting]); never outside a "Your turn". */
+    val waiting: Boolean get() = listening?.waiting == true
+
+    /** Whether the tab sounds or hears a note right now: the phone stays awake while it does (`KeepScreenAwake`). */
+    val isBusy: Boolean get() = isPlaying || listening?.heardNow != null
 
     /** How many half beats into [animalIndex]'s step the animal stands: the last click's, in Play and in Your turn's walk; else the step's start. */
     val animalHalfBeat: Int get() = playing?.halfBeat ?: listening?.animalHalfBeat ?: 0

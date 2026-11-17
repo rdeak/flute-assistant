@@ -227,4 +227,11 @@ class FluteUiStateTest {
         assertEquals(Pitch.HIGH, FluteUiState(tune = lamb, listening = Listening(index = 1, pitch = Pitch.HIGH)).pitch)
     }
 
+    @Test
+    fun `the tab is busy while it plays or hears a note, not while it listens to silence`() {
+        assertFalse(FluteUiState(tune = lamb).isBusy)
+        assertTrue(FluteUiState(tune = lamb, playing = Playing(0)).isBusy)
+        assertFalse(FluteUiState(tune = lamb, listening = Listening(index = 0)).isBusy)
+        assertTrue(FluteUiState(tune = lamb, listening = Listening(index = 0, heardNow = 67)).isBusy)
+    }
 }

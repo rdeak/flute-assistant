@@ -3,8 +3,7 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.domain.tuner.NoteMath
-import kotlin.math.pow
+import hr.bertlab.fluteassistant.domain.listen.TestFrames
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -17,7 +16,7 @@ class TuneCheckTest {
     private fun j(midi: Int) = TuneNote(midi, NoteLength.QUARTER, joined = true)
 
     /** The frequency of [midi] [cents] off it: where a note locked. */
-    private fun hz(midi: Int, cents: Double) = NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0)
+    private fun hz(midi: Int, cents: Double) = TestFrames.hz(midi, cents)
 
     @Test
     fun `waits on the first note, skipping rests and breaths, and on nothing in a tune without notes`() {

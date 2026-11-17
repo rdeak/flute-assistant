@@ -10,7 +10,9 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.NoteReading
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.pow
 
@@ -185,5 +187,12 @@ class TunerUiStatePitchWindowTest {
         assertEquals(81, target(offA4(1200.0)).heardMidi)
         val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69)
         assertEquals(69, held.heardMidi)
+    }
+
+    @Test
+    fun `the tab is busy while it hears a note or sounds the reference tone`() {
+        assertFalse(TunerUiState().isBusy)
+        assertTrue(TunerUiState(reading = offA4(0.0)).isBusy)
+        assertTrue(TunerUiState(isPlayingReference = true).isBusy)
     }
 }

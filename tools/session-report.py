@@ -33,8 +33,8 @@ MARK_WORD = {"right": "right, a star", "retry": "right after a stumble, a faint 
 PITCH_GLYPH = {"right": "♪", "retry": "♪"}
 # a step's mark (session.end), as the star row and the walk's "long enough" draw it
 # since 2026-11-14 the right note played off earns a sign in the star's place: too high, too low, let go too early
-# since 2026-11-16 a mark already given may change while the note goes on (the `changed` cell): held too long, or in
-# Exam the whole note's pitch
+# since 2026-11-16 a mark already given may change while the note goes on (the `changed` cell): held too long; in a
+# session of that one day it may also be Exam's mark for the whole note's pitch (the levels went on 2026-11-17)
 STAR_GLYPH = {"FIRST_TRY": "★", "RETRY": "☆", "HIGH": "⬇", "LOW": "⬆", "SHORT": "⏳", "LONG": "✋", "TONGUED": "✂"}
 STAR_COLOR = {"FIRST_TRY": "var(--good)", "RETRY": "var(--warn)", "HIGH": "var(--warn)", "LOW": "var(--warn)", "SHORT": "var(--critical)", "LONG": "var(--warn)", "TONGUED": "var(--warn)"}
 STAR_WORD = {"FIRST_TRY": "a star", "RETRY": "a faint star", "HIGH": "the down arrow, too high", "LOW": "the up arrow, too low", "LONG": "the hand, held too long", "TONGUED": "the scissors, a joined note tongued"}
@@ -302,6 +302,10 @@ def build(session, folder):
     path("floor", "var(--muted)", ' stroke-dasharray="3 3" opacity="0.8"')
     path("minLevel", "var(--s2)")
     path("level", "var(--s1)")
+    def glyph_at(i, r, color, title, glyph, size=15, lift=12):
+        """One glyph over row i's level, lift above it, with its hover title (escaped by the caller where it needs it)."""
+        w('<text x="%.1f" y="%.1f" fill="%s" font-size="%d" text-anchor="middle"><title>%s</title>%s</text>' % (x_of(i + 1), level_y(r) - lift, color, size, title, glyph))
+
     # onsets and verdicts
     for i, r in enumerate(rows):
         if r["onset"]:
@@ -314,7 +318,7 @@ def build(session, folder):
                 color = {"right": "var(--good)", "retry": "var(--warn)", "wrong": "var(--critical)"}.get(v, "var(--muted)")
                 glyph = (PITCH_GLYPH if has_walk else {}).get(v, MARK_GLYPH.get(v, v))
                 word = (PITCH_WORD if has_walk else {}).get(v, MARK_WORD.get(v, v))
-                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>%s</title>%s</text>' % (x, y - 12, color, html.escape(word), glyph))
+                glyph_at(i, r, color, html.escape(word), glyph)
     # the walk: a star on the frame a note was long enough, a mark on the frame one was cut short. A session
     # cut off before its end line has no marks: there a step that stumbled first (a wrong note, a cut) is faint.
     stumbled = set()
@@ -328,25 +332,22 @@ def build(session, folder):
         if now[1] == "SHORT":
             stumbled.add(now[0])
         if now != before and now[1] in ("DONE", "SHORT", "CUT"):
-            x = x_of(i + 1)
-            y = level_y(r)
             if now[1] == "DONE":
                 # The arrow the phone showed on the frame before (the `pitch` cell, since 2026-11-14) is the note's mark;
                 # else the end line's mark, else a star.
                 arrow = (rows[i - 1].get("pitch") or "") if i > 0 else ""
                 given = None if now[0] in changed_steps else marks.get(int(now[0]))
                 mark = arrow if arrow in ("HIGH", "LOW") else given or ("RETRY" if now[0] in stumbled else "FIRST_TRY")
-                w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s was long enough: %s</title>%s</text>' % (x, y - 12, STAR_COLOR[mark], now[0], STAR_WORD.get(mark, mark), STAR_GLYPH[mark]))
+                glyph_at(i, r, STAR_COLOR[mark], "step %s was long enough: %s" % (now[0], STAR_WORD.get(mark, mark)), STAR_GLYPH[mark])
             elif now[1] == "CUT":
-                w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was let go too early: the hourglass, and the run moved on</title>⏳</text>' % (x, y - 12, now[0]))
+                glyph_at(i, r, "var(--critical)", "step %s was let go too early: the hourglass, and the run moved on" % now[0], STAR_GLYPH["SHORT"], size=13)
             else:
-                w('<text x="%.1f" y="%.1f" fill="var(--critical)" font-size="13" text-anchor="middle"><title>step %s was cut short: hold it longer</title>✄</text>' % (x, y - 12, now[0]))
+                glyph_at(i, r, "var(--critical)", "step %s was cut short: hold it longer" % now[0], "✄", size=13)
         before = now
         if r.get("changed"):
             step, _, mark = r["changed"].partition(":")
-            x = x_of(i + 1)
-            y = level_y(r)
-            w('<text x="%.1f" y="%.1f" fill="%s" font-size="15" text-anchor="middle"><title>step %s\'s mark changed: %s</title>%s</text>' % (x, y - 28, STAR_COLOR.get(mark, "var(--muted)"), step, html.escape(STAR_WORD.get(mark, mark)), STAR_GLYPH.get(mark, mark)))
+            title = "step %s's mark changed: %s" % (step, html.escape(STAR_WORD.get(mark, mark)))
+            glyph_at(i, r, STAR_COLOR.get(mark, "var(--muted)"), title, STAR_GLYPH.get(mark, mark), lift=28)
 
     # lane B
     w('<text x="%d" y="%d" fill="var(--ink-2)" font-size="12" font-weight="600">Pitch</text>' % (left, b_top - 8))

@@ -5,7 +5,6 @@ package hr.bertlab.fluteassistant.domain.listen
 
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlin.math.abs
-import kotlin.math.log2
 
 /**
  * Turns microphone frames into notes the way the tuner's "Which?" mode does, and says when a
@@ -256,7 +255,7 @@ class NoteOnsetTracker(
         var counted = 0 // the lead as far as its oldest counted frame: a blink before the note's first frame is not its
         for (i in runFrames.size - 2 downTo 0) {
             val frequency = runFrames[i]
-            if (frequency != null && abs(1200.0 * log2(frequency / median)) > rules.nearCents) break
+            if (frequency != null && abs(NoteMath.centsApart(frequency, median)) > rules.nearCents) break
             lead++
             if (frequency != null) counted = lead
         }
@@ -326,7 +325,7 @@ class NoteOnsetTracker(
     private fun isSteady(): Boolean {
         if (recent.size < rules.lockFrames) return false
         val last = recent.takeLast(rules.lockFrames)
-        return 1200.0 * log2(last.max() / last.min()) <= rules.lockCents
+        return NoteMath.centsApart(last.max(), last.min()) <= rules.lockCents
     }
 
     /**
@@ -340,25 +339,20 @@ class NoteOnsetTracker(
     private fun identify(heard: Int, median: Double): Int {
         val current = sounding
         drifted = false
-        if (current == null || heard == current) {
-            driftFrames = 0
-            soundingHz = median
-            return heard
-        }
-        val reach = abs(NoteMath.centsBetween(median, current))
-        val fromSounding = soundingHz?.takeIf { rules.stepFromSounding }?.let { abs(1200.0 * log2(median / it)) } ?: 0.0
-        if (reach > rules.nearCents || fromSounding > rules.nearCents) {
-            driftFrames = 0
-            soundingHz = median
-            return heard
-        }
-        if (++driftFrames >= rules.switchFrames) {
-            driftFrames = 0
+        if (current != null && heard != current && !isClearStep(median, current)) {
+            if (++driftFrames < rules.switchFrames) return current
             drifted = true
-            soundingHz = median
-            return heard
         }
-        return current
+        driftFrames = 0
+        soundingHz = median
+        return heard
+    }
+
+    /** Whether [median] is a clear step away from the sounding note [current]: from its written pitch, or from where it was sounding. */
+    private fun isClearStep(median: Double, current: Int): Boolean {
+        val reach = abs(NoteMath.centsBetween(median, current))
+        val fromSounding = soundingHz?.takeIf { rules.stepFromSounding }?.let { abs(NoteMath.centsApart(median, it)) } ?: 0.0
+        return reach > rules.nearCents || fromSounding > rules.nearCents
     }
 
     companion object {
