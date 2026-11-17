@@ -3,12 +3,23 @@
 
 package hr.bertlab.fluteassistant.ui.tuner
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.FontScale
+import androidx.compose.ui.test.ForcedSize
+import androidx.compose.ui.test.then
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import hr.bertlab.fluteassistant.ui.common.assertWhole
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.listen.Hearing
@@ -17,6 +28,7 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -32,6 +44,7 @@ class TunerScreenTest {
     private var chosenNote: Int? = null
     private var chosenMode: TunerMode? = null
     private var playRequests = 0
+    private var guideOpens = 0
 
     private fun show(state: TunerUiState, locale: Locale = Locale.ENGLISH) {
         compose.setContent {
@@ -43,6 +56,7 @@ class TunerScreenTest {
                     onPlayNote = { playRequests++ },
                     onRequestPermission = { permissionRequests++ },
                     onOpenSettings = {},
+                    onOpenGuide = { guideOpens++ },
                 )
             }
         }
@@ -100,7 +114,7 @@ class TunerScreenTest {
 
     @Test
     fun identify_mode_keeps_the_ring_through_a_drift() {
-        // Sixty cents above A4: the nearest note is A♯4, but the ring has not moved yet.
+        // Sixty cents above A4: the nearest note is B♭4, but the ring has not moved yet.
         show(listening(455.4, mode = TunerMode.IDENTIFY).copy(identifiedMidi = 69))
         compose.onNodeWithContentDescription("Your sound is A4 but a little high. Go down").assertIsDisplayed()
         compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
@@ -197,26 +211,70 @@ class TunerScreenTest {
     }
 
     @Test
-    fun too_low_advises_rolling_out() {
+    fun too_low_on_the_tuning_note_advises_pushing_the_head_joint_in() {
         show(listening(430.0)) // A4 about 40 cents flat
         compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
-        compose.onNodeWithText("🔄 Roll the flute out a little").assertIsDisplayed()
+        compose.onNodeWithText("🔧 Push the head joint in a little").assertIsDisplayed()
     }
 
     @Test
-    fun too_high_advises_rolling_in() {
+    fun too_high_on_the_tuning_note_advises_pulling_the_head_joint_out() {
         show(listening(443.0)) // A4 about 12 cents sharp
         compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
-        compose.onNodeWithText("🔄 Roll the flute in a little").assertIsDisplayed()
+        compose.onNodeWithText("🔧 Pull the head joint out a little").assertIsDisplayed()
+    }
+
+    @Test
+    fun too_low_on_another_note_still_advises_rolling_out() {
+        show(listening(NoteMath.midiToFrequency(72) * 0.985, targetMidi = 72)) // C5 about 26 cents flat
+        compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
+        compose.onNodeWithText("🔄 Roll the flute out a little").assertIsDisplayed()
     }
 
     @Test
     fun a_note_played_well_flat_is_still_the_chosen_note() {
         show(listening(425.0)) // A4 sixty cents flat: the nearest note is G♯4, the fingers are right
         compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
-        compose.onNodeWithText("🔄 Roll the flute out a little").assertIsDisplayed()
+        compose.onNodeWithText("🔧 Push the head joint in a little").assertIsDisplayed()
         compose.onNodeWithText("⬆️ That's G♯4").assertDoesNotExist()
         compose.onNodeWithContentDescription("Your sound is A4 but a little low. Go up").assertIsDisplayed()
+    }
+
+    /**
+     * The head joint's lines are longer than the rolling ones they replace on A4: on a narrow phone, at
+     * normal and large text, in both languages, they shrink rather than get cut (Review Focus 1).
+     */
+    @Test
+    fun the_head_joint_advice_stays_whole_on_a_narrow_phone() {
+        var state by mutableStateOf(listening(430.0))
+        var locale by mutableStateOf(Locale.ENGLISH)
+        var scale by mutableStateOf(1f)
+        compose.setContent {
+            LocaleProvider(locale) {
+                DeviceConfigurationOverride(
+                    DeviceConfigurationOverride.FontScale(scale) then DeviceConfigurationOverride.ForcedSize(DpSize(360.dp, 653.dp)),
+                ) {
+                    TunerContent(state, {}, {}, {}, {}, {})
+                }
+            }
+        }
+        val lines = mapOf(
+            Locale.ENGLISH to listOf("🔧 Push the head joint in a little", "🔧 Pull the head joint out a little"),
+            Locale("hr") to listOf("🔧 Gurni glavu flaute malo unutra", "🔧 Izvuci glavu flaute malo van"),
+        )
+        for ((language, texts) in lines) {
+            for (fontScale in listOf(1f, 1.5f)) {
+                listOf(430.0, 443.0).zip(texts).forEach { (frequency, text) ->
+                    compose.runOnIdle {
+                        locale = language
+                        scale = fontScale
+                        state = listening(frequency)
+                    }
+                    compose.waitForIdle()
+                    assertWhole("$language at $fontScale", compose.onNodeWithText(text).assertIsDisplayed(), fontScale)
+                }
+            }
+        }
     }
 
     @Test
@@ -239,6 +297,8 @@ class TunerScreenTest {
         compose.onNodeWithText("🎉 Perfect!").assertIsDisplayed()
         compose.onNodeWithText("🔄 Roll the flute out a little").assertDoesNotExist()
         compose.onNodeWithText("🔄 Roll the flute in a little").assertDoesNotExist()
+        compose.onNodeWithText("🔧 Push the head joint in a little").assertDoesNotExist()
+        compose.onNodeWithText("🔧 Pull the head joint out a little").assertDoesNotExist()
         compose.onNodeWithText("👀 Check your fingers").assertDoesNotExist()
     }
 
@@ -246,7 +306,7 @@ class TunerScreenTest {
     fun croatian_advice_uses_the_informal_form() {
         show(listening(430.0), Locale("hr"))
         compose.onNodeWithText("⬆️ Malo više").assertIsDisplayed()
-        compose.onNodeWithText("🔄 Zakreni flautu malo od sebe").assertIsDisplayed()
+        compose.onNodeWithText("🔧 Gurni glavu flaute malo unutra").assertIsDisplayed()
     }
 
     @Test
@@ -305,4 +365,60 @@ class TunerScreenTest {
         show(listening(null).copy(isPlayingReference = true))
         compose.onNodeWithText("🔊 Listen").assertIsDisplayed()
     }
+
+    // ---- How? ----
+
+    @Test
+    fun how_shows_beside_hear_in_tune_mode_only() {
+        var state by mutableStateOf(listening(null))
+        compose.setContent {
+            LocaleProvider(Locale.ENGLISH) {
+                TunerContent(state, {}, {}, {}, {}, {}, onOpenGuide = { guideOpens++ })
+            }
+        }
+        compose.onNodeWithText("How?").assertIsDisplayed().performClick()
+        assertEquals(1, guideOpens)
+        compose.runOnIdle { state = identifying(null) }
+        compose.onNodeWithText("How?").assertDoesNotExist()
+    }
+
+    /** How? has Hear's height in Hear's row, so the row, and everything under it, keeps its place. */
+    @Test
+    fun how_and_hear_share_one_row() {
+        show(listening(null))
+        val hear = compose.onNodeWithText("Hear").getUnclippedBoundsInRoot()
+        val how = compose.onNodeWithText("How?").getUnclippedBoundsInRoot()
+        assertEquals(hear.top.value, how.top.value, 1f)
+        assertEquals(56f, (hear.bottom - hear.top).value, 1f)
+        assertEquals(56f, (how.bottom - how.top).value, 1f)
+        assertTrue("How? starts at ${how.left}, Hear ends at ${hear.right}", how.left >= hear.right)
+    }
+
+    /** Review Focus 2: on a narrow phone at the largest text the pills share the row, inside the stage, words whole. */
+    @Test
+    fun how_fits_beside_hear_on_a_narrow_phone_with_large_text() {
+        var locale by mutableStateOf(Locale.ENGLISH)
+        compose.setContent {
+            LocaleProvider(locale) {
+                DeviceConfigurationOverride(
+                    DeviceConfigurationOverride.FontScale(2f) then DeviceConfigurationOverride.ForcedSize(DpSize(360.dp, 653.dp)),
+                ) {
+                    TunerContent(listening(null), {}, {}, {}, {}, {})
+                }
+            }
+        }
+        mapOf(Locale.ENGLISH to listOf("Hear", "How?"), Locale("hr") to listOf("Slušaj", "Kako?")).forEach { (language, words) ->
+            compose.runOnIdle { locale = language }
+            compose.waitForIdle()
+            val (hearWord, howWord) = words
+            val hear = compose.onNodeWithText(hearWord).getUnclippedBoundsInRoot()
+            val how = compose.onNodeWithText(howWord).getUnclippedBoundsInRoot()
+            // The stage is the column's 20 dp padding and its own 3 dp border in from each side.
+            assertTrue("$language: Hear starts at ${hear.left}", hear.left >= 23.dp)
+            assertTrue("$language: How? ends at ${how.right}", how.right <= 360.dp - 23.dp)
+            assertTrue("$language: How? starts at ${how.left}, Hear ends at ${hear.right}", how.left >= hear.right)
+            words.forEach { assertWhole("$language at 2x", compose.onNodeWithText(it, useUnmergedTree = true), 2f) }
+        }
+    }
+
 }

@@ -5,11 +5,14 @@ package hr.bertlab.fluteassistant.ui.tuner
 
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.NoteReading
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.pow
 
@@ -119,17 +122,31 @@ class TunerUiStateAdviceTest {
     }
 
     @Test
-    fun `flat and sharp advise rolling, in both modes`() {
-        assertEquals(TunerAdvice.ROLL_OUT, target(offA4(-30.0)).advice)
-        assertEquals(TunerAdvice.ROLL_IN, target(offA4(30.0)).advice)
-        assertEquals(TunerAdvice.ROLL_OUT, target(offA4(-60.0)).advice) // still the chosen note
+    fun `flat and sharp advise rolling on every note but the tuning note`() {
+        assertEquals(TunerAdvice.ROLL_OUT, target(off(72, -30.0), targetMidi = 72).advice)
+        assertEquals(TunerAdvice.ROLL_IN, target(off(72, 30.0), targetMidi = 72).advice)
+        assertEquals(TunerAdvice.ROLL_OUT, target(off(72, -60.0), targetMidi = 72).advice) // still the chosen note
+        assertEquals(TunerAdvice.NONE, target(off(72, 5.0), targetMidi = 72).advice) // in tune
+        // Which? never names the head joint, not even on A4: only choosing A4 to tune on does.
         assertEquals(TunerAdvice.ROLL_OUT, TunerUiState(reading = offA4(-30.0), mode = TunerMode.IDENTIFY).advice)
+        assertEquals(TunerAdvice.ROLL_IN, TunerUiState(reading = offA4(30.0), mode = TunerMode.IDENTIFY).advice)
+    }
+
+    @Test
+    fun `the tuning note advises the head joint`() {
+        assertEquals(69, FluteRange.TUNING_NOTE)
+        assertEquals(TunerAdvice.HEAD_JOINT_IN, target(offA4(-30.0)).advice)
+        assertEquals(TunerAdvice.HEAD_JOINT_OUT, target(offA4(30.0)).advice)
+        assertEquals(TunerAdvice.HEAD_JOINT_IN, target(offA4(-60.0)).advice) // past halfway, still A4
         assertEquals(TunerAdvice.NONE, target(offA4(5.0)).advice) // in tune
+        assertEquals(TunerAdvice.GENTLER_AIR, target(offA4(1200.0)).advice) // the octave above keeps the air
+        assertEquals(TunerAdvice.CHECK_FINGERS, target(off(71, 0.0)).advice) // another note keeps the fingers
     }
 
     @Test
     fun `a reading wins over unclear sound`() {
-        assertEquals(TunerAdvice.ROLL_IN, target(offA4(30.0), hearing = Hearing.LOUD_UNCLEAR).advice)
+        assertEquals(TunerAdvice.HEAD_JOINT_OUT, target(offA4(30.0), hearing = Hearing.LOUD_UNCLEAR).advice)
+        assertEquals(TunerAdvice.ROLL_IN, target(off(72, 30.0), targetMidi = 72, hearing = Hearing.LOUD_UNCLEAR).advice)
     }
 
     @Test
@@ -148,7 +165,7 @@ class TunerUiStatePitchWindowTest {
         assertEquals(67, TunerUiState(reading = null, targetMidi = 67, mode = TunerMode.TARGET).homeMidi)
         assertNull(TunerUiState(reading = null, targetMidi = 67, mode = TunerMode.IDENTIFY).homeMidi)
         assertEquals(69, TunerUiState(reading = offA4(0.0), targetMidi = 67, mode = TunerMode.IDENTIFY).homeMidi)
-        val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69) // nearest is A♯4
+        val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69) // nearest is B♭4
         assertEquals(69, held.homeMidi)
     }
 
@@ -157,7 +174,7 @@ class TunerUiStatePitchWindowTest {
         val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69)
         assertEquals(60.0, held.gaugeCents!!, 0.01)
         assertEquals(TuningStatus.HIGH, held.status)
-        assertEquals(-40.0, held.copy(identifiedMidi = null).gaugeCents!!, 0.01) // the reading's own note, A♯4
+        assertEquals(-40.0, held.copy(identifiedMidi = null).gaugeCents!!, 0.01) // the reading's own note, B♭4
     }
 
     @Test
@@ -170,5 +187,12 @@ class TunerUiStatePitchWindowTest {
         assertEquals(81, target(offA4(1200.0)).heardMidi)
         val held = TunerUiState(reading = offA4(60.0), mode = TunerMode.IDENTIFY, identifiedMidi = 69)
         assertEquals(69, held.heardMidi)
+    }
+
+    @Test
+    fun `the tab is busy while it hears a note or sounds the reference tone`() {
+        assertFalse(TunerUiState().isBusy)
+        assertTrue(TunerUiState(reading = offA4(0.0)).isBusy)
+        assertTrue(TunerUiState(isPlayingReference = true).isBusy)
     }
 }

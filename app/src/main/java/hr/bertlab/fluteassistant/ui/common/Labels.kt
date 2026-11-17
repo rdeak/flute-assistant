@@ -21,6 +21,7 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.notes.NotesGame
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
@@ -65,11 +66,19 @@ fun TunerAdvice.labelRes(): Int? = when (this) {
     TunerAdvice.GENTLER_AIR -> R.string.advice_gentler_air
     TunerAdvice.CHECK_FINGERS -> R.string.advice_check_fingers
     TunerAdvice.PLAY_AGAIN -> R.string.advice_play_again
+    TunerAdvice.HOLD_LONGER -> R.string.advice_hold_longer
+    TunerAdvice.OUT_OF_AIR -> R.string.advice_out_of_air
+    TunerAdvice.TOO_HIGH -> R.string.too_high
+    TunerAdvice.TOO_LOW -> R.string.too_low
+    TunerAdvice.TOO_LONG -> R.string.advice_too_long
+    TunerAdvice.JOIN -> R.string.advice_join
+    TunerAdvice.HEAD_JOINT_IN -> R.string.advice_head_joint_in
+    TunerAdvice.HEAD_JOINT_OUT -> R.string.advice_head_joint_out
 }
 
 /**
  * Note name with octave for a MIDI number in the user's language. English uses scientific
- * pitch notation ("A♯4", middle C is C4). Croatian uses the German names (H for B, B for
+ * pitch notation ("B♭4", middle C is C4; the black notes spelled as [NoteSpelling] writes them). Croatian uses the German names (H for B, B for
  * B flat) and the octave names its music schools teach: middle C starts the one-lined
  * octave "c1", then "c2", "c3"; below it the small octave is lowercase with no number ("h"),
  * the great octave uppercase ("C") and the contra octave "C1".
@@ -82,8 +91,8 @@ fun noteLabel(resources: Resources, midi: Int): String =
 fun noteLabel(midi: Int): String = noteLabel(LocalResources.current, midi)
 
 /**
- * [noteLabel] split into the name and the octave figure ("A♯" and "4", "c" and "1", "h" and
- * ""), so the screens can raise the figure: the label reads "A♯⁴" or "c¹" on screen while
+ * [noteLabel] split into the name and the octave figure ("B♭" and "4", "c" and "1", "h" and
+ * ""), so the screens can raise the figure: the label reads "B♭⁴" or "c¹" on screen while
  * assistive technology still hears [noteLabel].
  */
 fun noteLabelParts(resources: Resources, midi: Int): Pair<String, String> {
@@ -128,10 +137,10 @@ private val OCTAVE_GAP = 2.sp
 private const val OCTAVE_RISE = 0.36f
 
 /**
- * The colour of a note's letter ([NoteLetterColors]); a sharp takes the colour of the
- * letter it raises, so C♯ is red like C.
+ * The colour of a note's letter ([NoteLetterColors]), the letter it is written on ([NoteSpelling]):
+ * C♯ red like C, E♭ yellow like E, B♭ pink like B (since 2026-11-16; before, D♯ and A♯ took D's and A's).
  */
-fun noteColor(midi: Int): Color = NoteLetterColors[LETTER_OF_PITCH_CLASS[Math.floorMod(midi, 12)]]
+fun noteColor(midi: Int): Color = NoteLetterColors[NoteSpelling.letterOf(midi)]
 
 /**
  * The pale tint of a note's colour: [noteColor] at [TINT_SHARE] over the card, so it stays a quiet
@@ -147,6 +156,4 @@ fun tintOf(color: Color): Color = lerp(FluteTheme.colors.card, color, TINT_SHARE
 
 private const val TINT_SHARE = 0.3f
 
-/** Index of the letter (C = 0 to B = 6) each pitch class is written on, sharps on the letter below. */
-private val LETTER_OF_PITCH_CLASS = intArrayOf(0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6)
 

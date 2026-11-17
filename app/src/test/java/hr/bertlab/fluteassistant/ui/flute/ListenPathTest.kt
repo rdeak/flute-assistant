@@ -4,8 +4,14 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
+import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -122,7 +128,130 @@ class ListenPathTest {
         assertTrue("without the floor the room's sound is judged: ${before.heard}", before.heard.any { it.index != null && it.atMs < roomMs })
     }
 
-    /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules]. */
+    // ---- The length rule on sound (2026-11-11): the notes are 400, 400 and 1500 ms ----
+
+    @Test
+    fun `a rest in the tune is walked on sound, and the note after it counts`() {
+        // At 120 a minute the quarter rest lasts 500 ms; the 400 ms gap ends inside it, and that note counts at once.
+        val withRest = listOf(TuneNote(71, NoteLength.QUARTER), TuneRest(NoteLength.QUARTER), TuneNote(71, NoteLength.QUARTER), TuneNote(71, NoteLength.HALF))
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 400)), rate, withRest, Pulse(120))
+        assertTrue("the rest was walked", run.steps.any { it.walk?.phase == Walk.Phase.REST })
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY, 3 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `notes long enough at their tempo earn their stars`() {
+        // At 120 a minute a quarter needs 250 ms and the half note 750.
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a note too short for a slow tempo gets the hourglass`() {
+        // At 40 a minute a quarter needs 375 ms and the half note 1875: the quarters are long enough, and the 1500 ms
+        // note is let go too early for the half note when its sound ends.
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(40))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.SHORT), run.marks)
+    }
+
+    @Test
+    fun `under the rule before 2026-11-14 that note is cut short and waited on`() {
+        val waits = ListenRun.Rules(shortMovesOn = false)
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, tune, Pulse(40), run = waits)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY), run.marks)
+        assertEquals(Walk.Phase.SHORT, run.steps.last().walk?.phase)
+        assertEquals(2, run.steps.last().walk?.index)
+    }
+
+    @Test
+    fun `three b's blown 60 cents high are walked and each earns the down arrow`() {
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50, cents = 60.0)), rate, tune, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.HIGH, 1 to StepMark.HIGH, 2 to StepMark.HIGH), run.marks)
+    }
+
+    @Test
+    fun `a note 60 cents under the written one is a wrong note`() {
+        val cs = listOf(TuneNote(72, NoteLength.QUARTER), TuneNote(72, NoteLength.QUARTER), TuneNote(72, NoteLength.HALF))
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50, cents = 40.0)), rate, cs, Pulse(120))
+        assertTrue(run.heard.toString(), run.marks.isEmpty())
+        assertTrue(run.steps.any { it.row.verdict == Verdict.WRONG })
+    }
+
+    /** Frames [samples] as the engine does and runs the flute's listening path over them, under [rules], pitch only. */
     private fun listen(samples: DoubleArray, rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules()): ListenPath.Run =
-        ListenPath.run(FluteSound.render(samples), rate, tune, rules)
+        ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(60), rules, run = ListenRun.Rules.PITCH_ONLY)
+
+    // ---- A note held too long, on sound (2026-11-16): the same notes, 400, 400 and 1500 ms ----
+
+    @Test
+    fun `a note held two beats over its length earns the hand`() {
+        // At 120 a minute a quarter lasts 500 ms; the room past it is 375 ms, and the third note sounds 1500.
+        val quarters = List(4) { TuneNote(71, NoteLength.QUARTER) }
+        val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, quarters, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.LONG), run.marks)
+    }
+
+    @Test
+    fun `a note that drifts thirty cents after its mark keeps its star`() {
+        // The last note rises from the B to 60 cents over it: in tune when it is long enough (250 ms in), 30 high on the
+        // whole. A mark is final once the note is long enough (Exam's whole-note mark went on 2026-11-17).
+        val quarters = List(3) { TuneNote(71, NoteLength.QUARTER) }
+        val sound = FluteSound.render(FluteSound.sound(gapsMs = 50, sagCents = 60.0))
+        val run = ListenPath.run(sound, rate, quarters, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    // ---- Legato on sound (2026-11-16): b ⌒ c ⌒ d at 120 a minute, a quarter lasting 500 ms ----
+
+    private val slurred = listOf(TuneNote(71, NoteLength.QUARTER), TuneNote(72, NoteLength.QUARTER, joined = true), TuneNote(74, NoteLength.HALF, joined = true))
+    private val bcd = listOf(71 to 600, 72 to 600, 74 to 1200)
+
+    private fun slur(samples: DoubleArray, tune: List<TuneItem> = slurred) = ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(120))
+
+    @Test
+    fun `a slur played joined earns its stars`() {
+        val run = slur(FluteSound.line(bcd))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a slur tongued in a dry room earns the scissors`() {
+        val run = slur(FluteSound.line(bcd, changeStopMs = 50, roomDb = -20.0))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.TONGUED, 2 to StepMark.TONGUED), run.marks)
+    }
+
+    @Test
+    fun `a breath-sized dip at a slurred change is no tongue`() {
+        val run = slur(FluteSound.line(bcd, changeDipDb = 10.0))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a tie with a breath dip in it is one note with its star`() {
+        val tie = listOf(TuneNote(71, NoteLength.QUARTER), TuneNote(71, NoteLength.QUARTER, joined = true), TuneNote(72, NoteLength.HALF))
+        val run = slur(FluteSound.line(listOf(71 to 550, 71 to 550, 72 to 1200), changeDipDb = 10.0), tie)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `an octave slur played joined earns its star on both and no hand`() {
+        val octave = listOf(TuneNote(71, NoteLength.QUARTER), TuneNote(83, NoteLength.QUARTER, joined = true), TuneNote(72, NoteLength.HALF))
+        val run = slur(FluteSound.line(listOf(71 to 500, 83 to 500, 72 to 1200)), octave)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a softer joined note after a breath-sized dip is no tongue`() {
+        // The final review of 2026-11-16: c and d 9 dB under b, a 10 dB dip 30 ms after each change, a dry room. Measured
+        // against b alone the dip into c was 0.28 deep, a tongue's; under the quieter side it is 0.14, a breath's.
+        val run = slur(FluteSound.line(bcd, changeDipDb = 10.0, roomDb = -20.0, notesDb = listOf(-12.0, -21.0, -21.0), dipAfterMs = 30))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+    }
+
+    @Test
+    fun `a slurred semitone forty cents sharp is heard on sound`() {
+        val tune = listOf(TuneNote(67, NoteLength.QUARTER), TuneNote(66, NoteLength.QUARTER, joined = true))
+        val run = ListenPath.run(FluteSound.render(FluteSound.line(listOf(67 to 600, 66 to 600), cents = 40.0)), rate, tune, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.HIGH, 1 to StepMark.HIGH), run.marks)
+    }
 }

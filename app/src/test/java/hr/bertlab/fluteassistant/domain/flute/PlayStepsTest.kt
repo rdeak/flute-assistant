@@ -9,6 +9,8 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.PlayStep.Moment
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /** [Tune.playSteps]: when each step sounds and where the metronome's clicks fall in it. */
@@ -43,5 +45,32 @@ class PlayStepsTest {
         assertEquals(1000L, step.durationMs)
         assertEquals(true, step.clickAtStart)
         assertEquals(listOf(Moment(500, halfBeat = 1), Moment(920, null)), step.inside)
+    }
+
+    // ---- Joined notes (2026-11-16): no gap before a joined note, and a tie is one sound ----
+
+    @Test
+    fun `a note joined to the one before has no gap before it`() {
+        val steps = Tune.playSteps(listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER, joined = true)), Pulse(60))
+        assertTrue(steps[0].inside.none { it.halfBeat == null })
+        assertFalse(steps[0].joined)
+        assertTrue(steps[1].joined)
+        assertFalse(steps[1].tied) // another note: it glides
+        assertEquals(1000L - Tune.gapMs(1000L), steps[1].inside.single { it.halfBeat == null }.atMs)
+    }
+
+    @Test
+    fun `a tie is one sound`() {
+        val steps = Tune.playSteps(listOf(TuneNote(60, QUARTER), TuneNote(60, QUARTER, joined = true)), Pulse(60))
+        assertTrue(steps[0].inside.none { it.halfBeat == null })
+        assertTrue(steps[1].joined)
+        assertTrue(steps[1].tied) // the same note: nothing starts
+    }
+
+    @Test
+    fun `a note before a rest or a note not joined keeps its gap`() {
+        val steps = Tune.playSteps(listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER), TuneNote(64, QUARTER, joined = true)), Pulse(60))
+        assertEquals(1, steps[0].inside.count { it.halfBeat == null })
+        assertTrue(steps[1].inside.none { it.halfBeat == null })
     }
 }

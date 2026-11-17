@@ -3,21 +3,27 @@
 
 package hr.bertlab.fluteassistant.domain.listen
 
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.pitched
+import hr.bertlab.fluteassistant.domain.listen.TestFrames.silent
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.pow
 
 class NoteOnsetTrackerTest {
 
-    /** A frame of a note at a real flute's level at the phone: the recorded sessions judged every note at 0.67 or over. */
-    private fun pitched(midi: Int, cents: Double = 0.0, probability: Double = 0.97) =
-        PitchFrame(NoteMath.midiToFrequency(midi) * 2.0.pow(cents / 1200.0), probability, level = 0.7f)
-
-    private val silent = PitchFrame(null, 0.0, level = 0f)
+    @Test
+    fun `the pitch a note locked at comes with its onset`() {
+        val tracker = NoteOnsetTracker()
+        val results = List(ListenRules.LOCK_FRAMES) { tracker.onFrame(pitched(71, cents = 55.0)) }
+        val locked = results.last()
+        assertEquals(72, locked.onset?.midi)
+        assertEquals(TestFrames.hz(71, cents = 55.0), locked.lockHz!!, 1e-6)
+        assertTrue("no onset, no pitch passed on", results.dropLast(1).all { it.onset == null && it.lockHz == null })
+        assertNull(tracker.onFrame(pitched(71, cents = 55.0)).lockHz)
+    }
 
     private fun feed(tracker: NoteOnsetTracker, frames: List<PitchFrame>): List<NoteOnsetTracker.Result> = frames.map(tracker::onFrame)
 
@@ -140,8 +146,7 @@ class NoteOnsetTrackerTest {
         assertEquals(listOf(null, null, 60), feed(tracker, List(3) { note }).onsets())
     }
 
-    private fun note(midi: Int, level: Float, minLevel: Float = level) =
-        PitchFrame(NoteMath.midiToFrequency(midi), 0.97, level, minLevel)
+    private fun note(midi: Int, level: Float, minLevel: Float = level) = pitched(midi, level = level, minLevel = minLevel)
 
     @Test
     fun `a tongued stop inside the newest hop starts the same note again`() {
@@ -236,7 +241,8 @@ class NoteOnsetTrackerTest {
         assertEquals("0.12", fields["stopDrop"])
         assertEquals("70.0", fields["nearCents"])
         assertEquals("0.45", fields["minLevel"])
-        assertEquals(17, fields.size)
+        assertEquals("1", fields["stepFromSounding"]) // since 2026-11-16
+        assertEquals(18, fields.size)
     }
 
     @Test
@@ -298,5 +304,223 @@ class NoteOnsetTrackerTest {
         // the second run must start where the phone started, not learn the room again.
         assertEquals(0.23f, NoteOnsetTracker(floor = 0.23f).floor)
         assertNull(NoteOnsetTracker().floor)
+    }
+
+    // ---- Where a note began: the frames that locked it count (the length check, 2026-11-11) ----
+
+    @Test
+    fun `a note after silence starts with the frames that locked it`() {
+        val tracker = NoteOnsetTracker()
+        val onset = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(60) }).last()
+        assertEquals(60, onset.onset?.midi)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, onset.leadFrames)
+    }
+
+    @Test
+    fun `frames of another note before the lock are not the note's start`() {
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, List(2) { pitched(61) } + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a long wobble of other notes before the lock gives the note no head start`() {
+        // Nine counted frames between e and f sharp that never agree (a voice, a slide, a warbling wrong note), with
+        // no gap, then c: the c began with its own first frame. Before, all eleven frames were its lead, and a
+        // quarter was earned on its onset frame (the review of 2026-11-11).
+        val tracker = NoteOnsetTracker()
+        val wobble = List(9) { pitched(if (it % 2 == 0) 64 else 66) }
+        val results = feed(tracker, wobble + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertTrue("the wobble never locks", results.dropLast(1).all { it.onset == null })
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), results.last().onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, results.last().leadFrames)
+    }
+
+    @Test
+    fun `unsteady frames of the note itself before the lock are its start`() {
+        // An attack that wavers inside c before it settles is still the child's c.
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, listOf(pitched(60, cents = 40.0), pitched(60, cents = -40.0)) + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals(ListenRules.LOCK_FRAMES + 1, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a step and a pop start with the frames of the new pitch before the lock`() {
+        // A tongued change to another note while the last one is still held: the recorded sessions of 2026-11-05
+        // show two frames of the new pitch before every such onset, the frames that locked it.
+        val step = NoteOnsetTracker()
+        feed(step, List(3) { pitched(60) })
+        val slurred = feed(step, List(ListenRules.LOCK_FRAMES) { pitched(62) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = false), slurred.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, slurred.leadFrames)
+
+        val pop = NoteOnsetTracker()
+        feed(pop, List(3) { pitched(60) })
+        val popped = feed(pop, List(ListenRules.LOCK_FRAMES) { pitched(72) }).last()
+        assertEquals(NoteOnsetTracker.Onset(72, fresh = false), popped.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, popped.leadFrames)
+    }
+
+    @Test
+    fun `a tongued restart starts at its onset`() {
+        val restart = NoteOnsetTracker()
+        feed(restart, List(4) { note(60, 0.6f) })
+        feed(restart, listOf(note(60, 0.55f, minLevel = 0.2f)))
+        val again = feed(restart, listOf(note(60, 0.6f))).single()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), again.onset)
+        assertEquals("the stop's frame is not the new note's", 0, again.leadFrames)
+    }
+
+    @Test
+    fun `a restart after a frame that did not count starts after it`() {
+        // The same note again after one silent frame: the frames before it were the old note's.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(4) { pitched(60) })
+        val again = feed(tracker, listOf(silent, pitched(60))).last()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), again.onset)
+        assertEquals(0, again.leadFrames)
+    }
+
+    @Test
+    fun `the lead starts again after a gap`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(3) { pitched(60) })
+        feed(tracker, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { silent })
+        val again = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(60) }).last()
+        assertEquals(NoteOnsetTracker.Onset(60, fresh = true), again.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, again.leadFrames)
+    }
+
+    @Test
+    fun `a gate blink among the locking frames is part of the note's start`() {
+        // The note began on its first counted frame; a breathy frame under the gate in between is still the note.
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, listOf(pitched(60), pitched(60, probability = 0.5), pitched(60), pitched(60)))
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals(3, results.last().leadFrames)
+    }
+
+    @Test
+    fun `an attack that scoops into the note from over the halfway point is the note's start`() {
+        // The recorded session 2026-11-05_17-04-38, frame 199: a tongued g begins 55 cents sharp, nearer g sharp,
+        // and settles within three frames. That frame is the child's g; a frame a semitone or more away is not.
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, listOf(pitched(67, cents = 55.0), pitched(67, cents = 36.0), pitched(67, cents = 24.0), pitched(67, cents = 17.0)))
+        assertEquals(NoteOnsetTracker.Onset(67, fresh = true), results.last().onset)
+        assertEquals(3, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a slide down to the note counts only its last frames`() {
+        // e sliding to c in steps the tracker never locks: only the frames near c are c's.
+        val tracker = NoteOnsetTracker()
+        val slide = listOf(400.0, 320.0, 240.0, 160.0, 80.0, 40.0).map { pitched(60, cents = it) }
+        val results = feed(tracker, slide + List(ListenRules.LOCK_FRAMES) { pitched(60) })
+        assertEquals(60, results.last().onset?.midi)
+        assertEquals("the frame 40 cents off and the two that locked it", ListenRules.LOCK_FRAMES, results.last().leadFrames)
+    }
+
+    @Test
+    fun `a held note played sharp gives the semitone slurred to after it no head start`() {
+        // b held 35 cents sharp, then a slur to c 5 cents flat: the two lie 60 cents apart, inside the near band, but
+        // the b sounded as b and its frames are b's. Before, all twenty were the c's lead, and a whole note was earned
+        // on its onset frame.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(20) { pitched(71, cents = 35.0) })
+        val slurred = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(72, cents = -5.0) }).last()
+        assertEquals(NoteOnsetTracker.Onset(72, fresh = false), slurred.onset)
+        assertEquals(ListenRules.LOCK_FRAMES - 1, slurred.leadFrames)
+    }
+
+    // ---- How deep the stop before a restart fell (2026-11-16): the flute's slur check tells a tongue from a breath dip ----
+
+    @Test
+    fun `a tongued change to another note says how deep its stop fell`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(60, level = 0.7f) })
+        feed(tracker, listOf(pitched(60, level = 0.7f, minLevel = 0.2f)))
+        val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
+        assertEquals(0.5f, result.stopDrop!!, 0.001f)
+    }
+
+    @Test
+    fun `a slur and a start after a gap have no stop depth`() {
+        val slur = NoteOnsetTracker()
+        feed(slur, List(5) { pitched(60) })
+        val slurred = feed(slur, List(ListenRules.LOCK_FRAMES) { pitched(62) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = false), slurred.onset)
+        assertNull(slurred.stopDrop)
+        val gap = NoteOnsetTracker()
+        feed(gap, List(5) { pitched(60) })
+        feed(gap, List(NoteOnsetTracker.ONSET_GAP_FRAMES) { silent })
+        val again = feed(gap, List(ListenRules.LOCK_FRAMES) { pitched(62) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), again.onset)
+        assertNull(again.stopDrop)
+    }
+
+    @Test
+    fun `a shallow dip at a change is a shallow stop`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(60, level = 0.7f) })
+        feed(tracker, listOf(pitched(60, level = 0.7f, minLevel = 0.52f)))
+        val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
+        assertEquals(0.18f, result.stopDrop!!, 0.001f)
+    }
+
+    @Test
+    fun `frames with no onset carry no stop depth`() {
+        val tracker = NoteOnsetTracker()
+        val results = feed(tracker, List(5) { pitched(60, level = 0.7f) } + listOf(pitched(60, level = 0.7f, minLevel = 0.2f)))
+        assertTrue(results.all { it.stopDrop == null })
+    }
+
+    @Test
+    fun `a softer note after a breath-sized dip measures the dip, not the change of loudness`() {
+        // The final review of 2026-11-16: c at 0.80, a dip to 0.54, d at 0.70. Against c alone the stop is 0.26 deep,
+        // a tongue's depth; the dip under the quieter side, d, is 0.16, a breath's.
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(60, level = 0.8f) })
+        feed(tracker, listOf(pitched(60, level = 0.8f, minLevel = 0.54f)))
+        val result = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(62, level = 0.7f) }).last()
+        assertEquals(NoteOnsetTracker.Onset(62, fresh = true), result.onset)
+        assertEquals(0.16f, result.stopDrop!!, 0.001f)
+    }
+
+    // ---- A slurred semitone on a flute off its pitch (2026-11-16, sharps and flats): a step measured from where the note sounded ----
+
+    @Test
+    fun `a slur to the next semitone on a flute forty cents sharp is a step`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(67, cents = 40.0) })
+        val step = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(66, cents = 40.0) }).last()
+        assertEquals(NoteOnsetTracker.Onset(66, fresh = false), step.onset)
+    }
+
+    @Test
+    fun `and up a semitone on a flute thirty-five cents flat`() {
+        val tracker = NoteOnsetTracker()
+        feed(tracker, List(5) { pitched(65, cents = -35.0) })
+        val step = feed(tracker, List(ListenRules.LOCK_FRAMES) { pitched(66, cents = -35.0) }).last()
+        assertEquals(NoteOnsetTracker.Onset(66, fresh = false), step.onset)
+    }
+
+    @Test
+    fun `with the rule off it is a drift that begins no note`() {
+        val tracker = NoteOnsetTracker(NoteOnsetTracker.Rules(stepFromSounding = false))
+        feed(tracker, List(5) { pitched(67, cents = 40.0) })
+        val after = feed(tracker, List(20) { pitched(66, cents = 40.0) })
+        assertTrue(after.all { it.onset == null })
+        assertEquals(66, tracker.sounding)
+    }
+
+    @Test
+    fun `a long note sagging slowly past the halfway point is still one note`() {
+        val tracker = NoteOnsetTracker()
+        val frames = feed(tracker, List(25) { pitched(67, cents = -3.0 * it) }) // to 72 cents under
+        assertEquals(1, frames.count { it.onset != null })
     }
 }

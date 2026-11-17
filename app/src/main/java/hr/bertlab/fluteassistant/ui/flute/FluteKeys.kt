@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,8 +16,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,8 +35,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -42,13 +47,19 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.fadedUnless
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -75,10 +86,26 @@ private val KeyDepth = 5.dp
 val FluteKeysMinHeight: Dp = (KeyHeight + KeyDepth) * 3 + KeyRowGap * 2
 
 /** The breath, rest and erase emoji, in dp so a large font scale cannot push the breath emoji out of a 40 dp key. */
-private const val SIGN_EMOJI_DP = 24f
+private const val TOOL_EMOJI_DP = 24f
 
-/** The plain keys at the end of the top row: breath, rest, erase. */
-private const val SignKeyCount = 3
+/** The plain keys at the end of the top row: join, rest, breath, erase. */
+private const val ToolKeyCount = 4
+
+/** The ♯♭ key beside C6 (since 2026-11-17), one note key wide, in the top row's second column. */
+private const val SharpFlatKeyCount = 1
+
+/** The ⌒ key's picture: the staff's own slur ([slurPath]), from (2, 3) to (28, 3) dp in a box this size. */
+private val JoinPictureWidth = 30.dp
+private val JoinPictureHeight = 16.dp
+private val JoinPicture by lazy { slurPath(StaffGeometry.slurCurve(1f, 3f - StaffGeometry.SLUR_END_DROP, 29f, 3f - StaffGeometry.SLUR_END_DROP, emptyList())) }
+
+/** The least a signed name shrinks to, in dp so that it stays this small at the largest text. */
+private val SignedNameFloor = 10.dp
+
+/** The ♯♭ key's picture: the staff's own sharp and flat, side by side, at [SHARP_FLAT_SCALE] of the staff's size. */
+private const val SHARP_FLAT_SCALE = 1.25f
+private val SharpFlatPictureWidth = (28 * SHARP_FLAT_SCALE).dp
+private val SharpFlatPictureHeight = (26 * SHARP_FLAT_SCALE).dp
 
 private const val SPONGE_EMOJI = "\uD83E\uDDFD" // sponge
 
@@ -89,17 +116,21 @@ private const val EraseRepeatMs = 120L
 /**
  * The fifteen keys ([StaffNotes.ALL]) in three rows, one per octave, highest on top as on
  * the staff (c3 alone, then c2 to h2, then c1 to h1), each key in its letter's colour with
- * its name; the key of [litMidi] sinks onto its shadow inside a yellow ring. A finger down
+ * its name; the key of [litMidi] (E's key for an E♭) sinks onto its shadow inside a yellow ring. While
+ * [signWaiting] each key shows the black note it will write, or is faded when it writes none ([FluteKey]). A finger down
  * calls [FluteActions.onKeyPressed] at once and the finger lifting, or sliding off, calls [FluteActions.onKeyReleased]; sliding
  * onto another key does not press it, so every note in the tune is a deliberate tap. A
  * screen reader activates a key through [FluteActions.onKeyActivated]. Every row is [keyHeight] tall, [KeyHeight] as
  * on the canvas unless the phone is on its side, and the three rows sit centred in the height they
  * are given. A key's width comes from the width given, less [keyGap] between each two keys.
  *
- * At the end of the top row, apart from c3 with the rest of the row empty between, stand three
- * plain keys, each one note key wide and over a note key of the row below (g2, a2, h2), so a tool is
- * never bigger than a note and a slip off c3 lands on nothing (since 2026-11-05; before that they
- * were two keys wide each and filled the row): the rest key (💤), held like a note key ([FluteActions.onRestPressed],
+ * Beside c3 stands the ♯♭ key (since 2026-11-17, [SharpFlatKey]), over d2, which calls [FluteActions.onSign] as the
+ * finger goes down and stays down while [signWaiting]; a slip off c3 lands on it. At the end of the top row, after one
+ * empty column, stand four plain keys, each one note key wide and over a note key of the row below (f2, g2, a2, h2), so
+ * a tool is never bigger than a note (since 2026-11-05; before that they were two keys wide each and filled the row;
+ * until 2026-11-17 two empty columns stood between c3 and them): the join key (⌒, since 2026-11-16, at the user's request, the
+ * picture the slur it draws), which calls [FluteActions.onJoin] as the finger goes down, stays down
+ * while [joinWaiting] and is faded and inert unless [joinEnabled]; the rest key (💤), held like a note key ([FluteActions.onRestPressed],
  * [FluteActions.onRestReleased], [FluteActions.onRestActivated]) and sunk while [restLit], the breath key (😮‍💨), which calls
  * [FluteActions.onBreath] as the finger goes down (the rest before the breath since 2026-11-05, at the user's
  * request; the other way round before), and the erase key (🧽), which calls [FluteActions.onEraseLast] as the
@@ -116,6 +147,9 @@ fun FluteKeys(
     modifier: Modifier = Modifier,
     keyHeight: Dp = KeyHeight,
     keyGap: Dp = KeyGap,
+    joinWaiting: Boolean = false,
+    joinEnabled: Boolean = false,
+    signWaiting: Boolean = false,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
     val rows = remember { StaffNotes.ALL.groupBy { Math.floorDiv(it, 12) }.toSortedMap().values.reversed() }
@@ -128,6 +162,7 @@ fun FluteKeys(
         val keyWidth = with(LocalDensity.current) {
             ((constraints.maxWidth - keyGap.roundToPx() * (keysPerRow - 1)) / keysPerRow).toDp()
         }
+        val key = Modifier.width(keyWidth).fillMaxHeight() // every key of every row: one column wide, as tall as its row
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -145,45 +180,50 @@ fun FluteKeys(
                     row.forEach { midi ->
                         FluteKey(
                             midi = midi,
-                            lit = midi == litMidi,
+                            // The key of the note held or playing: E's key for an E♭, as the white key wrote it.
+                            lit = litMidi != null && midi == NoteSpelling.naturalOf(litMidi),
+                            signWaiting = signWaiting,
                             onPress = actions.onKeyPressed,
                             onRelease = actions.onKeyReleased,
                             onActivate = actions.onKeyActivated,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                     }
                     if (row.size < keysPerRow) {
-                        // The short top row: c3, the empty middle, then the rest, the breath and the
-                        // erase key, each one note key wide. The middle is as wide as the key columns
-                        // it covers, so the row measures as the full rows do and the three stand over
-                        // the last three keys of the row below, the sponge ending where h2 does.
-                        val emptyColumns = keysPerRow - row.size - SignKeyCount
+                        // The short top row: c3, the ♯♭ key, the empty middle, then the join, the rest, the
+                        // breath and the erase key, each one note key wide. The middle is as wide as the key
+                        // columns it covers, so the row measures as the full rows do and the four stand
+                        // over the last four keys of the row below, the sponge ending where h2 does.
+                        SharpFlatKey(
+                            waiting = signWaiting,
+                            onSign = actions.onSign,
+                            modifier = key,
+                        )
+                        val emptyColumns = keysPerRow - row.size - SharpFlatKeyCount - ToolKeyCount
                         if (emptyColumns > 0) {
                             Spacer(Modifier.width(keyWidth * emptyColumns + keyGap * (emptyColumns - 1)))
                         }
+                        JoinKey(
+                            waiting = joinWaiting,
+                            enabled = joinEnabled,
+                            onJoin = actions.onJoin,
+                            modifier = key,
+                        )
                         RestKey(
                             lit = restLit,
                             onPress = actions.onRestPressed,
                             onRelease = actions.onRestReleased,
                             onActivate = actions.onRestActivated,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                         BreathKey(
                             onBreath = actions.onBreath,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                         EraseKey(
                             enabled = eraseEnabled,
                             onErase = actions.onEraseLast,
-                            modifier = Modifier
-                                .width(keyWidth)
-                                .fillMaxHeight(),
+                            modifier = key,
                         )
                     }
                 }
@@ -204,8 +244,7 @@ private fun RestKey(
     val label = stringResource(R.string.flute_rest)
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnRelease by rememberUpdatedState(onRelease)
-    SignKey(
-        emoji = SLEEP_EMOJI,
+    ToolKey(
         label = label,
         pressed = lit,
         onActivate = onActivate,
@@ -221,6 +260,73 @@ private fun RestKey(
                 },
             )
         },
+    ) { ToolEmoji(SLEEP_EMOJI) }
+}
+
+/**
+ * The join key (since 2026-11-16): a plain key with the slur it draws, the staff's own crescent. A finger going down
+ * joins the next note to the last one, or cancels a join waiting ([FluteActions.onJoin]); while one waits the key stays
+ * down in its yellow ring and a screen reader hears it selected. Faded and inert with nothing to join from.
+ */
+@Composable
+private fun JoinKey(waiting: Boolean, enabled: Boolean, onJoin: () -> Unit, modifier: Modifier = Modifier) {
+    val ink = FluteTheme.colors.text
+    WaitingKey(stringResource(R.string.flute_join), waiting, onJoin, modifier, enabled) {
+        Canvas(Modifier.size(JoinPictureWidth, JoinPictureHeight)) {
+            scale(density, pivot = Offset.Zero) {
+                drawPath(JoinPicture, ink)
+                drawPath(JoinPicture, ink, style = Stroke(1.5f, join = StrokeJoin.Round))
+            }
+        }
+    }
+}
+
+/**
+ * The ♯♭ key (since 2026-11-17): a plain key with a sharp and a flat drawn as the staff draws them ([drawSign]). A
+ * finger going down makes the next note key pressed write its letter's sharp or flat, or drops a sign waiting
+ * ([FluteActions.onSign]); while one waits the key stays down in its yellow ring and a screen reader hears it selected.
+ */
+@Composable
+private fun SharpFlatKey(waiting: Boolean, onSign: () -> Unit, modifier: Modifier = Modifier) {
+    val ink = FluteTheme.colors.text
+    WaitingKey(stringResource(R.string.flute_sign), waiting, onSign, modifier) {
+        Canvas(Modifier.size(SharpFlatPictureWidth, SharpFlatPictureHeight)) {
+            scale(SHARP_FLAT_SCALE * density, pivot = Offset.Zero) {
+                drawSign(Accidental.SHARP, cx = 7f, y = 13f, color = ink)
+                drawSign(Accidental.FLAT, cx = 21f, y = 17f, color = ink)
+            }
+        }
+    }
+}
+
+/**
+ * A key that waits for the next note key, the ⌒ key and the ♯♭ key: a plain key with its [picture]. A finger going down
+ * calls [onTap], which sets it waiting or drops what waits; while it is [waiting] the key stays down in its yellow ring
+ * and a screen reader hears it selected. Faded and inert while not [enabled], unless it waits: a second tap must still
+ * drop it.
+ */
+@Composable
+private fun WaitingKey(
+    label: String,
+    waiting: Boolean,
+    onTap: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    picture: @Composable () -> Unit,
+) {
+    val currentOnTap by rememberUpdatedState(onTap)
+    val active = enabled || waiting
+    ToolKey(
+        label = label,
+        pressed = waiting,
+        onActivate = { currentOnTap() },
+        enabled = active,
+        // Selected while it waits; nothing said otherwise, so a screen reader does not hear "not selected" on every visit.
+        selected = if (waiting) true else null,
+        modifier = modifier.then(
+            if (active) Modifier.pointerInput(Unit) { detectTapGestures(onPress = { currentOnTap() }) } else Modifier,
+        ),
+        content = picture,
     )
 }
 
@@ -230,8 +336,7 @@ private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
     val label = stringResource(R.string.flute_breath)
     val currentOnBreath by rememberUpdatedState(onBreath)
     var pressed by remember { mutableStateOf(false) }
-    SignKey(
-        emoji = BREATH_EMOJI,
+    ToolKey(
         label = label,
         pressed = pressed,
         onActivate = onBreath,
@@ -248,7 +353,7 @@ private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
                 },
             )
         },
-    )
+    ) { ToolEmoji(BREATH_EMOJI) }
 }
 
 /**
@@ -263,8 +368,7 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
     val scope = rememberCoroutineScope()
     val currentOnErase by rememberUpdatedState(onErase)
     var pressed by remember { mutableStateOf(false) }
-    SignKey(
-        emoji = SPONGE_EMOJI,
+    ToolKey(
         label = label,
         pressed = pressed,
         onActivate = { currentOnErase() },
@@ -296,21 +400,22 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
                 Modifier
             },
         ),
-    )
+    ) { ToolEmoji(SPONGE_EMOJI) }
 }
 
 /**
- * A plain (not a note's colour) key showing [emoji], named [label] for a screen reader; sunk in a
- * yellow ring while [pressed]; faded, and refusing [onActivate], while [enabled] is false.
+ * A plain (not a note's colour) key showing [content] (an emoji, [ToolEmoji], or a drawn picture), named [label] for a
+ * screen reader; sunk in a yellow ring while [pressed]; faded, and refusing [onActivate], while [enabled] is false.
  */
 @Composable
-private fun SignKey(
-    emoji: String,
+private fun ToolKey(
     label: String,
     pressed: Boolean,
     onActivate: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    selected: Boolean? = null,
+    content: @Composable () -> Unit,
 ) {
     val colors = FluteTheme.colors
     Box(
@@ -321,6 +426,7 @@ private fun SignKey(
                 role = Role.Button
                 contentDescription = label
                 if (!enabled) disabled()
+                if (selected != null) this.selected = selected
                 onClick {
                     if (enabled) onActivate()
                     enabled
@@ -329,9 +435,13 @@ private fun SignKey(
             .drawBehind { if (pressed) drawKeyRing() }
             .chunky(KeyShape, colors.raised, colors.outline, KeyDepth, pressed = pressed),
     ) {
-        Emoji(emoji, fontSize = emojiSizeFor(SIGN_EMOJI_DP))
+        content()
     }
 }
+
+/** A tool key's emoji, at the size every tool key shows its own. */
+@Composable
+private fun ToolEmoji(emoji: String) = Emoji(emoji, fontSize = emojiSizeFor(TOOL_EMOJI_DP))
 
 /** The yellow ring around a pressed key, a little outside its outline. */
 private fun DrawScope.drawKeyRing() {
@@ -345,28 +455,41 @@ private fun DrawScope.drawKeyRing() {
     )
 }
 
+/**
+ * A note key: the white key [midi], in its letter's colour. While the ♯♭ key waits ([signWaiting], since 2026-11-17) its
+ * face and name are the black note it writes ([FluteNotes.signed]), or it is faded and a screen reader hears it disabled
+ * when it writes none (D, A, C6). It always reports [midi], the white key, and its gesture is keyed on that alone: the
+ * face changes under a finger the moment a press spends the sign, and a finger already on D when the sign is tapped
+ * holds its note on, so neither may restart the gesture (whose `finally` would let the key go). The view model ignores
+ * a press of a key that writes nothing.
+ */
 @Composable
 private fun FluteKey(
     midi: Int,
     lit: Boolean,
+    signWaiting: Boolean,
     onPress: (Int) -> Unit,
     onRelease: (Int) -> Unit,
     onActivate: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val label = noteLabel(midi)
+    val face = FluteNotes.written(midi, signWaiting)
+    val writes = face != null
+    val label = noteLabel(face ?: midi)
     val colors = FluteTheme.colors
-    // The gesture block is keyed on the note alone, so it reads the latest callbacks through state.
+    // The gesture block is keyed on the key alone, so it reads the latest callbacks through state.
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnRelease by rememberUpdatedState(onRelease)
     Box(
         modifier = modifier
+            .fadedUnless(writes || lit, KeyDepth)
             .semantics(mergeDescendants = true) {
                 role = Role.Button
                 contentDescription = label
+                if (!writes) disabled()
                 onClick {
-                    onActivate(midi)
-                    true
+                    if (writes) onActivate(midi)
+                    writes
                 }
             }
             .drawBehind { if (lit) drawKeyRing() }
@@ -388,6 +511,21 @@ private fun FluteKey(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(noteText(midi), style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp), color = InkOnFill, maxLines = 1)
+        if (face != null && face != midi) {
+            // A signed name is longer ("gis¹", "C♯⁴"): it shrinks to fit on one line, as the black keys' names did (the
+            // final review of 2026-11-17: a fixed size was cut at the largest text). The floor is in dp, as one in sp
+            // doubles at the largest text and was still too wide there (`asTextSize`; less than `WordFloor`, for a key's room).
+            val floor = SignedNameFloor.asTextSize()
+            Text(
+                noteText(face),
+                style = MaterialTheme.typography.titleLarge,
+                color = InkOnFill,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = floor, maxFontSize = 22.sp),
+                modifier = Modifier.padding(horizontal = OutlineWidth),
+            )
+        } else {
+            Text(noteText(face ?: midi), style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp), color = InkOnFill, maxLines = 1)
+        }
     }
 }

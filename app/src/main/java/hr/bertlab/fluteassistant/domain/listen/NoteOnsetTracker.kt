@@ -5,7 +5,6 @@ package hr.bertlab.fluteassistant.domain.listen
 
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlin.math.abs
-import kotlin.math.log2
 
 /**
  * Turns microphone frames into notes the way the tuner's "Which?" mode does, and says when a
@@ -69,47 +68,65 @@ class NoteOnsetTracker(
         val restartRise: Float = RESTART_RISE,
         val restartFrames: Int = RESTART_FRAMES,
         val minLevel: Float = MIN_LEVEL,
+        val stepFromSounding: Boolean = true,
     ) {
         /** Name and value of every rule, in declaration order, the value as Kotlin prints it. */
-        fun fields(): List<Pair<String, String>> = listOf(
-            "gate" to gate.toString(), "lockFrames" to lockFrames.toString(), "lockCents" to lockCents.toString(),
-            "smoothing" to smoothing.toString(), "switchFrames" to switchFrames.toString(), "holdFrames" to holdFrames.toString(),
-            "nearCents" to nearCents.toString(), "onsetGapFrames" to onsetGapFrames.toString(),
-            "gapLevelRatio" to gapLevelRatio.toString(), "floorMargin" to floorMargin.toString(), "floorRise" to floorRise.toString(),
-            "recentFrames" to recentFrames.toString(), "attackFrames" to attackFrames.toString(), "stopDrop" to stopDrop.toString(),
-            "restartRise" to restartRise.toString(), "restartFrames" to restartFrames.toString(),
-            "minLevel" to minLevel.toString(),
-        )
+        fun fields(): List<Pair<String, String>> = TABLE.fields(this)
 
         /** These rules with the one named [name] set to [value] (rounded for a frame count); an unknown name is refused. */
-        fun with(name: String, value: Double): Rules {
-            val n = Math.round(value).toInt()
-            val f = value.toFloat()
-            return when (name) {
-                "gate" -> copy(gate = value)
-                "lockFrames" -> copy(lockFrames = n)
-                "lockCents" -> copy(lockCents = value)
-                "smoothing" -> copy(smoothing = n)
-                "switchFrames" -> copy(switchFrames = n)
-                "holdFrames" -> copy(holdFrames = n)
-                "nearCents" -> copy(nearCents = value)
-                "onsetGapFrames" -> copy(onsetGapFrames = n)
-                "gapLevelRatio" -> copy(gapLevelRatio = f)
-                "floorMargin" -> copy(floorMargin = f)
-                "floorRise" -> copy(floorRise = f)
-                "recentFrames" -> copy(recentFrames = n)
-                "attackFrames" -> copy(attackFrames = n)
-                "stopDrop" -> copy(stopDrop = f)
-                "restartRise" -> copy(restartRise = f)
-                "restartFrames" -> copy(restartFrames = n)
-                "minLevel" -> copy(minLevel = f)
-                else -> throw IllegalArgumentException("no rule named $name")
-            }
+        fun with(name: String, value: Double): Rules = TABLE.with(this, name, value)
+
+        companion object {
+            /** Every rule once, in declaration order: a new rule is a constructor parameter and a line here. */
+            private val TABLE = RuleTable<Rules>(
+                numberRule("gate", { it.gate }) { r, v -> r.copy(gate = v) },
+                countRule("lockFrames", { it.lockFrames }) { r, v -> r.copy(lockFrames = v) },
+                numberRule("lockCents", { it.lockCents }) { r, v -> r.copy(lockCents = v) },
+                countRule("smoothing", { it.smoothing }) { r, v -> r.copy(smoothing = v) },
+                countRule("switchFrames", { it.switchFrames }) { r, v -> r.copy(switchFrames = v) },
+                countRule("holdFrames", { it.holdFrames }) { r, v -> r.copy(holdFrames = v) },
+                numberRule("nearCents", { it.nearCents }) { r, v -> r.copy(nearCents = v) },
+                countRule("onsetGapFrames", { it.onsetGapFrames }) { r, v -> r.copy(onsetGapFrames = v) },
+                levelRule("gapLevelRatio", { it.gapLevelRatio }) { r, v -> r.copy(gapLevelRatio = v) },
+                levelRule("floorMargin", { it.floorMargin }) { r, v -> r.copy(floorMargin = v) },
+                levelRule("floorRise", { it.floorRise }) { r, v -> r.copy(floorRise = v) },
+                countRule("recentFrames", { it.recentFrames }) { r, v -> r.copy(recentFrames = v) },
+                countRule("attackFrames", { it.attackFrames }) { r, v -> r.copy(attackFrames = v) },
+                levelRule("stopDrop", { it.stopDrop }) { r, v -> r.copy(stopDrop = v) },
+                levelRule("restartRise", { it.restartRise }) { r, v -> r.copy(restartRise = v) },
+                countRule("restartFrames", { it.restartFrames }) { r, v -> r.copy(restartFrames = v) },
+                levelRule("minLevel", { it.minLevel }) { r, v -> r.copy(minLevel = v) },
+                flagRule("stepFromSounding", { it.stepFromSounding }) { r, v -> r.copy(stepFromSounding = v) },
+            )
+
+            /** The names [with] knows. */
+            val NAMES: Set<String> = TABLE.names
         }
     }
 
-    /** What became of one frame, and the note that began on it, if one did. */
-    data class Result(val decision: FrameDecision, val onset: Onset?)
+    /**
+     * What became of one frame, and the note that began on it, if one did. [leadFrames] are the
+     * frames before this one that belong to that note, which began that many frames before the
+     * phone was sure of it: the frames in a row before it that sounded near the pitch that locked
+     * ([leadOf]), after silence as after another note (a step, an octave pop). Frames of other notes
+     * before them are not its; nor is anything before a stop or, while a note sounded, before a
+     * frame that did not count or that showed that note going on, so a tongued restart starts at its
+     * onset and a slur starts after the last frame of the note before. 0 when no note began.
+     * [lockHz] is the pitch the note locked at, the median that named it (how far it lies from a
+     * written note says whether a wrong one was a near miss); null when no note began. [stopDrop]: on a frame whose
+     * onset came by a restart after a stop ([noticeStop]), how deep the stop fell under the quieter of its two sides:
+     * the lower of the note's recent level when the stop was first heard and this frame's quietest stretch, less the
+     * stop's quietest stretch (since 2026-11-16: the flute's slur check tells a tongue from a breath dip by it; measured
+     * against the note before alone, a softer note after it made a breath's dip a tongue's); null on every other frame,
+     * an onset after a gap included.
+     */
+    data class Result(
+        val decision: FrameDecision,
+        val onset: Onset?,
+        val leadFrames: Int = 0,
+        val lockHz: Double? = null,
+        val stopDrop: Float? = null,
+    )
 
     /**
      * A note that began: its MIDI, and whether it was a [fresh] start after a gap (nothing was
@@ -136,6 +153,13 @@ class NoteOnsetTracker(
      */
     var floor: Float? = floor
         private set
+    /**
+     * Where the sounding note was sounding: the median on the last frame whose median named it (since 2026-11-16). A move
+     * measured from here as well as from the note's written pitch ([Rules.stepFromSounding]) is how a slurred semitone on
+     * a flute blown sharp or flat is heard: G 40 cents sharp to F♯ 40 cents sharp lies 60 cents from G but 100 from
+     * where G sounded. Null between notes.
+     */
+    private var soundingHz: Double? = null
     /** Shown frames in a row whose note is a neighbour of [sounding] within reach; see [identify]. */
     private var driftFrames = 0
     /** Whether the last [identify] moved [sounding] by a drift rather than a clear step or a fresh start. */
@@ -148,10 +172,19 @@ class NoteOnsetTracker(
     /** Counted frames since the sounding note began (0 between notes); a stop in its first ones is its attack. */
     var framesSinceOnset = 0
         private set
+    /**
+     * The newest frames in a row that a note beginning now may have begun in, oldest first: each counted frame's
+     * frequency, and null for a frame the gate missed while nothing sounded (a breathy blink inside a note that
+     * is beginning). Emptied by a stop and, while a note sounds, by a frame that did not count or that showed the
+     * note going on: what came before was the old note's. [leadOf] reads [Result.leadFrames] from it.
+     */
+    private val runFrames = ArrayDeque<Double?>()
     /** Frames since a stop was heard inside the sounding note, or -1 when none is pending. */
     private var stopAge = -1
     /** The quietest stretch of the stop pending, which the tone must rise [RESTART_RISE] over. */
     private var stopFloor = 0f
+    /** The note's recent level when the stop pending was first heard: how deep it fell is this less [stopFloor]. */
+    private var stopRecent = 0f
 
     fun onFrame(frame: PitchFrame): Result {
         noticeStop(frame)
@@ -165,6 +198,8 @@ class NoteOnsetTracker(
         recentLevels.addLast(frame.level)
         while (recentLevels.size > rules.recentFrames) recentLevels.removeFirst()
         if (sounding != null) framesSinceOnset++
+        if (stopAge == 0) runFrames.clear() else runFrames.addLast(frequency) // a stop's frame is the old note's
+        while (runFrames.size > RUN_FRAMES) runFrames.removeFirst()
         recent.addLast(frequency)
         while (recent.size > rules.smoothing) recent.removeFirst()
         if (!isSteady()) return Result(FrameDecision.UNSTEADY, onset = null).also { ageStop() }
@@ -178,6 +213,7 @@ class NoteOnsetTracker(
             identified == before && restarted -> Onset(identified, fresh = true)
             else -> null
         }
+        val lead = if (onset != null) leadOf(median) else 0
         if (onset != null) {
             // The new note's loudness is its own; the frames that locked it are its first.
             levelSum = frame.level.toDouble()
@@ -186,15 +222,40 @@ class NoteOnsetTracker(
             recentLevels.addLast(frame.level)
             framesSinceOnset = 0
             stopAge = -1
+        } else if (stopAge < 0) {
+            // Shown as the sounding note going on (no stop waits to be a restart): this frame and all before it are
+            // that note's, however near the pitch of a note stepped to after them (a sharp b, then a slur to c).
+            runFrames.clear()
         }
         sounding = identified
         ageStop()
-        return Result(FrameDecision.SHOWN, onset)
+        // Under the quieter side: a joined note softer than the one before must not turn a breath's dip into a tongue's.
+        val stopDrop = if (onset != null && restarted) minOf(stopRecent, frame.minLevel) - stopFloor else null
+        return Result(FrameDecision.SHOWN, onset, lead, lockHz = median.takeIf { onset != null }, stopDrop = stopDrop)
+    }
+
+    /**
+     * How many frames before this one the note that locked at [median] began: the frames in a row, back from
+     * this one, that sounded within [ListenRules.NEAR_CENTS] of it (the tracker's own measure of the same note
+     * approached, as against a clear step), a blink among them included. So an attack that scoops into the note
+     * is the note's, and sound that wandered elsewhere before it, a wobble of other notes or a slide, is not.
+     */
+    private fun leadOf(median: Double): Int {
+        var lead = 0
+        var counted = 0 // the lead as far as its oldest counted frame: a blink before the note's first frame is not its
+        for (i in runFrames.size - 2 downTo 0) {
+            val frequency = runFrames[i]
+            if (frequency != null && abs(NoteMath.centsApart(frequency, median)) > rules.nearCents) break
+            lead++
+            if (frequency != null) counted = lead
+        }
+        return counted
     }
 
     /** Back to silence: no note sounding, nothing remembered of it (the room's floor is kept). */
     fun reset() {
         sounding = null
+        soundingHz = null
         recent.clear()
         gap = 0
         unheard = 0
@@ -204,6 +265,7 @@ class NoteOnsetTracker(
         levelCount = 0
         recentLevels.clear()
         framesSinceOnset = 0
+        runFrames.clear()
         stopAge = -1
     }
 
@@ -216,6 +278,7 @@ class NoteOnsetTracker(
         if (sounding == null || framesSinceOnset < rules.attackFrames || recentLevels.isEmpty()) return
         val recentMean = recentLevels.sum() / recentLevels.size
         if (frame.minLevel < recentMean - rules.stopDrop) {
+            if (stopAge < 0) stopRecent = recentMean
             stopFloor = if (stopAge < 0) frame.minLevel else minOf(stopFloor, frame.minLevel)
             stopAge = 0
         }
@@ -235,6 +298,8 @@ class NoteOnsetTracker(
      */
     private fun uncounted(decision: FrameDecision, level: Float): Result {
         val note = sounding
+        // A blink inside a note that is beginning stays in the run; a second one empties the window below.
+        if (note == null && runFrames.isNotEmpty()) runFrames.addLast(null) else runFrames.clear()
         if (note == null) {
             floor = floor?.let { minOf(level, it + rules.floorRise) } ?: level
         }
@@ -250,33 +315,34 @@ class NoteOnsetTracker(
     private fun isSteady(): Boolean {
         if (recent.size < rules.lockFrames) return false
         val last = recent.takeLast(rules.lockFrames)
-        return 1200.0 * log2(last.max() / last.min()) <= rules.lockCents
+        return NoteMath.centsApart(last.max(), last.min()) <= rules.lockCents
     }
 
     /**
      * The note [heard] (the median's nearest note) becomes the sounding note at once when nothing
-     * was sounding, when it is the sounding note, or when it is a clear step away; a drift that has
+     * was sounding, when it is the sounding note, or when it is a clear step away: further than
+     * [ListenRules.NEAR_CENTS] from the sounding note's written pitch or, with [Rules.stepFromSounding],
+     * from where it was sounding ([soundingHz]: a slurred semitone on a flute off pitch); a drift that has
      * only passed the halfway point to a neighbour waits for [ListenRules.SWITCH_FRAMES] shown
      * frames in a row, one frame back on the sounding note starting the count again.
      */
     private fun identify(heard: Int, median: Double): Int {
         val current = sounding
         drifted = false
-        if (current == null || heard == current) {
-            driftFrames = 0
-            return heard
-        }
-        val reach = abs(NoteMath.centsBetween(median, current))
-        if (reach > rules.nearCents) {
-            driftFrames = 0
-            return heard
-        }
-        if (++driftFrames >= rules.switchFrames) {
-            driftFrames = 0
+        if (current != null && heard != current && !isClearStep(median, current)) {
+            if (++driftFrames < rules.switchFrames) return current
             drifted = true
-            return heard
         }
-        return current
+        driftFrames = 0
+        soundingHz = median
+        return heard
+    }
+
+    /** Whether [median] is a clear step away from the sounding note [current]: from its written pitch, or from where it was sounding. */
+    private fun isClearStep(median: Double, current: Int): Boolean {
+        val reach = abs(NoteMath.centsBetween(median, current))
+        val fromSounding = soundingHz?.takeIf { rules.stepFromSounding }?.let { abs(NoteMath.centsApart(median, it)) } ?: 0.0
+        return reach > rules.nearCents || fromSounding > rules.nearCents
     }
 
     companion object {
@@ -285,6 +351,9 @@ class NoteOnsetTracker(
          * one. One frame is too few: a single dropped frame inside a held note would split it in two.
          */
         const val ONSET_GAP_FRAMES = 2
+
+        /** The most frames kept to read a note's lead from: over two seconds, more than any attack takes to settle. */
+        private const val RUN_FRAMES = 64
 
         /**
          * While a note sounds, an uncounted frame is quiet enough to count towards the gap only
@@ -322,8 +391,11 @@ class NoteOnsetTracker(
 
         /**
          * How far under the note's recent level the quietest stretch of a hop must fall to be a
-         * stop: 0.12, about 7 dB. A beginner's breathy tone wobbles by a decibel or two over 21 ms;
-         * a tongued stop falls 10 dB or more even with the room ringing on.
+         * stop: 0.12, about 7 dB; a tongued stop falls 10 dB or more even with the room ringing on.
+         * A child's breath can dip about as far for a moment inside a held note, which this hears as
+         * a stop and a restart: the flute's walk does not cut a note on it
+         * (`ListenRun.Rules.restartCuts`), and a higher value would lose the 40 ms tongue in a lively
+         * room (`ListenPathTest`; `ui/flute/DESIGN.md`, "The first runs with the walk").
          */
         const val STOP_DROP = 0.12f
 

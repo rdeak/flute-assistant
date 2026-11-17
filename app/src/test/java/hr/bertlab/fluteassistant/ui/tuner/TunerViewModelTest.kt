@@ -62,6 +62,31 @@ class TunerViewModelTest {
     }
 
     @Test
+    fun `the guide opens on the first card, moves and closes`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        assertNull(vm.state.value.guideCard)
+        vm.openGuide()
+        assertEquals(GuideCard.WARM_UP, vm.state.value.guideCard)
+        vm.showGuideCard(GuideCard.EACH_NOTE)
+        assertEquals(GuideCard.EACH_NOTE, vm.state.value.guideCard)
+        vm.closeGuide(GuideExit.BACK)
+        assertNull(vm.state.value.guideCard)
+        vm.openGuide()
+        assertEquals(GuideCard.WARM_UP, vm.state.value.guideCard) // always from the start
+        assertTrue(vm.state.value.isListening) // the microphone stays on underneath
+    }
+
+    @Test
+    fun `a closed guide is not moved or closed again`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        vm.showGuideCard(GuideCard.HEAD_JOINT)
+        assertNull(vm.state.value.guideCard)
+        vm.closeGuide(GuideExit.CLOSE)
+        assertNull(vm.state.value.guideCard)
+    }
+
+    @Test
     fun `does not listen without permission`() = runTest(dispatcher) {
         val vm = TunerViewModel(engine, settings, tonePlayer, logger)
         vm.startListening()
@@ -363,7 +388,7 @@ class TunerViewModelTest {
     @Test
     fun `the first note is identified at once`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
-        steady(a4(60.0)) // nearest is A♯4
+        steady(a4(60.0)) // nearest is B♭4
         advanceUntilIdle()
         assertEquals(70, vm.state.value.homeMidi)
     }
@@ -372,7 +397,7 @@ class TunerViewModelTest {
     fun `a drift past the halfway point moves the ring only once it lasts`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        // Two frames are unsteady while the pitch moves, then each frame is shown nearer A♯4.
+        // Two frames are unsteady while the pitch moves, then each frame is shown nearer B♭4.
         frames(a4(60.0), ListenRules.LOCK_FRAMES - 1 + ListenRules.SWITCH_FRAMES - 1)
         advanceUntilIdle()
         assertEquals(70, vm.state.value.reading!!.midi)
@@ -400,7 +425,7 @@ class TunerViewModelTest {
     fun `a clear step to another note moves the ring at once`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
         steady(440.0)
-        frames(a4(100.0), ListenRules.LOCK_FRAMES) // A♯4 in tune
+        frames(a4(100.0), ListenRules.LOCK_FRAMES) // B♭4 in tune
         advanceUntilIdle()
         assertEquals(70, vm.state.value.homeMidi)
         assertEquals(TuningStatus.IN_TUNE, vm.state.value.status)

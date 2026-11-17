@@ -41,7 +41,7 @@ object FluteFingerings {
         60 to setOf(THUMB, L1, L2, L3, R1, R2, R3, LOW_C),            // c1
         61 to setOf(THUMB, L1, L2, L3, R1, R2, R3, C_SHARP),          // cis1
         62 to setOf(THUMB, L1, L2, L3, R1, R2, R3),                   // d1
-        63 to setOf(THUMB, L1, L2, L3, R1, R2, R3, E_FLAT),           // dis1
+        63 to setOf(THUMB, L1, L2, L3, R1, R2, R3, E_FLAT),           // es1
         64 to setOf(THUMB, L1, L2, L3, R1, R2, E_FLAT),               // e1
         65 to setOf(THUMB, L1, L2, L3, R1, E_FLAT),                   // f1
         66 to setOf(THUMB, L1, L2, L3, R3, E_FLAT),                   // fis1
@@ -53,7 +53,7 @@ object FluteFingerings {
         72 to setOf(L1, E_FLAT),                                      // c2
         73 to setOf(E_FLAT),                                          // cis2
         74 to setOf(THUMB, L2, L3, R1, R2, R3),                       // d2
-        75 to setOf(THUMB, L2, L3, R1, R2, R3, E_FLAT),               // dis2
+        75 to setOf(THUMB, L2, L3, R1, R2, R3, E_FLAT),               // es2
         76 to setOf(THUMB, L1, L2, L3, R1, R2, E_FLAT),               // e2
         77 to setOf(THUMB, L1, L2, L3, R1, E_FLAT),                   // f2
         78 to setOf(THUMB, L1, L2, L3, R3, E_FLAT),                   // fis2

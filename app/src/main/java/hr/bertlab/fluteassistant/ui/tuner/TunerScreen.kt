@@ -114,6 +114,9 @@ fun TunerScreen(
         onModeChange = viewModel::setMode,
         onPlayNote = viewModel::playTargetNote,
         onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+        onOpenGuide = viewModel::openGuide,
+        onGuideCard = viewModel::showGuideCard,
+        onCloseGuide = viewModel::closeGuide,
         onOpenSettings = {
             context.startActivity(
                 Intent(
@@ -145,7 +148,17 @@ fun TunerContent(
     onRequestPermission: () -> Unit,
     onOpenSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenGuide: () -> Unit = {},
+    onGuideCard: (GuideCard) -> Unit = {},
+    onCloseGuide: (GuideExit) -> Unit = {},
 ) {
+    // The guide to tuning the flute takes the tab's place; it branches on the turn itself, so this one
+    // call keeps its card when the phone turns.
+    val guideCard = state.guideCard
+    if (state.permissionGranted && guideCard != null) {
+        TuningGuide(card = guideCard, onCard = onGuideCard, onClose = onCloseGuide, modifier = modifier)
+        return
+    }
     // A phone on its side has its own layout ([TunerSideways]), and its own place for the microphone
     // card, which brings its own page there.
     if (LocalSideways.current) {
@@ -155,6 +168,7 @@ fun TunerContent(
                 onTargetNoteChange = onTargetNoteChange,
                 onModeChange = onModeChange,
                 onPlayNote = onPlayNote,
+                onOpenGuide = onOpenGuide,
                 modifier = modifier,
             )
         } else {
@@ -212,6 +226,7 @@ fun TunerContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f, fill = false),
+                        onHow = onOpenGuide,
                         window = window,
                     )
                     TunerMode.IDENTIFY -> window(

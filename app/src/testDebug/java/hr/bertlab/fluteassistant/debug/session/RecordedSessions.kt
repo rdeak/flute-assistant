@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.debug.session
 
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
 import java.io.File
 
@@ -20,7 +21,8 @@ object RecordedSessions {
             try {
                 val session = Session.load(folder)
                 val pin = session.pin ?: return@mapNotNull "${folder.name}: no pin line in session.log (pin marks=0:FIRST_TRY,...)"
-                val run = ListenPath.run(session.audio.samples, session.audio.sampleRate, session.tune, floor = session.floor)
+                // Today's rules (one set since 2026-11-17, when the levels went).
+                val run = ListenPath.run(session.frames, session.tune, session.pulse, floor = session.floor, run = ListenRun.Rules())
                 if (run.marks == pin) null
                 else "${folder.name}: pin ${Session.spell(pin)} but replay ${Session.spell(run.marks)}"
             } catch (e: Exception) {

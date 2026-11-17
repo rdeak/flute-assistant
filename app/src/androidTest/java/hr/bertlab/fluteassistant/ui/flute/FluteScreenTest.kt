@@ -19,15 +19,19 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewRootForTest
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getBoundsInRoot
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -52,19 +56,26 @@ import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
+import hr.bertlab.fluteassistant.ui.theme.LightFluteColors
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -72,7 +83,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -88,9 +98,11 @@ class FluteScreenTest {
     private val released = mutableListOf<Int>()
     private val activated = mutableListOf<Int>()
     private var playToggles = 0
+    private var signs = 0
     private var erases = 0
     private val restEvents = mutableListOf<String>()
     private var breaths = 0
+    private var joins = 0
     private var chosenBpm: Int? = null
     private var chosenSignature: TimeSignature? = null
     private var speedOpens = 0
@@ -134,6 +146,8 @@ class FluteScreenTest {
                             onRestReleased = { restEvents += "release" },
                             onRestActivated = { restEvents += "activate" },
                             onBreath = { breaths++ },
+                            onJoin = { joins++ },
+                            onSign = { signs++ },
                             onTogglePlayback = { playToggles++ },
                             onEraseLast = { erases++ },
                             onBpmChange = { bpm ->
@@ -292,6 +306,43 @@ class FluteScreenTest {
         }
     }
 
+    /** Upright the advice is one line that shrinks to 14 sp and no further: every line, the longest Croatian ones too, shows whole. */
+    @Test
+    fun every_advice_shows_whole_on_a_narrow_phone_in_croatian_at_large_text() {
+        val twoNotes = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER))
+        val short = Walk(0, 0, Walk.Phase.SHORT)
+        val lines = listOf(
+            Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR) to "🎵 Odsviraj jedan dug, čist ton",
+            Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR) to "📱 Dođi bliže mobitelu",
+            Listening(index = 0, repeatHeld = true) to "🔁 Stani, pa odsviraj opet",
+            Listening(index = 0, walk = short) to "⏳ Prekratko, drži dulje",
+            Listening(index = 0, walk = short, faded = true) to "😮‍💨 Možda nema zraka? Udahni",
+            Listening(index = 0, pitch = Pitch.HIGH) to "⬇️ Malo niže",
+            Listening(index = 0, wrong = WrongNote(0, 64)) to "👀 Provjeri prste",
+            Listening(index = 0, tongued = true) to "✂️ Poveži ih, bez jezika",
+        )
+        state = mutableStateOf(FluteUiState(tune = twoNotes, listening = lines.first().first))
+        compose.setContent {
+            LocaleProvider(Locale("hr")) {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = 1.3f)) {
+                    Box(Modifier.width(360.dp)) {
+                        FluteContent(state = state.value, metronome = MetronomeUiState(), actions = FluteActions())
+                    }
+                }
+            }
+        }
+        for ((listening, line) in lines) {
+            compose.runOnIdle { state.value = state.value.copy(listening = listening) }
+            compose.waitForIdle()
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(line, useUnmergedTree = true).fetchSemanticsNode()
+                .config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts)
+            val layout = layouts.single()
+            assertFalse("\"$line\" runs past its one line", layout.hasVisualOverflow)
+            assertEquals("\"$line\" shows whole", line.length, layout.getLineEnd(0, visibleEnd = true))
+        }
+    }
+
     @Test
     fun croatian_copy() {
         show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER))), Locale("hr"))
@@ -347,7 +398,7 @@ class FluteScreenTest {
             "C6 $c6, then Rest $rest, Breathe $breath and the sponge $erase, in that order",
             c6.right < rest.left && rest.right < breath.left && breath.right < erase.left,
         )
-        // The three stand apart from c3 by more than a key: a tool, not a note, and a slip off c3 reaches nothing.
+        // The three stand apart from c3 by more than a key: a tool, not a note.
         assertTrue("Rest $rest should stand clear of C6 $c6 by more than a key", rest.left - c6.right > c5.width)
         assertTrue("Rest $rest should start where G5 $g5 does", abs((rest.left - g5.left).value) <= 1f)
         assertTrue("the sponge $erase should end where B5 $b5 does", abs((erase.right - b5.right).value) <= 1f)
@@ -1131,6 +1182,17 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
     }
 
+    /** A note cut short: the line asks to hold it longer, and no fingering shows, the fingers were right (2026-11-11). */
+    @Test
+    fun a_note_cut_short_asks_to_hold_it_longer_with_no_fingering() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))))
+        compose.onNodeWithText("⏳ Too short, hold longer").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
+        compose.onNodeWithText("🪈 Play C4").assertDoesNotExist()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SOUNDING)))
+        compose.onNodeWithText("⏳ Too short, hold longer").assertDoesNotExist()
+    }
+
     @Test
     fun the_listening_room_speaks_croatian() {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"))
@@ -1138,5 +1200,386 @@ class FluteScreenTest {
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64)))
         compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
         compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT)))
+        compose.onNodeWithText("⏳ Prekratko, drži dulje").assertIsDisplayed()
+    }
+
+    /** The guess says maybe (2026-11-13): out of air for a note that faded. A note blown high has the tuner's words, and no fingering: the fingers were right (2026-11-14). */
+    @Test
+    fun the_why_lines_say_maybe_in_both_languages() {
+        val faded = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)
+        val high = Listening(index = 0, pitch = Pitch.HIGH)
+        show(FluteUiState(tune = twoNotes, listening = faded))
+        compose.onNodeWithText("😮‍💨 Maybe out of air? Big breath first").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = high)
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist() // the fingers were right
+    }
+
+    @Test
+    fun the_why_lines_speak_croatian() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)), Locale("hr"))
+        compose.onNodeWithText("😮‍💨 Možda nema zraka? Udahni").assertIsDisplayed()
+        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, pitch = Pitch.HIGH))
+        compose.onNodeWithText("⬇️ Malo niže").assertIsDisplayed()
+    }
+
+    // ---- Feedback, not stars (2026-11-14) ----
+
+    @Test
+    fun a_note_blown_high_or_low_has_the_tuners_words_and_no_fingering() {
+        val sounding = Walk(0, 0, Walk.Phase.SOUNDING)
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0, heardNow = 60, pitch = Pitch.HIGH, walk = sounding)))
+        compose.onNodeWithText("⬇️ A little lower").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Fingering", substring = true).assertDoesNotExist()
+        state.value = state.value.copy(listening = Listening(index = 0, heardNow = 60, pitch = Pitch.LOW, walk = sounding))
+        compose.onNodeWithText("⬆️ A little higher").assertIsDisplayed()
+    }
+
+    @Test
+    fun the_marks_say_what_each_note_was() {
+        val three = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER), TuneNote(69, NoteLength.QUARTER))
+        show(FluteUiState(tune = three, marks = mapOf(0 to StepMark.HIGH, 1 to StepMark.LOW, 2 to StepMark.SHORT)))
+        compose.onNodeWithContentDescription("C4, 1 beat, too high").assertExists()
+        compose.onNodeWithContentDescription("G4, 1 beat, too low").assertExists()
+        compose.onNodeWithContentDescription("A4, 1 beat, let go too early").assertExists()
+    }
+
+    @Test
+    fun an_ended_run_says_how_its_speed_was_and_waits_for_the_pill() {
+        val slower = Listening(index = 1, finishing = true, pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true))
+        show(FluteUiState(tune = twoNotes, listening = slower, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY)))
+        compose.onNodeWithText("🐢 Slower than the 🐇").assertIsDisplayed()
+        compose.onNodeWithText("Stop").assertIsDisplayed()
+        compose.onNodeWithContentDescription("play this one", substring = true).assertDoesNotExist()
+        state.value = state.value.copy(listening = slower.copy(pace = Pace(bpm = 104, pairs = 7, knobBpm = 60, speaks = true)))
+        compose.onNodeWithText("🐇 Faster than the 🐢").assertIsDisplayed()
+    }
+
+    // ---- A note held too long (2026-11-16): the hand under it ----
+
+    @Test
+    fun a_note_held_too_long_shows_the_hand() {
+        show(FluteUiState(tune = twoNotes, marks = mapOf(0 to StepMark.LONG)))
+        compose.onNodeWithContentDescription("C4, 1 beat, held too long").assertExists()
+        compose.runOnIdle { state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 1, remark = StepMark.LONG), marks = mapOf(0 to StepMark.LONG)) }
+        compose.onNodeWithText("✋ Too long, let go sooner").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_note_held_too_long_says_so_in_croatian() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 1, remark = StepMark.LONG), marks = mapOf(0 to StepMark.LONG)), Locale("hr"))
+        compose.onNodeWithText("✋ Predugo, pusti ranije").assertIsDisplayed()
+        compose.onNodeWithContentDescription("c1, 1 doba, predugo").assertExists()
+    }
+
+    // ---- Legato (2026-11-16): the slur, a joined note's words, ✂️ ----
+
+    private val slurred = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER, joined = true), TuneNote(64, NoteLength.QUARTER))
+
+    @Test
+    fun a_joined_note_is_described_as_joined() {
+        show(FluteUiState(tune = slurred))
+        compose.onNodeWithContentDescription("D4, 1 beat, joined to the note before").assertExists()
+        compose.onNodeWithContentDescription("E4, 1 beat").assertExists()
+    }
+
+    @Test
+    fun a_tongued_mark_is_described() {
+        show(FluteUiState(tune = slurred, marks = mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.TONGUED)))
+        compose.onNodeWithContentDescription("D4, 1 beat, joined to the note before, tongued, not joined").assertExists()
+    }
+
+    @Test
+    fun a_joined_note_is_described_in_croatian() {
+        show(FluteUiState(tune = slurred, marks = mapOf(1 to StepMark.TONGUED)), locale = Locale("hr"))
+        compose.onNodeWithContentDescription(", spojeno s notom prije, jezikom, nije spojeno", substring = true).assertExists()
+    }
+
+    /** Ink pixels of the staff in the box [x0]..[x1] by [y0]..[y1], in dp from the tune row's left and the staff's top. */
+    private fun inkIn(row: PixelMap, x0: Float, x1: Float, y0: Float, y1: Float): Int {
+        val d = compose.density
+        val ink = LightFluteColors.text
+        var count = 0
+        for (x in with(d) { x0.dp.roundToPx() } until with(d) { x1.dp.roundToPx() }) {
+            for (y in with(d) { y0.dp.roundToPx() } until with(d) { y1.dp.roundToPx() }) if (row[x, y].near(ink)) count++
+        }
+        return count
+    }
+
+    @Test
+    fun slurs_and_the_waiting_arc_are_drawn() {
+        needsDevice()
+        show(FluteUiState(tune = slurred))
+        val row = compose.onNodeWithContentDescription("Your tune, 3 notes").captureToImage().toPixelMap()
+        // The first head stands NOTES_START - NOTES_CLIP + HEAD_X into the row, a beat (29 dp) apart; c¹ at 165, d¹ at 156.
+        val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
+        val beat = StaffGeometry.BEAT_WIDTH
+        assertTrue("a slur under c and d", inkIn(row, first + 6, first + beat - 6, 171f, 186f) > 0)
+        assertEquals("nothing under d and e, not joined", 0, inkIn(row, first + beat + 6, first + 2 * beat - 6, 162f, 180f))
+        state.value = state.value.copy(joinWaiting = true)
+        val waiting = compose.onNodeWithContentDescription("Your tune, 3 notes").captureToImage().toPixelMap()
+        assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 6, first + 2 * beat + 26, 152f, 168f) > 0)
+    }
+
+    @Test
+    fun a_slur_stays_under_its_notes_when_the_staff_has_scrolled() {
+        needsDevice()
+        // Twelve quarters, then e joined to f: the pair starts 383 dp into the row, past a phone's width, so the staff
+        // scrolls to show it. The slur's layer is moved by the row's scroll and not drawn again: it must move with it.
+        val tune = List(12) { TuneNote(60, NoteLength.QUARTER) } +
+            TuneNote(64, NoteLength.QUARTER) + TuneNote(65, NoteLength.QUARTER, joined = true)
+        show(FluteUiState(tune = tune))
+        compose.waitForIdle()
+        val rowNode = compose.onNodeWithContentDescription("Your tune, 14 notes")
+        val rowLeft = rowNode.getBoundsInRoot().left
+        val e = (compose.onNodeWithContentDescription("E4, 1 beat").getBoundsInRoot().left - rowLeft).value
+        val f = (compose.onNodeWithContentDescription("F4, 1 beat, joined to the note before").getBoundsInRoot().left - rowLeft).value
+        val unscrolled = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + 12 * StaffGeometry.BEAT_WIDTH + 3 * StaffGeometry.BAR_SLOT
+        assertTrue("the staff must have scrolled for this to test anything: e stands $e dp into the row", e < unscrolled - 1f)
+        // e¹ at 147 and f¹ at 138: the slur hangs under both heads, below the staff's bottom line and over the names.
+        val row = rowNode.captureToImage().toPixelMap()
+        val ink = inkIn(row, e + StaffGeometry.HEAD_X + 8, f + StaffGeometry.HEAD_X - 8, 155f, 172f)
+        assertTrue("the slur under e and f, where they stand now", ink > 0)
+    }
+
+    // ---- The ⌒ key (2026-11-16): left of 💤, faded with nothing to join, down while a join waits ----
+
+    @Test
+    fun the_join_key_stands_left_of_the_rest_key() {
+        show(FluteUiState())
+        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
+        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
+        val f5 = compose.onNodeWithContentDescription("F5").getBoundsInRoot()
+        val join = compose.onNodeWithContentDescription("Join to the next note").getBoundsInRoot()
+        val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
+        assertTrue("$join should sit in C6's row $c6", abs((join.top - c6.top).value) <= 1f && abs((join.bottom - c6.bottom).value) <= 1f)
+        assertTrue("$join should be one key wide", abs((join.width - c5.width).value) <= 1f)
+        assertTrue("$join should stand over F5 $f5", abs((join.left - f5.left).value) <= 1f)
+        assertTrue("$join should come just before Rest $rest", join.right < rest.left && rest.left - join.right < c5.width / 2)
+        assertTrue("two columns between C6 and ⌒: the ♯♭ key and an empty one", join.left - c6.right > c5.width * 2)
+    }
+
+    @Test
+    fun the_join_key_is_faded_with_nothing_to_join_and_selected_while_a_join_waits() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Join to the next note").assertIsNotEnabled()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER)))
+        // No "not selected" for a screen reader while no join waits: the key says selected only while one does.
+        compose.onNodeWithContentDescription("Join to the next note").assertIsEnabled()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        state.value = state.value.copy(joinWaiting = true)
+        compose.onNodeWithContentDescription("Join to the next note").assertIsSelected()
+        state.value = state.value.copy(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.QUARTER)), joinWaiting = false)
+        compose.onNodeWithContentDescription("Join to the next note").assertIsNotEnabled()
+    }
+
+    @Test
+    fun tapping_the_join_key_reports_it() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))))
+        compose.onNodeWithContentDescription("Join to the next note").performTouchInput { down(center) }
+        assertEquals("on the finger going down", 1, joins)
+        compose.onNodeWithContentDescription("Join to the next note").performTouchInput { up() }
+        compose.onNodeWithContentDescription("Join to the next note").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(2, joins)
+    }
+
+    @Test
+    fun the_join_key_is_named_for_a_screen_reader_in_croatian() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER))), Locale("hr"))
+        compose.onNodeWithContentDescription("Spoji sa sljedećom notom").assertExists()
+    }
+
+    // ---- The ♯♭ key (2026-11-17): beside C6, the next note its letter's sharp or flat ----
+
+    private val signKey = "Sharp or flat for the next note"
+
+    @Test
+    fun the_sign_key_stands_beside_c6_with_one_empty_column_before_the_tools() {
+        show(FluteUiState())
+        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
+        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
+        val d5 = compose.onNodeWithContentDescription("D5").getBoundsInRoot()
+        val f5 = compose.onNodeWithContentDescription("F5").getBoundsInRoot()
+        val sign = compose.onNodeWithContentDescription(signKey).getBoundsInRoot()
+        val join = compose.onNodeWithContentDescription("Join to the next note").getBoundsInRoot()
+        assertTrue("$sign should sit in C6's row $c6", abs((sign.top - c6.top).value) <= 1f && abs((sign.bottom - c6.bottom).value) <= 1f)
+        assertTrue("$sign should be one key wide", abs((sign.width - c5.width).value) <= 1f)
+        assertTrue("$sign should stand over D5 $d5", abs((sign.left - d5.left).value) <= 1f)
+        assertTrue("⌒ $join should still stand over F5 $f5", abs((join.left - f5.left).value) <= 1f)
+        assertTrue("one empty column between ♯♭ $sign and ⌒ $join", join.left - sign.right > c5.width)
+    }
+
+    @Test
+    fun while_the_sign_waits_the_keys_show_their_signed_notes_and_d_a_c6_fade() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription(signKey).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        compose.onNodeWithContentDescription("E♭4").assertDoesNotExist()
+        state.value = state.value.copy(signWaiting = true)
+        compose.onNodeWithContentDescription(signKey).assertIsSelected()
+        for (name in listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4", "C♯5", "E♭5", "F♯5", "G♯5", "B♭5")) {
+            compose.onNodeWithContentDescription(name).assertIsEnabled()
+        }
+        for (name in listOf("D4", "A4", "D5", "A5", "C6")) compose.onNodeWithContentDescription(name).assertIsNotEnabled()
+        compose.onNodeWithContentDescription("C4").assertDoesNotExist()
+        state.value = state.value.copy(signWaiting = false)
+        compose.onNodeWithContentDescription("C4").assertIsEnabled()
+        compose.onNodeWithContentDescription("D4").assertIsEnabled()
+    }
+
+    @Test
+    fun a_signed_key_held_reports_one_press_and_one_release() {
+        // The key's face goes from E♭ back to E while the finger is down (the press spent the sign): the hold must go on.
+        show(FluteUiState(signWaiting = true))
+        compose.onNodeWithContentDescription("E♭4").performTouchInput { down(center) }
+        assertEquals(listOf(64), pressed)
+        compose.runOnIdle { state.value = state.value.copy(signWaiting = false) }
+        compose.waitForIdle()
+        assertTrue("let go of while still held: $released", released.isEmpty())
+        compose.onNodeWithContentDescription("E4").performTouchInput { up() }
+        assertEquals(listOf(64), pressed)
+        assertEquals(listOf(64), released)
+    }
+
+    @Test
+    fun a_key_held_while_the_sign_is_tapped_is_not_let_go() {
+        // D fades the moment the sign waits; the note under the finger must go on until the finger lifts.
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("D4").performTouchInput { down(center) }
+        compose.runOnIdle { state.value = state.value.copy(signWaiting = true) }
+        compose.waitForIdle()
+        assertTrue("let go of while still held: $released", released.isEmpty())
+        compose.onNodeWithContentDescription("D4").performTouchInput { up() }
+        assertEquals(listOf(62), pressed)
+        assertEquals(listOf(62), released)
+    }
+
+    @Test
+    fun while_the_sign_waits_croatian_names_are_whole_at_large_text() = assertSignedNamesWhole(Locale("hr"), 1.3f)
+
+    /** The final review of 2026-11-17: a signed name shrinks to fit at the largest text, as the black keys' did. */
+    @Test
+    fun while_the_sign_waits_the_names_are_whole_at_the_largest_text() {
+        assertSignedNamesWhole(Locale("hr"), 2f)
+    }
+
+    @Test
+    fun while_the_sign_waits_english_names_are_whole_at_the_largest_text() {
+        assertSignedNamesWhole(Locale.ENGLISH, 2f)
+    }
+
+    /** The black notes' names are longer than the white ones' ("gis2" against "g2"): a 360 dp phone at [fontScale]. */
+    private fun assertSignedNamesWhole(locale: Locale, fontScale: Float) {
+        state = mutableStateOf(FluteUiState(signWaiting = true))
+        compose.setContent {
+            LocaleProvider(locale) {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = fontScale)) {
+                    Box(Modifier.width(360.dp)) {
+                        FluteContent(state = state.value, metronome = MetronomeUiState(), actions = FluteActions())
+                    }
+                }
+            }
+        }
+        val names = if (locale == Locale.ENGLISH) {
+            listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4", "C♯5", "E♭5", "F♯5", "G♯5", "B♭5")
+        } else {
+            listOf("cis1", "es1", "fis1", "gis1", "b1", "cis2", "es2", "fis2", "gis2", "b2")
+        }
+        for (name in names) {
+            assertWhole("360 dp, $locale, text $fontScale", compose.onNodeWithText(name, useUnmergedTree = true), textScale = fontScale)
+        }
+    }
+
+    @Test
+    fun a_held_signed_note_lights_its_white_key() {
+        // The final review of 2026-11-17: E's key wrote an E♭ and is held; it is E's key that is down, not none.
+        show(FluteUiState(tune = listOf(TuneNote(63, NoteLength.EIGHTH)), held = Held(63, index = 0, key = 64)))
+        val e = compose.onNodeWithText("E4", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val d = compose.onNodeWithText("D4", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("E's key should be down for its E♭: its name sits lower than D's ($e, $d)", (e.top - d.top).value > 2f)
+    }
+
+    @Test
+    fun a_key_held_while_the_sign_waits_is_not_faded() {
+        needsDevice()
+        // D is held when ♯♭ is tapped: it still sounds, so it is drawn whole; A, not held, fades.
+        show(FluteUiState(tune = listOf(TuneNote(62, NoteLength.EIGHTH)), held = Held(62, index = 0), signWaiting = true))
+        fun fill(name: String): Color = compose.onNodeWithContentDescription(name).captureToImage().toPixelMap()
+            .let { it[(it.width * 0.14f).toInt(), it.height / 2] }
+        assertTrue("held D should be whole, is ${fill("D4")}", fill("D4").near(noteColor(62)))
+        assertFalse("A, not held, should be faded, is ${fill("A4")}", fill("A4").near(noteColor(69)))
+    }
+
+    @Test
+    fun tapping_the_sign_key_reports_it() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription(signKey).performTouchInput { down(center) }
+        assertEquals("on the finger going down", 1, signs)
+        compose.onNodeWithContentDescription(signKey).performTouchInput { up() }
+        compose.onNodeWithContentDescription(signKey).performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(2, signs)
+    }
+
+    @Test
+    fun the_sign_key_is_named_for_a_screen_reader_in_croatian() {
+        show(FluteUiState(signWaiting = true), Locale("hr"))
+        compose.onNodeWithContentDescription("Povisilica ili snizilica za sljedeću notu").assertIsSelected()
+        compose.onNodeWithContentDescription("b1").assertIsEnabled() // h1's key writes b1 (B♭4)
+        compose.onNodeWithContentDescription("es2").assertIsEnabled()
+    }
+
+    // ---- Sharps and flats on the staff (2026-11-16) ----
+
+    private val signed = listOf(TuneNote(66, NoteLength.QUARTER), TuneNote(65, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
+
+    @Test
+    fun a_black_note_is_named_with_its_sign() {
+        show(FluteUiState(tune = signed))
+        compose.onNodeWithContentDescription("F♯4, 1 beat").assertExists()
+        compose.onNodeWithContentDescription("F4, 1 beat").assertExists() // a natural adds nothing to the name
+    }
+
+    @Test
+    fun a_black_note_is_named_with_its_sign_in_croatian() {
+        show(FluteUiState(tune = signed), Locale("hr"))
+        compose.onNodeWithContentDescription("fis1, 1 doba").assertExists()
+    }
+
+    @Test
+    fun a_signed_step_is_ten_dp_wider() {
+        show(FluteUiState(tune = signed))
+        val sharp = compose.onNodeWithContentDescription("F♯4, 1 beat").getBoundsInRoot()
+        val natural = compose.onNodeWithContentDescription("F4, 1 beat").getBoundsInRoot()
+        val plain = compose.onNodeWithContentDescription("G4, 1 beat").getBoundsInRoot()
+        assertEquals(29f, plain.width.value, 0.5f)
+        assertEquals(39f, sharp.width.value, 0.5f)
+        assertEquals(39f, natural.width.value, 0.5f)
+    }
+
+    /** Ink pixels of [step] in its first [width] dp, within 10 dp of [y], the staff's lines left out. */
+    private fun signInk(step: PixelMap, width: Float, y: Float): Int {
+        val d = compose.density
+        val ink = LightFluteColors.text
+        val lines = (0..4).map { StaffGeometry.TOP_LINE_Y + it * StaffGeometry.LINE_GAP }
+        var count = 0
+        for (x in with(d) { 2.dp.roundToPx() } until with(d) { width.dp.roundToPx() }) {
+            for (py in with(d) { (y - 10f).dp.roundToPx() } until with(d) { (y + 10f).dp.roundToPx() }) {
+                val inDp = py / d.density
+                if (lines.any { kotlin.math.abs(it - inDp) < 1.6f }) continue
+                if (step[x, py].near(ink)) count++
+            }
+        }
+        return count
+    }
+
+    @Test
+    fun the_signs_are_drawn_before_their_heads() {
+        needsDevice()
+        show(FluteUiState(tune = signed))
+        val f = StaffGeometry.yOf(StaffNotes.positionOf(65))
+        assertTrue("the sharp", signInk(compose.onNodeWithContentDescription("F♯4, 1 beat").captureToImage().toPixelMap(), 13f, f) > 0)
+        assertTrue("the natural", signInk(compose.onNodeWithContentDescription("F4, 1 beat").captureToImage().toPixelMap(), 13f, f) > 0)
+        // That a plain step draws no sign is held by its width (`a_signed_step_is_ten_dp_wider`): its tilted head starts
+        // 4.5 dp in, so a pixel window before it would be too narrow to say anything.
     }
 }

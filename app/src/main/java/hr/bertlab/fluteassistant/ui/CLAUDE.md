@@ -36,7 +36,8 @@ root CLAUDE.md, "Kid-friendly UI constraint".
 - Text on a bright fill is `InkOnFill`; a note's colour is `noteColor(midi)`. Everything pressable
   is a `ChunkyButton` / `Modifier.chunky`; a faded one goes through `fadedUnless` (`Modifier.alpha`
   cuts the shadow off flat). Emoji that are pictures are sized in dp, so large text does not grow
-  them out of their room.
+  them out of their room. The smallest a shrinking word gets is a size in dp too (`Dp.asTextSize()` and `WordFloor`,
+  `ui/common/TextFloor.kt`): a floor in sp doubles at the largest text and pushes the word out.
 - The credits stay behind a long press on the logo, with the website's address as plain text (never
   a link, so a child cannot leave the app), and since 2026-11-11 no privacy or licence lines (the
   user's call; Play asks for the policy in the app, so a review that flags it starts here, see
@@ -45,16 +46,18 @@ root CLAUDE.md, "Kid-friendly UI constraint".
   will not ask again (`tuner/CLAUDE.md`, "Asking for the microphone").
 - **The phone's Back** is the way back the screen itself shows, wherever one is open: OK on the
   notes picker and the flute's speed panel, a tap on the open book on the shelf, Not now on the
-  flute's microphone card, Stop while a tune runs, and it closes an open tempo wheel first. With
+  flute's microphone card, Stop while a tune runs, ✕ or OK on the tuner's guide, and it closes an open
+  tempo wheel first. With
   nothing open it is the phone's and leaves the app. A new panel gets a `BackHandler` and a test
   with `BackKey` (androidTest): `DESIGN.md`, "The phone's Back".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
-- `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both.
+- `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both (the flute's level used
+  it from 2026-11-16 until the levels went, 2026-11-17).
   `FingeringDiagram` is shared by the tuner and the flute's listening room, and `AdviceLine` by
   both too (it also takes the flute's "Play B4"): the same.
 - **A test of a fit compares bounds.** `assertIsDisplayed` does not prove one: what spills past a
   window is still displayed. Compare `getUnclippedBoundsInRoot()` with the room, and ask
-  `GetTextLayoutResult` about words (`TabletFitTest.assertWhole`).
+  `GetTextLayoutResult` about words (`assertWhole`, `ui/common/WholeText.kt` in androidTest).
 
 ## Sideways
 

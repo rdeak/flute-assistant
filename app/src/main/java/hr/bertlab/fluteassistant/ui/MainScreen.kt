@@ -40,6 +40,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,7 +75,7 @@ import hr.bertlab.fluteassistant.ui.common.AppLanguage
 import hr.bertlab.fluteassistant.ui.common.CreditsLogo
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.HideSystemBars
-import hr.bertlab.fluteassistant.ui.common.KeepScreenOn
+import hr.bertlab.fluteassistant.ui.common.KeepScreenAwake
 import hr.bertlab.fluteassistant.ui.common.LanguageSwitch
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
@@ -134,6 +135,7 @@ enum class AppTab(@StringRes val labelRes: Int, val emoji: String) {
  */
 @Composable
 fun MainScreen(
+    interactions: IntState,
     metronomeViewModel: MetronomeViewModel = hiltViewModel(),
     tunerViewModel: TunerViewModel = hiltViewModel(),
     notesViewModel: NotesViewModel = hiltViewModel(),
@@ -153,8 +155,8 @@ fun MainScreen(
     val dark = themeChoice.isDark(systemDark = isSystemInDarkTheme())
     SystemBarsFollowTheme(dark)
 
-    // A tune plays back untouched for up to a minute or two, and a child plays it back to the phone with both hands on the flute: the screen must not time out under either.
-    KeepScreenOn(enabled = metronomeState.isPlaying || tunerState.isListening || fluteState.isRunning)
+    // The phone stays awake while it sounds or hears a note, and for five minutes after that or after the last touch.
+    KeepScreenAwake(busy = metronomeState.isPlaying || fluteState.isBusy || tunerState.isBusy, interactions = interactions)
 
     // One-shot messages (audio unavailable) as a snackbar.
     val snackbarHostState = remember { SnackbarHostState() }

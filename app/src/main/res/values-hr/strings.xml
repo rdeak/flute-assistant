@@ -53,6 +53,22 @@
     <string name="lower_note">Niži ton</string>
     <string name="higher_note">Viši ton</string>
     <string name="hear_note">Slušaj</string>
+    <string name="tune_how">Kako?</string>
+    <string name="tune_guide_push_in">gurni unutra</string>
+    <string name="tune_guide_pull_out">izvuci van</string>
+    <string name="tune_guide_title">🔧 Kako ugoditi flautu</string>
+    <string name="tune_guide_back">Natrag</string>
+    <string name="tune_guide_next">Dalje</string>
+    <string name="tune_guide_close">Zatvori</string>
+    <string name="tune_guide_done">U redu</string>
+    <string name="tune_guide_warm_up_title">🌡️ Prvo zagrij flautu</string>
+    <string name="tune_guide_warm_up_text">Odsviraj nekoliko dugih tonova. Hladna flauta zvuči prenisko.</string>
+    <string name="tune_guide_head_joint_title">🎯 Ugodi na %1$s</string>
+    <string name="tune_guide_head_joint_text">Odsviraj dug %1$s, glasno kao i inače. Pomakni glavu flaute za malo, debljinu novčića, kako kaže štimer. Odsviraj opet.</string>
+    <string name="tune_guide_each_note_title">👂 Provjeri svaki ton</string>
+    <string name="tune_guide_each_note_text">Odaberi ton s ‹ ›, dodirni 🔊 Slušaj, pa ga odsviraj dugo. Pričekaj da se mjehurić smiri, pa pogledaj.</string>
+    <string name="tune_guide_one_note_off_title">🔄 Jedan ton još ne štima?</string>
+    <string name="tune_guide_one_note_off_text">Ne pomiči više glavu flaute. Zakreni cijelu flautu malo, kako kaže mali redak ispod štimera.</string>
     <string name="listen_status">🔊 Slušaj</string>
     <string name="fingering_for">Prstomet za %1$s</string>
     <string name="play_note_prompt">👂 Odsviraj %1$s</string>
@@ -76,10 +92,16 @@
     <string name="advice_clear_note">🎵 Odsviraj jedan dug, čist ton</string>
     <string name="advice_roll_out">🔄 Zakreni flautu malo od sebe</string>
     <string name="advice_roll_in">🔄 Zakreni flautu malo k sebi</string>
+    <string name="advice_head_joint_in">🔧 Gurni glavu flaute malo unutra</string>
+    <string name="advice_head_joint_out">🔧 Izvuci glavu flaute malo van</string>
     <string name="advice_faster_air">💨 Brži zrak</string>
     <string name="advice_gentler_air">🍃 Nježniji zrak</string>
     <string name="advice_check_fingers">👀 Provjeri prste</string>
     <string name="advice_play_again">🔁 Stani, pa odsviraj opet</string>
+    <string name="advice_hold_longer">⏳ Prekratko, drži dulje</string>
+    <string name="advice_too_long">✋ Predugo, pusti ranije</string>
+    <string name="advice_join">✂️ Poveži ih, bez jezika</string>
+    <string name="advice_out_of_air">😮‍💨 Možda nema zraka? Udahni</string>
     <string name="mic_permission_title">Smijem li slušati?</string>
     <string name="mic_permission_body">Samo slušam. Ništa se ne sprema.</string>
     <string name="mic_failed">Sada ne mogu slušati.</string>
@@ -147,6 +169,8 @@
     </plurals>
     <!-- Stanka, as music schools name a rest (cijela, polovinka, četvrtinka, osminka) -->
     <string name="flute_rest">Stanka</string>
+    <string name="flute_join">Spoji sa sljedećom notom</string>
+    <string name="flute_sign">Povisilica ili snizilica za sljedeću notu</string>
     <string name="flute_breath">Udahni</string>
     <string name="flute_breath_here">Ovdje udahni</string>
     <string name="flute_time_signature">Mjera %1$d/%2$d</string>
@@ -164,9 +188,17 @@
     <string name="flute_note_half_beat">%1$s, pola dobe</string>
     <string name="flute_mark_first_try">pogodak</string>
     <string name="flute_mark_retry">pogodak iz drugog puta</string>
+    <string name="flute_mark_high">previsoko</string>
+    <string name="flute_mark_low">prenisko</string>
+    <string name="flute_mark_short">prekratko</string>
+    <string name="flute_mark_long">predugo</string>
+    <string name="flute_mark_tongued">jezikom, nije spojeno</string>
+    <string name="flute_note_joined">%1$s, spojeno s notom prije</string>
     <string name="flute_mark_heard">čujem %1$s</string>
     <string name="flute_listen_here">sviraj ovu</string>
     <string name="flute_play_prompt">🪈 Odsviraj %1$s</string>
+    <string name="flute_speed_slower">%1$s Sporije od %2$s</string>
+    <string name="flute_speed_faster">%1$s Brže od %2$s</string>
     <!-- Croatian music schools name octaves c1, c2, c3 (jednocrtna, dvocrtna, trocrtna), with
          the one-lined octave starting at middle C -->
     <bool name="note_octaves_helmholtz">true</bool>
@@ -175,7 +207,7 @@
         <item>C</item>
         <item>Cis</item>
         <item>D</item>
-        <item>Dis</item>
+        <item>Es</item>
         <item>E</item>
         <item>F</item>
         <item>Fis</item>

@@ -24,10 +24,13 @@ object NoteMath {
 
     fun frequencyToNote(frequency: Double): NoteReading {
         require(frequency > 0.0) { "frequency must be positive" }
-        val exactMidi = 69.0 + 12.0 * log2(frequency / A4_HZ)
-        val midi = exactMidi.roundToInt()
-        return NoteReading(midi = midi, cents = (exactMidi - midi) * 100.0, frequency = frequency)
+        val exact = exactMidi(frequency)
+        val midi = exact.roundToInt()
+        return NoteReading(midi = midi, cents = (exact - midi) * 100.0, frequency = frequency)
     }
+
+    /** Where [frequency] lies as a MIDI number with its fraction: 69.5 is halfway from A4 to B♭4. */
+    fun exactMidi(frequency: Double): Double = 69.0 + 12.0 * log2(frequency / A4_HZ)
 
     fun midiToFrequency(midi: Int): Double = A4_HZ * 2.0.pow((midi - 69) / 12.0)
 
@@ -37,6 +40,9 @@ object NoteMath {
      */
     fun centsBetween(frequency: Double, targetMidi: Int): Double {
         require(frequency > 0.0) { "frequency must be positive" }
-        return 1200.0 * log2(frequency / midiToFrequency(targetMidi))
+        return centsApart(frequency, midiToFrequency(targetMidi))
     }
+
+    /** Signed distance in cents from [reference] to [frequency], both in Hz: positive when [frequency] is the higher. */
+    fun centsApart(frequency: Double, reference: Double): Double = 1200.0 * log2(frequency / reference)
 }

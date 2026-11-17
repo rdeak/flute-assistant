@@ -123,7 +123,8 @@ read the part the CLAUDE.md names before you change that part.
 Every user-visible string is a resource in both `values/strings.xml` and
 `values-hr/strings.xml`. Domain enums stay language-free; `ui/common/Labels.kt` maps them to
 string resources and builds note names from the `note_names` array (Croatian uses the German
-H / B convention). Croatian copy addresses the child in the informal singular.
+H / B convention). One spelling everywhere since 2026-11-16 (`domain/tuner/NoteSpelling`): C♯ E♭ F♯ G♯ B♭
+(cis es fis gis b), a sharp on the letter below and a flat on the letter above, in that letter's colour. Croatian copy addresses the child in the informal singular.
 
 ### Kid-friendly UI constraint
 
@@ -137,7 +138,8 @@ tab's CLAUDE.md; these rules hold on all of them:
 - Two numbers are meant to be there, keep them: the metronome's tempo figure (also in the flute's
   speed panel) and the time signature's figures on the flute's staff, the one number the user asked
   for on a main screen. The notes game's summary and Your turn show no number, and Your turn has no
-  summary.
+  summary, but for one line about speed when a finished run was played at another animal's speed than
+  the knob's ("🐢 Slower than the 🐇", 2026-11-14, `ui/flute/CLAUDE.md`).
 - The user rejected a wider layout (−/+ beside the ring, a ten-button signature scroller, flags in
   the content area) as too packed: keep the screens this sparse. The one agreed exception is the
   sideways layout (a phone on its side, 2026-11-05; spec
@@ -146,11 +148,21 @@ tab's CLAUDE.md; these rules hold on all of them:
   same way (2026-11-06, `ui/DESIGN.md`, "Tablets"): the tab grows, and nothing is added.
 - Added at the user's request (2026-11-07): a day/night switch in the top bar before the flag, a moon or a
   sun with no words (`ui/DESIGN.md`). It is part of the frame like the flag, not a control on a tab.
+- Added at the user's request (2026-11-14): the tuner's 🔧 How? button in Tune mode and its four picture
+  cards on tuning the flute (`ui/tuner/CLAUDE.md`, "How to tune").
+- Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
+  pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
+- Added at the user's request (2026-11-16, reshaped 2026-11-17): the flute's ♯♭ key beside C6, which makes
+  the next note key write its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭, both octaves), one tap per note; the
+  keys stay the fifteen white ones in three rows (`ui/flute/CLAUDE.md`, "Sharps and flats").
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than
   the speed knob and the metronome stage it opens in place, and note lengths as a control (lengths
-  come only from how long a key is held; the user drew this on 2026-10-24).
+  come only from how long a key is held; the user drew this on 2026-10-24). On 2026-11-17, after a parent
+  found the tab packed and could not tell the two levels apart, the user took out Listen to me's levels
+  (Practice and Exam: one set of rules, Practice's) and the black keys' scrolling piano rows, and turned down
+  any view, badge or switch that only explains a control: when a screen is too much, take things out.
 - Tap tempo, subdivisions, the beep and bell click sounds, the volume setting, presets (with their
   Room database) and the A4 reference are gone from the code since 2026-11-09, at the user's
   decision: no screen could reach them. The metronome clicks one woodblock on every beat at a fixed

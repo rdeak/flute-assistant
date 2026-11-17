@@ -15,7 +15,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -54,7 +53,7 @@ fun <T> ModeChoice(
         // The word shrinks rather than be cut short at large text ("👂 Slušaj" lost its end at twice the text on a
         // 360 dp phone): a cut word is worse than a small one. The floor is in dp, as one in sp doubles at the largest text.
         val wordStyle = MaterialTheme.typography.titleLarge
-        val wordFloor = with(LocalDensity.current) { PillWordFloor.toSp() }
+        val wordFloor = WordFloor.asTextSize()
         entries.forEach { entry ->
             val isSelected = entry == selected
             val emoji = emojiOf(entry)
@@ -80,6 +79,3 @@ fun <T> ModeChoice(
         }
     }
 }
-
-/** The least a pill's word shrinks to. */
-private val PillWordFloor = 12.dp

@@ -5,13 +5,14 @@ package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
+import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 
 /**
@@ -36,9 +37,10 @@ data class FluteUiState(
     /** What "Your turn" shows while the microphone is open and the child plays the tune; null otherwise. */
     val listening: Listening? = null,
     /**
-     * Goes up by one on every click while the tune plays back, and on every step the animal hops
-     * to while the flute listens; never reset, only its changes key the animal's hop (like
-     * `MetronomeUiState.beatPulse`).
+     * Goes up by one on every click while the tune plays back, and on every hop the run reports
+     * while the flute listens (`ListenRun.Step.hop`: a click inside the note the child plays, the
+     * move to the next note, back to the head of a note played again; never two in one place);
+     * never reset, only its changes key the animal's hop (like `MetronomeUiState.beatPulse`).
      */
     val beatPulse: Long = 0L,
     /** What each step earned in the last "Your turn", by its index in [tune]; cleared by a new run and by any change to the tune. */
@@ -51,7 +53,14 @@ data class FluteUiState(
     val openBook: Int = 0,
     /** The shelf as last stored; the open entry may lag behind [tune], so the shelf draws [shelf]. */
     val books: List<Book> = List(Songbook.SIZE) { Book() },
+    /** The ⌒ key was tapped: the next note pressed will be joined to the last one (since 2026-11-16). */
+    val joinWaiting: Boolean = false,
+    /** The ♯♭ key was tapped: the next note key pressed writes its letter's sharp or flat (since 2026-11-17). */
+    val signWaiting: Boolean = false,
 ) {
+    /** Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full. */
+    val canJoin: Boolean get() = Joins.canJoinAfter(tune)
+
     /** [books] with the open entry's tune replaced by [tune], the tune as the child sees it now. */
     val shelf: List<Book>
         get() = books.mapIndexed { index, book -> if (index == openBook) book.copy(tune = tune) else book }
@@ -64,7 +73,7 @@ data class FluteUiState(
     val promptMidi: Int?
         get() {
             val run = listening ?: return null
-            if (marks.isNotEmpty() || run.wrong != null || run.finishing || run.advice != TunerAdvice.NONE) return null
+            if (marks.isNotEmpty() || run.wrong != null || run.walk != null || run.finishing || run.advice != TunerAdvice.NONE) return null
             return run.index?.let(::noteAt)
         }
 
@@ -95,23 +104,31 @@ data class FluteUiState(
     /** Where the held key's note or rest sits in [tune]: the step with the yellow band; null at the cap, where a press is not added. */
     val heldIndex: Int? get() = held?.index
 
-    /** The step of the staff ringed in yellow: the playing step, else the one waited for (none once the last is counted), else the held key's. */
-    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing }?.index ?: heldIndex
+    /**
+     * The step of the staff ringed in yellow: the playing step, else the one the animal is on while listening (the
+     * one waited for, an earned note finishing its time, or a rest walked; none while the last note's sound ends),
+     * else the held key's.
+     */
+    val litIndex: Int? get() = playing?.index ?: listening?.takeUnless { it.finishing || it.ended }?.animalIndex ?: heldIndex
 
-    /** The step the knob's animal stands over while the tune runs: the playing step, else the one waited for, or the last counted while its sound ends; null at rest. */
-    val animalIndex: Int? get() = playing?.index ?: listening?.index
+    /**
+     * The step the knob's animal stands over while the tune runs: the playing step, else, listening, the note it
+     * walks, stopped on or finishes ([Listening.walk]) or the one waited for, or the last counted while its sound
+     * ends; null at rest.
+     */
+    val animalIndex: Int? get() = playing?.index ?: listening?.animalIndex
 
-    /** Whether the animal waits for the child to play the step it stands over: listening, and not finishing. */
-    val waiting: Boolean get() = listening?.let { !it.finishing && it.index != null } == true
+    /** Whether the animal waits for the child to play the step it stands over ([Listening.waiting]); never outside a "Your turn". */
+    val waiting: Boolean get() = listening?.waiting == true
 
-    /** How many half beats into [animalIndex]'s step the animal stands: the last click's in Play, the step's start while listening. */
-    val animalHalfBeat: Int get() = playing?.halfBeat ?: 0
+    /** Whether the tab sounds or hears a note right now: the phone stays awake while it does (`KeepScreenAwake`). */
+    val isBusy: Boolean get() = isPlaying || listening?.heardNow != null
 
-    /** The wrong note last heard for the step waited on, a bubble under that step ([Listening.wrong]). */
-    val wrong: WrongNote? get() = listening?.wrong
+    /** How many half beats into [animalIndex]'s step the animal stands: the last click's, in Play and in Your turn's walk; else the step's start. */
+    val animalHalfBeat: Int get() = playing?.halfBeat ?: listening?.animalHalfBeat ?: 0
 
-    /** The note the phone hears right now, a live bubble under the step waited on ([Listening.heardNow]). */
-    val heardNow: Int? get() = listening?.heardNow
+    /** The child's speed when the run ended at another animal's than the knob's: the ended run's one line ([Listening.pace]). */
+    val pace: Pace? get() = listening?.pace
 
     /** The one line under the staff while listening ([Listening.advice]); nothing otherwise. */
     val advice: TunerAdvice get() = listening?.advice ?: TunerAdvice.NONE

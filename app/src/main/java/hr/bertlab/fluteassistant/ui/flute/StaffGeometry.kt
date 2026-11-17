@@ -67,6 +67,10 @@ internal object StaffGeometry {
     const val MARKS_TOP = NAMES_TOP + PILL_HEIGHT + MARKS_GAP
     const val MARKS_HEIGHT = 26f
     const val MARK_SIZE = 20f
+    /** The arrow beside the live bubble of a note sounding off its pitch (2026-11-14), smaller than a mark. */
+    const val PITCH_ARROW_SIZE = 12f
+    /** The arrow's middle, right of the bubble's middle: just past its edge, overlapping it by a dp as in the mockup. */
+    const val PITCH_ARROW_X = (MARKS_HEIGHT + PITCH_ARROW_SIZE) / 2 - 1
     const val TOTAL_HEIGHT = MARKS_TOP + MARKS_HEIGHT
 
     /** A tie between two pills of one note: [PILL_TIE_GAP] under them, dipping [PILL_TIE_DIP]. */
@@ -182,6 +186,13 @@ internal object StaffGeometry {
     const val NOTES_CLIP = 57f
     const val NOTES_END_PADDING = 4f
 
+    /**
+     * The room after the last step: [NOTES_END_PADDING], and while the tune runs also what the arrow beside a live bubble
+     * ([PITCH_ARROW_X]) reaches past a one-beat step, so on the last note of a long tune it is not cut at the row's end.
+     */
+    fun endPadding(running: Boolean): Float =
+        NOTES_END_PADDING + if (running) maxOf(0f, BEAT_WIDTH / 2 + PITCH_ARROW_X + PITCH_ARROW_SIZE / 2 - BEAT_WIDTH) else 0f
+
     /** Space per beat, as the canvas drew it; an eighth gets a quarter's, as half of it would crowd the heads. */
     const val BEAT_WIDTH = 29f
 
@@ -200,11 +211,62 @@ internal object StaffGeometry {
         LineMark.BarLine -> BAR_SLOT
     }
 
-    /** The room one mark of the line takes: a step its pieces', a bar line [BAR_SLOT], a breath [BREATH_SLOT]. */
+    /**
+     * The room a sign takes before a note's head (since 2026-11-16, sharps and flats): a step with a sign
+     * ([LineMark.Step.sign], ♯ ♭ or ♮) is this much wider, everything in it after the sign moved right by it, so the sign
+     * never touches the note before. The sign's centre stands [SIGN_X] left of its head's centre, [SIGN_HALF_WIDTH] either side.
+     */
+    const val ACCIDENTAL_ROOM = 10f
+    const val SIGN_X = 17f
+    const val SIGN_HALF_WIDTH = 5.5f
+
+    /** How far under its head's centre a sign's ink reaches: the sharp's and the natural's right stem, 11, and its cap. */
+    const val SIGN_BELOW = 12f
+
+    /** The air a slur keeps under a sign's foot (a head's is [SLUR_CLEAR]): less, so a slur onto a sign does not sag. */
+    const val SIGN_SLUR_AIR = 1.5f
+
+    /** The room before [mark]'s first head: [ACCIDENTAL_ROOM] when it carries a sign, else none. */
+    fun signRoom(mark: LineMark.Step): Float = if (mark.sign != null) ACCIDENTAL_ROOM else 0f
+
+    /** The room one mark of the line takes: a step its pieces' and its sign's, a bar line [BAR_SLOT], a breath [BREATH_SLOT]. */
     fun markWidth(mark: LineMark): Float = when (mark) {
-        is LineMark.Step -> mark.parts.fold(0f) { sum, part -> sum + partWidth(part) }
+        is LineMark.Step -> signRoom(mark) + mark.parts.fold(0f) { sum, part -> sum + partWidth(part) }
         is LineMark.Breath -> BREATH_SLOT
         LineMark.BarLine -> BAR_SLOT
+    }
+
+    /**
+     * Where the pieces of one step stand, in dp from the step's left: the room its sign takes before the first head
+     * ([room], none without a sign), the step's whole [width], each piece's head centre ([heads]), the middle of each
+     * piece's name pill ([pills]) and the middle of each bar line inside the step ([bars]).
+     */
+    class StepLayout(val room: Float, val width: Float, val heads: List<Float>, val pills: List<Float>, val bars: List<Float>)
+
+    /**
+     * The layout of [mark]: the one place that knows a sign's room stands before the first head, makes that piece's
+     * pill as much wider and moves everything after it right. The staff's drawing, the slurs over it and the ties
+     * under its pills all read it, so they cannot part.
+     */
+    fun layout(mark: LineMark.Step): StepLayout {
+        val heads = mutableListOf<Float>()
+        val pills = mutableListOf<Float>()
+        val bars = mutableListOf<Float>()
+        var x = 0f
+        var extra = signRoom(mark) // waits for the first piece: its head stands after it, its pill is as much wider
+        for (part in mark.parts) {
+            when (part) {
+                is StepPart.Length -> {
+                    heads += x + extra + HEAD_X
+                    pills += x + (slotWidth(part.length) + extra) / 2
+                    x += extra
+                    extra = 0f
+                }
+                LineMark.BarLine -> bars += x + extra + BAR_SLOT / 2
+            }
+            x += partWidth(part)
+        }
+        return StepLayout(signRoom(mark), markWidth(mark), heads, pills, bars)
     }
 
     /**
@@ -231,6 +293,18 @@ internal object StaffGeometry {
             }
         }
         return lastHead
+    }
+
+    /**
+     * How far past the mark the staff keeps at its left ([anchorStart], dp at rest from the row's first mark) the
+     * row must scroll, in dp on screen, for the walking animal over [animalX] (the same measure) to stand inside a
+     * row [rowWidth] dp wide drawn at [scale], its whole box ([CORNER_BUTTON]) in view; 0 when it is in view already.
+     * A whole note's last beat after a whole note lies past a phone's edge: the staff follows by just that much, and
+     * the note before stays as far in view as it can.
+     */
+    fun followScroll(anchorStart: Float, animalX: Float, rowWidth: Float, scale: Float): Float {
+        val middle = (NOTES_START - NOTES_CLIP) * scale + (animalX - anchorStart) * scale
+        return maxOf(0f, middle + CORNER_BUTTON / 2 - rowWidth)
     }
 
     /** A note head's centre from the start of its slot. */
@@ -260,6 +334,13 @@ internal object StaffGeometry {
     /** Half the length of a ledger line. */
     const val LEDGER_HALF = 14.5f
 
+    /**
+     * How far left of its head's centre a ledger line reaches: [LEDGER_HALF], or beside a sign a dp short of the sign's
+     * right edge, just past the head (the final review of 2026-11-16: it ran 3 dp into C♯4's sharp).
+     */
+    fun ledgerLeft(signed: Boolean): Float = if (signed) SIGN_X - SIGN_HALF_WIDTH - LEDGER_SIGN_AIR else LEDGER_HALF
+    private const val LEDGER_SIGN_AIR = 1f
+
     /** A dotted half's dot, right of the head. */
     const val DOT_X = 16.5f
     const val DOT_RADIUS = 2.75f
@@ -280,6 +361,81 @@ internal object StaffGeometry {
     const val TIE_CONTROL = 22f
     const val TIE_WIDTH = 2f
 
+    /** How far under its heads' centre a tie's ink reaches: a quadratic dips halfway between its ends and its control point. */
+    const val TIE_LOW = (TIE_START + TIE_CONTROL) / 2 + TIE_WIDTH / 2
+
+    /**
+     * A slur (since 2026-11-16), always under the heads as the ties are, since every stem points up: its ends
+     * [SLUR_END_INSET] inside the end heads' centres and [SLUR_END_DROP] under them, its belly [SLUR_BELLY] and a dp
+     * more per [SLUR_BELLY_SPAN] of its length under the line from end to end, deeper where a head or a tie between
+     * must be cleared by [SLUR_CLEAR], but never so deep that its middle comes within [SLUR_PILL_AIR] of the name
+     * pills (under the lowest notes the pills win over the clearance); drawn as a crescent whose inner curve's control
+     * points lie [SLUR_THICKNESS] higher.
+     */
+    const val SLUR_END_INSET = 1f
+    const val SLUR_END_DROP = 9f
+    const val SLUR_BELLY = 7f
+    const val SLUR_BELLY_SPAN = 40f
+    const val SLUR_CLEAR = 4f
+    const val SLUR_PILL_AIR = 2f
+    const val SLUR_THICKNESS = 3.2f
+
+    /**
+     * How far the dashed arc of a join waiting for its next note runs on to the right of the note's head: within the rest
+     * of its beat and the row's end padding, since the staff scrolls its newest note to the end (26 dp was cut there).
+     */
+    const val WAITING_ARC_LENGTH = 16f
+
+    /** A slur's outer curve in dp: a cubic from ([x0], [y0]) through ([c1x], [c1y]) and ([c2x], [c2y]) to ([x1], [y1]). */
+    data class SlurCurve(val x0: Float, val y0: Float, val c1x: Float, val c1y: Float, val c2x: Float, val c2y: Float, val x1: Float, val y1: Float)
+
+    /**
+     * The slur from the head at [x0] (its centre at [headY0]) to the head at [x1] ([headY1]), passing under every
+     * (x, lowest y) of [clear]: the heads between its ends and the lowest points of the ties under them. Its control
+     * points lie a quarter of the way in from each end, on the line from end to end moved down by the belly, so the
+     * curve tilts with notes at different heights.
+     */
+    fun slurCurve(x0: Float, headY0: Float, x1: Float, headY1: Float, clear: List<Pair<Float, Float>>): SlurCurve {
+        val sx = x0 + SLUR_END_INSET
+        val sy = headY0 + SLUR_END_DROP
+        val ex = x1 - SLUR_END_INSET
+        val ey = headY1 + SLUR_END_DROP
+        val span = ex - sx
+        var belly = SLUR_BELLY + span / SLUR_BELLY_SPAN
+        for ((x, lowest) in clear) {
+            val along = ((x - sx) / span).coerceIn(0f, 1f)
+            val t = tAlong(along)
+            val reach = 3 * t * (1 - t) // how much of the belly the curve has at that point
+            if (reach <= 0f) continue
+            belly = maxOf(belly, (lowest + SLUR_CLEAR - (sy + (ey - sy) * along)) / reach)
+        }
+        // Never within the air of the pills anywhere along the curve, a steep one's low end included.
+        for (step in 1 until 50) {
+            val t = step / 50f
+            val chord = sy + (ey - sy) * xShare(t)
+            belly = minOf(belly, (NAMES_TOP - SLUR_PILL_AIR - chord) / (3 * t * (1 - t)))
+        }
+        val rise = (ey - sy) / 4
+        return SlurCurve(sx, sy, sx + span / 4, sy + rise + belly, ex - span / 4, ey - rise + belly, ex, ey)
+    }
+
+    /** The slur's parameter where its x is [along] of the way from end to end (its points' x run 0, 1/4, 3/4, 1): by halving. */
+    private fun tAlong(along: Float): Float {
+        var lo = 0f
+        var hi = 1f
+        repeat(30) {
+            val t = (lo + hi) / 2
+            if (xShare(t) < along) lo = t else hi = t
+        }
+        return (lo + hi) / 2
+    }
+
+    /** How far along from end to end the slur's x is at its parameter [t]: its points' x run 0, 1/4, 3/4, 1. */
+    private fun xShare(t: Float): Float {
+        val u = 1 - t
+        return 3 * u * u * t * 0.25f + 3 * u * t * t * 0.75f + t * t * t
+    }
+
     /** The 😮‍💨 over a breath: where its centre sits, and how big. */
     const val BREATH_FACE_Y = TOP_LINE_Y - 14f
     const val BREATH_FACE_SIZE = 14f
@@ -299,9 +455,7 @@ internal object StaffGeometry {
         val y = yOf(position)
         val ring = maxOf(LIT_RADIUS, WHOLE_RY + HEAD_EDGE)
         val stem = STEM_REACH + STEM_WIDTH / 2
-        // A quadratic tie dips halfway between its ends and its control point.
-        val tie = (TIE_START + TIE_CONTROL) / 2 + TIE_WIDTH / 2
         val ledgers = StaffNotes.ledgerLinesFor(position).map(::yOf)
-        return minOf(y - maxOf(ring, stem), ledgers.minOrNull() ?: y)..maxOf(y + maxOf(ring, tie), ledgers.maxOrNull() ?: y)
+        return minOf(y - maxOf(ring, stem), ledgers.minOrNull() ?: y)..maxOf(y + maxOf(ring, TIE_LOW), ledgers.maxOrNull() ?: y)
     }
 }

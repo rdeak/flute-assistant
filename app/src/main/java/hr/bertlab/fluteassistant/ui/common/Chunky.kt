@@ -257,3 +257,16 @@ const val STAR_EMOJI = "⭐" // star
 
 /** A star for a note that took more than one try: still earned, but faint. */
 const val RETRY_STAR_ALPHA = 0.35f
+
+/**
+ * The signs a step of the flute's "Your turn" earns in the star's place when the right note was played off (since
+ * 2026-11-14, the user's pick "2C" and the hourglass): too high (and the arrow beside a note sounding high), too low,
+ * let go before it was long enough. Drawn as the star is.
+ */
+const val HIGH_EMOJI = "⬇️" // down arrow: a little lower
+const val LOW_EMOJI = "⬆️" // up arrow: a little higher
+const val SHORT_EMOJI = "⏳" // hourglass: hold it longer
+
+/** The sign of a note held past its written length (since 2026-11-16, the user's pick "3A"), drawn as the others. */
+const val LONG_EMOJI = "✋" // raised hand: let go sooner
+const val TONGUED_EMOJI = "✂️" // scissors: a joined note started with the tongue (since 2026-11-16)

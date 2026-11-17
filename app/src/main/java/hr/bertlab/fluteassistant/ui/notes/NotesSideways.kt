@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
@@ -31,7 +30,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceIn
@@ -46,12 +44,12 @@ import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
-import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.SidewaysPlainButton
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 
@@ -238,7 +236,7 @@ private fun SidewaysPickButton(
     val description = stringResource(R.string.choose_notes)
     val backpack = with(LocalDensity.current) { 24.dp.toSp().value.toInt() }
     // The word's floor is in dp, as a floor in sp doubles with the text and the 100 dp column then has no room for "Odaberi" at the largest size.
-    val wordFloor = with(LocalDensity.current) { 9.dp.toSp() }
+    val wordFloor = 9.dp.asTextSize()
     ChunkyButton(
         onClick = onChoose,
         shape = RoundedCornerShape(30.dp),

@@ -3,10 +3,16 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.Bars
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
+import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepPart
+import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -91,6 +97,26 @@ class StaffGeometryTest {
         assertEquals(StaffGeometry.BEAT_WIDTH + StaffGeometry.BAR_SLOT + StaffGeometry.HEAD_X, StaffGeometry.beatX(tied, 9))
     }
 
+    /**
+     * The child's report of 2026-11-12: on a whole note after a whole note the animal walked off the staff's right
+     * edge. The staff keeps the note before the lit one at its left ([Bars.anchor]); that leaves the lit whole note's
+     * last beat past the row on a phone, so the staff scrolls on by just as much as the animal needs.
+     */
+    @Test
+    fun `the staff scrolls on just enough to keep the walking animal in its row`() {
+        val s = RunningStaffScale
+        val whole = listOf(StepPart.Length(NoteLength.WHOLE))
+        val start = StaffGeometry.slotWidth(NoteLength.WHOLE) + StaffGeometry.BAR_SLOT // the second whole note
+        val lastBeat = start + StaffGeometry.beatX(whole, 6)
+        val row = 300f
+        val scroll = StaffGeometry.followScroll(anchorStart = 0f, animalX = lastBeat, rowWidth = row, scale = s)
+        assertTrue("the last beat is past the row: $scroll", scroll > 0f)
+        val middle = (StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP) * s + lastBeat * s - scroll
+        assertEquals("the animal's box ends at the row's end", row, middle + StaffGeometry.CORNER_BUTTON / 2, 0.01f)
+        assertEquals("its head needs no scroll", 0f, StaffGeometry.followScroll(0f, start + StaffGeometry.beatX(whole, 0), row, s))
+        assertEquals("at rest there is room", 0f, StaffGeometry.followScroll(0f, lastBeat, row, 1f))
+    }
+
     @Test
     fun `a mark's room is what the staff draws for it`() {
         val tied = LineMark.Step(0, listOf(StepPart.Length(NoteLength.QUARTER), LineMark.BarLine, StepPart.Length(NoteLength.HALF)))
@@ -143,4 +169,186 @@ class StaffGeometryTest {
         // The first note's ring is not cut where the notes start to scroll.
         assertTrue(StaffGeometry.NOTES_START + StaffGeometry.HEAD_X - StaffGeometry.LIT_RADIUS >= StaffGeometry.NOTES_CLIP)
     }
+
+    @Test
+    fun `the arrow beside the last note's bubble stays inside a running row's end`() {
+        // The arrow stands right of the bubble, centred in the step's first beat; a one-beat step at the row's end leaves
+        // only the end padding past it (the emulator showed it cut to a sliver with the 4 dp of before, 2026-11-14).
+        val reach = StaffGeometry.BEAT_WIDTH / 2 + StaffGeometry.PITCH_ARROW_X + StaffGeometry.PITCH_ARROW_SIZE / 2
+        assertTrue(reach <= StaffGeometry.BEAT_WIDTH + StaffGeometry.endPadding(running = true))
+        assertEquals("writing keeps its end as it was", StaffGeometry.NOTES_END_PADDING, StaffGeometry.endPadding(running = false), 0f)
+    }
+
+    // ---- The walking animal on a tie (2026-11-16): Listen to me walks a tie as one note ----
+
+    @Test
+    fun `the animal walks onto the second note of a tie`() {
+        val tie = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(60, NoteLength.QUARTER, joined = true))
+        val apart = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(60, NoteLength.QUARTER))
+        val animal = StaffAnimal(index = 0, emoji = "🐇", flash = { 0f }, waiting = false, halfBeat = 2)
+        for ((tune, expectedStep) in listOf(tie to 1, apart to 0)) {
+            val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+            val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+            assertEquals(starts[expectedStep] + StaffGeometry.HEAD_X, animalX(animal, tune, lineMarks, starts)!!, 0.001f)
+        }
+    }
+
+    // ---- The slur (2026-11-16): under the heads, tilting with them, clear of the heads and ties between, above the pills ----
+
+    private val c1 = StaffGeometry.yOf(StaffNotes.positionOf(60))
+    private val d1 = StaffGeometry.yOf(StaffNotes.positionOf(62))
+    private val e1 = StaffGeometry.yOf(StaffNotes.positionOf(64))
+
+    /** The outer curve's y at [t]. */
+    private fun StaffGeometry.SlurCurve.y(t: Float): Float {
+        val u = 1 - t
+        return u * u * u * y0 + 3 * u * u * t * c1y + 3 * u * t * t * c2y + t * t * t * y1
+    }
+
+    private fun StaffGeometry.SlurCurve.x(t: Float): Float {
+        val u = 1 - t
+        return u * u * u * x0 + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * x1
+    }
+
+    /** The outer curve's y where it passes [x], sampled. */
+    private fun lowestAt(c: StaffGeometry.SlurCurve, x: Float): Float =
+        (0..1000).map { it / 1000f }.minBy { Math.abs(c.x(it) - x) }.let { c.y(it) }
+
+    private fun lowestOf(c: StaffGeometry.SlurCurve): Float = (0..1000).maxOf { c.y(it / 1000f) }
+
+    @Test
+    fun `a slur between notes at different heights tilts with them`() {
+        val c = StaffGeometry.slurCurve(14.5f, c1, 43.5f, d1, emptyList())
+        assertEquals(c1 + StaffGeometry.SLUR_END_DROP, c.y0, 0.001f)
+        assertEquals(d1 + StaffGeometry.SLUR_END_DROP, c.y1, 0.001f)
+        assertEquals(14.5f + StaffGeometry.SLUR_END_INSET, c.x0, 0.001f)
+        assertTrue("${c.c1y} > ${c.c2y}", c.c1y > c.c2y)
+        assertTrue("the belly lies under the line from end to end", lowestAt(c, 29f) > (c.y0 + c.y1) / 2 + StaffGeometry.SLUR_BELLY / 2)
+    }
+
+    @Test
+    fun `a slur clears the heads and ties between its ends`() {
+        val middle = 29f to c1 + StaffGeometry.HEAD_RY
+        val c = StaffGeometry.slurCurve(0f, e1, 58f, e1, listOf(middle))
+        assertTrue("${lowestAt(c, 29f)}", lowestAt(c, 29f) >= middle.second + StaffGeometry.SLUR_CLEAR - 0.5f)
+        val open = StaffGeometry.slurCurve(0f, e1, 58f, e1, emptyList())
+        assertTrue("nothing to clear: the plain belly", lowestAt(open, 29f) < middle.second)
+    }
+
+    @Test
+    fun `a slur under the lowest notes stays above the pills`() {
+        val c = StaffGeometry.slurCurve(14.5f, c1, 43.5f, d1, emptyList())
+        assertTrue("${lowestOf(c)}", lowestOf(c) + StaffGeometry.SLUR_THICKNESS < StaffGeometry.NAMES_TOP)
+        val tie = 29f to c1 + (StaffGeometry.TIE_START + StaffGeometry.TIE_CONTROL) / 2 + StaffGeometry.TIE_WIDTH / 2
+        val over = StaffGeometry.slurCurve(14.5f, c1, 72.5f, c1, listOf(tie))
+        assertTrue("${lowestOf(over)}", lowestOf(over) < StaffGeometry.NAMES_TOP)
+    }
+
+    @Test
+    fun `the waiting arc fits the room after the newest note`() {
+        // The staff scrolls its newest note to the end: the arc after it has the rest of its beat and the end padding.
+        val room = StaffGeometry.BEAT_WIDTH - StaffGeometry.HEAD_X + StaffGeometry.NOTES_END_PADDING
+        assertTrue("${StaffGeometry.WAITING_ARC_LENGTH} in $room", StaffGeometry.SLUR_END_INSET + StaffGeometry.WAITING_ARC_LENGTH <= room)
+    }
+
+    @Test
+    fun `a steep slur clearing a tie under c1 never reaches the pills`() {
+        // The final review of 2026-11-16: c¹ tied to c¹ slurred to c³ reached 194.7 dp, the cap checking only its middle.
+        val c3 = StaffGeometry.yOf(StaffNotes.positionOf(84))
+        val tie = 29f to c1 + (StaffGeometry.TIE_START + StaffGeometry.TIE_CONTROL) / 2 + StaffGeometry.TIE_WIDTH / 2
+        val steep = StaffGeometry.slurCurve(14.5f, c1, 72.5f, c3, listOf(tie))
+        // The cap samples the curve: a tenth of a dp past the air between samples is nothing against 2 dp of it.
+        assertTrue("${lowestOf(steep)}", lowestOf(steep) <= StaffGeometry.NAMES_TOP - StaffGeometry.SLUR_PILL_AIR + 0.1f)
+    }
+
+    // ---- Signs before the notes (2026-11-16, sharps and flats): ten dp more room, the sign inside it ----
+
+    @Test
+    fun `a step with a sign takes ten dp more room`() {
+        val plain = LineMark.Step(0, listOf(StepPart.Length(NoteLength.QUARTER)))
+        assertEquals(StaffGeometry.markWidth(plain) + 10f, StaffGeometry.markWidth(plain.copy(sign = Accidental.SHARP)), 0.001f)
+        assertEquals(StaffGeometry.markWidth(plain) + 10f, StaffGeometry.markWidth(plain.copy(sign = Accidental.NATURAL)), 0.001f)
+        assertEquals(0f, StaffGeometry.signRoom(plain), 0.001f)
+    }
+
+    @Test
+    fun `the sign lies inside its own step's room`() =
+        assertTrue(StaffGeometry.ACCIDENTAL_ROOM + StaffGeometry.HEAD_X - StaffGeometry.SIGN_X - StaffGeometry.SIGN_HALF_WIDTH >= 0f)
+
+    @Test
+    fun `the animal stands over a signed note's head, after its room`() {
+        val tune = listOf(TuneNote(65, NoteLength.QUARTER), TuneNote(66, NoteLength.QUARTER))
+        val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+        val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+        val animal = StaffAnimal(index = 1, emoji = "🐇", flash = { 0f }, waiting = false, halfBeat = 0)
+        assertEquals(starts[1] + 10f + StaffGeometry.HEAD_X, animalX(animal, tune, lineMarks, starts)!!, 0.001f)
+    }
+
+    /**
+     * The slur layer's places (the final review, 2026-11-16): a signed note split at a bar line has its sign's room once,
+     * before its first head, as `drawStep` draws it; its later heads stand where an unsigned split note's do, moved by the
+     * room alone. Counted twice, a slur or the waiting arc ending on its second head hung 10 dp past it.
+     */
+    @Test
+    fun `a split signed note's heads in the slur layer stand where they are drawn`() {
+        fun headsOf(last: Int): List<Float> {
+            val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER), TuneNote(last, NoteLength.HALF))
+            val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+            val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+            return stepPlaces(lineMarks, starts).getValue(3).heads
+        }
+        val plain = headsOf(65)
+        val signed = headsOf(66)
+        assertEquals(2, signed.size)
+        assertEquals(plain[0] + StaffGeometry.ACCIDENTAL_ROOM, signed[0], 0.001f)
+        assertEquals(plain[1] + StaffGeometry.ACCIDENTAL_ROOM, signed[1], 0.001f)
+    }
+
+    /** A ledger line beside a sign starts clear of it (the final review): it ran 3 dp into C♯4's sharp. */
+    @Test
+    fun `a ledger line beside a sign starts clear of it, and still shows left of the head`() {
+        assertEquals(StaffGeometry.LEDGER_HALF, StaffGeometry.ledgerLeft(signed = false), 0.001f)
+        assertTrue(StaffGeometry.ledgerLeft(signed = true) <= StaffGeometry.SIGN_X - StaffGeometry.SIGN_HALF_WIDTH - 1f)
+        assertTrue(StaffGeometry.ledgerLeft(signed = true) > StaffGeometry.HEAD_RX)
+    }
+
+    /**
+     * A slur passes under the signs of the notes it reaches, as under their heads (the final review's look, 2026-11-16: it
+     * ran through the foot of C♯4's sharp): the sign's ink reaches [StaffGeometry.SIGN_BELOW] under its head's centre.
+     */
+    private fun assertTheSlurClearsTheSign(vararg midis: Int, signed: Int) {
+        val tune = midis.mapIndexed { k, midi -> TuneNote(midi, NoteLength.EIGHTH, joined = k > 0) }
+        val lineMarks = Bars.write(tune, TimeSignature.FOUR_FOUR)
+        val starts = lineMarks.runningFold(0f) { x, mark -> x + StaffGeometry.markWidth(mark) }
+        val places = stepPlaces(lineMarks, starts)
+        val curve = slurFor(Joins.arcs(tune).single(), tune, places)
+        val sign = places.getValue(signed).heads.first() - StaffGeometry.SIGN_X
+        val foot = StaffGeometry.yOf(FluteNotes.positionOf(midis[signed])) + StaffGeometry.SIGN_BELOW
+        for (x in listOf(sign - 3f, sign, sign + 3f)) {
+            assertTrue("under the sign at $x: ${lowestAt(curve, x)} against its foot $foot", lowestAt(curve, x) >= foot + 1f)
+        }
+    }
+
+    @Test
+    fun `a slur passes under the sign of a note inside it`() = assertTheSlurClearsTheSign(64, 66, 67, signed = 1)
+
+    @Test
+    fun `a slur passes under the sign of the note it ends on`() = assertTheSlurClearsTheSign(71, 73, signed = 1)
+
+    @Test
+    fun `a slur clears the sign of every black note, inside it, at its end and coming down onto it`() {
+        val misses = mutableListOf<String>()
+        for (black in listOf(61, 63, 66, 68, 70, 73, 75, 78, 80, 82)) {
+            val runs = listOf("inside" to intArrayOf(black - 1, black, black + 1), "at its end" to intArrayOf(black - 1, black), "coming down" to intArrayOf(black + 3, black))
+            for ((how, midis) in runs) {
+                try {
+                    assertTheSlurClearsTheSign(*midis, signed = 1)
+                } catch (e: AssertionError) {
+                    misses += "$how $black: ${e.message}"
+                }
+            }
+        }
+        assertTrue(misses.joinToString("\n"), misses.isEmpty())
+    }
+
 }

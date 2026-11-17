@@ -24,9 +24,16 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   Activity-scoped so state and playback survive tab switches and that re-creation; a turn of the
   phone re-creates nothing (`configChanges` in the manifest, "Sideways" below);
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
-  when the notes tab is left, so the child always comes back to a zero score. `MainScreen` also
-  keeps the screen on (`ui/common/KeepScreenOn`) while the metronome plays, the tuner listens or
-  the flute's tune runs (Play, or "Your turn" listening). While the metronome plays, the bottom bar's 🥁 hops on every beat
+  when the notes tab is left, so the child always comes back to a zero score. The screen
+  neither dims nor locks while the app is in front (`ui/common/KeepScreenAwake`, the user's call on
+  2026-11-17: a child plays with both hands on the flute, often reading the staff from a stand). It
+  stays on while the phone sounds (the metronome, a tune played back, the tuner's reference note) or
+  hears a note (the tuner's reading, Your turn's `heardNow`), and for five minutes after that or after
+  the last touch, key or return to the front (`MainActivity.onUserInteraction` and `onResume`); then
+  the phone's own timeout takes over, so a phone left open still locks itself. A note heard counts, an
+  open microphone does not: the tuner listens whenever its tab is open and Your turn waits for its first
+  note without end. In the background the phone sleeps as usual. Before 2026-11-17 the screen stayed on
+  only while the metronome played, the tuner listened or the flute's tune ran. While the metronome plays, the bottom bar's 🥁 hops on every beat
   on every tab (since 2026-11-03: `TabBar` with `rememberBeatFlash` / `hopOnBeat` from
   `ui/common/BeatFlash.kt`, the same hop as the ring's animal), so a running drum is visible
   everywhere and one tap on it reaches Stop; a screen reader hears that tab as "Playing"
@@ -54,7 +61,8 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   white cards (`Stage`) on sky blue, or navy in dark mode, with dynamic colour off; the tokens that
   change with the theme are `FluteColors` (read through `FluteTheme.colors`), the bright fills that
   never change are `Sun` (yellow = chosen), `Go` (the Sound switch), `Stop` and `NoteLetterColors`, one per letter,
-  which `noteColor(midi)` applies wherever a note appears (a sharp takes the letter below). Text on a
+  which `noteColor(midi)` applies wherever a note appears (a sharp takes the letter below, a flat the letter above:
+`NoteSpelling`, C♯ E♭ F♯ G♯ B♭ since 2026-11-16). Text on a
   bright fill is always `InkOnFill`, with one exception (2026-11-07): the notes tab's keys (picker and summary) sit on `noteTint`
   (`ui/common/Labels.kt`, the letter colour at 0.3 over the card colour), which in dark mode is a dark surface and
   not a bright fill, so a key's label takes `colors.text` there (`NoteKey`, `ui/notes/DESIGN.md`). Everything pressable is a `ChunkyButton` / `Modifier.chunky`
@@ -121,10 +129,11 @@ under the tab bar). Each panel that takes a tab's place takes Back as its own wa
   book (`flute.shelf_close`); the microphone card: as Not now; a tune that runs, Play or Your turn: as Stop
   (`FluteContent`, a handler in each branch, and Compose asks the one composed last first);
 - the metronome tab: an open tempo wheel closes (`MetronomeContent`);
+- the tuner tab: the guide to tuning the flute closes (`TuningGuide`, since 2026-11-14);
 - the language list and the credits are a popup and a dialog and always closed on Back.
 
 With nothing open Back is the phone's: it leaves the app, as before, and a running metronome plays on. The tuner
-takes none (its microphone card has no way back: the tab is the microphone). The handlers stand above each
+takes none but for its guide (its microphone card has no way back: the tab is the microphone). The handlers stand above each
 `LocalSideways` branch, so a phone on its side has them too. Tests press it with `BackKey` (androidTest, `ui/common`):
 `Watch()` in the content, `press`, and `taken` for "Back is the phone's here"; a Back nothing takes would close the
 test's own Activity, so `press` refuses one.

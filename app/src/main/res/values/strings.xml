@@ -59,6 +59,26 @@
     <string name="lower_note">Lower note</string>
     <string name="higher_note">Higher note</string>
     <string name="hear_note">Hear</string>
+    <!-- The tuner's Tune mode, beside Hear: opens the four picture cards on tuning the flute -->
+    <string name="tune_how">How?</string>
+    <!-- The guide to tuning the flute: the words under the arrows on its head-joint picture -->
+    <string name="tune_guide_push_in">push in</string>
+    <string name="tune_guide_pull_out">pull out</string>
+    <!-- The guide's heading, its buttons' names for a screen reader, its OK, and its four cards (title, words);
+         the head-joint card's %1$s is the tuning note, A4 -->
+    <string name="tune_guide_title">🔧 How to tune</string>
+    <string name="tune_guide_back">Back</string>
+    <string name="tune_guide_next">Next</string>
+    <string name="tune_guide_close">Close</string>
+    <string name="tune_guide_done">OK</string>
+    <string name="tune_guide_warm_up_title">🌡️ Warm up first</string>
+    <string name="tune_guide_warm_up_text">Play a few long notes. A cold flute sounds too low.</string>
+    <string name="tune_guide_head_joint_title">🎯 Tune on %1$s</string>
+    <string name="tune_guide_head_joint_text">Play a long %1$s, as loud as you always play. Move the head joint a tiny bit, as thin as a coin, the way the tuner says. Play again.</string>
+    <string name="tune_guide_each_note_title">👂 Check each note</string>
+    <string name="tune_guide_each_note_text">Pick a note with ‹ ›, tap 🔊 Hear, then play it long. Wait until the bubble stops moving, then look.</string>
+    <string name="tune_guide_one_note_off_title">🔄 One note still off?</string>
+    <string name="tune_guide_one_note_off_text">Don\'t slide the head joint again. Roll the whole flute a little, the way the small line under the tuner says.</string>
     <!-- Status line while the reference note sounds from the speaker -->
     <string name="listen_status">🔊 Listen</string>
     <!-- Accessibility name of the fingering diagram; the argument is the note, e.g. "A4" -->
@@ -88,10 +108,19 @@
     <string name="advice_clear_note">🎵 Play one long, clear note</string>
     <string name="advice_roll_out">🔄 Roll the flute out a little</string>
     <string name="advice_roll_in">🔄 Roll the flute in a little</string>
+    <!-- Only when tuning on a1 / A4 (FluteRange.TUNING_NOTE): the fix on the flute itself -->
+    <string name="advice_head_joint_in">🔧 Push the head joint in a little</string>
+    <string name="advice_head_joint_out">🔧 Pull the head joint out a little</string>
     <string name="advice_faster_air">💨 Faster air</string>
     <string name="advice_gentler_air">🍃 Gentler air</string>
     <string name="advice_check_fingers">👀 Check your fingers</string>
     <string name="advice_play_again">🔁 Stop, then play it again</string>
+    <!-- The hourglass is the note's own mark when it was let go too early (2026-11-14): the line and the mark are one sign.
+         The note is already marked and the run has moved on, so the line is for the next notes: no "until the star". -->
+    <string name="advice_hold_longer">⏳ Too short, hold longer</string>
+    <string name="advice_too_long">✋ Too long, let go sooner</string>
+    <string name="advice_join">✂️ Join them, no tongue</string>
+    <string name="advice_out_of_air">😮‍💨 Maybe out of air? Big breath first</string>
     <string name="mic_permission_title">Can I listen?</string>
     <string name="mic_permission_body">I only listen. Nothing is saved.</string>
     <!-- The tuner when the microphone will not open or stops. The cause goes to the log, as a child can do nothing with it -->
@@ -175,6 +204,10 @@
     <string name="speed_done">OK</string>
     <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->
     <string name="flute_rest">Rest</string>
+    <!-- The join key (⌒): the next note pressed is joined to the last one, a slur or a tie -->
+    <string name="flute_join">Join to the next note</string>
+    <!-- The ♯♭ key beside C6 (2026-11-17): the next note key pressed writes its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭) -->
+    <string name="flute_sign">Sharp or flat for the next note</string>
     <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
     <string name="flute_breath">Breathe</string>
     <!-- Accessibility name of a breath sign on the staff -->
@@ -195,27 +228,38 @@
     <!-- "Your turn": appended to a note's accessibility name on the flute staff while the flute listens or after it did -->
     <string name="flute_mark_first_try">got it</string>
     <string name="flute_mark_retry">got it after a retry</string>
+    <!-- The right note played off (2026-11-14): too high, too low, let go before it was long enough -->
+    <string name="flute_mark_high">too high</string>
+    <string name="flute_mark_low">too low</string>
+    <string name="flute_mark_short">let go too early</string>
+    <string name="flute_mark_long">held too long</string>
+    <string name="flute_mark_tongued">tongued, not joined</string>
+    <string name="flute_note_joined">%1$s, joined to the note before</string>
     <!-- The wrong note heard for the step; the argument is its name, e.g. "A4" -->
     <string name="flute_mark_heard">heard %1$s</string>
     <string name="flute_listen_here">play this one</string>
     <!-- The line under the staff when "Listen to me" starts, until the first note is judged; the argument is the note waited on, e.g. "B4". The flute shows what the child does. -->
     <string name="flute_play_prompt">🪈 Play %1$s</string>
+    <!-- The line when a finished "Listen to me" was played at another speed than the knob's; the first argument is the
+         animal of the child's speed, the second the knob's, e.g. "🐢 Slower than the 🐇". No past tense: in Croatian it would need the child's gender. -->
+    <string name="flute_speed_slower">%1$s Slower than the %2$s</string>
+    <string name="flute_speed_faster">%1$s Faster than the %2$s</string>
     <!-- Octave naming for noteLabel(): false = scientific pitch notation (C4 is middle C), true = the
          Helmholtz-style names Croatian music schools use (c1 is middle C, c2 above it). -->
     <bool name="note_octaves_helmholtz">false</bool>
-    <!-- Note names for the 12 pitch classes from C, using sharps. Localised: Croatian uses H and B. -->
+    <!-- Note names for the 12 pitch classes from C, in the app's one spelling (NoteSpelling, since 2026-11-16): C♯ E♭ F♯ G♯ B♭. Localised: Croatian uses H and B. -->
     <string-array name="note_names">
         <item>C</item>
         <item>C♯</item>
         <item>D</item>
-        <item>D♯</item>
+        <item>E♭</item>
         <item>E</item>
         <item>F</item>
         <item>F♯</item>
         <item>G</item>
         <item>G♯</item>
         <item>A</item>
-        <item>A♯</item>
+        <item>B♭</item>
         <item>B</item>
     </string-array>
 </resources>

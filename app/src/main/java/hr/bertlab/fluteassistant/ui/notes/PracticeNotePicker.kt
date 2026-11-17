@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.runtime.remember
@@ -386,7 +387,7 @@ internal fun SoundTile(soundOn: Boolean, onToggleSound: () -> Unit, modifier: Mo
     val colors = FluteTheme.colors
     val shape = RoundedCornerShape(28.dp)
     // In dp: a floor in sp doubles with the text, and at the largest size "Sound" then has no room beside the speaker in the 100 dp column.
-    val wordFloor = with(LocalDensity.current) { 9.dp.toSp() }
+    val wordFloor = 9.dp.asTextSize()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),

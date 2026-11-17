@@ -14,6 +14,12 @@ object FluteRange {
     const val HIGHEST_MIDI = 96
     /** a1 / A4, the note an orchestra tunes to. */
     const val DEFAULT_TARGET = 69
+    /**
+     * a1 / A4, the note the head joint is set on: the tuner names the head joint only when the
+     * child tunes on it (spec `2026-11-14-tuning-guide-design.md`). The same note as
+     * [DEFAULT_TARGET] but its own constant, so a new default never moves the tuning note.
+     */
+    const val TUNING_NOTE = 69
 
     val midiRange: IntRange = LOWEST_MIDI..HIGHEST_MIDI
 

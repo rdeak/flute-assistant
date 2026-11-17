@@ -115,4 +115,39 @@ class SustainedToneSynthTest {
         // The waveform's own steepest step at 392 Hz and this amplitude is about 0.043; an envelope jump shows.
         assertTrue("largest step $largest", largest <= 0.06f)
     }
+    // ---- The glide (2026-11-16): a joined note in Play changes pitch with no new attack ----
+
+    @Test
+    fun `a glide moves the pitch with the level held`() {
+        val synth = SustainedToneSynth(sampleRate)
+        synth.noteOn(440.0, 0.5f)
+        val before = synth.render(100)
+        synth.glide(494.0, 0.5f)
+        val after = synth.render(200)
+        val n = sampleRate * 50 / 1000
+        val peakBefore = before.takeLast(n).maxOf { abs(it) }
+        val peakAfter = after.takeLast(n).maxOf { abs(it) }
+        assertEquals(peakBefore, peakAfter, peakBefore * 0.02f)
+        // No new attack: every 5 ms right after the glide is as loud as before it (a retrigger fades to nothing first).
+        val window = sampleRate * 5 / 1000
+        for (start in 0 until n step window) {
+            assertTrue("level held at ${start * 1000 / sampleRate} ms", after.copyOfRange(start, start + window).maxOf { abs(it) } >= peakBefore * 0.9f)
+        }
+        val joined = before.takeLast(n) + after.take(n)
+        val steps = (1 until joined.size).map { abs(joined[it] - joined[it - 1]) }
+        val stepBefore = steps.take(n - 1).max()
+        // A higher pitch has steeper slopes (494 / 440); a click would be a jump many times the largest step.
+        assertTrue("no jump at the glide", steps.drop(n - 1).max() <= stepBefore * (494f / 440f) * 1.05f)
+        val hz = risingCrossings(after, after.size - 2 * n, after.size) * 1000.0 / 100
+        assertEquals(494.0, hz, 494.0 * 0.025) // 100 ms counts whole cycles: within one cycle
+        assertFalse(synth.isSilent)
+    }
+
+    @Test
+    fun `a glide with nothing sounding starts the note`() {
+        val synth = SustainedToneSynth(sampleRate)
+        synth.glide(440.0, 0.5f)
+        assertFalse(synth.isSilent)
+        assertTrue(synth.render(50).any { abs(it) > 0.1f })
+    }
 }

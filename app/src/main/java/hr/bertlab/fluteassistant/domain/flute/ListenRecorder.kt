@@ -14,7 +14,7 @@ import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
  * the tracker made of it ([decision], [sounding], [onset], its room [floor] after the frame),
  * the [verdict] if a note was judged on it, the step waited on before that judgement ([waited],
  * its note [expected]) and what the child saw after it ([heardNow], [advice], [repeatHeld],
- * [finishing], [hearing]).
+ * [finishing], [hearing], [walk]).
  */
 data class ListenFrame(
     val frame: PitchFrame,
@@ -30,24 +30,33 @@ data class ListenFrame(
     val repeatHeld: Boolean,
     val finishing: Boolean,
     val hearing: Hearing,
+    /** Where the animal was after the frame when it was not simply waiting ([Listening.walk]). */
+    val walk: Walk? = null,
+    /** Which way the note walked sounded off its pitch after the frame ([Listening.pitch], since 2026-11-14). */
+    val pitch: Pitch? = null,
+    /** A mark already given that changed on this frame (since 2026-11-16: held too long). */
+    val changed: MarkChange? = null,
 )
+
+/** The step at [index], already marked, is marked [mark] instead (since 2026-11-16). */
+data class MarkChange(val index: Int, val mark: StepMark)
 
 /**
  * Keeps a "Your turn" run for inspection afterwards: [start] when the child presses the button
- * (before the microphone opens, with the tune on the staff, the pulse it was written in and the
- * room's floor the tracker still holds), [frame] for every frame the run processed, in
+ * (before the microphone opens, with what the run runs under, [ListenRun.Setup]: the tune on the staff, the pulse,
+ * the room's floor the tracker still holds and the rules in force), [frame] for every frame the run processed, in
  * order, [end] with the marks when the run is over. The debug build records every run into a
  * folder on the phone (`ui/flute/CLAUDE.md`, "Sessions"); the release build binds [None] and
  * keeps nothing.
  */
 interface ListenRecorder {
-    fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?)
+    fun start(setup: ListenRun.Setup)
     fun frame(frame: ListenFrame)
     fun end(marks: Map<Int, StepMark>)
 
     /** Keeps nothing: the release build's recorder. */
     object None : ListenRecorder {
-        override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = Unit
+        override fun start(setup: ListenRun.Setup) = Unit
         override fun frame(frame: ListenFrame) = Unit
         override fun end(marks: Map<Int, StepMark>) = Unit
     }

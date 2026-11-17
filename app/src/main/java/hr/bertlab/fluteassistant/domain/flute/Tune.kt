@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import kotlin.math.ceil
 import kotlin.math.roundToLong
 
@@ -58,28 +57,43 @@ data class Pulse(val bpm: Int, val timeSignature: TimeSignature = TimeSignature.
     /** How long a quarter note lasts, the unit [NoteLength] counts in: two clicks in 6/8, one in 4/4, half of one in 2/2. */
     val quarterMs: Double get() = clickMs * timeSignature.noteValue / 4
 
+    /** How long a half beat lasts, the step [NoteLength.halfBeats] counts in: an eighth note. */
+    val halfBeatMs: Double get() = quarterMs / 2
+
     /** How many half beats of the flute's beat (a quarter note) one click lasts: 2 in x/4, 1 in x/8, 4 in x/2. */
     val halfBeatsPerClick: Int get() = 8 / timeSignature.noteValue
 }
 
 /** One step of the child's tune: a [TuneNote], a [TuneRest] or a [TuneBreath]. */
-sealed interface TuneItem
+sealed interface TuneItem {
+    /** How long the step lasts: a note's or a rest's length, and null for a breath, which takes no time. */
+    val length: NoteLength?
+}
 
-/** One note of the child's tune: which key, and how long it lasts ([NoteLength], in beats). */
-data class TuneNote(val midi: Int, val length: NoteLength) : TuneItem
+/**
+ * One note of the child's tune: which key, and how long it lasts ([NoteLength], in beats). [joined]: it is joined to
+ * the step before it, which is a note (since 2026-11-16, the ⌒ key): a slur, or a tie when it is the same note
+ * ([Joins]). Play goes on into it with no gap and no new attack.
+ */
+data class TuneNote(val midi: Int, override val length: NoteLength, val joined: Boolean = false) : TuneItem
 
 /** A silence the child made on purpose with the rest key, as long as the key was held, like a note. */
-data class TuneRest(val length: NoteLength) : TuneItem
+data class TuneRest(override val length: NoteLength) : TuneItem
 
 /** A sign for the player that this is the place to take a breath: no sound and no time, playback goes past it. */
-data object TuneBreath : TuneItem
+data object TuneBreath : TuneItem {
+    override val length: NoteLength? get() = null
+}
 
 /**
  * One step of the tune as Play plays it: the step at [index] sounds [midi] (null: a rest, silent)
  * for [durationMs]. The metronome's clicks that fall in it are timed from the step's own start,
  * so a hop always lands with the note it belongs to: [clickAtStart] says one falls on its start,
  * and [inside] lists, in order, the later ones and, for a note, its end a short gap
- * ([Tune.gapMs]) before the next step.
+ * ([Tune.gapMs]) before the next step; a note the next note is joined to has no end, it goes on
+ * into that note. [joined]: the step's note is joined to the one before (since 2026-11-16), so it
+ * starts with no gap before it and no new attack; [tied]: joined to the same note, a tie, which is
+ * one sound going on.
  */
 data class PlayStep(
     val index: Int,
@@ -87,6 +101,8 @@ data class PlayStep(
     val durationMs: Long,
     val clickAtStart: Boolean,
     val inside: List<Moment>,
+    val joined: Boolean = false,
+    val tied: Boolean = false,
 ) {
     /** Something inside a step, [atMs] after its start: a click [halfBeat] half beats into it, or (null) the note's end. */
     data class Moment(val atMs: Long, val halfBeat: Int?)
@@ -94,15 +110,17 @@ data class PlayStep(
 
 /**
  * The tune the flute tab records: a line of [TuneItem]s, one per key press. A note or a rest
- * is as long as its key was held, snapped to the metronome's [Pulse] ([lengthOf]); a breath has
+ * is as long as its key was held, snapped to the writing pace ([TuneWriter.WRITING_PULSE], [lengthOf]); a breath has
  * no length. It is played back at the metronome's pulse, so the rhythm stays when the tempo
  * changes, with a short gap ([gapMs]) taken out of the end of each note so a repeated note is
  * heard twice. The time between presses is not recorded: a silence is only ever a rest the
  * child put there.
  *
- * Stored as one string, `"60:2,r:2,b,67:4"`: each note's key and its length in half beats, a
- * rest as `r` and its length, a breath as `b`. The decoder is lenient: entries it cannot read
- * are dropped, a third field per entry is accepted and ignored, and a note length above
+ * Stored as one string, `"60:2,r:2,b,67:4,69:2:s"`: each note's key and its length in half beats, a
+ * rest as `r` and its length, a breath as `b`, and a third field `s` on a note joined to the one
+ * before (since 2026-11-16; older builds ignore it and keep the note). The decoder is lenient:
+ * entries it cannot read are dropped, any other third field is ignored, a join is kept only where
+ * the step before is a note, and a note length above
  * [NoteLength.WHOLE]'s is a held time in milliseconds from before lengths were snapped (never
  * under 300), turned into a length at the tempo given. Older builds drop rests and breaths.
  */
@@ -117,9 +135,10 @@ object Tune {
     private const val FIELD_SEPARATOR = ":"
     private const val REST = "r"
     private const val BREATH = "b"
+    private const val JOINED = "s"
 
     /** How long a note of [length] lasts at [pulse], gap included, in ms. */
-    fun durationMs(length: NoteLength, pulse: Pulse): Long = (length.halfBeats * pulse.quarterMs / 2).roundToLong()
+    fun durationMs(length: NoteLength, pulse: Pulse): Long = (length.halfBeats * pulse.halfBeatMs).roundToLong()
 
     /** The silence at the end of a note lasting [durationMs]. */
     fun gapMs(durationMs: Long): Long = minOf(GAP_MS.toLong(), durationMs / 4)
@@ -141,35 +160,45 @@ object Tune {
     fun playSteps(items: List<TuneItem>, pulse: Pulse): List<PlayStep> {
         var startsAt = 0 // half beats from the start of the tune to this step
         return items.mapIndexedNotNull { index, item ->
-            val length = when (item) {
-                is TuneNote -> item.length
-                is TuneRest -> item.length
-                TuneBreath -> return@mapIndexedNotNull null
-            }
+            val length = item.length ?: return@mapIndexedNotNull null
             val duration = durationMs(length, pulse)
             val clicks = (0 until length.halfBeats).filter { (startsAt + it) % pulse.halfBeatsPerClick == 0 }
-            val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.quarterMs / 2).roundToLong(), it) } +
-                listOfNotNull(if (item is TuneNote) PlayStep.Moment(duration - gapMs(duration), null) else null)
+            // A note the next note is joined to goes on into it: no end, no gap.
+            val goesOn = (items.getOrNull(index + 1) as? TuneNote)?.joined == true
+            val inside = clicks.filter { it > 0 }.map { PlayStep.Moment((it * pulse.halfBeatMs).roundToLong(), it) } +
+                listOfNotNull(if (item is TuneNote && !goesOn) PlayStep.Moment(duration - gapMs(duration), null) else null)
             startsAt += length.halfBeats
-            PlayStep(index, (item as? TuneNote)?.midi, duration, clickAtStart = clicks.firstOrNull() == 0, inside.sortedBy { it.atMs })
+            val note = item as? TuneNote
+            val joined = note?.joined == true
+            PlayStep(
+                index, note?.midi, duration, clickAtStart = clicks.firstOrNull() == 0, inside.sortedBy { it.atMs },
+                joined = joined,
+                tied = joined && (items.getOrNull(index - 1) as? TuneNote)?.midi == note?.midi,
+            )
         }
     }
 
     /**
-     * Keeps only the notes the keys offer ([StaffNotes.ALL]), every rest, and a breath unless the
-     * step before it is already one, then caps the count.
+     * Keeps only the flute's notes ([FluteNotes.ALL], the black ones too since 2026-11-16), every rest, and a breath unless the
+     * step before it is already one, then caps the count; last, a note's join is dropped where the
+     * step before it is not a note (the first step, after a rest or a breath), so no slur hangs.
      */
     fun sanitize(items: List<TuneItem>): List<TuneItem> = items
-        .filter { it !is TuneNote || it.midi in StaffNotes.ALL }
+        .filter { it !is TuneNote || it.midi in FluteNotes.ALL }
         .fold(mutableListOf<TuneItem>()) { kept, item ->
             if (item != TuneBreath || kept.lastOrNull() != TuneBreath) kept += item
             kept
         }
         .take(MAX_NOTES)
+        .let { kept ->
+            kept.mapIndexed { index, item ->
+                if (item is TuneNote && item.joined && kept.getOrNull(index - 1) !is TuneNote) item.copy(joined = false) else item
+            }
+        }
 
     fun encode(items: List<TuneItem>): String = items.joinToString(NOTE_SEPARATOR) {
         when (it) {
-            is TuneNote -> "${it.midi}$FIELD_SEPARATOR${it.length.halfBeats}"
+            is TuneNote -> "${it.midi}$FIELD_SEPARATOR${it.length.halfBeats}" + if (it.joined) "$FIELD_SEPARATOR$JOINED" else ""
             is TuneRest -> "$REST$FIELD_SEPARATOR${it.length.halfBeats}"
             TuneBreath -> BREATH
         }
@@ -189,7 +218,7 @@ object Tune {
             } else {
                 lengthOf(value.toLong(), Pulse(legacyBpm)) // held when a beat was always a quarter note
             }
-            TuneNote(midi, length)
+            TuneNote(midi, length, joined = fields.getOrNull(2) == JOINED)
         },
     )
 }

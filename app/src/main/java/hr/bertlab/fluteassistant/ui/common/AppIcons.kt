@@ -34,6 +34,7 @@ object AppIcons {
         filled("stop", "M8.5,6h7a2.5,2.5 0 0 1 2.5,2.5v7a2.5,2.5 0 0 1 -2.5,2.5h-7a2.5,2.5 0 0 1 -2.5,-2.5v-7a2.5,2.5 0 0 1 2.5,-2.5z")
     }
     val Done: ImageVector by lazy { stroked("done", "M5,12.5l4.5,4.5L19,7.5", 3f) }
+    val Close: ImageVector by lazy { stroked("close", "M6,6L18,18M18,6L6,18", 3.5f) }
     val Again: ImageVector by lazy {
         stroked("again", "M17,2l3,3 -3,3M4,11V9a4,4 0 0 1 4,-4h12M7,22l-3,-3 3,-3M20,13v2a4,4 0 0 1 -4,4H4", 3f)
     }

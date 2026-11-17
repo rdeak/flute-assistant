@@ -59,7 +59,7 @@ class TuneTest {
         for (signature in TimeSignature.entries) {
             val pulse = Pulse(100, signature)
             val metronomeBarMs = signature.beatsPerBar * pulse.clickMs
-            assertEquals(signature.name, metronomeBarMs, Bars.halfBeatsPerBar(signature) * pulse.quarterMs / 2, 0.001)
+            assertEquals(signature.name, metronomeBarMs, Bars.halfBeatsPerBar(signature) * pulse.halfBeatMs, 0.001)
         }
     }
 
@@ -104,7 +104,7 @@ class TuneTest {
     fun `decode drops what it cannot read, rounds odd lengths and ignores a pause field`() {
         assertEquals(
             listOf(TuneNote(60, QUARTER), TuneNote(72, HALF), TuneNote(74, HALF)),
-            Tune.decode("60:2,x:1,61:2,67,72:4:150, ,74:3,76:0,77:-2", legacyBpm = 120),
+            Tune.decode("60:2,x:1,85:2,67,72:4:150, ,74:3,76:0,77:-2", legacyBpm = 120),
         )
     }
 
@@ -138,5 +138,34 @@ class TuneTest {
     fun `sanitize keeps offered notes and caps`() {
         assertEquals(200, Tune.sanitize(List(250) { TuneNote(60, QUARTER) }).size)
         assertEquals(listOf(TuneNote(62, HALF)), Tune.sanitize(listOf(TuneNote(96, QUARTER), TuneNote(62, HALF))))
+    }
+
+    // ---- Joined notes (2026-11-16, the ⌒ key): a third field on the note joined to the one before ----
+
+    @Test
+    fun `a joined note is stored with a third field`() {
+        assertEquals("60:2,62:2:s", Tune.encode(listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER, joined = true))))
+    }
+
+    @Test
+    fun `a third field s reads as joined and any other is ignored`() {
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER, joined = true)), Tune.decode("60:2,62:2:s", 60))
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER)), Tune.decode("60:2,62:2:x", 60))
+    }
+
+    @Test
+    fun `a join is dropped where the step before is not a note`() {
+        assertEquals(listOf(TuneNote(60, QUARTER)), Tune.decode("60:2:s", 60))
+        assertEquals(listOf(TuneRest(QUARTER), TuneNote(62, QUARTER)), Tune.decode("r:2,62:2:s", 60))
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneBreath, TuneNote(62, QUARTER)), Tune.decode("60:2,b,62:2:s", 60))
+    }
+
+    // ---- Black notes (2026-11-16): stored as their MIDI number, kept when they are the flute's ----
+
+    @Test
+    fun `black notes are kept and notes outside c4 to c6 dropped`() {
+        val tune = Tune.decode("66:2,85:2,59:2,70:4", 60)
+        assertEquals(listOf(TuneNote(66, QUARTER), TuneNote(70, HALF)), tune)
+        assertEquals("66:2,70:4", Tune.encode(tune))
     }
 }

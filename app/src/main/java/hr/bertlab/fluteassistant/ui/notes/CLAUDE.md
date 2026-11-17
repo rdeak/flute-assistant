@@ -6,7 +6,9 @@ change that part).
 
 ## Where things are
 
-- `domain/notes/`: pure Kotlin. `StaffNotes` (the fifteen notes and their places on the staff),
+- `domain/notes/`: pure Kotlin. `StaffNotes` (the fifteen notes and their places on the staff; the
+  game keeps these white notes on purpose, while the flute's keys have every semitone since 2026-11-16,
+  `domain/flute/FluteNotes`, so do not point the game at the flute's notes),
   `NotesRound` (one round of either game and its rules, `open`, `tapped` and `next`; it is also the
   tab's state), `Phrases` (Hear's phrases and their staircase), `NoteProgress` (the sticker book),
   `NotesGame`.

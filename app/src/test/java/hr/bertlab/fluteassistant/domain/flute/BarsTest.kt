@@ -12,6 +12,7 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -163,4 +164,55 @@ class BarsTest {
         assertEquals(marks.lastIndex, Bars.anchor(marks, tune, litIndex = null))
         assertEquals(marks.lastIndex, Bars.anchor(marks, tune, litIndex = 7)) // an index past the tune: the end
     }
+
+    // ---- Every written step knows its sign (2026-11-16, sharps and flats): the black note's own, or a natural ----
+
+    private fun n(midi: Int, length: NoteLength = QUARTER) = TuneNote(midi, length)
+
+    /** The signs of the steps [tune] is written in, in order, at 4/4. */
+    private fun signs(vararg tune: TuneItem): List<Accidental?> =
+        Bars.write(tune.toList(), TimeSignature.FOUR_FOUR).filterIsInstance<Step>().map { it.sign }
+
+    @Test
+    fun `a black note carries its own sign`() =
+        assertEquals(listOf(Accidental.SHARP, null, Accidental.FLAT), signs(n(66), n(67), n(70)))
+
+    @Test
+    fun `a white note after its own sharp in the bar gets a natural`() {
+        assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL), signs(n(66), n(65)))
+        assertEquals(listOf(Accidental.FLAT, Accidental.NATURAL), signs(n(70), n(71)))
+    }
+
+    @Test
+    fun `another note between does not cancel the sharp`() =
+        assertEquals(listOf(Accidental.SHARP, null, Accidental.NATURAL), signs(n(66), n(67), n(65)))
+
+    @Test
+    fun `a natural holds, so the next one needs none`() {
+        assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL, null), signs(n(66), n(65), n(65)))
+        assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL, Accidental.SHARP, Accidental.NATURAL), signs(n(66), n(65), n(66), n(65)))
+    }
+
+    @Test
+    fun `the next bar starts clean`() =
+        assertEquals(listOf(Accidental.SHARP, null, null, null, null), signs(n(66), n(67), n(69), n(71), n(65)))
+
+    @Test
+    fun `another octave is another place`() =
+        assertEquals(listOf(Accidental.SHARP, null), signs(n(66), n(77)))
+
+    @Test
+    fun `a rest or a breath between changes nothing`() {
+        assertEquals(listOf(Accidental.SHARP, null, Accidental.NATURAL), signs(n(66), TuneRest(QUARTER), n(65)))
+        assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL), signs(n(66), TuneBreath, n(65)))
+    }
+
+    @Test
+    fun `a sharp whose note crosses into the next bar does not reach it`() =
+        // The F♯ begins on beat 4 and runs three beats into bar 2; the F after it is in bar 2, which began clean.
+        assertEquals(listOf(null, null, null, Accidental.SHARP, null), signs(n(60), n(62), n(64), n(66, WHOLE), n(65)))
+
+    @Test
+    fun `white notes alone carry nothing`() =
+        assertEquals(listOf(null, null), signs(n(65), n(67)))
 }

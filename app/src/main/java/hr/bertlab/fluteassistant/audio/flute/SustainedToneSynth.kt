@@ -9,7 +9,8 @@ import kotlin.math.PI
  * A flute voice ([FluteTimbre]) that does not know its length in advance: [noteOn] fades the
  * note in over [ATTACK_MS] and holds it, [noteOff] fades it out over [RELEASE_MS], and a
  * [noteOn] while a note sounds fades the old note down over [RETRIGGER_MS] before the new
- * attack, so nothing clicks. The oscillator is phase-continuous across every change.
+ * attack, so nothing clicks; [glide] moves a sounding note to another pitch with no fade and no
+ * attack (a joined note in Play, since 2026-11-16). The oscillator is phase-continuous across every change.
  * [render] fills PCM blocks on demand and writes zeros while [isSilent]. Pure Kotlin, one
  * thread at a time (the player's render thread drives it through a command queue).
  */
@@ -46,6 +47,20 @@ class SustainedToneSynth(private val sampleRate: Int) {
             pendingFrequencyHz = frequencyHz
             pendingAmplitude = amplitude
             stage = Stage.RETRIGGER
+        }
+    }
+
+    /**
+     * Moves the sounding note to [frequencyHz] with its level held: no fade, no new attack, the phase going on, so
+     * nothing clicks. A note waiting behind a retrigger fade takes the new pitch; with nothing sounding, or a note
+     * releasing, it is [noteOn] at [amplitude].
+     */
+    fun glide(frequencyHz: Double, amplitude: Float) {
+        require(frequencyHz > 0.0) { "frequency must be positive" }
+        when (stage) {
+            Stage.ATTACK, Stage.SUSTAIN -> phaseStep = TWO_PI * frequencyHz / sampleRate
+            Stage.RETRIGGER -> pendingFrequencyHz = frequencyHz
+            Stage.IDLE, Stage.RELEASE -> noteOn(frequencyHz, amplitude)
         }
     }
 

@@ -54,6 +54,11 @@ class AudioTrackFluteTonePlayer @Inject constructor(private val logger: Logger) 
         commands.add(ToneCommand.On(frequencyHz, PEAK * volume.coerceIn(0f, 1f)))
     }
 
+    override fun glide(frequencyHz: Double, volume: Float) {
+        if (!isOpen()) open()
+        commands.add(ToneCommand.Glide(frequencyHz, PEAK * volume.coerceIn(0f, 1f)))
+    }
+
     override fun noteOff() {
         commands.add(ToneCommand.Off)
     }

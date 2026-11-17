@@ -15,9 +15,14 @@ mono 32-bit float at the microphone's rate, from the first hop after it opened, 
 file is the newest hop of frame `k`), `frames.csv` (one row per frame the view model processed:
 frame, ms, f, p, level, minLevel, decision, sounding, onset `fresh`/`step`, verdict, the step
 waited on before the judgement and its note, heardNow, advice, repeatHeld, finishing, hearing,
-and the tracker's floor; what the phone actually did) and `session.log` (the app's log format:
-`session.start` with the app, device and the floor the tracker still held from the run before,
-`session.rules` with every threshold in force read from the constants, `session.pulse`, one
+the tracker's floor, the walk (`walk,halfBeat,phase`, since 2026-11-11) and the arrow of a note
+walked off its pitch (`pitch`: HIGH, LOW or empty, since 2026-11-14) and a mark already given that changed on the
+frame (`changed`: `<index>:<MARK>` or empty, since 2026-11-16: ✋ held too long); what the
+phone actually did) and `session.log` (the app's log format:
+`session.start` with the app, device and the floor the tracker still held from the run before (sessions of
+2026-11-16 also name the child's level, `listenLevel=practice|exam`, read and ignored since the levels went on
+2026-11-17), `session.rules` with every threshold in force (the tracker's constants and the run's, `ListenRun.Rules`;
+a `wholeNote` on a line of 2026-11-16 is read and ignored), `session.pulse`, one
 `session.tune` per item, `session.audio` when the microphone opened, then every log line the app
 wrote while the run was open stamped `frame=<rows written before it> tag=<its tag> level=<d|i|w|e>`,
 so a line logged while frame 25 is processed says `frame=24`, and `session.end` with the marks; `flute.listen_stop` is
@@ -54,16 +59,46 @@ tools/pull-sessions.sh                                   # the phone's sessions 
                                                          # also <folder>/sweep.txt: what each value would have heard
 ./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=minLevel:0,0.3,0.4,0.45
                                                          # the loudness floor: did it leave a child's soft notes out, or let the room in?
+./gradlew :app:testDebugUnitTest --tests '*SessionReplayTest*' -Psession=sessions/<folder> -Psweep=lengthSlack:1,1.5,2
+                                                         # the length rule (half beats a note may stop short of its written
+                                                         # length, 1.5 since 2026-11-13): did it catch long notes and keep the quarters?
+                                                         # also -Psweep=restartCuts:0,1 (1: a restart with no gap cuts the
+                                                         # note walked, the rule until 2026-11-13; a child's breath dips do that)
+                                                         # also -Psweep=maxNeedMs:2000,3000,4000, the longest any note needs
+                                                         # also -Psweep=tuneCents:15,25,40 (cents off the written pitch a note
+                                                         # may sound and still be in tune, 25 since 2026-11-14: who gets an arrow)
+                                                         # and -Psweep=highCents:0,70,75 (how far above the written note its
+                                                         # semitone above is still that note blown high; 0 is the nearest semitone)
+                                                         # also -Psweep=longSlack:1,1.5,2 (half beats past its length a note may
+                                                         # run before ✋, 1.5 since 2026-11-16)
+                                                         # (the run's own rules are ListenRun.Rules; a sweep names one of them
+                                                         # or one of the tracker's, and detects the audio once for all values)
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
 ```
 
 The replay that is compared with the phone runs under the rules the session was recorded with (its
-`session.rules` line; a rule younger than the recording, `minLevel` for sessions before 2026-11-10,
-is switched off: `Replay.recordedRules`), so a rule added since does not show up as a difference. Where
+`session.rules` line; a rule younger than the recording takes what the builds before it did, from one
+table for the tracker's rules and the run's, `Replay.BEFORE`: no `minLevel` before 2026-11-10, no length
+rule (`lengthSlack`, `maxNeedMs`) before 2026-11-11, `restartCuts` on, `graceFrames` 2 and
+`walkRests` off (rests passed over) before 2026-11-13, and before 2026-11-14 ("feedback, not stars") `highCents` 0
+(the nearest semitone, no band above a written note), `tuneCents` infinite (no arrow) and `shortMovesOn` off (a note
+let go too early was waited on), and before 2026-11-16 `longSlack` infinite (no note too long); a new rule gets a
+line there; a rule the app no longer has, `wholeNote` of 2026-11-16, is read and ignored), so a rule added since does not show up as a difference. A
+"wrong" logged before 2026-11-13 for a note heard while a note cut short waited is today's "ignored"
+(only the word changed: `Replay.sameVerdict`). A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
+has it compared too: the frame a note was earned or cut short on; one that recorded the arrow (`pitch`, since
+2026-11-14) has that compared too, and one that recorded `changed` (since 2026-11-16) the frame a mark changed on.
+`report.html` draws those frames
+(★ or ☆ long enough, ⬇ ⬆ long enough but too high or too low, ✂ cut short and waited on, ⏳ let go too early and moved
+on, ✋ and a mark drawn higher: changed after it was given; ♪ is a right pitch beginning a note). Where
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
-hear in the same sound. A sweep changes one of today's rules. The detector is not part of the rules:
+hear in the same sound; "today's" run rules are `ListenRun.Rules()` (one set since 2026-11-17, when the levels went),
+and so are a sweep's and a pinned session's. A sweep changes one of today's rules. The detector is not part of the rules:
 sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a
-frame or two whatever the rules. A frame's decision can be `FAINT` since 2026-11-10: a clear pitch
+frame or two whatever the rules, and sessions from before its fix of 2026-11-14 (a dip still falling
+where the search ends gives no pitch) differ on the frames where a voice read as the lowest pitch
+searched, 246.15 Hz: 40 of the 72 recorded until then, by 1 to 20 frames and no mark, and
+`2026-11-14_20-24-41` by 73 frames and two marks (the talk that was taken for a B). A frame's decision can be `FAINT` since 2026-11-10: a clear pitch
 under the loudness floor (`ui/flute/DESIGN.md`, "The room is not judged").
 
 `ListenPath` (test source set) frames the audio as the engine does and feeds it to `ListenRun`

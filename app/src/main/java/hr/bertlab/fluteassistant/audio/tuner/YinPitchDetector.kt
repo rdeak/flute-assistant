@@ -64,13 +64,13 @@ class YinPitchDetector(
         require(buffer.size == bufferSize) { "expected $bufferSize samples, got ${buffer.size}" }
         if (rms(buffer) < silenceRms) return null
 
-        // Steps 1 + 2: difference function d(tau) over the search range.
-        for (tau in 1..tauMax) difference[tau] = differenceAt(buffer, tau)
+        // Steps 1 + 2: difference function d(tau) over the search range, and one lag past it (step 4).
+        for (tau in 1..tauMax + 1) difference[tau] = differenceAt(buffer, tau)
 
         // Step 3: cumulative mean normalised difference d'(tau).
         cmnd[0] = 1.0
         var runningSum = 0.0
-        for (tau in 1..tauMax) {
+        for (tau in 1..tauMax + 1) {
             runningSum += difference[tau]
             cmnd[tau] = if (runningSum == 0.0) 1.0 else difference[tau] * tau / runningSum
         }
@@ -87,6 +87,9 @@ class YinPitchDetector(
             tau++
         }
         if (found < 0) return null
+        // A dip still falling where the search ends is the near side of a period longer than the
+        // range (a voice a little under the flute), not a period: no pitch, not the range's lowest.
+        if (found == tauMax && cmnd[tauMax + 1] < cmnd[tauMax]) return null
 
         // Step 5: parabolic interpolation for sub-sample accuracy.
         val probability = (1.0 - cmnd[found]).coerceIn(0.0, 1.0)
@@ -168,8 +171,9 @@ class YinPitchDetector(
 
         /**
          * The detector the tuner uses: it searches one semitone beyond [FluteRange] on either
-         * side, so voices and mains hum below the flute cannot register as low notes, and it
-         * gates on [QUIET_ROOM_RMS].
+         * side, so voices and mains hum below the flute cannot register as low notes (nor, since
+         * 2026-11-14, as the lowest pitch searched: see step 4 of [detect]), and it gates on
+         * [QUIET_ROOM_RMS].
          */
         fun forFlute(sampleRate: Int, bufferSize: Int = 4096): YinPitchDetector = YinPitchDetector(
             sampleRate = sampleRate,

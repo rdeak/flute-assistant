@@ -6,11 +6,15 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import org.junit.Assert.assertEquals
@@ -152,5 +156,80 @@ class FluteUiStateTest {
         assertNull(FluteUiState(tune = lamb, listening = Listening(index = 2)).fingeringMidi)
         assertNull(FluteUiState(tune = lamb, playing = Playing(1)).fingeringMidi)
         assertNull(FluteUiState(tune = lamb).fingeringMidi)
+    }
+
+    // ---- The walk of Your turn (2026-11-11): each note held for its length ----
+
+    @Test
+    fun `the animal stands where the walk is`() {
+        val tune = listOf(TuneNote(60, NoteLength.HALF), TuneNote(67, NoteLength.QUARTER))
+        val walking = FluteUiState(tune = tune, listening = Listening(index = 0, walk = Walk(0, 2, Walk.Phase.SOUNDING)))
+        assertEquals(0, walking.animalIndex)
+        assertEquals(2, walking.animalHalfBeat)
+        assertEquals(0, walking.litIndex)
+        assertTrue("the note is still waited on while it sounds", walking.waiting)
+    }
+
+    @Test
+    fun `while an earned note finishes its time its star shows and nothing is waited on`() {
+        val tune = listOf(TuneNote(60, NoteLength.HALF), TuneNote(67, NoteLength.QUARTER))
+        val done = FluteUiState(
+            tune = tune, marks = mapOf(0 to StepMark.FIRST_TRY),
+            listening = Listening(index = 1, walk = Walk(0, 2, Walk.Phase.DONE)),
+        )
+        assertEquals(0, done.animalIndex)
+        assertEquals(2, done.animalHalfBeat)
+        assertEquals("the ring stays with the animal", 0, done.litIndex)
+        assertFalse(done.waiting)
+    }
+
+    @Test
+    fun `a rest walked is ringed and not waited on`() {
+        // Rests behave as in Play (2026-11-13): ringed, the animal on its clicks, nothing waited on under it.
+        val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneRest(NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER))
+        val resting = FluteUiState(tune = tune, listening = Listening(index = 2, walk = Walk(1, 0, Walk.Phase.REST)))
+        assertEquals(1, resting.litIndex)
+        assertEquals(1, resting.animalIndex)
+        assertFalse(resting.waiting)
+        val ending = FluteUiState(tune = tune.take(2), listening = Listening(index = 0, walk = Walk(1, 0, Walk.Phase.REST)))
+        assertEquals("the rest that ends the tune is ringed too", 1, ending.litIndex)
+        assertFalse(ending.waiting)
+    }
+
+    @Test
+    fun `a note cut short asks to hold it longer with no fingering`() {
+        val short = FluteUiState(tune = lamb, listening = Listening(index = 1, walk = Walk(1, 0, Walk.Phase.SHORT)))
+        assertEquals(TunerAdvice.HOLD_LONGER, short.advice)
+        assertNull(short.fingeringMidi)
+        assertNull(short.promptMidi)
+        assertEquals(1, short.animalIndex)
+        assertTrue("it waits to be played again", short.waiting)
+    }
+
+    @Test
+    fun `the prompt goes once the first note sounds`() {
+        val sounding = FluteUiState(tune = lamb, listening = Listening(index = 1, walk = Walk(1, 0, Walk.Phase.SOUNDING)))
+        assertNull(sounding.promptMidi)
+    }
+
+    @Test
+    fun `a note cut short and marked is not waited on, and an ended run rings nothing`() {
+        val cut = FluteUiState(tune = lamb, listening = Listening(index = 2, walk = Walk(1, 0, Walk.Phase.CUT)))
+        assertFalse(cut.waiting)
+        assertEquals("the animal stands on the note let go too early", 1, cut.animalIndex)
+        val pace = Pace(bpm = 64, pairs = 7, knobBpm = 100, speaks = true)
+        // A run whose last rest was walked: without the speed line its animal's step would be ringed.
+        val ended = FluteUiState(tune = lamb, listening = Listening(index = 3, walk = Walk(3, 0, Walk.Phase.REST), pace = pace))
+        assertNull(ended.litIndex)
+        assertFalse(ended.waiting)
+        assertEquals(pace, ended.pace)
+    }
+
+    @Test
+    fun `the tab is busy while it plays or hears a note, not while it listens to silence`() {
+        assertFalse(FluteUiState(tune = lamb).isBusy)
+        assertTrue(FluteUiState(tune = lamb, playing = Playing(0)).isBusy)
+        assertFalse(FluteUiState(tune = lamb, listening = Listening(index = 0)).isBusy)
+        assertTrue(FluteUiState(tune = lamb, listening = Listening(index = 0, heardNow = 67)).isBusy)
     }
 }

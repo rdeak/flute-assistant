@@ -8,6 +8,7 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.mutableIntStateOf
 import dagger.hilt.android.AndroidEntryPoint
 import hr.bertlab.fluteassistant.ui.MainScreen
 
@@ -22,6 +23,9 @@ import hr.bertlab.fluteassistant.ui.MainScreen
  */
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+    /** Goes up on every touch, key and return to the front: the screen stays on for five minutes after the last (`KeepScreenAwake`). */
+    private val interactions = mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Everything the app plays (clicks, the reference note, the game's note) is media, so
@@ -31,7 +35,17 @@ class MainActivity : AppCompatActivity() {
         // The bars' icons are set again from the app's own theme once it is known (`SystemBarsFollowTheme`).
         enableEdgeToEdge()
         setContent {
-            MainScreen()
+            MainScreen(interactions = interactions)
         }
+    }
+
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        interactions.intValue++
+    }
+
+    override fun onResume() {
+        super.onResume()
+        interactions.intValue++
     }
 }

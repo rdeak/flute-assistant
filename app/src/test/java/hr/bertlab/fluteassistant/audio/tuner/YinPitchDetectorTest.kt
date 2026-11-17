@@ -91,6 +91,19 @@ class YinPitchDetectorTest {
         assertNull("an adult voice", flute.detect(sine(150.0, harmonics = listOf(0.6, 0.4))))
     }
 
+    // A voice a little under the range is periodic enough to pass the threshold before the search
+    // ends, on the way down to a period the search never reaches. The end of the search is not
+    // that period: on the phone's sessions of 2026-11-14 it was reported as one (246.15 Hz at
+    // 48 kHz, a low B) and "Your turn", which takes a note in any octave, took talk for the tune's B.
+    @Test
+    fun `flute detector gives no pitch for a voice just under its range`() {
+        val flute = YinPitchDetector.forFlute(sampleRate)
+        val heard = listOf(225.0, 230.0, 235.0, 240.0, 245.0).mapNotNull { voice ->
+            flute.detect(sine(voice, harmonics = listOf(0.6, 0.4)))?.let { "$voice Hz read as ${it.frequency} Hz" }
+        }
+        assertEquals(emptyList<String>(), heard)
+    }
+
     @Test
     fun `flute detector still hears the lowest flute note played flat`() {
         val flute = YinPitchDetector.forFlute(sampleRate)

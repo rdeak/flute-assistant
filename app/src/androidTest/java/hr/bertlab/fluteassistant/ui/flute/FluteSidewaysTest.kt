@@ -13,6 +13,8 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
@@ -28,6 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Listening
+import hr.bertlab.fluteassistant.domain.flute.Pace
+import hr.bertlab.fluteassistant.domain.flute.Pitch
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -201,7 +206,7 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
-            listOf("C6", "B5", "C5", "B4", "C4", "Rest", "Breathe", "Erase the last note").forEach { name ->
+            listOf("C6", "Sharp or flat for the next note", "B5", "C5", "B4", "C4", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
                 assertInside(name, key(name).assertIsDisplayed(), shadow = 5.dp)
                 assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
                 assertNear("$each: $name's height", each.keyHeight.dp, height(key(name)))
@@ -213,6 +218,20 @@ class FluteSidewaysTest {
             }
             assertInside("the knob", knob().assertIsDisplayed())
             assertInside("the book", book().assertIsDisplayed())
+        }
+    }
+
+    /** The ♯♭ key (2026-11-17) stands beside C6 on its side too, over D5. */
+    @Test
+    fun the_sign_key_stands_beside_c6_on_its_side() {
+        show(FluteUiState(tune = twoNotes))
+        PHONES.forEach { each ->
+            on(each)
+            val c6 = bounds(key("C6"))
+            val d5 = bounds(key("D5"))
+            val sign = bounds(key("Sharp or flat for the next note"))
+            assertNear("$each: ♯♭ in C6's row", c6.top, sign.top)
+            assertNear("$each: ♯♭ over D5", d5.left, sign.left)
         }
     }
 
@@ -242,6 +261,7 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
+            assertNear("$each: the join over F5", bounds(key("F5")).left, bounds(key("Join to the next note")).left, tolerance = 1f)
             assertNear("$each: the rest over G5", bounds(key("G5")).left, bounds(key("Rest")).left, tolerance = 1f)
             assertNear("$each: the breath over A5", bounds(key("A5")).left, bounds(key("Breathe")).left, tolerance = 1f)
             assertNear("$each: the sponge over B5", bounds(key("B5")).right, bounds(key("Erase the last note")).right, tolerance = 1f)
@@ -351,12 +371,22 @@ class FluteSidewaysTest {
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)) to "🎵 Odsviraj jedan dug, čist ton",
             state.value.copy(listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)) to "📱 Dođi bliže mobitelu",
             state.value.copy(listening = Listening(index = 0, repeatHeld = true)) to "🔁 Stani, pa odsviraj opet",
+            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT))) to "⏳ Prekratko, drži dulje",
+            state.value.copy(listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT), faded = true)) to
+                "😮‍💨 Možda nema zraka? Udahni",
+            state.value.copy(listening = Listening(index = 0, pitch = Pitch.HIGH)) to "⬇️ Malo niže",
+            state.value.copy(listening = Listening(index = 0, pitch = Pitch.LOW)) to "⬆️ Malo više",
+            state.value.copy(listening = Listening(index = 0, tongued = true)) to "✂️ Poveži ih, bez jezika",
+            state.value.copy(listening = Listening(index = 1, finishing = true, pace = Pace(64, 7, 100, true))) to "🐢 Sporije od 🐇",
+            state.value.copy(listening = Listening(index = 1, finishing = true, pace = Pace(104, 7, 60, true))) to "🐇 Brže od 🐢",
         ).forEach { (next, advice) ->
             compose.runOnIdle { state.value = next }
             compose.waitForIdle()
             word(advice).assertIsDisplayed()
             assertWholeWords(advice)
             assertTrue("the advice runs into Stop", bounds(word(advice)).bottom <= bounds(word("Stani")).top)
+            // Stop keeps its own height: a column squeezes its last child.
+            assertNear("$fontScale, \"$advice\": Stop's height", 104.dp, height(compose.onNode(hasClickAction() and hasText("Stani"))))
             assertInside("the advice", word(advice))
         }
     }

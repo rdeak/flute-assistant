@@ -4,14 +4,12 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
-import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
-import hr.bertlab.fluteassistant.domain.listen.Hearing
-import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import hr.bertlab.fluteassistant.ui.flute.FluteSound
 import hr.bertlab.fluteassistant.ui.flute.ListenPath
@@ -31,17 +29,17 @@ class PinnedSessionTest {
     private val tune: List<TuneItem> = listOf(TuneNote(71, QUARTER), TuneNote(71, QUARTER), TuneNote(71, HALF))
 
     /** A synthetic session under [folder]/sessions, named [name], with [pin] as its pin line when given. */
-    private fun session(name: String, pin: String?): File {
-        val samples = FluteSound.render(FluteSound.sound(gapsMs = 50))
+    private fun session(name: String, pin: String?, cents: Double = 0.0): File {
+        val samples = FluteSound.render(FluteSound.sound(gapsMs = 50, cents = cents))
         val hop = AudioRecordTunerEngine.HOP_SIZE
-        val run = ListenPath.run(samples, FluteSound.RATE, tune)
+        val run = ListenPath.run(samples, FluteSound.RATE, tune, Pulse(90))
         val root = folder.newFolder(name)
         val r = FileSessionRecorder(root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, Pulse(90), floor = null)
+        r.start(ListenRun.Setup(tune, Pulse(90)))
         r.opened(FluteSound.RATE, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
-            r.frame(ListenFrame(step.pitch, step.decision, step.sounding, step.onset, step.floor, step.verdict, step.waited, step.expected, null, TunerAdvice.NONE, false, false, Hearing.CLEAR))
+            r.frame(step.row)
         }
         r.end(run.marks)
         val dir = File(root, "sessions").listFiles()!!.single()

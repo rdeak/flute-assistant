@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -41,6 +40,8 @@ import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.SidewaysPlainButton
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.WordFloor
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.labelRes
 
 /*
@@ -82,11 +83,17 @@ private val AdviceHeight = 58.dp
 private val AdviceFont = 22.sp
 private val NarrowAdviceFont = 19.sp
 
-/** The floor of the microphone's error, in dp as a floor in sp doubles at the largest text size. */
-private val ErrorMinFont = 12.dp
-
 /** The longest words shrink to this before they are cut; bigger than a bubble's number, and only a large text size on a small phone gets there. */
 private val StatusMinFont = 12.sp
+
+/**
+ * Hear over How? at the top of the column in Tune mode: 80 tall with 10 between on the 915 x 411 phone,
+ * 70 with 8 between on a short one, so both stand clear of the mode pair and its shadow.
+ */
+private val TopHeight = 80.dp
+private val TopHeightShort = 70.dp
+private val TopGap = 10.dp
+private val TopGapShort = 8.dp
 
 /** Mode buttons: 92 tall with 13 between on the 915 x 411 phone, 80 with 9 between on a short one. */
 private val ModeHeight = 92.dp
@@ -106,6 +113,7 @@ internal fun TunerSideways(
     onModeChange: (TunerMode) -> Unit,
     onPlayNote: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenGuide: () -> Unit = {},
 ) {
     val groupLabel = stringResource(R.string.tuner_mode)
     BoxWithConstraints(modifier.fillMaxSize()) {
@@ -117,12 +125,22 @@ internal fun TunerSideways(
         SidewaysPage(
             column = {
                 if (state.mode == TunerMode.TARGET) {
-                    SidewaysPlainButton(
-                        emoji = SPEAKER_EMOJI,
-                        text = stringResource(R.string.hear_note),
-                        onClick = onPlayNote,
-                        enabled = !state.isPlayingReference,
-                    )
+                    // Hear over How? as one child, so the column keeps two and the pair stays low.
+                    Column(verticalArrangement = Arrangement.spacedBy(if (short) TopGapShort else TopGap)) {
+                        SidewaysPlainButton(
+                            emoji = SPEAKER_EMOJI,
+                            text = stringResource(R.string.hear_note),
+                            onClick = onPlayNote,
+                            enabled = !state.isPlayingReference,
+                            height = if (short) TopHeightShort else TopHeight,
+                        )
+                        SidewaysPlainButton(
+                            emoji = WRENCH_EMOJI,
+                            text = stringResource(R.string.tune_how),
+                            onClick = onOpenGuide,
+                            height = if (short) TopHeightShort else TopHeight,
+                        )
+                    }
                 }
                 // One child, so the pair stays low whether or not Hear is above it.
                 Column(
@@ -221,8 +239,8 @@ private fun WindowBetweenArrows(
                 icon = AppIcons.ChevronLeft,
                 description = stringResource(R.string.lower_note),
                 enabled = state.targetMidi > FluteRange.LOWEST_MIDI,
-                size = arrow,
                 onClick = { onTargetNoteChange(state.targetMidi - 1) },
+                modifier = Modifier.size(arrow),
             )
         } else {
             Spacer(Modifier.size(arrow))
@@ -242,8 +260,8 @@ private fun WindowBetweenArrows(
                 icon = AppIcons.ChevronRight,
                 description = stringResource(R.string.higher_note),
                 enabled = state.targetMidi < FluteRange.HIGHEST_MIDI,
-                size = arrow,
                 onClick = { onTargetNoteChange(state.targetMidi + 1) },
+                modifier = Modifier.size(arrow),
             )
         } else {
             Spacer(Modifier.size(arrow))
@@ -282,7 +300,7 @@ private fun TunerWords(state: TunerUiState, wide: Boolean, modifier: Modifier = 
                     style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 1.25.em),
                     textAlign = TextAlign.Center,
                     autoSize = TextAutoSize.StepBased(
-                        minFontSize = with(LocalDensity.current) { ErrorMinFont.toSp() },
+                        minFontSize = WordFloor.asTextSize(),
                         maxFontSize = if (wide) AdviceFont else NarrowAdviceFont,
                     ),
                     modifier = Modifier.fillMaxSize(),

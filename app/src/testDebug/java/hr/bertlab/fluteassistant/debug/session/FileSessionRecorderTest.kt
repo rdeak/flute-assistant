@@ -4,15 +4,19 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogTags
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
+import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
+import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
+import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
@@ -20,6 +24,7 @@ import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -45,7 +50,8 @@ class FileSessionRecorderTest {
         decision: FrameDecision = FrameDecision.SHOWN, sounding: Int? = 71, onset: NoteOnsetTracker.Onset? = NoteOnsetTracker.Onset(71, fresh = true),
         floor: Float? = null, verdict: Verdict? = Verdict.RIGHT, waited: Int? = 0, expected: Int? = 71, heardNow: Int? = null,
         advice: TunerAdvice = TunerAdvice.NONE, repeatHeld: Boolean = false, finishing: Boolean = false, hearing: Hearing = Hearing.CLEAR,
-    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing)
+        walk: Walk? = null, pitch: Pitch? = null, changed: MarkChange? = null,
+    ) = ListenFrame(PitchFrame(f, p, level, minLevel), decision, sounding, onset, floor, verdict, waited, expected, heardNow, advice, repeatHeld, finishing, hearing, walk, pitch, changed)
 
     private fun sessions(root: File = folder.root) = File(root, "sessions").listFiles().orEmpty().sortedBy { it.name }
 
@@ -54,7 +60,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a run makes a folder with the three files and says where`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame())
         r.end(mapOf(0 to StepMark.FIRST_TRY))
@@ -67,9 +73,27 @@ class FileSessionRecorderTest {
     }
 
     @Test
+    fun `the rules written down are the ones the run was given`() {
+        val r = recorder()
+        val moved = ListenRun.Setup(
+            tune, pulse,
+            rules = NoteOnsetTracker.Rules(minLevel = 0.3f, stepFromSounding = false),
+            run = ListenRun.Rules(lengthSlack = 1.0, slurCheck = false),
+        )
+        r.start(moved)
+        r.end(emptyMap())
+        val rules = lines(sessions().single())[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
+        assertEquals("0.3", rules["minLevel"])
+        assertEquals("0", rules["stepFromSounding"])
+        assertEquals("1.0", rules["lengthSlack"])
+        assertEquals("0", rules["slurCheck"])
+        assertEquals("a rule not moved keeps its default", "25.0", rules["tuneCents"])
+    }
+
+    @Test
     fun `the header names the facts, the rules, the pulse and every tune item`() {
         val r = recorder()
-        r.start(tune, pulse, floor = 0.2345f)
+        r.start(ListenRun.Setup(tune, pulse, floor = 0.2345f))
         r.opened(48_000, "UNPROCESSED")
         r.end(emptyMap())
         val lines = lines(sessions().single())
@@ -78,7 +102,23 @@ class FileSessionRecorderTest {
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(19, rules.size)
+        assertEquals(34, rules.size)
+        assertEquals("1", rules["stepFromSounding"])
+        assertEquals("1.5", rules["longSlack"])
+        assertNull("one set of rules since 2026-11-17: no whole-note rule", rules["wholeNote"])
+        assertEquals("1", rules["slurCheck"])
+        assertEquals("0.25", rules["slurStopDrop"])
+        assertEquals("1", rules["walkRests"])
+        assertEquals("75.0", rules["highCents"])
+        assertEquals("25.0", rules["tuneCents"])
+        assertEquals("3", rules["tuneFrames"])
+        assertEquals("1", rules["shortMovesOn"])
+        assertEquals("6", rules["paceMinPairs"])
+        assertEquals("0.15", rules["paceOff"])
+        assertEquals("1.5", rules["lengthSlack"])
+        assertEquals("0", rules["restartCuts"])
+        assertEquals("2", rules["graceFrames"])
+        assertEquals("3000.0", rules["maxNeedMs"])
         assertEquals("0.85", rules["gate"])
         assertEquals("0.002", rules["floorRise"])
         assertEquals("0.12", rules["stopDrop"])
@@ -95,22 +135,45 @@ class FileSessionRecorderTest {
     @Test
     fun `a frame is one csv row at the stated precision`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame())
         r.frame(frame(f = null, p = 0.0, level = 0.05f, minLevel = 0.04f, decision = FrameDecision.SILENT, sounding = null, onset = null, floor = 0.05f, verdict = null, waited = 3, expected = 72, heardNow = 60, advice = TunerAdvice.COME_CLOSER, repeatHeld = true, finishing = true, hearing = Hearing.QUIET_UNCLEAR))
         r.end(emptyMap())
         val csv = File(sessions().single(), "frames.csv").readLines()
-        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor", csv[0])
-        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,", csv[1])
-        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500", csv[2])
+        assertEquals("frame,ms,f,p,level,minLevel,decision,sounding,onset,verdict,waited,expected,heardNow,advice,repeatHeld,finishing,hearing,floor,walk,halfBeat,phase,pitch,changed", csv[0])
+        assertEquals("1,42.67,493.88,0.912,0.4123,0.3000,SHOWN,71,fresh,right,0,71,,,false,false,CLEAR,,,,,,", csv[1])
+        assertEquals("2,85.33,,0.000,0.0500,0.0400,SILENT,,,,3,72,60,COME_CLOSER,true,true,QUIET_UNCLEAR,0.0500,,,,,", csv[2])
         assertEquals(3, csv.size)
+    }
+
+    @Test
+    fun `a walking frame says where the animal is`() {
+        val r = recorder()
+        r.start(ListenRun.Setup(tune, pulse))
+        r.opened(48_000, "MIC")
+        r.frame(frame(walk = Walk(3, 2, Walk.Phase.SHORT), advice = TunerAdvice.HOLD_LONGER))
+        r.end(emptyMap())
+        val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
+        assertEquals(listOf("HOLD_LONGER"), row.filter { it == "HOLD_LONGER" })
+        assertEquals(listOf("3", "2", "SHORT", ""), row.dropLast(1).takeLast(4)) // the last cell is `changed`
+    }
+
+    @Test
+    fun `a frame of a note sounding off its pitch keeps its arrow`() {
+        val r = recorder()
+        r.start(ListenRun.Setup(tune, pulse))
+        r.opened(48_000, "MIC")
+        r.frame(frame(walk = Walk(0, 0, Walk.Phase.SOUNDING), advice = TunerAdvice.TOO_HIGH, pitch = Pitch.HIGH))
+        r.end(emptyMap())
+        val row = File(sessions().single(), "frames.csv").readLines()[1].split(',')
+        assertEquals(listOf("0", "0", "SOUNDING", "HIGH"), row.dropLast(1).takeLast(4)) // the last cell is `changed`
     }
 
     @Test
     fun `a step onset and the other verdicts are spelled out`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame(onset = NoteOnsetTracker.Onset(72, fresh = false), verdict = Verdict.WRONG))
         r.frame(frame(onset = NoteOnsetTracker.Onset(72, fresh = true), verdict = Verdict.RETRY))
@@ -123,7 +186,7 @@ class FileSessionRecorderTest {
     @Test
     fun `ms follows the opened rate`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(44_100, "MIC")
         r.frame(frame())
         r.end(emptyMap())
@@ -135,7 +198,7 @@ class FileSessionRecorderTest {
     fun `audio is written only between start and end`() {
         val r = recorder()
         r.samples(floatArrayOf(9f, 9f), 2) // nothing open: ignored
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(floatArrayOf(0.1f, 0.2f, 0.3f), 3)
         r.end(emptyMap())
@@ -150,7 +213,7 @@ class FileSessionRecorderTest {
     fun `a teed line carries the frame count, its tag and level, and the audio line the microphone`() {
         val r = recorder()
         r.line(LogTags.FLUTE, 'd', "flute.idle") // nothing open: dropped
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.line(LogTags.FLUTE, 'd', "flute.listen notes=2")
         r.opened(48_000, "MIC")
         r.frame(frame())
@@ -169,7 +232,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a microphone opened again inside one run keeps the first one's audio and says so`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(floatArrayOf(0.1f), 1)
         r.frame(frame())
@@ -193,7 +256,7 @@ class FileSessionRecorderTest {
             override val entries: Set<Map.Entry<Int, StepMark>> get() = throw IllegalStateException("no marks")
         }
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(FloatArray(2048), 2048)
         r.frame(frame())
@@ -204,7 +267,7 @@ class FileSessionRecorderTest {
         val dataBytes = (header[40].toInt() and 0xff) or ((header[41].toInt() and 0xff) shl 8) or ((header[42].toInt() and 0xff) shl 16) or ((header[43].toInt() and 0xff) shl 24)
         assertEquals("the data size the closed writer patched in", 2048 * 4, dataBytes)
         now += 1_000
-        r.start(tune, pulse, floor = null) // the failed run is over: a new one gets its own folder
+        r.start(ListenRun.Setup(tune, pulse)) // the failed run is over: a new one gets its own folder
         r.end(emptyMap())
         assertEquals(2, sessions().size)
     }
@@ -212,7 +275,7 @@ class FileSessionRecorderTest {
     @Test
     fun `the end line has the marks and the wav its length`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(FloatArray(2048), 2048)
         r.frame(frame())
@@ -227,7 +290,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a run with no microphone still closes cleanly`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.end(emptyMap())
         val dir = sessions().single()
         val audio = WavFile.read(File(dir, "audio.wav"))
@@ -242,14 +305,14 @@ class FileSessionRecorderTest {
         val r = recorder()
         val made = mutableListOf<String>()
         repeat(FileSessionRecorder.KEEP + 1) {
-            r.start(tune, pulse, floor = null)
+            r.start(ListenRun.Setup(tune, pulse))
             r.end(emptyMap())
             made += sessions().last().name
             now += 1_000
         }
         assertEquals("the oldest run's folder is gone, the newest twenty stand", made.drop(1), sessions().map { it.name })
         now -= 1_000L * (FileSessionRecorder.KEEP + 1)
-        r.start(tune, pulse, floor = null) // a start at the oldest time again: its folder was deleted, so this makes it anew, not a `_2`
+        r.start(ListenRun.Setup(tune, pulse)) // a start at the oldest time again: its folder was deleted, so this makes it anew, not a `_2`
         r.end(emptyMap())
         assertEquals(listOf(made[0]) + made.drop(2), sessions().map { it.name })
     }
@@ -258,7 +321,7 @@ class FileSessionRecorderTest {
     fun `two runs in one second get their own folders`() {
         val r = recorder()
         repeat(2) {
-            r.start(tune, pulse, floor = null)
+            r.start(ListenRun.Setup(tune, pulse))
             r.end(emptyMap())
         }
         val names = sessions().map { it.name }
@@ -270,7 +333,7 @@ class FileSessionRecorderTest {
     fun `a root that cannot be written drops the session without throwing`() {
         val file = folder.newFile("not-a-folder")
         val r = recorder(root = file)
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(FloatArray(10), 10)
         r.frame(frame())
@@ -285,7 +348,7 @@ class FileSessionRecorderTest {
     fun `a failure of any kind inside the recorder is logged once and never thrown`() {
         // The recorder must never disturb the run on a child's phone: a bug in it is a log line, not a crash.
         val r = FileSessionRecorder(folder.root, facts, logger) { throw IllegalStateException("no clock") }
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame())
         r.end(emptyMap())
@@ -297,14 +360,27 @@ class FileSessionRecorderTest {
     @Test
     fun `a start while a run is open closes the one before`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.frame(frame())
         now += 1_000
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.end(emptyMap())
         val dirs = sessions()
         assertEquals(2, dirs.size)
         assertEquals("session.end frames=1 marks=", lines(dirs[0]).last())
         assertEquals("session.end frames=0 marks=", lines(dirs[1]).last())
+    }
+
+    @Test
+    fun `a mark that changed is the last cell of its row`() {
+        val r = recorder()
+        r.start(ListenRun.Setup(tune, pulse))
+        r.frame(frame())
+        r.frame(frame(changed = MarkChange(0, StepMark.LONG)))
+        r.end(emptyMap())
+        val rows = File(sessions().single(), "frames.csv").readLines()
+        assertTrue(rows[0], rows[0].endsWith(",changed"))
+        assertTrue(rows[1], rows[1].endsWith(","))
+        assertTrue(rows[2], rows[2].endsWith(",0:LONG"))
     }
 }
