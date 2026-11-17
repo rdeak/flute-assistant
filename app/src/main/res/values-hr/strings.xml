@@ -149,9 +149,6 @@
          pratiti in music also means to accompany, and the phone stays silent -->
     <string name="flute_play">Odsviraj</string>
     <string name="flute_your_turn">Poslušaj me</string>
-    <string name="flute_level">Razina</string>
-    <string name="flute_level_practice">Vježba</string>
-    <string name="flute_level_exam">Ispit</string>
     <string name="flute_erase">Obriši zadnju notu</string>
     <string name="flute_keys">Tipke flaute</string>
     <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>
@@ -173,6 +170,7 @@
     <!-- Stanka, as music schools name a rest (cijela, polovinka, četvrtinka, osminka) -->
     <string name="flute_rest">Stanka</string>
     <string name="flute_join">Spoji sa sljedećom notom</string>
+    <string name="flute_sign">Povisilica ili snizilica za sljedeću notu</string>
     <string name="flute_breath">Udahni</string>
     <string name="flute_breath_here">Ovdje udahni</string>
     <string name="flute_time_signature">Mjera %1$d/%2$d</string>

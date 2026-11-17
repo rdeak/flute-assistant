@@ -5,7 +5,6 @@ package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
@@ -61,11 +60,10 @@ class ReplayTest {
         pulse: Pulse = Pulse(90),
         run: ListenRun.Rules = ListenRun.Rules(),
         tune: List<TuneItem> = this.tune,
-        level: ListenLevel = ListenLevel.PRACTICE,
     ): File {
         val run = ListenPath.run(samples, rate, tune, pulse, rules, run = run)
         val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, pulse, floor = null, level = level)
+        r.start(tune, pulse, floor = null)
         r.opened(rate, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
@@ -349,7 +347,7 @@ class ReplayTest {
         assertEquals(0, Replay.diff(phone, replay).count)
     }
 
-    // ---- Practice and Exam (2026-11-16): a mark that changes, the two new rules, Exam in the report ----
+    // ---- A note held too long (2026-11-16): a mark that changes, the room to run over ----
 
     /** Four quarters at 120: the third of the sound's notes, 1500 ms, runs two beats past its 500 ms. */
     private val quarters: List<TuneItem> = List(4) { TuneNote(71, QUARTER) }
@@ -365,18 +363,10 @@ class ReplayTest {
         val session = Session.load(dir)
         assertFalse(session.recordsChanged)
         assertEquals(Double.POSITIVE_INFINITY, Replay.recordedRunRules(session).longSlack, 0.0)
-        assertFalse(Replay.recordedRunRules(session).wholeNote)
         val report = Replay.report(session)
         assertTrue(report, report.lines().any { it.startsWith("diff: none") })
         assertTrue(report, report.contains("  marks=0:FIRST_TRY,1:FIRST_TRY,2:FIRST_TRY\n"))
         assertTrue("today's rules hold the third note too long: $report", report.contains("  marks=0:FIRST_TRY,1:FIRST_TRY,2:LONG\n"))
-    }
-
-    @Test
-    fun `a session recorded in exam replays under exam's rules`() {
-        val session = Session.load(recorded(pulse = Pulse(120), tune = quarters, run = ListenLevel.EXAM.rules, level = ListenLevel.EXAM))
-        assertEquals(ListenLevel.EXAM.rules, Replay.recordedRunRules(session))
-        assertTrue(Replay.report(session).lines().any { it.startsWith("diff: none") })
     }
 
     @Test
@@ -392,50 +382,26 @@ class ReplayTest {
     }
 
     @Test
-    fun `the report says what exam makes of the sound`() {
-        val report = Replay.report(Session.load(recorded(pulse = Pulse(120), tune = quarters)))
-        val lines = report.lines()
-        val exam = lines.indexOf("exam:")
-        assertTrue(report, exam > 0)
-        assertTrue(report, lines.drop(exam + 1).takeWhile { it.startsWith("  ") }.any { it.startsWith("  marks=") })
-    }
-
-    @Test
-    fun `the new rules can be swept`() {
+    fun `the room to run over can be swept`() {
         val session = Session.load(recorded(pulse = Pulse(120), tune = quarters))
         assertEquals(3, Replay.sweep(session, "longSlack:1,1.5,100").lines().count { it.startsWith("longSlack=") })
-        assertEquals(2, Replay.sweep(session, "wholeNote:0,1").lines().count { it.startsWith("wholeNote=") })
     }
 
     @Test
-    fun `an exam session is compared with exam's rules of today and swept as exam`() {
-        // 20 cents high: in tune for Practice, the down arrow in Exam.
-        val sharp = FluteSound.render(FluteSound.sound(gapsMs = 50, cents = 20.0))
-        val session = Session.load(recorded(samples = sharp, run = ListenLevel.EXAM.rules, level = ListenLevel.EXAM))
-        assertEquals(ListenLevel.EXAM, Replay.level(session))
-        val report = Replay.report(session)
-        assertFalse(report, report.contains("today's rules differ"))
-        val exam = ListenPath.run(session.frames, tune, session.pulse, run = ListenLevel.EXAM.rules).marks
-        assertTrue(exam.toString(), StepMark.HIGH in exam.values)
-        val line = Replay.sweep(session, "tuneCents:15").lines().single { it.startsWith("tuneCents=15") }
-        assertTrue(line, line.endsWith("marks=" + Session.spell(exam)))
-    }
-
-    @Test
-    fun `a session without a level was practice`() {
+    fun `an old session's listenLevel and wholeNote are read and ignored`() {
+        // A build of 16 November wrote the child's level on the start line and Exam's whole-note rule on the rules line;
+        // since 2026-11-17 there is one set of rules, and the replay reads both and runs the one.
         val dir = recorded()
         val log = File(dir, "session.log")
-        log.writeText(log.readText().replace(" listenLevel=practice", ""))
-        assertEquals(ListenLevel.PRACTICE, Replay.level(Session.load(dir)))
-    }
-
-    @Test
-    fun `a session whose start line says level, as the first build of the levels wrote it, keeps its level`() {
-        // Build d2d5ff2 wrote `level=exam` on session.start before the field became listenLevel (the log's stamp has a `level` too).
-        val dir = recorded(run = ListenLevel.EXAM.rules, level = ListenLevel.EXAM)
-        val log = File(dir, "session.log")
-        log.writeText(log.readText().replace(" listenLevel=exam", " level=exam"))
-        assertEquals(ListenLevel.EXAM, Replay.level(Session.load(dir)))
+        log.writeText(log.readText().replace(Regex(" listenLevel=[^ \n]*"), "").replace("session.start ", "session.start listenLevel=exam ")
+            .replace(Regex(" wholeNote=[^ \n]*"), "").replace(Regex("(session\\.rules .*)"), "$1 wholeNote=1"))
+        val session = Session.load(dir)
+        assertEquals("exam", session.facts["listenLevel"])
+        assertEquals("1", session.rules["wholeNote"])
+        assertEquals(ListenRun.Rules(), Replay.recordedRunRules(session))
+        val report = Replay.report(session)
+        assertTrue(report, report.lines().any { it.startsWith("diff: none") })
+        assertFalse(report, report.lines().contains("exam:"))
     }
 
     // ---- Legato (2026-11-16): a joined note is recorded, and a session from before replays without the slur check ----

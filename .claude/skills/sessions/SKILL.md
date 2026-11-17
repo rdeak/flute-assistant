@@ -17,11 +17,12 @@ frame, ms, f, p, level, minLevel, decision, sounding, onset `fresh`/`step`, verd
 waited on before the judgement and its note, heardNow, advice, repeatHeld, finishing, hearing,
 the tracker's floor, the walk (`walk,halfBeat,phase`, since 2026-11-11) and the arrow of a note
 walked off its pitch (`pitch`: HIGH, LOW or empty, since 2026-11-14) and a mark already given that changed on the
-frame (`changed`: `<index>:<MARK>` or empty, since 2026-11-16: ✋ held too long, or Exam's whole-note pitch); what the
+frame (`changed`: `<index>:<MARK>` or empty, since 2026-11-16: ✋ held too long); what the
 phone actually did) and `session.log` (the app's log format:
-`session.start` with the app, device, the floor the tracker still held from the run before and the child's level
-(`listenLevel=practice|exam`, since 2026-11-16; a session without it was Practice), `session.rules` with every threshold in force (the tracker's constants and
-the level's run rules, `ListenLevel.rules`), `session.pulse`, one
+`session.start` with the app, device and the floor the tracker still held from the run before (sessions of
+2026-11-16 also name the child's level, `listenLevel=practice|exam`, read and ignored since the levels went on
+2026-11-17), `session.rules` with every threshold in force (the tracker's constants and the run's, `ListenRun.Rules`;
+a `wholeNote` on a line of 2026-11-16 is read and ignored), `session.pulse`, one
 `session.tune` per item, `session.audio` when the microphone opened, then every log line the app
 wrote while the run was open stamped `frame=<rows written before it> tag=<its tag> level=<d|i|w|e>`,
 so a line logged while frame 25 is processed says `frame=24`, and `session.end` with the marks; `flute.listen_stop` is
@@ -69,8 +70,7 @@ tools/pull-sessions.sh                                   # the phone's sessions 
                                                          # and -Psweep=highCents:0,70,75 (how far above the written note its
                                                          # semitone above is still that note blown high; 0 is the nearest semitone)
                                                          # also -Psweep=longSlack:1,1.5,2 (half beats past its length a note may
-                                                         # run before ✋, Practice 1.5 and Exam 1 since 2026-11-16) and
-                                                         # -Psweep=wholeNote:0,1 (Exam's mark that follows the whole note)
+                                                         # run before ✋, 1.5 since 2026-11-16)
                                                          # (the run's own rules are ListenRun.Rules; a sweep names one of them
                                                          # or one of the tracker's, and detects the audio once for all values)
 python3 tools/session-report.py sessions/<folder>        # <folder>/report.html: the run on a timeline, hover for a frame's row
@@ -82,19 +82,18 @@ table for the tracker's rules and the run's, `Replay.BEFORE`: no `minLevel` befo
 rule (`lengthSlack`, `maxNeedMs`) before 2026-11-11, `restartCuts` on, `graceFrames` 2 and
 `walkRests` off (rests passed over) before 2026-11-13, and before 2026-11-14 ("feedback, not stars") `highCents` 0
 (the nearest semitone, no band above a written note), `tuneCents` infinite (no arrow) and `shortMovesOn` off (a note
-let go too early was waited on), and before 2026-11-16 (the levels) `longSlack` infinite (no note too long) and
-`wholeNote` off; a new rule gets a line there), so a rule added since does not show up as a difference. A
+let go too early was waited on), and before 2026-11-16 `longSlack` infinite (no note too long); a new rule gets a
+line there; a rule the app no longer has, `wholeNote` of 2026-11-16, is read and ignored), so a rule added since does not show up as a difference. A
 "wrong" logged before 2026-11-13 for a note heard while a note cut short waited is today's "ignored"
 (only the word changed: `Replay.sameVerdict`). A session that recorded the walk (`walk,halfBeat,phase` in `frames.csv`, since 2026-11-11)
 has it compared too: the frame a note was earned or cut short on; one that recorded the arrow (`pitch`, since
 2026-11-14) has that compared too, and one that recorded `changed` (since 2026-11-16) the frame a mark changed on.
 `report.html` draws those frames
 (★ or ☆ long enough, ⬇ ⬆ long enough but too high or too low, ✂ cut short and waited on, ⏳ let go too early and moved
-on, ✋ and a mark drawn higher: changed after it was given; ♪ is a right pitch beginning a note). `replay.txt` also has
-an `exam:` part: what Exam's rules make of the same sound, with each frame a mark changed on. Where
+on, ✋ and a mark drawn higher: changed after it was given; ♪ is a right pitch beginning a note). Where
 today's rules are others, `replay.txt` then says so (`today's rules differ: ...`) and lists what they
-hear in the same sound; "today's" run rules are those of the session's level (`Replay.level`: Practice for a session
-without `listenLevel`), and so are a sweep's and a pinned session's. A sweep changes one of today's rules. The detector is not part of the rules:
+hear in the same sound; "today's" run rules are `ListenRun.Rules()` (one set since 2026-11-17, when the levels went),
+and so are a sweep's and a pinned session's. A sweep changes one of today's rules. The detector is not part of the rules:
 sessions from before its change of 2026-11-10 (it reads the newest half of the window) differ by a
 frame or two whatever the rules, and sessions from before its fix of 2026-11-14 (a dip still falling
 where the search ends gives no pitch) differ on the frames where a voice read as the lowest pitch

@@ -5,7 +5,6 @@ package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
@@ -24,6 +23,7 @@ import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.fakes.FakeLogger
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -79,14 +79,14 @@ class FileSessionRecorderTest {
         r.end(emptyMap())
         val lines = lines(sessions().single())
         val start = lines[0]
-        assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345 listenLevel=practice"))
+        assertTrue(start, start.startsWith("session.start at=") && start.endsWith(" app=1.0.2 code=1 device=\"Google Pixel 7\" sdk=34 floor=0.2345"))
         // ISO 8601 with the phone's offset; at +00:00 (a CI runner, a phone in Lisbon) SimpleDateFormat writes Z.
         assertTrue(start, Regex("""session\.start at=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(Z|[+-]\d{2}:\d{2}) .*""").matches(start))
         val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals(35, rules.size)
+        assertEquals(34, rules.size)
         assertEquals("1", rules["stepFromSounding"])
         assertEquals("1.5", rules["longSlack"])
-        assertEquals("0", rules["wholeNote"])
+        assertNull("one set of rules since 2026-11-17: no whole-note rule", rules["wholeNote"])
         assertEquals("1", rules["slurCheck"])
         assertEquals("0.25", rules["slurStopDrop"])
         assertEquals("1", rules["walkRests"])
@@ -350,20 +350,6 @@ class FileSessionRecorderTest {
         assertEquals(2, dirs.size)
         assertEquals("session.end frames=1 marks=", lines(dirs[0]).last())
         assertEquals("session.end frames=0 marks=", lines(dirs[1]).last())
-    }
-
-    @Test
-    fun `a session started in exam writes its level and exam's rules`() {
-        val r = recorder()
-        r.start(tune, pulse, floor = null, level = ListenLevel.EXAM)
-        r.end(emptyMap())
-        val lines = lines(sessions().single())
-        assertTrue(lines[0], lines[0].endsWith(" listenLevel=exam"))
-        val rules = lines[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
-        assertEquals("15.0", rules["tuneCents"])
-        assertEquals("1.0", rules["lengthSlack"])
-        assertEquals("1.0", rules["longSlack"])
-        assertEquals("1", rules["wholeNote"])
     }
 
     @Test

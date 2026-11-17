@@ -42,20 +42,20 @@ import hr.bertlab.fluteassistant.ui.theme.ActionStop
  * the pieces, the same ones upright shows, and these only say where they stand.
  */
 
-/** Between the keys and the two big buttons, as `SidewaysGeometry.keysRoom` counts it. */
+/** Between the keys and the two big buttons, as `SidewaysGeometry.keyHeight` counts it. */
 private val KeysToButtons = SidewaysGeometry.MARGIN.dp
 
-/** The keys' column's own least height: the keys' least room and the buttons under them (299). */
-private val KeysColumnMinHeight = (KeysGeometry.MIN_HEIGHT + SidewaysGeometry.UNDER_KEYS).dp
+/** The keys' column's own least height: the page's least, less the margins above and below it. */
+private val KeysColumnMinHeight = (SidewaysGeometry.WRITING_MIN_HEIGHT - 2 * SidewaysGeometry.MARGIN).dp
 
 /**
  * Writing a tune: the staff's card, which takes all the width the keys leave, and the keys with Play
  * and Listen to me under them. There is no right column here: beside the keys it left the staff about
  * three beats at 800 dp wide (`fit-v2.html`), so the two buttons went under the keys, in upright's
- * order, leaving a child nothing to relearn. [keys] is handed its modifier, the largest key ([KeysGeometry.SIDEWAYS_MAX])
- * and the gap between the keys, from the window's size; the staff stays at rest scale. Where the keys' room
- * ([SidewaysGeometry.keysRoom]) is under their least ([KeysGeometry.MIN_HEIGHT]), shorter than any phone it was drawn
- * for, the column of keys and buttons scrolls instead, as upright's tab does.
+ * order, leaving a child nothing to relearn. [keys] is handed its modifier, the key height and the
+ * gap between the keys, from the window's size; the staff stays at rest scale. Below
+ * [SidewaysGeometry.WRITING_MIN_HEIGHT], shorter than any phone it was drawn for, the keys would
+ * overflow onto Play, so the column of keys and buttons scrolls instead, as upright's tab does.
  */
 @Composable
 internal fun FluteWritingSideways(
@@ -67,7 +67,8 @@ internal fun FluteWritingSideways(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = SidewaysGeometry.MARGIN.dp
         val contentWidth = maxWidth.value
-        val keysFit = SidewaysGeometry.keysRoom(maxHeight.value) >= KeysGeometry.MIN_HEIGHT
+        val keyHeight = SidewaysGeometry.keyHeight(maxHeight.value).dp
+        val keysFit = maxHeight.value >= SidewaysGeometry.WRITING_MIN_HEIGHT
         // A tablet gives the staff more of the room: a zoomed tab has height to spare, and a tune wants the width.
         val zoom = LocalTabZoom.current
         val keysWidth = if (zoom > 1f) TabletGeometry.sidewaysKeys(zoom) else SidewaysGeometry.keysWidth(contentWidth)
@@ -95,7 +96,7 @@ internal fun FluteWritingSideways(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    KeysGeometry.SIDEWAYS_MAX.dp,
+                    keyHeight,
                     SidewaysGeometry.keyGap(contentWidth).dp,
                 )
                 buttons(Modifier)
@@ -111,8 +112,7 @@ internal fun FluteWritingSideways(
  * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`. [prompt], "Play B4" before the first note
  * of a "Your turn" is judged, stands where the advice does. The fingering a wrong note brings upright
  * does not show here: the column is 116 dp wide and the diagram would be about 17 dp tall; its line,
- * "Check your fingers", is one of the advices and does. [level], the pair of Practice and Exam (2026-11-16), stands
- * under the line until the run's first note is judged.
+ * "Check your fingers", is one of the advices and does.
  */
 @Composable
 internal fun FluteRunningSideways(
@@ -121,17 +121,11 @@ internal fun FluteRunningSideways(
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
     prompt: AnnotatedString? = null,
-    level: (@Composable () -> Unit)? = null,
 ) {
     SidewaysPage(
         modifier = modifier,
         column = {
-            // The line and, until the first note is judged, the level's pair under it (2026-11-16): one child of the
-            // column, so the column keeps the line at its top and Stop at its bottom, and the pair stands under the line.
-            Column(verticalArrangement = Arrangement.spacedBy(LevelGap)) {
-                if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
-                level?.invoke()
-            }
+            if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
             SidewaysActionButton(
                 icon = AppIcons.Stop,
                 text = stringResource(R.string.stop),
@@ -173,6 +167,3 @@ internal fun FluteSpeedSideways(
         MetronomeStageSideways(metronome, wheel, onBpmChange, onTimeSignatureChange, card)
     }
 }
-
-/** The room between the line and the level's pair in the running column. */
-private val LevelGap = 8.dp

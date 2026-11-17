@@ -52,7 +52,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
@@ -62,13 +61,10 @@ import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
-import hr.bertlab.fluteassistant.ui.common.ModeChoice
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
-import hr.bertlab.fluteassistant.ui.common.emoji
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
-import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeMinHeight
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeStage
@@ -121,14 +117,13 @@ fun FluteScreen(
             onRestActivated = viewModel::onRestActivated,
             onBreath = viewModel::onBreath,
             onJoin = viewModel::onJoin,
-            onKeyScrolled = viewModel::onKeyScrolled,
+            onSign = viewModel::onSign,
             onEraseLast = viewModel::eraseLast,
             onTogglePlayback = viewModel::togglePlayback,
             onYourTurn = {
                 if (micGranted()) viewModel.startListening() else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
             },
             onStop = viewModel::stopRun,
-            onLevelChosen = viewModel::chooseLevel,
             onBpmChange = viewModel::setBpm,
             onTimeSignatureChange = viewModel::setTimeSignature,
             onSpeedOpen = viewModel::openSpeed,
@@ -160,13 +155,10 @@ class FluteActions(
     val onRestReleased: () -> Unit = {},
     val onRestActivated: () -> Unit = {},
     val onBreath: () -> Unit = {},
-    /**
-     * A press taken back: the finger on the key began scrolling the keys, after ms and dy dp, and whether the rows could
-     * move that way (since 2026-11-16).
-     */
-    val onKeyScrolled: (Int, Long, Float, Boolean) -> Unit = { _, _, _, _ -> },
     /** The ⌒ key: the next note is joined to the last one (since 2026-11-16). */
     val onJoin: () -> Unit = {},
+    /** The ♯♭ key: the next note key pressed writes its letter's sharp or flat (since 2026-11-17). */
+    val onSign: () -> Unit = {},
     val onEraseLast: () -> Unit = {},
     /** Play. */
     val onTogglePlayback: () -> Unit = {},
@@ -174,8 +166,6 @@ class FluteActions(
     val onYourTurn: () -> Unit = {},
     /** The one wide Stop while the tune runs. */
     val onStop: () -> Unit = {},
-    /** 🎵 Practice or 🎓 Exam, chosen in the listening room until the first note is judged (since 2026-11-16). */
-    val onLevelChosen: (ListenLevel) -> Unit = {},
     /** The speed panel's ring and beat buttons: they set the metronome's tempo and beat. */
     val onBpmChange: (Int) -> Unit = {},
     val onTimeSignatureChange: (TimeSignature) -> Unit = {},
@@ -197,11 +187,11 @@ private val PlayShadow = 8.dp
 /**
  * Everything below this height cannot hold the keys: the column's own padding (4 dp over, 16 under),
  * the stage (the staff with the names under it, in the stage's 16 dp padding, which holds its
- * border), the keys' least room (the top row and the C4 octave's two rows, [FluteKeysMinHeight]) and the
- * Play row with its shadow, and the two gaps between them. It is 628 dp, what the column measures (642 with
- * three rows of keys, until 2026-11-16); until 2026-11-10 it counted 22 dp more, so a phone that leaves the
- * tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too short, its
- * spare height under the Play row and Stop far over Play's place.
+ * border), three key rows and the Play row with its shadow, and the two gaps between them. It is
+ * 642 dp, what the column measures; until 2026-11-10 it counted 22 dp more, so a phone that leaves
+ * the tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too
+ * short, its spare height under the Play row and Stop far over Play's place. (628 from 2026-11-16, when
+ * the black keys scrolled in rows of their own, until 2026-11-17.)
  */
 private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
     14.dp + FluteKeysMinHeight + 14.dp + PlayRowHeight + PlayShadow
@@ -376,25 +366,16 @@ fun FluteContent(
             }
         } else {
             val fits = maxHeight >= FitsHeight
-            // The largest a key grows to upright: a phone's keys keep the canvas's 58 (KeysGeometry).
-            val uprightKeyMax = if (zoomed) KeysGeometry.TABLET_UPRIGHT_MAX.dp else KeyHeight
+            val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
             val running = state.isRunning
             // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
             // Or, once a run ended at another animal's speed than the knob's, that one line until Stop (2026-11-14).
             val prompt = state.promptMidi?.let { playPrompt(it) } ?: state.pace?.let { speedLine(it) }
-            // 🎵 Practice or 🎓 Exam, until the run's first note is judged (2026-11-16).
-            val level: (@Composable (Boolean) -> Unit)? = if (state.choosesLevel) {
-                { stacked -> LevelChoice(state.level, actions.onLevelChosen, stacked, compact = stacked && SidewaysGeometry.isShort(maxHeight.value)) }
-            } else {
-                null
-            }
             // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
             BackHandler(enabled = running, onBack = actions.onStop)
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
             // out in places of their own, and a staff made anew at each swap would scroll in from its start.
             val staffPlace = rememberLazyListState()
-            // The key rows' scroll, here for the same reason: they come back where they were after a run and a turn.
-            val keysPlace = rememberKeysPlace()
             val staffScale = when {
                 !running -> if (sideways && zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f
                 sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT)
@@ -450,17 +431,17 @@ fun FluteContent(
                     )
                 }
             }
-            val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, maxKeyHeight, keyGap ->
+            val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, keyHeight, keyGap ->
                 FluteKeys(
                     litMidi = state.litMidi,
                     restLit = state.restLit,
                     eraseEnabled = !state.isEmpty,
                     actions = actions,
-                    place = keysPlace,
                     joinWaiting = state.joinWaiting,
                     joinEnabled = state.canJoin,
+                    signWaiting = state.signWaiting,
                     modifier = keysModifier,
-                    maxKeyHeight = maxKeyHeight,
+                    keyHeight = keyHeight,
                     keyGap = keyGap,
                 )
             }
@@ -498,7 +479,6 @@ fun FluteContent(
                         advice = state.advice,
                         onStop = actions.onStop,
                         prompt = prompt,
-                        level = level?.let { { it(true) } },
                     )
                 } else {
                     FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
@@ -523,7 +503,7 @@ fun FluteContent(
                                 .fillMaxWidth()
                                 .then(if (fits) Modifier.weight(1f) else Modifier.heightIn(min = AdviceLineHeight)),
                         ) {
-                            ListenRoom(state, prompt, level = level?.let { { it(false) } })
+                            ListenRoom(state, prompt)
                         }
                         BigActionButton(
                             icon = AppIcons.Stop,
@@ -539,7 +519,7 @@ fun FluteContent(
                             Modifier
                                 .fillMaxWidth()
                                 .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
-                            uprightKeyMax,
+                            uprightKeyHeight,
                             KeyGap,
                         )
                         playRow(Modifier)
@@ -560,7 +540,7 @@ fun FluteContent(
  * its column ([FluteRunningSideways]): the column is too narrow for the diagram.
  */
 @Composable
-private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?, level: (@Composable () -> Unit)? = null) {
+private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ListenRoomGap)) {
         state.fingeringMidi?.let { midi ->
             FingeringDiagram(
@@ -573,27 +553,7 @@ private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?, level: (@C
             )
         }
         if (prompt != null) AdviceLine(prompt) else AdviceLine(state.advice)
-        level?.invoke()
     }
-}
-
-/**
- * The level of the run on, 🎵 Practice or 🎓 Exam, the app's own pair of pills ([ModeChoice], the tuner's and the notes
- * tab's): shown from the start of a run until its first note is judged (2026-11-16, the user's picks "1C" and the two
- * pictures); [stacked] in a phone on its side's column.
- */
-@Composable
-private fun LevelChoice(level: ListenLevel, onChoose: (ListenLevel) -> Unit, stacked: Boolean, compact: Boolean = false) {
-    ModeChoice(
-        entries = ListenLevel.entries,
-        selected = level,
-        onSelect = onChoose,
-        groupLabel = stringResource(R.string.flute_level),
-        emojiOf = { it.emoji },
-        labelResOf = { it.labelRes() },
-        stacked = stacked,
-        compact = compact,
-    )
 }
 
 /** "🐢 Slower than the 🐇": the child's animal first, the knob's second (2026-11-14). */

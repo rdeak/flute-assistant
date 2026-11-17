@@ -11,7 +11,7 @@ import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
@@ -66,7 +66,7 @@ class FileSessionRecorder(
     private val lock = Any()
     private var session: Session? = null
 
-    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel) = guarded {
+    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = guarded {
         session?.let { close(it, marks = emptyMap()) }
         val dir = newFolder()
         val log = File(dir, LOG).bufferedWriter()
@@ -76,10 +76,10 @@ class FileSessionRecorder(
         val at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).format(Date(now()))
         line(
             s, "session.start", "at" to at, "app" to facts.app, "code" to facts.code, "device" to facts.device,
-            "sdk" to facts.sdk, "floor" to floor?.let { level(it) }, "listenLevel" to level.name.lowercase(Locale.ROOT),
+            "sdk" to facts.sdk, "floor" to floor?.let { level(it) },
         )
-        // The app runs with the tracker's rules at their defaults and the run's at the level's, which is what is written down.
-        val rules = NoteOnsetTracker.Rules().fields() + level.rules.fields()
+        // The app runs with the tracker's rules and the run's at their defaults, which is what is written down.
+        val rules = NoteOnsetTracker.Rules().fields() + ListenRun.Rules().fields()
         line(s, "session.rules", *rules.toTypedArray())
         line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
         tune.forEachIndexed { index, item ->

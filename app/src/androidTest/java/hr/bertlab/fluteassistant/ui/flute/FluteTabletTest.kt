@@ -7,16 +7,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.SemanticsNodeInteraction
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
@@ -24,7 +21,6 @@ import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.TabletHost
 import hr.bertlab.fluteassistant.ui.common.TabletSize
-import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -80,40 +76,15 @@ class FluteTabletTest {
     private fun assertNear(what: String, expected: Dp, actual: Dp) =
         assertTrue("$size: $what: expected about $expected, got $actual", abs((expected - actual).value) <= TOLERANCE)
 
-    /** Since 2026-11-16 (sharps and flats): spare height shows more rows before it grows keys, and upright the five do not fit. */
     @Test
-    fun upright_keys_are_58_tall_on_both_tablets() {
+    fun upright_keys_are_72_tall_on_both_tablets() {
         show(TabletSize.TEN_UPRIGHT)
         for (each in listOf(TabletSize.TEN_UPRIGHT, TabletSize.EIGHT_UPRIGHT)) {
             on(each)
             val c4 = bounds(key("C4"))
-            val cs4 = bounds(key("C♯4"))
-            assertNear1("C4's height", 58.dp, c4.bottom - c4.top)
-            assertNear1("C♯4's height", 48.dp, cs4.bottom - cs4.top)
+            assertNear("C4's height", 72.dp, c4.bottom - c4.top)
         }
     }
-
-    /** On its side a tablet fits all five rows, and the keys grow together to fill the height, up to 88 dp. */
-    @Test
-    fun sideways_all_five_rows_fit_and_the_keys_grow() {
-        show(TabletSize.TEN_SIDEWAYS)
-        for (each in listOf(TabletSize.TEN_SIDEWAYS, TabletSize.EIGHT_SIDEWAYS)) {
-            on(each)
-            val keys = bounds(key("Flute keys"))
-            val rows = bounds(compose.onNodeWithTag(KEY_ROWS_TAG))
-            for (name in listOf("C♯5", "B♭5", "C5", "B5", "C♯4", "C4")) {
-                val b = bounds(key(name))
-                assertTrue("$each: $name $b should be whole inside the rows $rows", b.top >= rows.top - 1.dp && b.bottom + 5.dp <= rows.bottom + 1.dp)
-            }
-            val white = KeysGeometry.whiteHeight((keys.bottom - keys.top).value, KeysGeometry.SIDEWAYS_MAX)
-            assertTrue("$each: the keys should grow past 58, are $white", white > 70f)
-            val c4 = bounds(key("C4"))
-            assertNear1("C4's height", white.dp, c4.bottom - c4.top)
-        }
-    }
-
-    private fun assertNear1(what: String, expected: Dp, actual: Dp) =
-        assertTrue("$size: $what: expected about $expected, got $actual", abs((expected - actual).value) <= 1f)
 
     @Test
     fun upright_nothing_scrolls_and_play_ends_inside_the_room() {
@@ -150,17 +121,5 @@ class FluteTabletTest {
 
     private companion object {
         const val TOLERANCE = 3f
-    }
-
-    @Test
-    fun the_level_pair_shows_on_a_tablet() {
-        show(TabletSize.TEN_UPRIGHT, FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
-        for (each in TabletSize.entries) {
-            on(each)
-            val group = bounds(compose.onNodeWithContentDescription("Level").assertIsDisplayed())
-            val stop = bounds(compose.onNodeWithText("Stop"))
-            assertTrue("$each: the pair ends at ${group.bottom}, Stop starts at ${stop.top}", group.bottom <= stop.top)
-            for (word in listOf("Practice", "Exam")) assertWhole("$each", compose.onNodeWithText(word, useUnmergedTree = true))
-        }
     }
 }

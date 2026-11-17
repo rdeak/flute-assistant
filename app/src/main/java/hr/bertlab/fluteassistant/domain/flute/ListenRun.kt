@@ -100,7 +100,7 @@ data class Walk(val index: Int, val halfBeat: Int, val phase: Phase) {
  * @property pitch which way the note walked sounds off its written pitch while it is not yet long enough (since
  * 2026-11-14): the arrow beside its bubble and the tuner's line; null in tune, and once it is long enough.
  * @property remark the sign the step marked last earned ([StepMark.HIGH], [StepMark.LOW], [StepMark.SHORT], and since
- * 2026-11-16 [StepMark.LONG], or the arrow its whole note earned in Exam), whose line stays until the next note is judged,
+ * 2026-11-16 [StepMark.LONG]), whose line stays until the next note is judged,
  * right or wrong, so there is time to read it; null when it earned a star.
  * @property pace the child's speed, once the run is over, when it was another animal's than the knob's ([Pace.speaks]):
  * the one line the ended run's screen shows until it is closed.
@@ -189,10 +189,11 @@ data class Listening(
  * that note's sound ends or [Rules.finishFrames] pass, and then [isOver]; with a rest after it, the
  * run is over once that rest is walked.
  *
- * Since 2026-11-16 (the levels, [ListenLevel]) a note's mark may change after it was given, while its sound goes on (its
- * tail, [OpenNote]): it becomes [StepMark.LONG] the moment its sound runs more than [Rules.longSlack] half beats past its
- * written length (never the tune's last note), and with [Rules.wholeNote] (Exam) its pitch is read over the whole note
- * when the sound ends, another note is judged or the run ends. The frame says so ([Step.changed], [ListenFrame.changed]).
+ * Since 2026-11-16 a note's mark may change after it was given, while its sound goes on (its tail, [OpenNote]): it
+ * becomes [StepMark.LONG] the moment its sound runs more than [Rules.longSlack] half beats past its written length (never
+ * the tune's last note). The frame says so ([Step.changed], [ListenFrame.changed]). The levels of that day, Practice and
+ * Exam, went on 2026-11-17 (the user: "keep just rules from practice and remove exam logic completely"); with them went
+ * Exam's mark that followed the whole note.
  *
  * Since 2026-11-16 (legato, [Joins]) a tie, or a slur to the same letter in another octave, is one note: walked from
  * its first note's head across all of them on their clicks, its written length theirs together, and nothing after it
@@ -236,8 +237,6 @@ class ListenRun(
      * @property paceOff [PACE_OFF].
      * @property longSlack half beats past its written length a note may sound before it is held too long and marked
      * [StepMark.LONG] ([LONG_SLACK], since 2026-11-16; infinite is the rule before: nothing was too long).
-     * @property wholeNote whether a note's mark is final only when its sound ends, its pitch read over the whole note
-     * (1 in a session's line, since 2026-11-16, [ListenLevel.EXAM]); off, the mark is final once the note is long enough.
      * @property slurCheck whether a note written joined to a note of another letter and started with the tongue is marked
      * [StepMark.TONGUED] (1 in a session's line, since 2026-11-16, legato); off, it earns its mark as any note.
      * @property slurStopDrop how deep a stop before such a note must fall, on the level scale, to be a tongue
@@ -258,7 +257,6 @@ class ListenRun(
         val paceMinPairs: Int = PACE_MIN_PAIRS,
         val paceOff: Double = PACE_OFF,
         val longSlack: Double = LONG_SLACK,
-        val wholeNote: Boolean = false,
         val slurCheck: Boolean = true,
         val slurStopDrop: Double = SLUR_STOP_DROP,
     ) {
@@ -271,7 +269,7 @@ class ListenRun(
             "highCents" to highCents.toString(), "tuneCents" to tuneCents.toString(), "tuneFrames" to tuneFrames.toString(),
             "shortMovesOn" to if (shortMovesOn) "1" else "0",
             "paceMinPairs" to paceMinPairs.toString(), "paceOff" to paceOff.toString(),
-            "longSlack" to longSlack.toString(), "wholeNote" to if (wholeNote) "1" else "0",
+            "longSlack" to longSlack.toString(),
             "slurCheck" to if (slurCheck) "1" else "0", "slurStopDrop" to slurStopDrop.toString(),
         )
 
@@ -291,7 +289,6 @@ class ListenRun(
             "paceMinPairs" -> copy(paceMinPairs = Math.round(value).toInt())
             "paceOff" -> copy(paceOff = value)
             "longSlack" -> copy(longSlack = value)
-            "wholeNote" -> copy(wholeNote = value != 0.0)
             "slurCheck" -> copy(slurCheck = value != 0.0)
             "slurStopDrop" -> copy(slurStopDrop = value)
             else -> throw IllegalArgumentException("no rule named $name")
@@ -354,8 +351,7 @@ class ListenRun(
      * began); null when none was judged.
      * @property pace on the frame the last note is marked, the child's speed over the run, whether it speaks or not; null
      * on every other frame, and when no two notes in a row began clean.
-     * @property changed a mark already given changed on this frame (since 2026-11-16): held too long, or in Exam the
-     * whole note's pitch.
+     * @property changed a mark already given changed on this frame (since 2026-11-16): held too long.
      */
     class Step(
         val row: ListenFrame,
@@ -390,18 +386,14 @@ class ListenRun(
 
     /**
      * The note just earned while its sound goes on ([tailOpen]'s note, since 2026-11-16): its step, where it began and
-     * the last frame the tracker showed it on the run's clock, its readings off the written pitch (where it locked,
-     * [lockCents], when it has none), the [star] it earned or would have earned, and whether it was marked too long. Its
-     * own times, kept apart from [time], which a rest or the next note replaces while it sounds.
+     * the last frame the tracker showed it on the run's clock, its readings off the written pitch, and whether it was
+     * marked too long. Its own times, kept apart from [time], which a rest or the next note replaces while it sounds.
      */
     private class OpenNote(
         val index: Int,
         val startMs: Double,
         var sureMs: Double,
         val readings: MutableList<Double>,
-        val lockCents: Double?,
-        val star: StepMark,
-        val tongued: Boolean = false,
     ) {
         var long = false
     }
@@ -494,7 +486,7 @@ class ListenRun(
         nowMs += frame.hopMs
         val moves = Moves()
         val result = tracker.onFrame(frame)
-        if (tracker.sounding == null) closeTail(moves)
+        if (tracker.sounding == null) closeTail()
         val runMean = hearingTracker.levelMean // read before onFrame, which empties the window when the run ends
         val hearing = hearingTracker.onFrame(frame.level, result.decision)
         val hearingMean = if (hearing == listening.hearing) null else if (hearing == Hearing.CLEAR) runMean else hearingTracker.levelMean
@@ -521,8 +513,8 @@ class ListenRun(
         }
         open?.takeIf { moves.held?.index != it.index }?.let { followTail(it, result.decision, frame.frequency, moves) }
         if (wasFinishing && (tracker.sounding == null || ++framesFinishing >= run.finishFrames)) isOver = true
-        // The run's end closes the last note, here, so a mark it changes is on this frame's row.
-        if (isOver) closeTail(moves)
+        // The run's end closes the last note; nothing is open after it.
+        if (isOver) closeTail()
         if (!wasFinishing && !listening.finishing) followSound()
         val row = ListenFrame(
             frame = frame, decision = result.decision, sounding = tracker.sounding, onset = result.onset, floor = tracker.floor,
@@ -607,7 +599,7 @@ class ListenRun(
         val verdict = check.judge(onset.midi, onset.fresh, begun = listening.walk?.phase == Walk.Phase.SHORT, lockHz = lockHz, sameAsLast = sameAsLast)
         if (verdict != Verdict.IGNORED) {
             // Another note was judged: the last one's tail and its line are over.
-            closeTail(moves)
+            closeTail()
             listening = listening.copy(remark = null, tongued = false)
         }
         // A note written joined to another letter, found at once, that began after a gap or a stop as deep as a tongue
@@ -673,13 +665,12 @@ class ListenRun(
             listening.pitch == Pitch.LOW -> StepMark.LOW
             else -> null
         }
-        val star = check.star
         val mark = check.earn(remark)
         val cents = time.readings.takeIf { it.isNotEmpty() }?.let(::median) ?: time.lockCents
         moves.held = NoteTime(index, time.heldMs.roundToLong(), needMs(index).roundToLong(), mark = mark, cents = cents)
         lastSounded = sounds(noteAt(index))
         tailOpen = true
-        open = OpenNote(index, time.startMs, time.sureMs, time.readings.toMutableList(), time.lockCents, star, time.tongued)
+        open = OpenNote(index, time.startMs, time.sureMs, time.readings.toMutableList())
         val done = check.isDone
         // Done: the animal stays over the last note while its sound ends.
         listening = listening.copy(
@@ -713,33 +704,10 @@ class ListenRun(
         )
     }
 
-    /**
-     * The note just earned is over: its sound ended, another note was judged, or the run ended. With [Rules.wholeNote]
-     * (Exam, since 2026-11-16) its mark is final only now: too long stays; else the arrow when the median of every
-     * reading of the whole note lies beyond [Rules.tuneCents], else the star it earned or would have earned. A mark that
-     * changes says so on this frame, and its line stands (the arrow's, or none for a star) until the next note is
-     * judged; a note judged next takes the line away at once.
-     */
-    private fun closeTail(moves: Moves) {
-        val note = open
+    /** The note just earned is over: its sound ended, another note was judged, or the run ended. */
+    private fun closeTail() {
         tailOpen = false
         open = null
-        if (note == null || !run.wholeNote) return
-        if (note.tongued && !note.long) return // the scissors say more than the whole note's pitch
-        val cents = note.readings.takeIf { it.isNotEmpty() }?.let(::median) ?: note.lockCents
-        val mark = when {
-            note.long -> StepMark.LONG
-            cents == null -> return
-            else -> when (side(cents)) {
-                Pitch.HIGH -> StepMark.HIGH
-                Pitch.LOW -> StepMark.LOW
-                null -> note.star
-            }
-        }
-        if (mark == check.marks[note.index]) return
-        check.remark(note.index, mark)
-        listening = listening.copy(remark = mark.takeIf { it == StepMark.HIGH || it == StepMark.LOW || it == StepMark.LONG })
-        moves.changed = Changed(note.index, mark, (note.sureMs - note.startMs).roundToLong(), fullMs(note.index).roundToLong(), cents)
     }
 
     /**
@@ -1041,23 +1009,11 @@ class ListenRun(
         const val PACE_OFF = 0.15
 
         /**
-         * Half beats past its written length a note may sound in Practice before it is held too long, three quarters of
+         * Half beats past its written length a note may sound before it is held too long, three quarters of
          * a beat, the room [LENGTH_SLACK] gives the other way (the user's ask of 2026-11-16: "on practice also check when
          * held is too long"). Changed only from recorded sessions, a sweep of `longSlack`.
          */
         const val LONG_SLACK = 1.5
-
-        /**
-         * Exam's pitch gate in cents (2026-11-16): within 15 lay 86% of the recorded notes of 12 to 14 November against
-         * their run's own centre, 99% within Practice's 25. Changed only from recorded sessions, a sweep of `tuneCents`.
-         */
-        const val EXAM_TUNE_CENTS = 15.0
-
-        /** Exam's room to stop short, half a beat. Changed only from recorded sessions, a sweep of `lengthSlack`. */
-        const val EXAM_LENGTH_SLACK = 1.0
-
-        /** Exam's room to run over, half a beat. Changed only from recorded sessions, a sweep of `longSlack`. */
-        const val EXAM_LONG_SLACK = 1.0
 
         /**
          * How deep the stop before a note written joined must fall to be the tongue, on the level scale (1.0 is 60 dB):

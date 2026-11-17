@@ -46,6 +46,16 @@ internal object TabletGeometry {
     private const val MAX_ZOOM = 2f
 
     /**
+     * Upright, a phone's key and the most a zoomed one is: about 104 dp on a 10-inch tablet. The 58 is
+     * also the flute's `KeyHeight` and `SidewaysGeometry.KEY_HEIGHT_MIN`; change the three together.
+     */
+    private const val KEY_HEIGHT = 58f
+    private const val KEY_HEIGHT_MAX = 72f
+
+    /** The flute's three key rows, which share what the height spares. */
+    private const val KEY_ROWS = 3
+
+    /**
      * The keys' column on a zoomed tab, sideways, against a phone's [PHONE_KEYS]: with
      * [SIDEWAYS_STAFF_SCALE] it leaves the staff room for about 13 quarter notes and their bar lines,
      * against about 10.
@@ -83,4 +93,7 @@ internal object TabletGeometry {
 
     /** The resting staff at this [zoom]: [SIDEWAYS_STAFF_SCALE], but a barely zoomed window keeps a phone's real size. */
     fun sidewaysStaffScale(zoom: Float): Float = maxOf(SIDEWAYS_STAFF_SCALE, 1f / zoom)
+
+    /** An upright key on a zoomed tab: a third of what the height [spare]s, as there are three rows. */
+    fun uprightKeyHeight(spare: Float): Float = (KEY_HEIGHT + spare / KEY_ROWS).coerceIn(KEY_HEIGHT, KEY_HEIGHT_MAX)
 }

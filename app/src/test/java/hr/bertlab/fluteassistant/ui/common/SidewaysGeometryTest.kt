@@ -87,6 +87,14 @@ class SidewaysGeometryTest {
     }
 
     @Test
+    fun `a key is a third of what the height leaves, its shadow less, from 58 to 88`() {
+        assertDp(85.3f, SidewaysGeometry.keyHeight(411f))
+        assertDp(68.3f, SidewaysGeometry.keyHeight(360f))
+        assertDp(58f, SidewaysGeometry.keyHeight(300f))
+        assertDp(88f, SidewaysGeometry.keyHeight(800f))
+    }
+
+    @Test
     fun `the running staff is 4 over 3 where it fits and the largest that fits below`() {
         assertScale(4f / 3f, SidewaysGeometry.runningStaffScale(411f, StaffGeometry.TOTAL_HEIGHT))
         assertScale(1.19f, SidewaysGeometry.runningStaffScale(360f, StaffGeometry.TOTAL_HEIGHT))
@@ -198,15 +206,19 @@ class SidewaysGeometryTest {
         assertDp(20f, SidewaysGeometry.FINGERING_GAP)
     }
 
-    /**
-     * The page needs its two margins, the keys at their least, the gap, and Play with its shadow: 16 + 199 + 8 + 92 (329,
-     * with 213 for three rows of keys, until 2026-11-16). Under it the keys' column scrolls.
-     */
+    /** The page needs its two margins, the keys at their least, the gap, and Play with its shadow: 16 + 213 + 8 + 92. */
     @Test
-    fun `writing needs 315 dp, which is the keys' least room and the buttons`() {
-        assertDp(FluteKeysMinHeight.value, SidewaysGeometry.keysRoom(315f))
-        assertDp(2 * SidewaysGeometry.MARGIN + FluteKeysMinHeight.value + 8f + 92f, 315f)
-        assertDp(100f, SidewaysGeometry.UNDER_KEYS)
+    fun `writing needs 329 dp, which is the keys' least height and the buttons`() {
+        assertDp(329f, SidewaysGeometry.WRITING_MIN_HEIGHT)
+        assertDp(2 * SidewaysGeometry.MARGIN + FluteKeysMinHeight.value + 8f + 92f, SidewaysGeometry.WRITING_MIN_HEIGHT)
+        assertDp(313f, SidewaysGeometry.WRITING_MIN_HEIGHT - 2 * SidewaysGeometry.MARGIN)
+    }
+
+    /** Where the keys fit the formula's own height is the least a key has, so nothing is lost by the scroll below it. */
+    @Test
+    fun `a key is its least at the height where writing stops fitting`() {
+        assertDp(58f, SidewaysGeometry.keyHeight(SidewaysGeometry.WRITING_MIN_HEIGHT))
+        assertTrue(SidewaysGeometry.keyHeight(SidewaysGeometry.WRITING_MIN_HEIGHT + 30f) > 58f)
     }
 
     /**
@@ -236,12 +248,5 @@ class SidewaysGeometryTest {
                 assertTrue("$letters dots in $column: $row", (column - row) / 2 >= 9f)
             }
         }
-    }
-
-    /** Since 2026-11-16 the keys' room is what the column leaves them: the height less the margins, the buttons and their gap. */
-    @Test
-    fun `the keys' room is the height less the margins, the buttons and their gap`() {
-        assertDp(295f, SidewaysGeometry.keysRoom(411f))
-        assertDp(244f, SidewaysGeometry.keysRoom(360f))
     }
 }

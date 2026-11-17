@@ -8,6 +8,7 @@ import hr.bertlab.fluteassistant.ui.common.TabletGeometry.isTablet
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry.sidewaysKeys
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry.sidewaysStaffScale
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry.tabZoom
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry.uprightKeyHeight
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -76,5 +77,13 @@ class TabletGeometryTest {
     fun `barely zoomed, the keys and the staff are no smaller than a phone's`() {
         assertEquals(372f, sidewaysKeys(1.02f) * 1.02f, 0.5f)
         assertEquals(1f, sidewaysStaffScale(1.02f) * 1.02f, 0.01f)
+    }
+
+    @Test
+    fun `upright keys take a third of what the height spares, from 58 to 72`() {
+        assertEquals(72f, uprightKeyHeight(81f), 0.01f)
+        assertEquals(66.67f, uprightKeyHeight(26f), 0.01f)
+        assertEquals(58f, uprightKeyHeight(0f), 0.01f)
+        assertEquals(58f, uprightKeyHeight(-10f), 0.01f)
     }
 }

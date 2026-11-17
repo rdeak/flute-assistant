@@ -150,18 +150,19 @@ tab's CLAUDE.md; these rules hold on all of them:
   sun with no words (`ui/DESIGN.md`). It is part of the frame like the flag, not a control on a tab.
 - Added at the user's request (2026-11-14): the tuner's 🔧 How? button in Tune mode and its four picture
   cards on tuning the flute (`ui/tuner/CLAUDE.md`, "How to tune").
-- Added at the user's request (2026-11-16): the level of Listen to me, 🎵 Practice or 🎓 Exam, chosen in
-  the listening room until the run's first note is judged, never on the writing screen
-  (`ui/flute/CLAUDE.md`, "Two levels").
 - Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
   pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
-- Added at the user's request (2026-11-16): the flute's black keys, C♯ E♭ F♯ G♯ B♭ in both octaves, in piano
-  rows that scroll under the top row (`ui/flute/CLAUDE.md`, "Sharps and flats").
+- Added at the user's request (2026-11-16, reshaped 2026-11-17): the flute's ♯♭ key beside C6, which makes
+  the next note key write its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭, both octaves), one tap per note; the
+  keys stay the fifteen white ones in three rows (`ui/flute/CLAUDE.md`, "Sharps and flats").
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than
   the speed knob and the metronome stage it opens in place, and note lengths as a control (lengths
-  come only from how long a key is held; the user drew this on 2026-10-24).
+  come only from how long a key is held; the user drew this on 2026-10-24). On 2026-11-17, after a parent
+  found the tab packed and could not tell the two levels apart, the user took out Listen to me's levels
+  (Practice and Exam: one set of rules, Practice's) and the black keys' scrolling piano rows, and turned down
+  any view, badge or switch that only explains a control: when a screen is too much, take things out.
 - Tap tempo, subdivisions, the beep and bell click sounds, the volume setting, presets (with their
   Room database) and the A4 reference are gone from the code since 2026-11-09, at the user's
   decision: no screen could reach them. The metronome clicks one woodblock on every beat at a fixed

@@ -50,14 +50,13 @@ data class MarkChange(val index: Int, val mark: StepMark)
  * keeps nothing.
  */
 interface ListenRecorder {
-    /** A run begins at [level] (since 2026-11-16; [ListenLevel.PRACTICE] when a caller has none to say), whose rules it is judged by. */
-    fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel = ListenLevel.PRACTICE)
+    fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?)
     fun frame(frame: ListenFrame)
     fun end(marks: Map<Int, StepMark>)
 
     /** Keeps nothing: the release build's recorder. */
     object None : ListenRecorder {
-        override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?, level: ListenLevel) = Unit
+        override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = Unit
         override fun frame(frame: ListenFrame) = Unit
         override fun end(marks: Map<Int, StepMark>) = Unit
     }

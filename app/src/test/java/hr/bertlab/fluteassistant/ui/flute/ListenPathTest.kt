@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
@@ -182,25 +181,24 @@ class ListenPathTest {
     private fun listen(samples: DoubleArray, rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules()): ListenPath.Run =
         ListenPath.run(FluteSound.render(samples), rate, tune, Pulse(60), rules, run = ListenRun.Rules.PITCH_ONLY)
 
-    // ---- Practice and Exam on sound (2026-11-16): the same notes, 400, 400 and 1500 ms ----
+    // ---- A note held too long, on sound (2026-11-16): the same notes, 400, 400 and 1500 ms ----
 
     @Test
     fun `a note held two beats over its length earns the hand`() {
-        // At 120 a minute a quarter lasts 500 ms; Practice's room past it is 375 ms, and the third note sounds 1500.
+        // At 120 a minute a quarter lasts 500 ms; the room past it is 375 ms, and the third note sounds 1500.
         val quarters = List(4) { TuneNote(71, NoteLength.QUARTER) }
         val run = ListenPath.run(FluteSound.render(FluteSound.sound(gapsMs = 50)), rate, quarters, Pulse(120))
         assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.LONG), run.marks)
     }
 
     @Test
-    fun `a note that drifts thirty cents after its mark earns the arrow in exam and keeps its star in practice`() {
-        // The last note rises from the B to 60 cents over it: in tune when it is long enough (250 ms in), 30 high on the whole.
+    fun `a note that drifts thirty cents after its mark keeps its star`() {
+        // The last note rises from the B to 60 cents over it: in tune when it is long enough (250 ms in), 30 high on the
+        // whole. A mark is final once the note is long enough (Exam's whole-note mark went on 2026-11-17).
         val quarters = List(3) { TuneNote(71, NoteLength.QUARTER) }
         val sound = FluteSound.render(FluteSound.sound(gapsMs = 50, sagCents = 60.0))
-        val exam = ListenPath.run(sound, rate, quarters, Pulse(120), run = ListenLevel.EXAM.rules)
-        assertEquals(exam.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.HIGH), exam.marks)
-        val practice = ListenPath.run(sound, rate, quarters, Pulse(120), run = ListenLevel.PRACTICE.rules)
-        assertEquals(practice.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), practice.marks)
+        val run = ListenPath.run(sound, rate, quarters, Pulse(120))
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
     }
 
     // ---- Legato on sound (2026-11-16): b ⌒ c ⌒ d at 120 a minute, a quarter lasting 500 ms ----

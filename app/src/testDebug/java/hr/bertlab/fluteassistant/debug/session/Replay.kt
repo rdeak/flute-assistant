@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.debug.session
 
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -82,24 +81,17 @@ object Replay {
         "tuneCents" to Double.POSITIVE_INFINITY, // 2026-11-14: no pitch remark, no arrow
         "shortMovesOn" to 0.0, // 2026-11-14: a note let go too early was waited on
         "longSlack" to Double.POSITIVE_INFINITY, // 2026-11-16: no note was too long
-        "wholeNote" to 0.0, // 2026-11-16: a mark was final once the note was long enough
         "slurCheck" to 0.0, // 2026-11-16: no slur check, a joined note tongued kept its star
         "stepFromSounding" to 0.0, // 2026-11-16: a move was a step only when far from the sounding note's written pitch
     )
 
-    /** [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. */
+    /**
+     * [today]'s rules (the ones in [names]) set as [session] recorded them, a rule it does not name as [BEFORE] has it. A
+     * rule the app no longer has is read and ignored: `wholeNote`, Exam's of 2026-11-16, on the rules line of a session of
+     * that day (the levels went on 2026-11-17, and with them the start line's `listenLevel`).
+     */
     private fun <R> recorded(session: Session, today: R, names: Set<String>, with: R.(String, Double) -> R): R =
         names.fold(today) { rules, name -> (session.rules[name]?.toDouble() ?: BEFORE[name])?.let { rules.with(name, it) } ?: rules }
-
-    /**
-     * The level the child chose for [session] (`listenLevel` on its start line, since 2026-11-16; `level` in the first build
-     * of the levels, d2d5ff2, whose start line, unstamped, was unambiguous); a session without either was Practice. Its
-     * rules are the run's "today" for the session: what the report compares with, a sweep moves, a pin is checked by.
-     */
-    fun level(session: Session): ListenLevel {
-        val name = session.facts["listenLevel"] ?: session.facts["level"]
-        return ListenLevel.entries.firstOrNull { it.name.lowercase(Locale.ROOT) == name } ?: ListenLevel.PRACTICE
-    }
 
     /** The tracker's rules the phone ran [session] under. */
     fun recordedRules(session: Session): NoteOnsetTracker.Rules =
@@ -155,7 +147,7 @@ object Replay {
             }
         }
         val today = NoteOnsetTracker.Rules()
-        val todayRun = level(session).rules // the child's level: an Exam session is compared with Exam's rules of today
+        val todayRun = ListenRun.Rules()
         if (today != rules || todayRun != run) {
             val then = fields(rules, run).toMap()
             val changed = fields(today, todayRun).filter { (name, value) -> then[name] != value }
@@ -165,12 +157,6 @@ object Replay {
             for (step in now.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
             out.appendLine("  marks=" + Session.spell(now.marks))
         }
-        // What Exam (2026-11-16) makes of the same sound, the tracker's rules today's.
-        out.appendLine("exam:")
-        val exam = ListenPath.run(session.frames, session.tune, session.pulse, today, session.floor, ListenLevel.EXAM.rules)
-        for (step in exam.steps) if (step.onset != null) out.appendLine("  " + onset(step, rate))
-        for (step in exam.steps) step.row.changed?.let { out.appendLine("  frame=${step.frame} changed=${it.index}:${it.mark}") }
-        out.appendLine("  marks=" + Session.spell(exam.marks))
         out.appendLine("phone:")
         for (step in session.rows) if (step.onset != null) out.appendLine("  " + onset(step, rate))
         out.appendLine("events:")
@@ -181,7 +167,7 @@ object Replay {
     /**
      * One line per value of the rule named in [spec], a tracker's (`stopDrop:0.08,0.12,0.5`) or the run's own
      * (`lengthSlack:0.5,1,2` in half beats, `maxNeedMs:2000,3000,4000`): what was heard and the marks earned, at
-     * the session's pulse, the other rules at today's values of the session's level ([level]). The audio is detected
+     * the session's pulse, the other rules at today's values. The audio is detected
      * once for all of them.
      */
     fun sweep(session: Session, spec: String): String {
@@ -196,7 +182,7 @@ object Replay {
                 session.frames, session.tune, session.pulse,
                 rules = if (ofRun) NoteOnsetTracker.Rules() else NoteOnsetTracker.Rules().with(name, value),
                 floor = session.floor,
-                run = if (ofRun) level(session).rules.with(name, value) else level(session).rules,
+                run = if (ofRun) ListenRun.Rules().with(name, value) else ListenRun.Rules(),
             )
             out.appendLine("$name=${number(value)} heard=${run.heard.joinToString(",") { it.onset.midi.toString() }} marks=${Session.spell(run.marks)}")
         }

@@ -108,7 +108,7 @@ data class PlayStep(
 
 /**
  * The tune the flute tab records: a line of [TuneItem]s, one per key press. A note or a rest
- * is as long as its key was held, snapped to the metronome's [Pulse] ([lengthOf]); a breath has
+ * is as long as its key was held, snapped to the writing pace ([TuneWriter.WRITING_PULSE], [lengthOf]); a breath has
  * no length. It is played back at the metronome's pulse, so the rhythm stays when the tempo
  * changes, with a short gap ([gapMs]) taken out of the end of each note so a repeated note is
  * heard twice. The time between presses is not recorded: a silence is only ever a rest the
@@ -174,7 +174,7 @@ object Tune {
     }
 
     /**
-     * Keeps only the notes the keys offer ([FluteNotes.ALL], black keys too since 2026-11-16), every rest, and a breath unless the
+     * Keeps only the flute's notes ([FluteNotes.ALL], the black ones too since 2026-11-16), every rest, and a breath unless the
      * step before it is already one, then caps the count; last, a note's join is dropped where the
      * step before it is not a note (the first step, after a rest or a breath), so no slur hangs.
      */

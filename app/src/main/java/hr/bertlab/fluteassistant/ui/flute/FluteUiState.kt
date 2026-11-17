@@ -6,7 +6,6 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Joins
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Pitch
@@ -40,8 +39,6 @@ data class FluteUiState(
     val playing: Playing? = null,
     /** What "Your turn" shows while the microphone is open and the child plays the tune; null otherwise. */
     val listening: Listening? = null,
-    /** How closely "Your turn" judges, the child's choice, remembered (since 2026-11-16). */
-    val level: ListenLevel = ListenLevel.PRACTICE,
     /**
      * Goes up by one on every click while the tune plays back, and on every hop the run reports
      * while the flute listens (`ListenRun.Step.hop`: a click inside the note the child plays, the
@@ -61,6 +58,8 @@ data class FluteUiState(
     val books: List<Book> = List(Songbook.SIZE) { Book() },
     /** The ⌒ key was tapped: the next note pressed will be joined to the last one (since 2026-11-16). */
     val joinWaiting: Boolean = false,
+    /** The ♯♭ key was tapped: the next note key pressed writes its letter's sharp or flat (since 2026-11-17). */
+    val signWaiting: Boolean = false,
 ) {
     /** Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full. */
     val canJoin: Boolean get() = Joins.canJoinAfter(tune)
@@ -104,19 +103,6 @@ data class FluteUiState(
 
     /** Whether there is a note to check: rests and breaths alone give "Your turn" nothing to do. */
     val canListen: Boolean get() = tune.any { it is TuneNote }
-
-    /**
-     * Whether the child may still choose the level of the run on (since 2026-11-16): until its first note is judged,
-     * right or wrong. No mark, no wrong note, not finishing, no speed line, and no walk but an opening rest's; and the line
-     * is the prompt or the room's own advice ("Come closer", "Play one long, clear note"), never one about a note played,
-     * which cannot stand before a note is judged and would not leave the pair and Stop room in a short phone's column.
-     */
-    val choosesLevel: Boolean
-        get() {
-            val run = listening ?: return false
-            return marks.isEmpty() && run.wrong == null && !run.finishing && run.pace == null &&
-                (run.walk == null || run.walk.phase == Walk.Phase.REST) && run.advice in BEFORE_A_NOTE
-        }
 
     /** The note key drawn pressed: the playing note's, else the held key. */
     val litMidi: Int? get() = playing?.let { (tune.getOrNull(it.index) as? TuneNote)?.midi } ?: held?.midi
@@ -169,6 +155,3 @@ data class FluteUiState(
     /** The one line under the staff while listening ([Listening.advice]); nothing otherwise. */
     val advice: TunerAdvice get() = listening?.advice ?: TunerAdvice.NONE
 }
-
-/** The lines that can stand before a run's first note is judged: the prompt's (none of its own), and the room's. */
-private val BEFORE_A_NOTE = setOf(TunerAdvice.NONE, TunerAdvice.COME_CLOSER, TunerAdvice.CLEAR_NOTE)

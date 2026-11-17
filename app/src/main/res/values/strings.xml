@@ -180,10 +180,6 @@
          playing the tune on a real flute and marks each note. Worded as the child speaking to the phone, like
          Croatian "Poslušaj me" (since 2026-11-04; it said "Your turn") -->
     <string name="flute_your_turn">Listen to me</string>
-    <!-- How closely Listen to me judges, the child's choice in the listening room (2026-11-16): a teacher's words for a test. -->
-    <string name="flute_level">Level</string>
-    <string name="flute_level_practice">Practice</string>
-    <string name="flute_level_exam">Exam</string>
     <string name="flute_erase">Erase the last note</string>
     <string name="flute_keys">Flute keys</string>
     <!-- The yellow animal knob at the staff's top left (its content description; the argument is the speed's animal, e.g. "Rabbit"): a tap opens the metronome's ring in place -->
@@ -208,8 +204,11 @@
     <string name="speed_done">OK</string>
     <!-- The rest key (💤): held like a note key, it adds a silence; also the name of a rest on the staff -->
     <string name="flute_rest">Rest</string>
-    <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
+    <!-- The join key (⌒): the next note pressed is joined to the last one, a slur or a tie -->
     <string name="flute_join">Join to the next note</string>
+    <!-- The ♯♭ key beside C6 (2026-11-17): the next note key pressed writes its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭) -->
+    <string name="flute_sign">Sharp or flat for the next note</string>
+    <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
     <string name="flute_breath">Breathe</string>
     <!-- Accessibility name of a breath sign on the staff -->
     <string name="flute_breath_here">Breathe here</string>

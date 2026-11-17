@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.domain.settings
 
 import hr.bertlab.fluteassistant.domain.flute.Book
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.notes.NoteProgress
@@ -35,9 +34,6 @@ interface SettingsStore {
     fun loadNotesGame(): NotesGame
     fun saveNotesGame(game: NotesGame)
 
-    /** The level of the flute's Listen to me; [ListenLevel.PRACTICE] until the other is chosen (since 2026-11-16). */
-    fun loadListenLevel(): ListenLevel
-    fun saveListenLevel(level: ListenLevel)
     /** The sticker book: how well each note is known, decoded leniently (see NoteProgress). */
     fun loadNoteProgress(): NoteProgress
     fun saveNoteProgress(progress: NoteProgress)

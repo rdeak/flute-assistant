@@ -19,7 +19,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -30,7 +29,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.flute.Book
-import hr.bertlab.fluteassistant.domain.flute.ListenLevel
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Pitch
@@ -77,7 +75,6 @@ class FluteSidewaysTest {
     private var playToggles = 0
     private var yourTurns = 0
     private var stops = 0
-    private val levelsChosen = mutableListOf<ListenLevel>()
     private var micDismissals = 0
     private var speedOpens = 0
     private var speedDones = 0
@@ -88,7 +85,7 @@ class FluteSidewaysTest {
         val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
         val keysWidth: Float get() = SidewaysGeometry.keysWidth(contentWidth)
         val keyGap: Float get() = SidewaysGeometry.keyGap(contentWidth)
-        val keyHeight: Float get() = KeysGeometry.whiteHeight(SidewaysGeometry.keysRoom(height.toFloat()), KeysGeometry.SIDEWAYS_MAX)
+        val keyHeight: Float get() = SidewaysGeometry.keyHeight(height.toFloat())
         val keyWidth: Float get() = (keysWidth - 6 * keyGap) / 7
         val column: Float get() = SidewaysGeometry.columnWidth(height.toFloat())
         val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
@@ -118,7 +115,6 @@ class FluteSidewaysTest {
                             onBookChosen = { chosenBooks += it },
                             onYourTurn = { yourTurns++ },
                             onStop = { stops++ },
-                            onLevelChosen = { levelsChosen += it },
                             onMicDismiss = { micDismissals++ },
                         ),
                     )
@@ -205,29 +201,15 @@ class FluteSidewaysTest {
         }
     }
 
-    /**
-     * Since 2026-11-16 (sharps and flats) the top row stays and four rows scroll under it, opening at the bottom: every
-     * phone shows the top row and the C4 octave's two rows whole, and a 411 dp tall one the C5 white row too. A white key
-     * is 58 dp and a black one 48 on all three, as the five rows fit none of them.
-     */
     @Test
-    fun writing_shows_the_top_row_the_c4_octave_and_both_buttons_on_every_phone() {
+    fun writing_shows_every_key_and_both_buttons_on_every_phone() {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
-            assertNear("$each: a white key", 58.dp, each.keyHeight.dp)
-            listOf("C6", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
+            listOf("C6", "Sharp or flat for the next note", "B5", "C5", "B4", "C4", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
                 assertInside(name, key(name).assertIsDisplayed(), shadow = 5.dp)
                 assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
                 assertNear("$each: $name's height", each.keyHeight.dp, height(key(name)))
-            }
-            val rows = bounds(compose.onNodeWithTag(KEY_ROWS_TAG))
-            val whole = listOf("C♯4", "B♭4", "C4", "B4") + if (each.height > 400) listOf("C5", "B5") else emptyList()
-            whole.forEach { name ->
-                val b = bounds(key(name))
-                assertTrue("$each: $name $b should be whole inside the rows $rows", b.top >= rows.top - SLACK && b.bottom + 5.dp <= rows.bottom + SLACK)
-                assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
-                assertNear("$each: $name's height", if ('♯' in name || '♭' in name) 48.dp else 58.dp, height(key(name)))
             }
             listOf("Play", "Listen to me").forEach { name ->
                 assertInside(name, word(name).assertIsDisplayed(), shadow = 8.dp)
@@ -236,6 +218,20 @@ class FluteSidewaysTest {
             }
             assertInside("the knob", knob().assertIsDisplayed())
             assertInside("the book", book().assertIsDisplayed())
+        }
+    }
+
+    /** The ♯♭ key (2026-11-17) stands beside C6 on its side too, over D5. */
+    @Test
+    fun the_sign_key_stands_beside_c6_on_its_side() {
+        show(FluteUiState(tune = twoNotes))
+        PHONES.forEach { each ->
+            on(each)
+            val c6 = bounds(key("C6"))
+            val d5 = bounds(key("D5"))
+            val sign = bounds(key("Sharp or flat for the next note"))
+            assertNear("$each: ♯♭ in C6's row", c6.top, sign.top)
+            assertNear("$each: ♯♭ over D5", d5.left, sign.left)
         }
     }
 
@@ -389,7 +385,7 @@ class FluteSidewaysTest {
             word(advice).assertIsDisplayed()
             assertWholeWords(advice)
             assertTrue("the advice runs into Stop", bounds(word(advice)).bottom <= bounds(word("Stani")).top)
-            // With the level's pair in the column too (no note judged yet), Stop keeps its own height: a column squeezes its last child.
+            // Stop keeps its own height: a column squeezes its last child.
             assertNear("$fontScale, \"$advice\": Stop's height", 104.dp, height(compose.onNode(hasClickAction() and hasText("Stani"))))
             assertInside("the advice", word(advice))
         }
@@ -636,16 +632,15 @@ class FluteSidewaysTest {
     // ---- Writing below the least height ----
 
     /**
-     * Under 315 dp (the margins, the keys at their least, a gap and Play; 329 with three rows of keys, until
-     * 2026-11-16) the keys' column scrolls rather than let the key rows run past it onto Play: the top row would
-     * stand above the page's margin and the bottom one on Play. Both phones here are shorter than any the layout
-     * was drawn for.
+     * Under 329 dp (the margins, the keys at their least, a gap and Play) the keys' column scrolls
+     * rather than let the key rows run past it onto Play: the top row would stand above the page's
+     * margin and the bottom one on Play. Both phones here are shorter than any the layout was drawn for.
      */
     @Test
-    fun below_315_dp_tall_the_keys_scroll_and_stay_clear_of_play() {
-        phone = Phone(640, 310)
+    fun below_329_dp_tall_the_keys_scroll_and_stay_clear_of_play() {
+        phone = Phone(640, 320)
         show(FluteUiState(tune = twoNotes))
-        listOf(Phone(640, 310), Phone(640, 300)).forEach { each ->
+        listOf(Phone(640, 320), Phone(640, 300)).forEach { each ->
             on(each)
             val top = bounds(key("C6"))
             val bottom = bounds(key("C4"))
@@ -660,8 +655,8 @@ class FluteSidewaysTest {
 
     /** A little over the least height the keys and Play need, the column fits and does not scroll. */
     @Test
-    fun just_over_315_dp_tall_nothing_needs_to_scroll() {
-        phone = Phone(640, 325)
+    fun just_over_329_dp_tall_nothing_needs_to_scroll() {
+        phone = Phone(640, 340)
         show(FluteUiState(tune = twoNotes))
         assertInside("Play", word("Play").assertIsDisplayed(), shadow = 8.dp)
         assertInside("the top key", key("C6"), shadow = 5.dp)
@@ -708,65 +703,6 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = longTune))
         compose.waitForIdle()
         assertTheStaffNeverGoesBackToItsStart { state.value = FluteUiState(tune = longTune, playing = Playing(38)) }
-    }
-
-    // ---- The key rows keep their place through a real turn and a run (the final review, 2026-11-16) ----
-
-    /** The user's Galaxy A55 upright (its tab 653 dp tall), where the rows scroll in less room than on its side. */
-    private val a55Upright = Phone(504, 653)
-
-    private fun rowsBounds() = bounds(compose.onNodeWithTag(KEY_ROWS_TAG))
-
-    private fun assertRowsAtTheBottom(what: String) =
-        assertNear("$what: the C4 row ends at the rows' bottom", rowsBounds().bottom, bounds(key("C4")).bottom + 5.dp)
-
-    private fun assertRowsAtTheTop(what: String) = assertNear("$what: C♯5 at the rows' top", rowsBounds().top, bounds(key("C♯5")).top)
-
-    private fun turnTo(each: Phone, isSideways: Boolean) {
-        compose.runOnIdle {
-            phone = each
-            sideways = isSideways
-        }
-        compose.waitForIdle()
-    }
-
-    @Test
-    fun the_rows_keep_their_bottom_through_a_turn_each_way() {
-        show(FluteUiState(tune = twoNotes))
-        assertRowsAtTheBottom("on its side")
-        turnTo(a55Upright, isSideways = false)
-        assertRowsAtTheBottom("upright, the rows shorter")
-        turnTo(Phone(915, 411), isSideways = true)
-        assertRowsAtTheBottom("on its side again")
-    }
-
-    @Test
-    fun the_rows_keep_their_top_through_a_turn_each_way() {
-        show(FluteUiState(tune = twoNotes))
-        key("C♯5").performScrollTo()
-        assertRowsAtTheTop("on its side")
-        turnTo(a55Upright, isSideways = false)
-        assertRowsAtTheTop("upright")
-        turnTo(Phone(915, 411), isSideways = true)
-        assertRowsAtTheTop("on its side again")
-    }
-
-    @Test
-    fun the_rows_keep_their_place_through_a_run() {
-        phone = a55Upright
-        sideways = false
-        show(FluteUiState(tune = twoNotes))
-        state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0))
-        compose.waitForIdle()
-        state.value = FluteUiState(tune = twoNotes)
-        compose.waitForIdle()
-        assertRowsAtTheBottom("after a run")
-        key("C♯5").performScrollTo()
-        state.value = FluteUiState(tune = twoNotes, playing = Playing(0))
-        compose.waitForIdle()
-        state.value = FluteUiState(tune = twoNotes)
-        compose.waitForIdle()
-        assertRowsAtTheTop("after a run")
     }
 
     // ---- The microphone card ----
@@ -953,59 +889,5 @@ class FluteSidewaysTest {
             assertWholeWords("👀 Check your fingers")
             compose.onNodeWithContentDescription("Fingering for C4").assertDoesNotExist()
         }
-    }
-
-    // ---- Practice and Exam (2026-11-16): the pair in the running column, above Stop ----
-
-    @Test
-    fun the_level_pair_stands_in_the_column_above_stop() {
-        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
-        val practice = bounds(word("Practice").assertIsDisplayed())
-        val exam = bounds(word("Exam").assertIsDisplayed())
-        val stop = bounds(word("Stop"))
-        assertTrue("Practice ($practice) stands over Exam ($exam)", practice.bottom <= exam.top)
-        // Under the line, as drawn (level-icons-v4.html), not floating halfway down the column.
-        val line = bounds(word("🪈 Play C4"))
-        assertTrue("the pair ($practice) stands just under the line ($line)", practice.top >= line.bottom && practice.top - line.bottom <= 16.dp)
-        assertTrue("Exam ends at ${exam.bottom}, Stop starts at ${stop.top}", exam.bottom <= stop.top)
-        for ((what, b) in listOf("Practice" to practice, "Exam" to exam)) {
-            assertTrue("$what ($b) is inside the column of Stop ($stop)", b.left >= stop.left - SLACK && b.right <= stop.right + SLACK)
-        }
-        word("Exam").performClick()
-        assertEquals(listOf(ListenLevel.EXAM), levelsChosen)
-    }
-
-    @Test
-    fun the_level_words_are_whole_on_a_short_phone_in_croatian_at_large_text() {
-        phone = Phone(640, 360)
-        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"), fontScale = 1.5f)
-        for (text in listOf("Vježba", "Ispit", "🪈 Odsviraj c1")) assertWholeWords(text)
-        val group = bounds(compose.onNodeWithContentDescription("Razina").assertIsDisplayed())
-        assertTrue("the pair ends at ${group.bottom}, Stop starts at ${bounds(word("Stani")).top}", group.bottom <= bounds(word("Stani")).top)
-        assertInside("the pair", compose.onNodeWithContentDescription("Razina"))
-    }
-
-    /** At the largest text the stacked words shrink with their line, not to the floor (a fixed line height would not fit 52 dp). */
-    @Test
-    fun the_level_words_stay_readable_at_the_largest_text() {
-        phone = Phone(640, 360)
-        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"), fontScale = 2.0f)
-        for (text in listOf("Vježba", "Ispit")) {
-            assertWholeWords(text)
-            // The picture is sized in dp and does not grow with the text, so the word keeps about its size at normal text:
-            // its line at least half its pill (0.58 with the picture in dp; 0.39 when the picture grew with the text).
-            val word = height(compose.onNodeWithText(text, useUnmergedTree = true))
-            val pill = height(word(text))
-            assertTrue("\"$text\" is $word tall in a pill $pill tall: the picture took the word's room", word >= pill * 0.5f)
-        }
-    }
-
-    @Test
-    fun the_level_words_are_whole_on_a_short_wide_phone() {
-        phone = Phone(800, 360)
-        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)))
-        for (text in listOf("Practice", "Exam", "🪈 Play C4")) assertWholeWords(text)
-        val group = bounds(compose.onNodeWithContentDescription("Level").assertIsDisplayed())
-        assertTrue("the pair ends at ${group.bottom}, Stop starts at ${bounds(word("Stop")).top}", group.bottom <= bounds(word("Stop")).top)
     }
 }

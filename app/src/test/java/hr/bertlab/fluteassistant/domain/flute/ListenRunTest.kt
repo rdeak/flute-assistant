@@ -1034,7 +1034,7 @@ class ListenRunTest {
                 "repeatAdviceFrames" to "25", "finishFrames" to "35", "lengthSlack" to "1.5", "maxNeedMs" to "3000.0",
                 "restartCuts" to "0", "graceFrames" to "2", "walkRests" to "1",
                 "highCents" to "75.0", "tuneCents" to "25.0", "tuneFrames" to "3", "shortMovesOn" to "1",
-                "paceMinPairs" to "6", "paceOff" to "0.15", "longSlack" to "1.5", "wholeNote" to "0",
+                "paceMinPairs" to "6", "paceOff" to "0.15", "longSlack" to "1.5",
                 "slurCheck" to "1", "slurStopDrop" to "0.25",
             ),
             ListenRun.Rules().fields(),
@@ -1042,7 +1042,7 @@ class ListenRunTest {
         assertEquals(
             setOf(
                 "repeatAdviceFrames", "finishFrames", "lengthSlack", "maxNeedMs", "restartCuts", "graceFrames", "walkRests",
-                "highCents", "tuneCents", "tuneFrames", "shortMovesOn", "paceMinPairs", "paceOff", "longSlack", "wholeNote",
+                "highCents", "tuneCents", "tuneFrames", "shortMovesOn", "paceMinPairs", "paceOff", "longSlack",
                 "slurCheck", "slurStopDrop",
             ),
             ListenRun.Rules.NAMES,
@@ -1435,13 +1435,7 @@ class ListenRunTest {
         assertEquals(2, run.listening.index)
     }
 
-    // Practice and Exam (2026-11-16): the levels the child chooses, each a preset of the run's rules.
-
-    @Test
-    fun `practice is the default rules and exam asks for more`() {
-        assertEquals(ListenRun.Rules(), ListenLevel.PRACTICE.rules)
-        assertEquals(ListenRun.Rules(tuneCents = 15.0, lengthSlack = 1.0, longSlack = 1.0, wholeNote = true), ListenLevel.EXAM.rules)
-    }
+    // The room to run over (2026-11-16), one set of rules since the levels went (2026-11-17).
 
     @Test
     fun `the default rules are the numbers of before plus the room to run over`() {
@@ -1449,19 +1443,16 @@ class ListenRunTest {
         assertEquals(25.0, rules.tuneCents, 0.0)
         assertEquals(1.5, rules.lengthSlack, 0.0)
         assertEquals(1.5, rules.longSlack, 0.0)
-        assertFalse(rules.wholeNote)
     }
 
     @Test
-    fun `the two new rules are written down last and can be moved`() {
-        // Written after them since 2026-11-16: the slur rules (`the slur rules are named rules`).
-        assertEquals(listOf("longSlack" to "1.5", "wholeNote" to "0"), ListenRun.Rules().fields().dropLast(2).takeLast(2))
+    fun `the room to run over is written down before the slur rules and can be moved`() {
+        assertEquals("longSlack" to "1.5", ListenRun.Rules().fields().dropLast(2).last())
         assertEquals(0.5, ListenRun.Rules().with("longSlack", 0.5).longSlack, 0.0)
-        assertTrue(ListenRun.Rules().with("wholeNote", 1.0).wholeNote)
         assertEquals(Double.POSITIVE_INFINITY, ListenRun.Rules.PITCH_ONLY.longSlack, 0.0)
     }
 
-    // A note held too long (2026-11-16): in both levels, three quarters of a beat over in Practice, half a beat in Exam.
+    // A note held too long (2026-11-16): three quarters of a beat over.
 
     /** [ms] of [midi] sounding, [cents] off its pitch; every frame's step. */
     private fun ListenRun.sound(midi: Int, ms: Double, cents: Double = 0.0): List<ListenRun.Step> =
@@ -1469,11 +1460,11 @@ class ListenRunTest {
 
     private fun ListenRun.quiet(ms: Double): List<ListenRun.Step> = List(framesFor(ms)) { onFrame(silent) }
 
-    private fun practice(vararg tune: TuneItem, pulse: Pulse = Pulse(60)) = timed(*tune, pulse = pulse, run = ListenLevel.PRACTICE.rules)
-    private fun exam(vararg tune: TuneItem, pulse: Pulse = Pulse(60)) = timed(*tune, pulse = pulse, run = ListenLevel.EXAM.rules)
+    /** A run under the app's rules, [ListenRun.Rules] at their defaults (Practice's until the levels went, 2026-11-17). */
+    private fun practice(vararg tune: TuneItem, pulse: Pulse = Pulse(60)) = timed(*tune, pulse = pulse, run = ListenRun.Rules())
 
     @Test
-    fun `in practice a quarter note held a beat over is too long, once, and says so`() {
+    fun `a quarter note held a beat over is too long, once, and says so`() {
         val run = practice(q(67), q(69))
         val steps = run.sound(67, 2000.0)
         val changed = steps.mapNotNull { it.changed }
@@ -1489,14 +1480,11 @@ class ListenRunTest {
     }
 
     @Test
-    fun `six tenths of a beat over is not too long in practice and is in exam`() {
+    fun `six tenths of a beat over is not too long`() {
         val practice = practice(q(67), q(69))
         practice.sound(67, 1600.0)
         practice.quiet(300.0)
         assertEquals(StepMark.FIRST_TRY, practice.marks[0])
-        val exam = exam(q(67), q(69))
-        exam.sound(67, 1700.0)
-        assertEquals(StepMark.LONG, exam.marks[0])
     }
 
     @Test
@@ -1567,45 +1555,10 @@ class ListenRunTest {
         assertEquals(StepMark.LONG, run.marks[0])
     }
 
-    // Exam: the whole note (2026-11-16): a note's mark is final when its sound ends, its pitch read over all of it.
+    // A mark is final once the note is long enough (Exam's whole-note mark went on 2026-11-17).
 
     @Test
-    fun `in exam a star becomes the arrow when the rest of the note drifts`() {
-        val run = exam(q(67), q(69))
-        run.sound(67, 600.0)
-        assertEquals(StepMark.FIRST_TRY, run.marks[0])
-        run.sound(67, 800.0, cents = 30.0)
-        val end = run.quiet(200.0)
-        assertEquals(StepMark.HIGH, run.marks[0])
-        assertEquals(StepMark.HIGH, end.mapNotNull { it.changed }.single().mark)
-        assertEquals(TunerAdvice.TOO_HIGH, run.listening.advice)
-    }
-
-    @Test
-    fun `in exam an arrow becomes the star when the whole note reads in tune`() {
-        val run = exam(q(67), q(69))
-        run.sound(67, 550.0, cents = 30.0)
-        assertEquals(StepMark.HIGH, run.marks[0])
-        run.sound(67, 850.0)
-        run.quiet(200.0)
-        assertEquals(StepMark.FIRST_TRY, run.marks[0])
-        assertNull(run.listening.remark)
-        assertEquals(TunerAdvice.NONE, run.listening.advice)
-    }
-
-    @Test
-    fun `after a wrong note the whole note in tune is the faint star`() {
-        val run = exam(q(67), q(69))
-        run.sound(60, 300.0)
-        run.quiet(200.0)
-        run.sound(67, 550.0, cents = 30.0)
-        run.sound(67, 850.0)
-        run.quiet(200.0)
-        assertEquals(StepMark.RETRY, run.marks[0])
-    }
-
-    @Test
-    fun `in practice the mark does not follow the note`() {
+    fun `the mark does not follow the note once it is long enough`() {
         val run = practice(q(67), q(69))
         run.sound(67, 600.0)
         run.sound(67, 800.0, cents = 30.0)
@@ -1614,53 +1567,7 @@ class ListenRunTest {
     }
 
     @Test
-    fun `a mark that changes because the next note began brings no line`() {
-        val run = exam(q(67), q(69), q(71))
-        run.sound(67, 600.0)
-        run.sound(67, 800.0, cents = 30.0)
-        run.sound(69, 300.0)
-        assertEquals(StepMark.HIGH, run.marks[0])
-        assertEquals(TunerAdvice.NONE, run.listening.advice)
-    }
-
-    @Test
-    fun `the last note's whole note is read when the run ends`() {
-        val run = exam(q(67))
-        run.sound(67, 600.0)
-        run.sound(67, 800.0, cents = 30.0)
-        run.quiet(200.0)
-        assertTrue(run.isOver)
-        assertEquals(StepMark.HIGH, run.marks[0])
-    }
-
-    @Test
-    fun `a last note still sounding when the run ends is read on the frame it ends`() {
-        val run = exam(q(67))
-        run.sound(67, 600.0)
-        // The run ends FINISH_FRAMES after the note was marked, while the note goes on.
-        val steps = List(framesFor(1500.0)) { run.onFrame(pitched(67, cents = 30.0)) to run.isOver }
-        val end = steps.indexOfFirst { it.second }
-        assertTrue("the run ended while the note sounded", end >= 0)
-        assertEquals(MarkChange(0, StepMark.HIGH), steps[end].first.row.changed)
-        assertEquals(1, steps.count { it.first.changed != null })
-        assertEquals(StepMark.HIGH, run.marks[0])
-    }
-
-    @Test
-    fun `in exam a note held too long keeps its hand and its line when it ends`() {
-        val run = exam(q(67), q(69))
-        run.sound(67, 1700.0, cents = 30.0)
-        run.quiet(200.0)
-        assertEquals(StepMark.LONG, run.marks[0])
-        assertEquals(TunerAdvice.TOO_LONG, run.listening.advice)
-    }
-
-    @Test
-    fun `fifteen cents is the gate in exam and twenty five in practice`() {
-        val exam = exam(q(67), q(69))
-        exam.sound(67, 1000.0, cents = 20.0)
-        exam.quiet(200.0)
-        assertEquals(StepMark.HIGH, exam.marks[0])
+    fun `twenty cents off is still in tune`() {
         val practice = practice(q(67), q(69))
         practice.sound(67, 1000.0, cents = 20.0)
         practice.quiet(200.0)
@@ -1668,11 +1575,7 @@ class ListenRunTest {
     }
 
     @Test
-    fun `a quarter let go after three tenths of a beat is short in exam and long enough in practice`() {
-        val exam = exam(q(67), q(69)) // needs half a beat, 500 ms; 300 ms with the grace frames stays under it
-        exam.sound(67, 300.0)
-        exam.quiet(300.0)
-        assertEquals(StepMark.SHORT, exam.marks[0])
+    fun `a quarter let go after three tenths of a beat is long enough`() {
         val practice = practice(q(67), q(69)) // needs a quarter of a beat, 250 ms
         practice.sound(67, 300.0)
         practice.quiet(300.0)
@@ -1824,17 +1727,6 @@ class ListenRunTest {
     }
 
     @Test
-    fun `in exam a tongued note keeps its scissors when its whole pitch is read`() {
-        val run = exam(q(60), j(62), q(64))
-        run.begin(60)
-        run.hold(60, after(800.0))
-        run.tongueTo(60, 62)
-        run.sound(62, 900.0, cents = 40.0)
-        run.stop()
-        assertEquals(StepMark.TONGUED, run.marks[1])
-    }
-
-    @Test
     fun `while the tongued note sounds off its pitch the tuning line comes first`() {
         val run = timed(q(60), j(62))
         run.begin(60)
@@ -1863,7 +1755,6 @@ class ListenRunTest {
         assertEquals(listOf("slurCheck" to "1", "slurStopDrop" to "0.25"), rules.fields().takeLast(2))
         assertEquals(false, rules.with("slurCheck", 0.0).slurCheck)
         assertEquals(0.4, rules.with("slurStopDrop", 0.4).slurStopDrop, 0.0)
-        assertTrue(ListenLevel.EXAM.rules.slurCheck)
     }
 
     @Test

@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** The flute's own notes (since 2026-11-16): every semitone from C4 to C6, a black note on its letter's place. */
@@ -28,9 +29,10 @@ class FluteNotesTest {
     }
 
     @Test
-    fun `an octave's white keys and its black keys, each after the white key it follows`() {
-        assertEquals(listOf(60, 62, 64, 65, 67, 69, 71), FluteNotes.whitesOf(60))
-        assertEquals(listOf(61 to 0, 63 to 1, 66 to 3, 68 to 4, 70 to 5), FluteNotes.blacksOf(60))
-        assertEquals(listOf(73 to 0, 75 to 1, 78 to 3, 80 to 4, 82 to 5), FluteNotes.blacksOf(72))
+    fun `each white key's signed note is the one the app spells on its letter`() {
+        // The ♯♭ key (2026-11-17): C, F and G take their sharp, E and B their flat; D, A and C6 have none.
+        val signed = mapOf(60 to 61, 64 to 63, 65 to 66, 67 to 68, 71 to 70, 72 to 73, 76 to 75, 77 to 78, 79 to 80, 83 to 82)
+        for ((key, note) in signed) assertEquals("$key", note, FluteNotes.signed(key))
+        for (key in listOf(62, 69, 74, 81, 84)) assertNull("$key", FluteNotes.signed(key))
     }
 }

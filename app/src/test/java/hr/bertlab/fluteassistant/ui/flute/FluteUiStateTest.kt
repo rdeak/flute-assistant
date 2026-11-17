@@ -235,20 +235,4 @@ class FluteUiStateTest {
         assertFalse(FluteUiState(tune = lamb).keepsScreenOn)
     }
 
-    @Test
-    fun `the level is chosen until the first note is judged`() {
-        val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
-        assertFalse(FluteUiState(tune = tune).choosesLevel)
-        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 0)).choosesLevel)
-        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 0, hearing = Hearing.QUIET_UNCLEAR)).choosesLevel) // "Come closer" has the line
-        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 1, walk = Walk(0, 0, Walk.Phase.REST))).choosesLevel) // an opening rest
-        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SOUNDING))).choosesLevel)
-        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, wrong = WrongNote(0, 62))).choosesLevel)
-        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 1), marks = mapOf(0 to StepMark.FIRST_TRY)).choosesLevel)
-        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, finishing = true)).choosesLevel)
-        // Lines that speak of a note already played never stand with the pair: only the prompt and the room's own advice.
-        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, repeatHeld = true)).choosesLevel)
-        assertFalse(FluteUiState(tune = tune, listening = Listening(index = 0, pitch = Pitch.HIGH)).choosesLevel)
-        assertTrue(FluteUiState(tune = tune, listening = Listening(index = 0, hearing = Hearing.LOUD_UNCLEAR)).choosesLevel)
-    }
 }
