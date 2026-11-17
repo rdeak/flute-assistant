@@ -3,17 +3,15 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.ui.common.KeyGap
+import hr.bertlab.fluteassistant.ui.common.KeyHeight
+import hr.bertlab.fluteassistant.ui.common.TabPadding
 import hr.bertlab.fluteassistant.ui.common.noteText
-import hr.bertlab.fluteassistant.ui.common.noteLabel
-import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.FingeringDiagram
-import hr.bertlab.fluteassistant.ui.common.FINGERING_ASPECT_RATIO
-import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.aspectRatio
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -274,7 +272,7 @@ fun FluteContent(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                        .padding(TabPadding),
                 ) {
                     MicrophonePermissionCard(
                         onRequestPermission = actions.onRequestMic,
@@ -309,7 +307,7 @@ fun FluteContent(
                     modifier = Modifier
                         .fitOrScroll(fits = maxHeight >= MetronomeMinHeight, minHeight = MetronomeMinHeight)
                         .closesTempoWheel(wheel)
-                        .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                        .padding(TabPadding),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
@@ -352,7 +350,7 @@ fun FluteContent(
                 Column(
                     modifier = Modifier
                         .fitOrScroll(fits = maxHeight >= ShelfMinHeight, minHeight = ShelfMinHeight)
-                        .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                        .padding(TabPadding),
                 ) {
                     TuneShelf(
                         books = state.shelf,
@@ -486,7 +484,7 @@ fun FluteContent(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(if (fits) Modifier else Modifier.verticalScroll(rememberScrollState()))
-                        .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                        .padding(TabPadding),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
@@ -541,14 +539,7 @@ fun FluteContent(
 private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ListenRoomGap)) {
         state.fingeringMidi?.let { midi ->
-            FingeringDiagram(
-                keys = FluteFingerings.keysFor(midi),
-                noteLabel = noteLabel(midi),
-                color = noteColor(midi),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(FINGERING_ASPECT_RATIO),
-            )
+            FingeringDiagram(midi, Modifier.fillMaxWidth())
         }
         if (prompt != null) AdviceLine(prompt) else AdviceLine(state.advice)
     }

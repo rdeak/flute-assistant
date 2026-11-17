@@ -46,7 +46,6 @@ internal object SidewaysGeometry {
     /** Seven keys a row: 48 wide with 6 gaps (7 * 48 + 6 * 6), or 40 wide with 4 gaps below [NARROW_CONTENT]. */
     private const val KEYS = 372f
     private const val KEYS_NARROW = 304f
-    private const val KEY_GAP = 6f
     private const val KEY_GAP_NARROW = 4f
 
     /** The button row under the keys: Play and Listen to me are 84 tall, and their 8 dp shadow ends level with the page's margin. */
@@ -64,17 +63,15 @@ internal object SidewaysGeometry {
      */
     private const val KEYS_SPENT = MARGIN * 2 + KEYS_BUTTONS + KEYS_TO_BUTTONS + KEY_ROW_GAPS
 
-    /** Every key row has its own 5 dp shadow, which the mockup counted only once. */
-    private const val KEY_SHADOW = 5f
-    private const val KEY_HEIGHT_MIN = 58f
+    /** A key is `KeyLook.kt`'s [KEY_HEIGHT] at the least, and every key row has its own shadow ([KEY_DEPTH]), which the mockup counted only once. */
     private const val KEY_HEIGHT_MAX = 88f
 
     /**
      * The window height under which writing cannot give its keys their least (three rows of
-     * [KEY_HEIGHT_MIN] and their shadows) and still have the buttons under them: 329. Under it the
+     * [KEY_HEIGHT] and their shadows) and still have the buttons under them: 329. Under it the
      * keys' column scrolls, as upright's tab does; the phones the layout was drawn for are all taller.
      */
-    const val WRITING_MIN_HEIGHT = KEYS_SPENT + 3 * (KEY_HEIGHT_MIN + KEY_SHADOW)
+    const val WRITING_MIN_HEIGHT = KEYS_SPENT + 3 * (KEY_HEIGHT + KEY_DEPTH)
 
     private const val RING_MAX = 304f
 
@@ -110,7 +107,7 @@ internal object SidewaysGeometry {
     private const val PITCH_WINDOW_WIDTH = 132f
 
     /**
-     * The least the fingering is given beside the window, 205 dp wide and about 30 tall. It is not
+     * The least the fingering is given beside the window, 205 dp wide and about 40 tall. It is not
      * higher because a camera hole takes width from the tab: an 800 wide phone with a hole of 45 dp
      * (the emulator's) or a 780 wide one with 30 leave 210 or 205, and both must keep the full-size
      * ring. The edge is a window 750 wide at 360 tall.
@@ -167,7 +164,7 @@ internal object SidewaysGeometry {
 
     /** A third of what the height leaves for the rows, less each row's shadow: 85 at 411, 68 at 360. */
     fun keyHeight(height: Float): Float =
-        ((height - KEYS_SPENT) / 3 - KEY_SHADOW).coerceIn(KEY_HEIGHT_MIN, KEY_HEIGHT_MAX)
+        ((height - KEYS_SPENT) / 3 - KEY_DEPTH).coerceIn(KEY_HEIGHT, KEY_HEIGHT_MAX)
 
     /**
      * The running staff's scale: the upright one's 4/3 where the card's height allows it, below that

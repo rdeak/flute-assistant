@@ -40,6 +40,7 @@ import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.Phone
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
 import hr.bertlab.fluteassistant.ui.common.needsDevice
@@ -81,16 +82,10 @@ class FluteSidewaysTest {
     private var chosenSignature: TimeSignature? = null
     private val chosenBooks = mutableListOf<Int>()
 
-    private class Phone(val width: Int, val height: Int) {
-        val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
-        val keysWidth: Float get() = SidewaysGeometry.keysWidth(contentWidth)
-        val keyGap: Float get() = SidewaysGeometry.keyGap(contentWidth)
-        val keyHeight: Float get() = SidewaysGeometry.keyHeight(height.toFloat())
-        val keyWidth: Float get() = (keysWidth - 6 * keyGap) / 7
-        val column: Float get() = SidewaysGeometry.columnWidth(height.toFloat())
-        val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
-        override fun toString() = "$width x $height"
-    }
+    private val Phone.keysWidth: Float get() = SidewaysGeometry.keysWidth(contentWidth)
+    private val Phone.keyGap: Float get() = SidewaysGeometry.keyGap(contentWidth)
+    private val Phone.keyHeight: Float get() = SidewaysGeometry.keyHeight(height.toFloat())
+    private val Phone.keyWidth: Float get() = (keysWidth - 6 * keyGap) / 7
 
     /** [FluteScreenTest]'s `show`, inside a phone on its side. */
     private fun show(initial: FluteUiState, locale: Locale = Locale.ENGLISH, fontScale: Float = 1f) {
@@ -869,7 +864,7 @@ class FluteSidewaysTest {
 
     /**
      * On its side the line stands at the top of the right column, as the advice does, on every phone; the fingering
-     * does not show there: the column is 116 dp wide and the diagram would be about 17 dp tall.
+     * does not show there: the column is 116 dp wide and the diagram would be about 23 dp tall.
      */
     @Test
     fun on_its_side_the_room_is_the_line_in_the_column_and_no_fingering() {

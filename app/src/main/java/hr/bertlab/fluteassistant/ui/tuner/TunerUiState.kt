@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.tuner
 
+import androidx.compose.runtime.Immutable
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
@@ -45,6 +46,11 @@ data class TunerUiState(
      * leaving it are logged (`tuner.guide`).
      */
     val guideCard: GuideCard? = null,
+    /**
+     * A fix on the flute the line still says in the silence after it, or [TunerAdvice.NONE]: `FixHold` decides it and
+     * [TunerViewModel] feeds it. Kept here, not in the screen, so a turn keeps it.
+     */
+    val heldFix: TunerAdvice = TunerAdvice.NONE,
 ) {
     /** Distance in cents from [targetMidi] to the played note (positive = sharp), or null in silence. */
     val centsOffTarget: Double?
@@ -111,8 +117,8 @@ data class TunerUiState(
         }
 
     /**
-     * The one line of advice under the status line, derived so the composable only maps an
-     * enum to a string. A reading wins over [hearing], and the reference tone wins over both.
+     * What to change, which the tuner's one line says when there is something ([line]). A reading wins over
+     * [hearing], and the reference tone wins over both.
      * A flat or sharp note gets rolling, except when the child tunes on [FluteRange.TUNING_NOTE]:
      * the head joint is set once, on that note, and every other note drifts by itself and is
      * fixed with the lips, so only there does it name the head joint.
@@ -137,6 +143,47 @@ data class TunerUiState(
             }
         }
 
+    /**
+     * Whether the flute's pressed keys are in the note's colour (since 2026-11-18, the calmer Tune view): while it helps,
+     * before a sound (how to play the note) and when another note or octave is heard; grey (a quiet one, readable at night too) while the right note sounds,
+     * flat, sharp or in tune, so the eyes go to the window. In Which? nothing is ever another note, so it is lit only in
+     * silence, where it has no note to show.
+     */
+    val fingeringLit: Boolean
+        get() = status == TuningStatus.NONE || mismatch != TargetMismatch.NONE
+
+    /**
+     * Whether a tap on the window plays the chosen note (since 2026-11-18, when the Hear button went): in Tune mode, in
+     * silence only. Not while the note already plays, and not while the child plays, as a finger on the bubble would
+     * start the note and blank the reading for its two seconds (the user's call, the same day).
+     */
+    val tapPlaysNote: Boolean
+        get() = mode == TunerMode.TARGET && !isPlayingReference && reading == null
+
+    /**
+     * Plain silence: nothing heard, nothing to say about the sound, no note playing and the microphone fine. Only it
+     * keeps a fix on the line ([heldFix]).
+     */
+    val isPlainSilence: Boolean
+        get() = status == TuningStatus.NONE && advice == TunerAdvice.NONE && !isPlayingReference && !micFailed
+
+    /**
+     * What the tuner's one line says, the first of these that holds: the microphone failed; what to change, as a flat
+     * or sharp reading always carries [advice] (so "A little higher" and "That's E4" are never on the line: the
+     * window's bubble and arrow say up or down and name another note); listen, while the chosen note plays; the cheer
+     * in tune; a fix on the flute kept through the silence after it ([heldFix]); else the prompt to play.
+     */
+    val line: TunerLine
+        get() = when {
+            micFailed -> TunerLine.MicFailed
+            advice != TunerAdvice.NONE -> TunerLine.Advice(advice)
+            isPlayingReference -> TunerLine.Listen
+            status == TuningStatus.IN_TUNE -> TunerLine.InTune
+            heldFix != TunerAdvice.NONE -> TunerLine.Advice(heldFix)
+            mode == TunerMode.TARGET -> TunerLine.PlayNote(targetMidi)
+            else -> TunerLine.PlayAnyNote
+        }
+
     /** Tuning the flute itself: Tune mode with the tuning note chosen. */
     private val isTuningNote: Boolean
         get() = mode == TunerMode.TARGET && targetMidi == FluteRange.TUNING_NOTE
@@ -156,3 +203,27 @@ enum class TuningStatus { NONE, IN_TUNE, LOW, HIGH }
 
 /** Whether the heard note in target mode is the chosen one, its octave, or another note altogether. */
 enum class TargetMismatch { NONE, OCTAVE_UP, OCTAVE_DOWN, OTHER_NOTE }
+
+/**
+ * What the tuner's one line says ([TunerUiState.line]): the screen only turns it into words. Immutable, so the line is
+ * drawn again when what it says changes and not on every frame the microphone hears.
+ */
+@Immutable
+sealed interface TunerLine {
+    /** The microphone would not open or stopped. */
+    data object MicFailed : TunerLine
+
+    /** What to change. A fix on the flute ([TunerAdvice.isFluteFix]) opens the guide when tapped. */
+    data class Advice(val advice: TunerAdvice) : TunerLine
+
+    /** The chosen note is playing. */
+    data object Listen : TunerLine
+
+    data object InTune : TunerLine
+
+    /** Silence in Tune mode: play the chosen note, [midi]. */
+    data class PlayNote(val midi: Int) : TunerLine
+
+    /** Silence in Which? mode: play any note. */
+    data object PlayAnyNote : TunerLine
+}

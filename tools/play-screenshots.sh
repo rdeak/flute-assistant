@@ -93,8 +93,8 @@ print(\"CDEFGAB\".index(letter) + 7 * (octave - lowest) + 1)" "$name")
   echo "$name -> staff position $pos"
 }
 
-run_language() { # lang, flute tab, metronome tab, tuner tab, notes tab, play, stop, target-mode pill, tune notes...
-  local L=$1 TAB_FLUTE=$2 TAB_METRONOME=$3 TAB_TUNER=$4 TAB_NOTES=$5 PLAY=$6 STOP=$7 TARGET=$8; shift 8
+run_language() { # lang, flute tab, metronome tab, tuner tab, notes tab, fingers tab, play, stop, target-mode pill, tune notes...
+  local L=$1 TAB_FLUTE=$2 TAB_METRONOME=$3 TAB_TUNER=$4 TAB_NOTES=$5 TAB_FINGERS=$6 PLAY=$7 STOP=$8 TARGET=$9; shift 9
   local TUNE=("$@") last i n r x y
   last=${TUNE[$((${#TUNE[@]} - 1))]}
   $ADB shell pm clear $PKG >/dev/null
@@ -123,14 +123,16 @@ run_language() { # lang, flute tab, metronome tab, tuner tab, notes tab, play, s
   tap "$TAB_NOTES"; $ADB shell sleep 1
   for i in 1 2 3; do answer_note; $ADB shell sleep 1.6; done
   answer_note; $ADB shell sleep 0.3; shot "$L" 4-notes; $ADB shell sleep 1.5
+  # Fingers (since 2026-11-17): G in every octave, a beginner's first left-hand note, with the keys to press.
+  tap "$TAB_FINGERS"; $ADB shell sleep 1; tap G; $ADB shell sleep 1; shot "$L" 5-fingers
 }
 
 $ADB install -r app/build/outputs/apk/debug/app-debug.apk >/dev/null || exit 1
 $ADB shell cmd uimode night no >/dev/null
 both_languages() {
   rm -f "$OUT"/*/[0-9]-*.jpg # a renamed tab must not leave its old shot behind
-  run_language en Flute Metronome Tuner Notes Play Stop Tune C4 C4 G4 G4 A4 A4 G4
-  run_language hr Flauta Metronom Štimer Note Sviraj Stani Ugodi c1 c1 g1 g1 a1 a1 g1
+  run_language en Flute Metronome Tuner Notes Fingers Play Stop Tune C4 C4 G4 G4 A4 A4 G4
+  run_language hr Flauta Metronom Štimer Note Hvatovi Sviraj Stani Ugodi c1 c1 g1 g1 a1 a1 g1
 }
 demo() { $ADB shell am broadcast -a com.android.systemui.demo -e command "$@" >/dev/null; } # the status bar's demo mode
 tablet_pass() { # slot, wm size, user_rotation

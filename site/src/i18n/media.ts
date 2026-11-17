@@ -26,6 +26,7 @@ const order: Record<FeatureId, string> = {
   metronome: '2-metronome',
   tuner: '3-tuner',
   notes: '4-notes',
+  fingers: '5-fingers',
 };
 
 /** The phone screenshot of a tab in a language, or in English when that language has none. */

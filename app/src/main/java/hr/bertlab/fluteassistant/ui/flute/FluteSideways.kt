@@ -111,7 +111,7 @@ internal fun FluteWritingSideways(
  * top and Stop low on the right, in Listen to me's corner, under the thumb that started the run.
  * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`. [prompt], "Play B4" before the first note
  * of a "Your turn" is judged, stands where the advice does. The fingering a wrong note brings upright
- * does not show here: the column is 116 dp wide and the diagram would be about 17 dp tall; its line,
+ * does not show here: the column is 116 dp wide and the diagram would be about 23 dp tall; its line,
  * "Check your fingers", is one of the advices and does.
  */
 @Composable

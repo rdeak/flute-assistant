@@ -33,6 +33,7 @@ import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
+import hr.bertlab.fluteassistant.ui.common.TabPadding
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.ActionStop
@@ -100,7 +101,7 @@ fun MetronomeContent(
             modifier = Modifier
                 .fitOrScroll(fits = maxHeight >= MetronomeMinHeight, minHeight = MetronomeMinHeight)
                 .closesTempoWheel(wheel)
-                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                .padding(TabPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {

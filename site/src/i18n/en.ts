@@ -9,7 +9,7 @@ export const en: Strings = {
   meta: {
     title: 'Flute Assistant – flute tuner, metronome and notes for kids',
     description:
-      'A free Android app for children learning the flute: a digital flute, a metronome with animals, a flute tuner and a note reading game. No ads, works offline.',
+      'A free Android app for children learning the flute: a digital flute, a metronome with animals, a flute tuner, a note reading game and a flute fingering chart. No ads, works offline.',
     ogImageAlt:
       'Flute Assistant: the Android robot playing the flute, with the words Flute, metronome, tuner and notes.',
   },
@@ -19,28 +19,28 @@ export const en: Strings = {
   hero: {
     eyebrow: 'Free for Android',
     title: 'The flute app for kids who are just starting',
-    lead: 'Play a tune, keep the beat, tune your flute and learn to read notes. Four big, friendly screens for primary-school children, with almost nothing to read.',
+    lead: 'Play a tune, keep the beat, tune your flute, learn to read notes and find the fingers for every note. Five big, friendly screens for primary-school children, with almost nothing to read.',
     chips: ['Free', 'No ads', 'Works offline', 'English and Croatian'],
     platform: 'For Android phones and tablets',
     shotAlt: 'Flute Assistant on a tablet and a phone: a tune on a staff beside colourful note keys, and the metronome’s ring of animals.',
   },
   badgeAlt: 'Get it on Google Play',
   features: {
-    title: 'Four screens, one flute friend',
+    title: 'Five screens, one flute friend',
     lead: 'Everything a young flute player reaches for at a lesson or at home, in one app.',
     items: [
       {
         id: 'flute',
         name: 'Flute',
         title: 'Play it, see it written, hear it back',
-        text: 'Fifteen colourful keys in three rows. Hold a key to hear its note: the longer you hold it, the longer the note. Your tune is written on a real staff, with the note names underneath.',
+        text: 'Fifteen colourful keys in three rows, and a ♯♭ key for the sharps and flats. Hold a key to hear its note: the longer you hold it, the longer the note. Join two notes with ⌒ for a slur. Your tune is written on a real staff, with the note names underneath.',
         points: [
           'Hear your tune played back',
-          'Press “Listen to me”, play the tune on your own flute and get a star for every note you get right',
+          'Press “Listen to me”, play the tune on your own flute and get a star for every note you get right, or a sign that says what to change',
           'Six little books keep six tunes',
         ],
         shotAlt:
-          'The Flute screen: a short tune on a staff with the note names under it, and fifteen colourful note keys.',
+          'The Flute screen: a short tune on a staff with the note names under it, fifteen colourful note keys and the ♯♭ and ⌒ keys.',
       },
       {
         id: 'metronome',
@@ -59,9 +59,14 @@ export const en: Strings = {
         id: 'tuner',
         name: 'Tuner',
         title: 'Bring the note home',
-        text: 'Play a note and watch it float above or below its home ring. The tuner says “A little higher” or “A little lower” and gives a tip, like rolling the flute in or using gentler air. Bring the note home for “Perfect!”.',
-        points: ['Or pick a note, hear it and see its fingering', 'No numbers to read'],
-        shotAlt: 'The Tuner screen: the note to tune to in its home ring, a Hear button and the note’s fingering.',
+        text: 'Play a note and watch it float above or below its home ring. One line tells you what to change, like rolling the flute in a little, using gentler air or pushing the head joint in. Bring the note home for “Perfect!”.',
+        points: [
+          'Or pick a note, tap it to hear it and see its fingering on a drawing of the flute',
+          'Tap a tip about the flute for four pictures on how to tune it',
+          'No numbers to read',
+        ],
+        shotAlt:
+          'The Tuner screen: the note to tune to in its home ring between two arrows, and under it the flute with the note’s fingering.',
       },
       {
         id: 'notes',
@@ -74,6 +79,19 @@ export const en: Strings = {
           'Fifteen notes across the flute’s first two octaves',
         ],
         shotAlt: 'The Notes screen: the Find and Hear games, a note found on the staff, and stars for the round so far.',
+      },
+      {
+        id: 'fingers',
+        name: 'Fingers',
+        title: 'Which fingers for this note?',
+        text: 'Pick a note with the letter keys, or its sharp or flat with ♯♭, and see it in every octave the flute plays: the note on the staff, its name, and the flute as you see it when you play, with the keys to press filled in. Tap a flute to tune that note.',
+        points: [
+          'Every key of a concert flute, the trill keys too',
+          'Every note from middle C up three octaves',
+          'Left hand and right hand marked on every flute',
+        ],
+        shotAlt:
+          'The Fingers screen: G in three octaves, each on a small staff beside a drawing of the flute with the keys to press filled in, and the letter keys below.',
       },
     ],
   },
@@ -96,7 +114,7 @@ export const en: Strings = {
   },
   teachers: {
     title: 'Do you teach the flute?',
-    text: 'Tell your pupils about Flute Assistant. The metronome keeps going while sheet music is open in another app, and the tuner shows a beginner which way to go without a single number.',
+    text: 'Tell your pupils about Flute Assistant. The metronome keeps going while sheet music is open in another app, the tuner shows a beginner which way to go without a single number, and the fingering chart shows every note on the whole concert flute.',
     share: 'Share this page',
     shareText: 'Flute Assistant: a free flute app for kids who are just starting',
     copied: 'Link copied',
@@ -114,11 +132,15 @@ export const en: Strings = {
       },
       {
         q: 'Which flute does it work with?',
-        a: 'The concert (transverse) flute: the tuner, the fingerings and the fifteen notes follow the flute’s first two octaves. The metronome and the note reading game help any young musician.',
+        a: 'The concert (transverse) flute. The tuner and the fingering chart cover every note from middle C up three octaves, and the digital flute plays the first two. The metronome and the note reading game help any young musician.',
+      },
+      {
+        q: 'Does it show flute fingerings?',
+        a: 'Yes. The Fingers screen shows every note from middle C up three octaves on a drawing of the concert flute, with the keys to press filled in, and the tuner shows the fingering of the note being tuned.',
       },
       {
         q: 'How do I tune a flute with it?',
-        a: 'Open the Tuner and play one long, steady note, such as A. If the note floats above its ring, the app says “A little lower” and gives a tip, like rolling the flute in a little or using gentler air. When the note comes home, it says “Perfect!”.',
+        a: 'Open the Tuner, choose A in Tune and play one long, steady A. If it floats above its ring, the tuner tells you to pull the head joint out a little; tap that tip for four pictures on tuning the flute. On other notes it says what to change, like rolling the flute in a little or using gentler air. When the note comes home, it says “Perfect!”.',
       },
       {
         q: 'Does it need the internet?',
@@ -167,13 +189,14 @@ export const en: Strings = {
   },
   app: {
     description:
-      'A free Android app for primary-school children learning the flute, with a digital flute, a metronome, a flute tuner and a note reading game.',
+      'A free Android app for primary-school children learning the flute, with a digital flute, a metronome, a flute tuner, a note reading game and a flute fingering chart.',
     features: [
-      'Digital flute with fifteen note keys that writes the tune on a staff',
-      'Listen to me: follows the tune played on a real flute and gives a star for every right note',
+      'Digital flute with fifteen note keys, sharps and flats and slurs, that writes the tune on a staff',
+      'Listen to me: follows the tune played on a real flute, gives a star for every right note and says what to change',
       'Metronome with five animal speeds and two to six beats in a bar',
-      'Flute tuner with tips and fingerings, without numbers',
+      'Flute tuner with tips, fingerings and a guide to tuning, without numbers',
       'Two note reading games on the treble staff: Find (place the named note) and Hear (write a short tune by ear)',
+      'Flute fingering chart: every note from middle C up three octaves on a drawing of the concert flute, every key included',
       'No ads, no account, no data collected, works offline',
     ],
   },

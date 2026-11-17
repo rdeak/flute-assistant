@@ -41,6 +41,7 @@ import hr.bertlab.fluteassistant.ui.AppTab
 import hr.bertlab.fluteassistant.ui.SideRail
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
+import hr.bertlab.fluteassistant.ui.common.Phone
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
 import org.junit.Assert.assertEquals
@@ -65,12 +66,6 @@ class MetronomeSidewaysTest {
     private lateinit var state: MutableState<MetronomeUiState>
     private var phone by mutableStateOf(Phone(915, 411))
     private var toggles = 0
-
-    private class Phone(val width: Int, val height: Int) {
-        val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
-        val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
-        override fun toString() = "$width x $height"
-    }
 
     private fun show(
         initial: MetronomeUiState = MetronomeUiState(),

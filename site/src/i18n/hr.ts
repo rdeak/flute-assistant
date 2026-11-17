@@ -9,7 +9,7 @@ export const hr: Strings = {
   meta: {
     title: 'Flute Assistant – štimer, metronom i note za male flautiste',
     description:
-      'Besplatna Android aplikacija za djecu koja uče flautu: digitalna flauta, metronom sa životinjama, štimer i igra čitanja nota. Bez oglasa, radi bez interneta.',
+      'Besplatna Android aplikacija za djecu koja uče flautu: digitalna flauta, metronom sa životinjama, štimer, igra čitanja nota i hvatovi za flautu. Bez oglasa, radi bez interneta.',
     ogImageAlt: 'Flute Assistant: Android robot svira flautu.',
   },
   skipLink: 'Preskoči na sadržaj',
@@ -18,27 +18,27 @@ export const hr: Strings = {
   hero: {
     eyebrow: 'Besplatno za Android',
     title: 'Aplikacija za flautu za djecu koja tek počinju',
-    lead: 'Odsviraj pjesmicu, drži ritam, ugodi flautu i nauči čitati note. Četiri velika, vesela ekrana za djecu u osnovnoj školi, gotovo bez čitanja.',
+    lead: 'Odsviraj pjesmicu, drži ritam, ugodi flautu, nauči čitati note i pronađi hvat za svaku notu. Pet velikih, veselih ekrana za djecu u osnovnoj školi, gotovo bez čitanja.',
     chips: ['Besplatno', 'Bez oglasa', 'Radi bez interneta', 'Hrvatski i engleski'],
     platform: 'Za Android mobitele i tablete',
     shotAlt: 'Flute Assistant na tabletu i mobitelu: pjesmica na crtovlju uz šarene tipke s notama i metronomov krug sa životinjama.',
   },
   badgeAlt: 'Preuzmite na Google Playu',
   features: {
-    title: 'Četiri ekrana, jedan prijatelj za flautu',
+    title: 'Pet ekrana, jedan prijatelj za flautu',
     lead: 'Sve što mali flautist treba na satu ili kod kuće, u jednoj aplikaciji.',
     items: [
       {
         id: 'flute',
         name: 'Flauta',
         title: 'Odsviraj, vidi zapisano, poslušaj',
-        text: 'Petnaest šarenih tipki u tri reda. Drži tipku da čuješ ton: što je dulje držiš, to je nota dulja. Tvoja se pjesmica zapisuje na pravo crtovlje, s imenima nota ispod.',
+        text: 'Petnaest šarenih tipki u tri reda i tipka ♯♭ za povisilice i snizilice. Drži tipku da čuješ ton: što je dulje držiš, to je nota dulja. Tipkom ⌒ povežeš dvije note u legato. Tvoja se pjesmica zapisuje na pravo crtovlje, s imenima nota ispod.',
         points: [
           'Poslušaj svoju pjesmicu',
-          'Pritisni „Poslušaj me“, odsviraj pjesmicu na svojoj flauti i dobij zvjezdicu za svaku pogođenu notu',
+          'Pritisni „Poslušaj me“, odsviraj pjesmicu na svojoj flauti i dobij zvjezdicu za svaku pogođenu notu ili znak što trebaš popraviti',
           'Šest knjižica čuva šest pjesmica',
         ],
-        shotAlt: 'Ekran Flauta: kratka pjesmica na crtovlju s imenima nota ispod i petnaest šarenih tipki.',
+        shotAlt: 'Ekran Flauta: kratka pjesmica na crtovlju s imenima nota ispod, petnaest šarenih tipki te tipke ♯♭ i ⌒.',
       },
       {
         id: 'metronome',
@@ -57,9 +57,13 @@ export const hr: Strings = {
         id: 'tuner',
         name: 'Štimer',
         title: 'Vrati notu kući',
-        text: 'Odsviraj ton i gledaj kako lebdi iznad ili ispod svoje kućice. Štimer kaže „Malo više“ ili „Malo niže“ i da savjet, na primjer da malo zakreneš flautu ili puhneš nježnije. Vrati notu kući za „Savršeno!“.',
-        points: ['Ili odaberi notu, poslušaj je i pogledaj prstomet', 'Bez brojeva za čitanje'],
-        shotAlt: 'Ekran Štimer: nota za ugađanje u svojoj kućici, tipka Slušaj i prstomet te note.',
+        text: 'Odsviraj ton i gledaj kako lebdi iznad ili ispod svoje kućice. Jedan redak kaže što promijeniti, na primjer da malo zakreneš flautu, puhneš nježnije ili gurneš glavu flaute unutra. Vrati notu kući za „Savršeno!“.',
+        points: [
+          'Ili odaberi notu, dodirni je da je čuješ i pogledaj njezin hvat na crtežu flaute',
+          'Dodirni savjet o flauti za četiri slike o tome kako je ugoditi',
+          'Bez brojeva za čitanje',
+        ],
+        shotAlt: 'Ekran Štimer: nota za ugađanje u svojoj kućici između dvije strelice, a ispod nje flauta s hvatom te note.',
       },
       {
         id: 'notes',
@@ -72,6 +76,19 @@ export const hr: Strings = {
           'Petnaest nota kroz prve dvije oktave flaute',
         ],
         shotAlt: 'Ekran Note: igre Nađi i Slušaj, pronađena nota na crtovlju i zvjezdice za ovaj krug.',
+      },
+      {
+        id: 'fingers',
+        name: 'Hvatovi',
+        title: 'Koji prsti za ovu notu?',
+        text: 'Odaberi notu tipkom sa slovom, ili njezinu povisilicu i snizilicu tipkom ♯♭, i vidi je u svakoj oktavi koju flauta svira: notu na crtovlju, njezino ime i flautu kakvu vidiš dok sviraš, s obojenim tipkama koje pritišćeš. Dodirni flautu da ugodiš tu notu.',
+        points: [
+          'Sve tipke koncertne flaute, i one za trilere',
+          'Sve note od c1 tri oktave naviše',
+          'Lijeva i desna ruka označene na svakoj flauti',
+        ],
+        shotAlt:
+          'Ekran Hvatovi: g u tri oktave, svaki na malom crtovlju uz crtež flaute s obojenim tipkama koje treba pritisnuti, i tipke sa slovima ispod.',
       },
     ],
   },
@@ -94,7 +111,7 @@ export const hr: Strings = {
   },
   teachers: {
     title: 'Predajete flautu?',
-    text: 'Preporučite Flute Assistant svojim učenicima. Metronom kuca i dok su note otvorene u drugoj aplikaciji, a štimer početniku pokazuje kamo treba ići, bez ijednog broja.',
+    text: 'Preporučite Flute Assistant svojim učenicima. Metronom kuca i dok su note otvorene u drugoj aplikaciji, štimer početniku pokazuje kamo treba ići, bez ijednog broja, a hvatovi pokazuju svaku notu na cijeloj koncertnoj flauti.',
     share: 'Podijelite ovu stranicu',
     shareText: 'Flute Assistant: besplatna aplikacija za djecu koja tek uče flautu',
     copied: 'Poveznica je kopirana',
@@ -112,11 +129,15 @@ export const hr: Strings = {
       },
       {
         q: 'S kojom flautom radi?',
-        a: 'S koncertnom (poprečnom) flautom: štimer, prstomet i petnaest nota prate prve dvije oktave flaute. Metronom i igra čitanja nota pomoći će svakom malom glazbeniku.',
+        a: 'S koncertnom (poprečnom) flautom. Štimer i hvatovi pokrivaju sve note od c1 tri oktave naviše, a digitalna flauta svira prve dvije. Metronom i igra čitanja nota pomoći će svakom malom glazbeniku.',
+      },
+      {
+        q: 'Pokazuje li hvatove za flautu?',
+        a: 'Da. Ekran Hvatovi pokazuje svaku notu od c1 tri oktave naviše na crtežu koncertne flaute, s obojenim tipkama koje treba pritisnuti, a štimer pokazuje hvat note koju ugađate.',
       },
       {
         q: 'Kako se njime ugađa flauta?',
-        a: 'Otvorite Štimer i odsvirajte jedan dug, miran ton, na primjer A. Ako ton lebdi iznad svoje kućice, aplikacija kaže „Malo niže“ i da savjet, na primjer da malo zakrenete flautu ili puhnete nježnije. Kad se ton vrati kući, piše „Savršeno!“.',
+        a: 'Otvorite Štimer, odaberite a1 u načinu Ugodi i odsvirajte jedan dug, miran a1. Ako lebdi iznad svoje kućice, štimer kaže da malo izvučete glavu flaute; dodirnite taj savjet za četiri slike o ugađanju flaute. Na drugim notama kaže što promijeniti, na primjer da malo zakrenete flautu ili puhnete nježnije. Kad se ton vrati kući, piše „Savršeno!“.',
       },
       {
         q: 'Treba li aplikaciji internet?',
@@ -165,13 +186,14 @@ export const hr: Strings = {
   },
   app: {
     description:
-      'Besplatna Android aplikacija za djecu u osnovnoj školi koja uče flautu: digitalna flauta, metronom, štimer za flautu i igra čitanja nota.',
+      'Besplatna Android aplikacija za djecu u osnovnoj školi koja uče flautu: digitalna flauta, metronom, štimer za flautu, igra čitanja nota i hvatovi za flautu.',
     features: [
-      'Digitalna flauta s petnaest tipki koja pjesmicu zapisuje na crtovlje',
-      'Poslušaj me: prati pjesmicu odsviranu na pravoj flauti i daje zvjezdicu za svaku pogođenu notu',
+      'Digitalna flauta s petnaest tipki, povisilicama, snizilicama i legatom, koja pjesmicu zapisuje na crtovlje',
+      'Poslušaj me: prati pjesmicu odsviranu na pravoj flauti, daje zvjezdicu za svaku pogođenu notu i kaže što popraviti',
       'Metronom s pet životinja za brzinu i od dvije do šest doba u taktu',
-      'Štimer za flautu sa savjetima i prstometom, bez brojeva',
+      'Štimer za flautu sa savjetima, hvatovima i uputama za ugađanje, bez brojeva',
       'Dvije igre čitanja nota na crtovlju s violinskim ključem: Nađi (smjesti notu po imenu) i Slušaj (zapiši kratku melodiju po sluhu)',
+      'Hvatovi za flautu: svaka nota od c1 tri oktave naviše na crtežu koncertne flaute, sa svim tipkama',
       'Bez oglasa, bez računa, bez prikupljanja podataka, radi bez interneta',
     ],
   },

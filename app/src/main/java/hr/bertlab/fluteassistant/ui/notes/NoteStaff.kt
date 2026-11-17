@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.toSize
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
+import hr.bertlab.fluteassistant.ui.common.drawStaffClef
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
@@ -128,13 +128,6 @@ private const val HEAD_RY = 0.42f
 /** A wrong place's cross circle, in pitches. */
 private const val CROSS_RADIUS = 0.45f
 
-/**
- * The clef is drawn small and faint, as on the canvas: one of its units is this share of a
- * space, and its curl ([CLEF_CURL] units below its origin) sits on the G line.
- */
-private const val CLEF_SCALE = 0.62f
-private const val CLEF_CURL = 3.15f
-private const val G_LINE = 4
 
 /** A ledger line's half length, in pitches: a little past the note head each side. */
 private const val LEDGER_HALF = 1f
@@ -276,7 +269,8 @@ fun NoteStaff(
             for (position in StaffNotes.LINE_POSITIONS) {
                 drawLine(colors.text, Offset(0f, yOf(position)), Offset(size.width, yOf(position)), lineWidth)
             }
-            drawTrebleClef(space * CLEF_SCALE, Offset(space * 0.15f, yOf(G_LINE) - space * CLEF_SCALE * CLEF_CURL), colors.mutedText.copy(alpha = 0.4f))
+            // Small and faint, as on the canvas.
+            drawStaffClef(space, yOf(StaffNotes.G_LINE), x = space * 0.15f, color = colors.mutedText.copy(alpha = 0.4f))
 
             fun emoji(text: String, centre: Offset, sizePx: Float, alpha: Float = 1f) {
                 val layout = sparkle.measure(text, emojiStyle.copy(fontSize = (sizePx / density / fontScale).sp))

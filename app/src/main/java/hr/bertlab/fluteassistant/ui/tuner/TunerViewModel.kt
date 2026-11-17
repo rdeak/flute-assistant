@@ -11,12 +11,14 @@ import hr.bertlab.fluteassistant.audio.tuner.ReferenceTonePlayer
 import hr.bertlab.fluteassistant.audio.tuner.TunerEngine
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
+import hr.bertlab.fluteassistant.domain.listen.FixHold
 import hr.bertlab.fluteassistant.domain.listen.FrameDecision
 import hr.bertlab.fluteassistant.domain.listen.FrameSummary
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.HearingTracker
 import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.settings.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
@@ -45,7 +47,8 @@ import kotlin.math.log2
  * - keeps the identified note (the ring of [TunerMode.IDENTIFY]) through a drift just past the
  *   halfway point to a neighbouring note until it has lasted [ListenRules.SWITCH_FRAMES],
  * - tells the screen when sound keeps coming without ever becoming a note ([Hearing], judged
- *   by [HearingTracker]), so it can say what to change.
+ *   by [HearingTracker]), so it can say what to change,
+ * - keeps a fix on the flute on the line a while after the sound stops ([FixHold]).
  *
  * It also writes the tuner's structured log under [LogTags.TUNER]: what became of every frame
  * ([FrameDecision], verbose), a `tuner.summary` every [ListenRules.SUMMARY_FRAMES] frames, `tuner.reading`
@@ -73,6 +76,7 @@ class TunerViewModel @Inject constructor(
     /** Shown frames in a row whose note is not the identified one but still within reach of it; see [identify]. */
     private var driftFrames = 0
     private val hearingTracker = HearingTracker()
+    private val fixHold = FixHold()
     private val summary = FrameSummary()
     private var loggedReadingMidi: Int? = null
 
@@ -138,11 +142,12 @@ class TunerViewModel @Inject constructor(
 
     /**
      * Sounds the chosen note for [REFERENCE_TONE_MS] at [TONE_VOLUME]. Readings pause meanwhile
-     * (the microphone would otherwise measure the speaker) and start afresh when it ends.
+     * (the microphone would otherwise measure the speaker) and start afresh when it ends. Only when a tap on the
+     * window plays the note ([TunerUiState.tapPlaysNote]: Tune mode, in silence); otherwise it does nothing.
      */
     fun playTargetNote() {
-        playJob?.cancel()
         val current = _state.value
+        if (!current.tapPlaysNote) return
         logger.d(LogTags.TUNER, "tuner.reference", "midi" to current.targetMidi, "ms" to REFERENCE_TONE_MS, "volume" to TONE_VOLUME)
         tonePlayer.play(
             NoteMath.midiToFrequency(current.targetMidi),
@@ -169,10 +174,14 @@ class TunerViewModel @Inject constructor(
         _state.update { it.copy(isPlayingReference = false) }
     }
 
-    /** Opens the guide to tuning the flute, always on its first card. The microphone stays on underneath. */
-    fun openGuide() {
-        logger.d(LogTags.TUNER, "tuner.guide", "action" to "open", "page" to GuideCard.WARM_UP.ordinal)
-        _state.update { it.copy(guideCard = GuideCard.WARM_UP) }
+    /**
+     * Opens the guide to tuning the flute on [card]: the one the tuner's line names (`TunerAdvice.guideCard`), the only
+     * way in since 2026-11-18, when the How? button went. The microphone stays on underneath.
+     */
+    fun openGuide(card: GuideCard) {
+        logger.d(LogTags.TUNER, "tuner.guide", "action" to "open", "page" to card.ordinal, "via" to "line")
+        dropHeldFix() // it has led here; the line starts afresh when the guide closes
+        _state.update { it.copy(guideCard = card) }
     }
 
     /** Shows [card] of an open guide; does nothing while it is closed. */
@@ -187,6 +196,17 @@ class TunerViewModel @Inject constructor(
         val card = _state.value.guideCard ?: return
         logger.d(LogTags.TUNER, "tuner.guide", "action" to "close", "page" to card.ordinal, "via" to via.name.lowercase())
         _state.update { it.copy(guideCard = null) }
+    }
+
+    /**
+     * Opens [midi] in Tune mode, as a tap on a flute of the Fingers tab asks (since 2026-11-18): the mode and the note
+     * set as the child would set them, both remembered and logged as theirs, and an open guide closed, so the tab
+     * shows the note's window and not a card.
+     */
+    fun tune(midi: Int) {
+        closeGuide(GuideExit.FINGERS)
+        if (_state.value.mode != TunerMode.TARGET) setMode(TunerMode.TARGET)
+        setTargetNote(midi)
     }
 
     /** Switches between naming the heard note and measuring against the chosen one; remembered. */
@@ -207,6 +227,7 @@ class TunerViewModel @Inject constructor(
         val runMean = hearingTracker.levelMean // read before onFrame, which empties the window when the run ends
         val hearing = hearingTracker.onFrame(frame.level, decision)
         updateHearing(hearing, if (hearing == Hearing.CLEAR) runMean else hearingTracker.levelMean)
+        holdFix()
         summary.add(frame, decision)
         if (summary.frames >= ListenRules.SUMMARY_FRAMES) logSummary()
         logReadingIfChanged()
@@ -276,11 +297,24 @@ class TunerViewModel @Inject constructor(
         logger.d(LogTags.TUNER, "tuner.hearing", "hearing" to hearing, "levelMean" to levelMean)
     }
 
-    /** Ends any unclear-sound run, for when the listening starts afresh or the microphone is not the child's. */
+    /** Ends any unclear-sound run and drops a held fix, for when the listening starts afresh or the microphone is not the child's. */
     private fun clearHearing() {
         val runMean = hearingTracker.levelMean
         hearingTracker.reset()
         updateHearing(Hearing.CLEAR, runMean)
+        dropHeldFix()
+    }
+
+    /** After a frame: a fix on the flute stays on the line through the silence that follows it ([FixHold]). */
+    private fun holdFix() {
+        val now = _state.value
+        val held = fixHold.onFrame(now.advice, now.isPlainSilence)
+        if (held != now.heldFix) _state.update { it.copy(heldFix = held) }
+    }
+
+    private fun dropHeldFix() {
+        fixHold.clear()
+        _state.update { it.copy(heldFix = TunerAdvice.NONE) }
     }
 
     private fun logSummary() {

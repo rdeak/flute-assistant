@@ -3,7 +3,10 @@
 
 package hr.bertlab.fluteassistant.domain.tuner
 
+import hr.bertlab.fluteassistant.domain.tuner.FluteKey.B_FLAT_LEVER
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.C_SHARP
+import hr.bertlab.fluteassistant.domain.tuner.FluteKey.D_SHARP_TRILL
+import hr.bertlab.fluteassistant.domain.tuner.FluteKey.D_TRILL
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.E_FLAT
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.G_SHARP
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.L1
@@ -14,7 +17,9 @@ import hr.bertlab.fluteassistant.domain.tuner.FluteKey.R1
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.R2
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.R3
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.THUMB
+import hr.bertlab.fluteassistant.domain.tuner.FluteKey.THUMB_B_FLAT
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -54,12 +59,31 @@ class FluteFingeringsTest {
     }
 
     @Test
-    fun `every flute note has a fingering except the two that need trill keys`() {
-        for (midi in FluteRange.midiRange) {
-            if (midi == 94 || midi == 95) assertNull("midi $midi", FluteFingerings.keysFor(midi))
-            else assertNotNull("midi $midi", FluteFingerings.keysFor(midi))
-        }
+    fun `the two notes under c4 use a trill key and no E flat key`() {
+        assertEquals(setOf(THUMB, R1, D_TRILL), FluteFingerings.keysFor(94)) // b3
+        assertEquals(setOf(THUMB, L1, L3, D_SHARP_TRILL), FluteFingerings.keysFor(95)) // h3
+    }
+
+    @Test
+    fun `every flute note has a fingering`() {
+        for (midi in FluteRange.midiRange) assertNotNull("midi $midi", FluteFingerings.keysFor(midi))
         assertNull(FluteFingerings.keysFor(59))
         assertNull(FluteFingerings.keysFor(97))
+    }
+
+    @Test
+    fun `no basic fingering presses a B flat lever`() {
+        for (midi in FluteRange.midiRange) {
+            val keys = FluteFingerings.keysFor(midi)!!
+            assertFalse("midi $midi", THUMB_B_FLAT in keys || B_FLAT_LEVER in keys)
+        }
+    }
+
+    @Test
+    fun `the keys are fifteen, from the head joint down`() {
+        assertEquals(
+            listOf(THUMB_B_FLAT, THUMB, L1, L2, L3, G_SHARP, B_FLAT_LEVER, R1, D_TRILL, R2, D_SHARP_TRILL, R3, E_FLAT, C_SHARP, LOW_C),
+            FluteKey.entries,
+        )
     }
 }

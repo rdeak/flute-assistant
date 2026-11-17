@@ -640,7 +640,7 @@ section {
   font-size: 1.2rem;
 }
 
-/* The four tabs */
+/* The five tabs */
 .features {
   background: var(--card);
   border-block: 2px solid var(--border);
@@ -693,6 +693,10 @@ section {
 
 .feature--notes {
   --accent: var(--note-c);
+}
+
+.feature--fingers {
+  --accent: var(--note-f);
 }
 
 .tag {

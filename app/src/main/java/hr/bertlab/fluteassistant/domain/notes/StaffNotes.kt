@@ -3,19 +3,20 @@
 
 package hr.bertlab.fluteassistant.domain.notes
 
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
+
 /**
  * The notes the reading game asks and the places they sit on the treble staff: the
  * naturals from c1 to c3 (C4 to C6, MIDI 60 to 84), fifteen notes for the fifteen places
  * from the ledger line below the staff to the second ledger line above it. The index of a
- * note in [ALL] is its staff position, counted from the bottom.
+ * note in [ALL] is its staff position, counted from the bottom ([NoteSpelling.placeOf]).
  */
 object StaffNotes {
     private const val LOWEST_MIDI = 60
     private const val HIGHEST_MIDI = 84
-    private val NATURAL_PITCH_CLASSES = setOf(0, 2, 4, 5, 7, 9, 11)
 
-    /** Every note offered, lowest first. */
-    val ALL: List<Int> = (LOWEST_MIDI..HIGHEST_MIDI).filter { it.mod(12) in NATURAL_PITCH_CLASSES }
+    /** Every note offered, lowest first: the white ones, written with no sign. */
+    val ALL: List<Int> = (LOWEST_MIDI..HIGHEST_MIDI).filter { NoteSpelling.signOf(it) == null }
 
     /** How many places the staff has: one per note in [ALL]. */
     const val POSITIONS = 15
@@ -25,6 +26,9 @@ object StaffNotes {
 
     /** The five staff lines, bottom (e1) to top (f2); the even positions in between are spaces. */
     val LINE_POSITIONS: List<Int> = listOf(2, 4, 6, 8, 10)
+
+    /** The G line (g1), the second from the bottom, which the treble clef curls round. */
+    const val G_LINE = 4
 
     /** The places that need no ledger line: d1, the space under the staff, to g2, the space above it. */
     val STAFF_POSITIONS: IntRange = 1..11

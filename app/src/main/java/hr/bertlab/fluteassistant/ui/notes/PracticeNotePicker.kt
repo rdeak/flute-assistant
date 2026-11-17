@@ -59,6 +59,7 @@ import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.SPEAKER_EMOJI
 import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.dashedBorder
@@ -437,6 +438,5 @@ private fun SoundSwitch(soundOn: Boolean, size: DpSize, knob: Dp, inset: Dp) {
     }
 }
 
-private const val SPEAKER_EMOJI = "🔊" // speaker, loud
 private const val MUTED_EMOJI = "🔇" // speaker, muted
 private const val SPARKLES_EMOJI = "✨" // sparkles, a note that moved up

@@ -230,12 +230,12 @@ java -Djava.awt.headless=true tools/IconGen.java /tmp/icons
 ```
 
 Phone screenshots come from the emulator: with the AVD running (`-no-audio`, see CLAUDE.md) and
-a debug APK built, `tools/play-screenshots.sh` drives the four tabs in English and Croatian and
+a debug APK built, `tools/play-screenshots.sh` drives the five tabs in English and Croatian and
 writes one 1080x1920 JPEG per tab (Play asks for 9:16) into `docs/release/play-listing/screenshots/`.
 Re-run it after any visible change before uploading.
 
 Tablet screenshots come from the same script: `tools/play-screenshots.sh tablet` fakes a tablet on the
-phone AVD at exactly Play's ratios, so nothing is padded, and writes four shots per language into
+phone AVD at exactly Play's ratios, so nothing is padded, and writes five shots per language into
 `docs/release/play-listing/screenshots-tablet/`: `7-inch/<lang>/` (upright, 1296x2304) and `10-inch/<lang>/`
 (sideways, 2880x1620). Play asks for at least
 4 per tablet slot, 9:16 or 16:9, and no added text. Nothing uploads the listing: in Play Console open the

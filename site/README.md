@@ -57,7 +57,7 @@ The pages need no change.
   Play Console points at `/privacy/` and the old app versions are gone.
 - **Only true facts in the structured data and FAQ.** No rating, review or download count until
   there are real ones. The words describe the app as the screenshots show it: after
-  `tools/play-screenshots.sh` (and its `tablet` run) renews them, read the four features in
+  `tools/play-screenshots.sh` (and its `tablet` run) renews them, read the five features in
   `src/i18n/*.ts` against the new shots.
 - **The Play links carry their tags.** `playUrl()` adds `utm_source=website` and
   `utm_campaign=<lang>-<placement>` (header, hero, cta, qr, and llms for `/llms.txt`), both as

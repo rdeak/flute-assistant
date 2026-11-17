@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -63,7 +62,9 @@ import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.ModeChoice
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.SPEAKER_EMOJI
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.TabPadding
 import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.labelRes
@@ -122,12 +123,13 @@ class NotesActions(
 )
 
 /**
- * The whole game, top to bottom: the two game pills, then one hero row (the streak's flames,
+ * The whole game, top to bottom: the two game pills, then, while a note is asked for, the feedback line ([FeedbackLine],
+ * under the pills since 2026-11-18: it stood under the staff), then one hero row (the streak's flames,
  * the note to find in its letter's colour or, in Hear, the speaker bubble that plays the phrase
  * again, and the "Pick" button that opens the note picker; the headline once the round is over;
- * "Which notes?" while choosing), then the stage with the staff and its feedback line, or the round
- * summary, or the picker, whose own big OK button closes it (the Pick button hides meanwhile, so
- * there is one way out on screen; the phone's Back closes it too), and at the bottom the round's stars. The pills stay on all three screens.
+ * "Which notes?" while choosing), then the stage with the staff, or the round summary, or the picker, whose own
+ * big OK button closes it (the Pick button hides meanwhile, so there is one way out on screen; the phone's Back
+ * closes it too), and at the bottom the round's stars. The pills stay on all three screens.
  * Choosing notes pauses the question in place; it comes back untouched. [NotesActions.onPhraseShown] asks for
  * Hear's phrase to be played while the staff is on screen: as a new phrase comes, and as the picker
  * closes over one drawn under it.
@@ -174,11 +176,15 @@ fun NotesContent(
         Column(
             modifier = Modifier
                 .fitOrScroll(fits = maxHeight >= NotesMinHeight, minHeight = NotesMinHeight)
-                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+                .padding(TabPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             GamePills(game = state.game, onSetGame = actions.onSetGame)
+            // What to do, right under the game pills and over the buttons, while a note is asked for (since 2026-11-18, the
+            // user: "move ... below buttons find and hear"; it stood under the staff): every tab keeps one order, the words
+            // first, the buttons under them, the content last. The picker and the summary have no such line.
+            if (!choosingNotes && !state.roundOver) FeedbackLine(state = state, placing = placing)
             HeroRow(
                 state = state,
                 choosingNotes = choosingNotes,
@@ -455,10 +461,10 @@ internal fun LetterDots(
 }
 
 /**
- * The staff, taking all the height the stage has left, with the streak's burst over it every fifth
- * flame ([StreakBurst]), and the feedback line; the note
- * above, in the hero row, is the question itself. The place under the child's finger
- * ([placing]) is kept by the caller, as the hero row's speaker bubble waits on it too.
+ * The staff, taking all the height the stage has left, with the streak's burst over it every fifth flame
+ * ([StreakBurst]); the note above, in the hero row, is the question itself, and the feedback line is over the hero row
+ * (since 2026-11-18). The place under the child's finger ([placing]) is kept by the caller, as the hero row's speaker
+ * bubble and the feedback line wait on it too.
  */
 @Composable
 private fun ColumnScope.Question(
@@ -483,12 +489,10 @@ private fun ColumnScope.Question(
         )
         StreakBurst(state.streak, Modifier.matchParentSize())
     }
-    Spacer(Modifier.height(12.dp))
-    FeedbackLine(state = state, placing = placing)
 }
 
 /**
- * The line under the staff (in the panel beside it, sideways): "That's it!" bounces in, as
+ * The line under the game pills (in the panel beside the staff, sideways): "That's it!" bounces in, as
  * "Perfect!" does on the tuner, "Slide, let go" while a finger is down, "Try again" after a
  * miss, and "Listen" while Hear's phrase sounds, over a finger's line and a miss's as the staff
  * takes no answer then. "That's it!" goes first: after a phrase's last note the phrase plays back
@@ -559,4 +563,3 @@ private val FeedbackFloor = 11.sp
 
 internal const val BACKPACK_EMOJI = "\uD83C\uDF92" // school backpack
 
-private const val SPEAKER_EMOJI = "\uD83D\uDD0A" // speaker with sound waves

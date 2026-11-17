@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.ui.tuner
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,10 +13,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,23 +23,17 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
-import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.FINGERING_ASPECT_RATIO
-import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.SidewaysPlainButton
 import hr.bertlab.fluteassistant.ui.common.Stage
-import hr.bertlab.fluteassistant.ui.common.WordFloor
-import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.labelRes
 
 /*
@@ -51,8 +43,9 @@ import hr.bertlab.fluteassistant.ui.common.labelRes
  * two arrows, and in Which? mode the arrows' room stays empty, so the ring does not move when the
  * mode changes. The words and the fingering stand to its right; in a window under 750 dp wide
  * (at 360 tall: the 640 wide phone) the fingering would be too small there, so it goes under the
- * window across the card. The buttons are in the right column: Hear at the top in Tune mode only,
- * and Which? over Tune low.
+ * window across the card. The right column holds only Which? over Tune, low. In Tune mode a tap on the window plays
+ * the chosen note, and a line that names a fix on the flute opens the guide on its card: the Hear and How? buttons
+ * that stood at the top of the column went on 2026-11-18 (the calmer Tune view), as upright.
  */
 
 /**
@@ -70,30 +63,25 @@ private val NarrowWordsGap = 6.dp
 
 /** The room between the window and the fingering under it, in a window under 750 dp wide. */
 private val FingeringUnderGap = 12.dp
-private val WordsGap = 16.dp
-
-/** The status line's size where the room is wide (the mockup's 40 over 48) and where it is not (28). */
-private val StatusFont = 40.sp
-private val StatusHeight = 48.dp
-private val NarrowStatusFont = 28.sp
-private val NarrowStatusHeight = 64.dp
-
-/** The advice line's room: two lines of its 22 sp, so that nothing below it moves when it comes and goes. */
-private val AdviceHeight = 58.dp
-private val AdviceFont = 22.sp
-private val NarrowAdviceFont = 19.sp
-
-/** The longest words shrink to this before they are cut; bigger than a bubble's number, and only a large text size on a small phone gets there. */
-private val StatusMinFont = 12.sp
 
 /**
- * Hear over How? at the top of the column in Tune mode: 80 tall with 10 between on the 915 x 411 phone,
- * 70 with 8 between on a short one, so both stand clear of the mode pair and its shadow.
+ * The most the fingering is wide under the window (since 2026-11-17): the flute picture is taller for its width than
+ * the strip was, and across the whole card it would take 20 dp more from the window than the strip did.
  */
-private val TopHeight = 80.dp
-private val TopHeightShort = 70.dp
-private val TopGap = 10.dp
-private val TopGapShort = 8.dp
+private val UnderFingeringWidth = 300.dp
+
+/**
+ * The line of words: 40 sp in up to two lines where the room is wide (the mockup's), 28 sp in up to three where it is
+ * not, in a box 108 or 124 dp tall. That is the room the status line and the advice line under it had together until
+ * 2026-11-18, so the fingering beside or under the words stands where it stood, whatever the line says.
+ */
+private val WordsFont = 40.sp
+private val WordsHeight = 108.dp
+private val NarrowWordsFont = 28.sp
+private val NarrowWordsHeight = 124.dp
+
+/** The words over the fingering beside the window: one value, as an arrangement built while the tab draws is never equal to the last. */
+private val WordsArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
 
 /** Mode buttons: 92 tall with 13 between on the 915 x 411 phone, 80 with 9 between on a short one. */
 private val ModeHeight = 92.dp
@@ -107,14 +95,7 @@ private val ModeGapShort = 9.dp
  * [SidewaysGeometry], which the unit tests pin.
  */
 @Composable
-internal fun TunerSideways(
-    state: TunerUiState,
-    onTargetNoteChange: (Int) -> Unit,
-    onModeChange: (TunerMode) -> Unit,
-    onPlayNote: () -> Unit,
-    modifier: Modifier = Modifier,
-    onOpenGuide: () -> Unit = {},
-) {
+internal fun TunerSideways(state: TunerUiState, actions: TunerActions, modifier: Modifier = Modifier) {
     val groupLabel = stringResource(R.string.tuner_mode)
     BoxWithConstraints(modifier.fillMaxSize()) {
         // The geometry is given the tab's size, not the card's, as that is what its formulas count from.
@@ -124,25 +105,7 @@ internal fun TunerSideways(
         val short = SidewaysGeometry.isShort(height)
         SidewaysPage(
             column = {
-                if (state.mode == TunerMode.TARGET) {
-                    // Hear over How? as one child, so the column keeps two and the pair stays low.
-                    Column(verticalArrangement = Arrangement.spacedBy(if (short) TopGapShort else TopGap)) {
-                        SidewaysPlainButton(
-                            emoji = SPEAKER_EMOJI,
-                            text = stringResource(R.string.hear_note),
-                            onClick = onPlayNote,
-                            enabled = !state.isPlayingReference,
-                            height = if (short) TopHeightShort else TopHeight,
-                        )
-                        SidewaysPlainButton(
-                            emoji = WRENCH_EMOJI,
-                            text = stringResource(R.string.tune_how),
-                            onClick = onOpenGuide,
-                            height = if (short) TopHeightShort else TopHeight,
-                        )
-                    }
-                }
-                // One child, so the pair stays low whether or not Hear is above it.
+                // The column's one child, so the pair stays low.
                 Column(
                     verticalArrangement = Arrangement.spacedBy(if (short) ModeGapShort else ModeGap),
                     modifier = Modifier
@@ -153,7 +116,7 @@ internal fun TunerSideways(
                         SidewaysPlainButton(
                             emoji = entry.emoji,
                             text = stringResource(entry.labelRes()),
-                            onClick = { onModeChange(entry) },
+                            onClick = { actions.onModeChange(entry) },
                             selected = entry == state.mode,
                             height = if (short) ModeHeightShort else ModeHeight,
                         )
@@ -162,10 +125,11 @@ internal fun TunerSideways(
             },
         ) { card ->
             Stage(modifier = card, verticalArrangement = Arrangement.Center) {
+                val scale = SidewaysGeometry.pitchWindowScale(height)
                 if (beside) {
-                    TunerBeside(state, SidewaysGeometry.pitchWindowScale(height), onTargetNoteChange)
+                    TunerBeside(state, scale, actions)
                 } else {
-                    TunerUnder(state, SidewaysGeometry.pitchWindowScale(height), cardWidth - SidewaysGeometry.CARD_CHROME, onTargetNoteChange)
+                    TunerUnder(state, scale, cardWidth - SidewaysGeometry.CARD_CHROME, actions)
                 }
             }
         }
@@ -174,20 +138,20 @@ internal fun TunerSideways(
 
 /** The window between its arrows on the left, the words over the fingering on the right. */
 @Composable
-private fun TunerBeside(state: TunerUiState, scale: Float, onTargetNoteChange: (Int) -> Unit) {
+private fun TunerBeside(state: TunerUiState, scale: Float, actions: TunerActions) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        WindowBetweenArrows(state, scale, ArrowSize, ArrowGap, onTargetNoteChange)
+        WindowBetweenArrows(state, scale, ArrowSize, ArrowGap, actions)
         Spacer(Modifier.width(FingeringGap))
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(WordsGap, Alignment.CenterVertically),
+            verticalArrangement = WordsArrangement,
             modifier = Modifier.weight(1f),
         ) {
-            TunerWords(state, wide = true)
-            TunerFingering(state, Modifier.testTag("fingering"))
+            TunerWords(state.line, wide = true, onOpenGuide = actions.onOpenGuide)
+            TunerFingering(state.homeMidi, state.fingeringLit, Modifier.testTag("fingering"))
         }
     }
 }
@@ -197,11 +161,12 @@ private fun TunerBeside(state: TunerUiState, scale: Float, onTargetNoteChange: (
  * across the card under both. The window gives up the fingering's height and the gap between.
  */
 @Composable
-private fun TunerUnder(state: TunerUiState, scale: Float, innerWidth: Float, onTargetNoteChange: (Int) -> Unit) {
-    val fingeringHeight = innerWidth / FINGERING_ASPECT_RATIO
+private fun TunerUnder(state: TunerUiState, scale: Float, innerWidth: Float, actions: TunerActions) {
+    val fingeringHeight = minOf(innerWidth, UnderFingeringWidth.value) / FINGERING_ASPECT_RATIO
     val windowScale = scale - (fingeringHeight + FingeringUnderGap.value) / PitchWindowHeight.value
     Column(
         verticalArrangement = Arrangement.spacedBy(FingeringUnderGap),
+        horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
@@ -209,104 +174,42 @@ private fun TunerUnder(state: TunerUiState, scale: Float, innerWidth: Float, onT
             horizontalArrangement = Arrangement.spacedBy(NarrowWordsGap),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            WindowBetweenArrows(state, windowScale, NarrowArrowSize, NarrowArrowGap, onTargetNoteChange)
-            TunerWords(state, wide = false, modifier = Modifier.weight(1f))
+            WindowBetweenArrows(state, windowScale, NarrowArrowSize, NarrowArrowGap, actions)
+            TunerWords(state.line, wide = false, onOpenGuide = actions.onOpenGuide, modifier = Modifier.weight(1f))
         }
-        TunerFingering(state, Modifier.testTag("fingering"))
+        TunerFingering(state.homeMidi, state.fingeringLit, Modifier.testTag("fingering").widthIn(max = UnderFingeringWidth))
     }
 }
 
 /**
- * The pitch window at [scale], with the ‹ and › either side in Tune mode and the same room empty
- * in Which? mode, so the block is the same width and the ring does not move when the mode does.
+ * The pitch window at [scale] between its ‹ and › ([StepArrows]: their room stays empty in Which? mode, so the ring
+ * does not move when the mode does).
  */
 @Composable
-private fun WindowBetweenArrows(
-    state: TunerUiState,
-    scale: Float,
-    arrow: Dp,
-    gap: Dp,
-    onTargetNoteChange: (Int) -> Unit,
-) {
-    val description = pitchWindowDescription(state)
+private fun WindowBetweenArrows(state: TunerUiState, scale: Float, arrow: Dp, gap: Dp, actions: TunerActions) {
     val windowHeight = PitchWindowHeight * scale
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(gap),
-    ) {
-        if (state.mode == TunerMode.TARGET) {
-            StepButton(
-                icon = AppIcons.ChevronLeft,
-                description = stringResource(R.string.lower_note),
-                enabled = state.targetMidi > FluteRange.LOWEST_MIDI,
-                onClick = { onTargetNoteChange(state.targetMidi - 1) },
-                modifier = Modifier.size(arrow),
-            )
-        } else {
-            Spacer(Modifier.size(arrow))
-        }
-        PitchWindow(
-            homeMidi = state.homeMidi,
-            heardMidi = state.heardMidi,
-            cents = state.gaugeCents,
-            description = description,
-            maxScale = scale,
-            modifier = Modifier
+    StepArrows(state.targetMidi, actions.onTargetNoteChange, arrows = state.mode == TunerMode.TARGET, button = arrow, gap = gap) {
+        TunerWindow(
+            state,
+            actions.onPlayNote,
+            Modifier
                 .size(windowHeight * PITCH_WINDOW_ASPECT_RATIO, windowHeight)
                 .testTag("pitch_window"),
+            maxScale = scale,
         )
-        if (state.mode == TunerMode.TARGET) {
-            StepButton(
-                icon = AppIcons.ChevronRight,
-                description = stringResource(R.string.higher_note),
-                enabled = state.targetMidi < FluteRange.HIGHEST_MIDI,
-                onClick = { onTargetNoteChange(state.targetMidi + 1) },
-                modifier = Modifier.size(arrow),
-            )
-        } else {
-            Spacer(Modifier.size(arrow))
-        }
     }
 }
 
-/**
- * The status line over the advice line, and the error message when there is one. Both lines keep
- * their room whatever they say, so nothing under them moves. [wide] is the mockup's 40 sp and 22 sp
- * in one line, and not wide is its 28 sp and 19 sp, the status in up to two lines.
- */
+/** The one line of words ([StatusLine]) at this layout's sizes: [wide] beside the fingering, not wide beside a smaller window. */
 @Composable
-private fun TunerWords(state: TunerUiState, wide: Boolean, modifier: Modifier = Modifier) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+private fun TunerWords(line: TunerLine, wide: Boolean, onOpenGuide: (GuideCard) -> Unit, modifier: Modifier = Modifier) {
+    StatusLine(
+        line,
+        onOpenGuide,
         modifier = modifier,
-    ) {
-        StatusLine(
-            state,
-            maxFont = if (wide) StatusFont else NarrowStatusFont,
-            height = if (wide) StatusHeight else NarrowStatusHeight,
-            minFont = StatusMinFont,
-            maxLines = if (wide) 1 else 2,
-            style = MaterialTheme.typography.headlineMedium.copy(lineHeight = 1.2.em),
-        )
-        Box(Modifier.fillMaxWidth().height(AdviceHeight)) {
-            if (!state.micFailed) {
-                AdviceLine(state.advice, wrap = true, wrapMaxFont = if (wide) AdviceFont else NarrowAdviceFont)
-            } else {
-                // A failed microphone means nothing is heard, so there is no advice to make room for and nothing moves.
-                Text(
-                    stringResource(R.string.mic_failed),
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 1.25.em),
-                    textAlign = TextAlign.Center,
-                    autoSize = TextAutoSize.StepBased(
-                        minFontSize = WordFloor.asTextSize(),
-                        maxFontSize = if (wide) AdviceFont else NarrowAdviceFont,
-                    ),
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-    }
+        maxFont = if (wide) WordsFont else NarrowWordsFont,
+        height = if (wide) WordsHeight else NarrowWordsHeight,
+        maxLines = if (wide) 2 else 3,
+        style = MaterialTheme.typography.headlineMedium.copy(lineHeight = 1.2.em),
+    )
 }
-

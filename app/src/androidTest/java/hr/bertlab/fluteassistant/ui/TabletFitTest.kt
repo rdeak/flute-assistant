@@ -3,6 +3,8 @@
 
 package hr.bertlab.fluteassistant.ui
 
+import hr.bertlab.fluteassistant.domain.fingers.FingerPick
+import hr.bertlab.fluteassistant.ui.fingers.FingersContent
 import android.content.res.Configuration
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
@@ -34,6 +36,7 @@ import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.tuner.GuideCard
+import hr.bertlab.fluteassistant.ui.tuner.TunerActions
 import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.TabletHost
@@ -48,6 +51,7 @@ import hr.bertlab.fluteassistant.ui.notes.NotesActions
 import hr.bertlab.fluteassistant.ui.notes.NotesContent
 import hr.bertlab.fluteassistant.ui.tuner.TunerContent
 import hr.bertlab.fluteassistant.ui.tuner.TunerUiState
+import hr.bertlab.fluteassistant.ui.tuner.listening
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -152,19 +156,17 @@ class TabletFitTest {
 
     @Composable
     private fun Tuner(state: TunerUiState) {
-        TunerContent(
-            state = state,
-            onTargetNoteChange = {},
-            onModeChange = {},
-            onPlayNote = {},
-            onRequestPermission = {},
-            onOpenSettings = {},
-        )
+        TunerContent(state, TunerActions())
     }
 
     @Composable
     private fun Notes(state: NotesRound) {
         NotesContent(state = state, actions = NotesActions())
+    }
+
+    @Composable
+    private fun Fingers(state: FingerPick) {
+        FingersContent(state, onLetter = {}, onSign = {}, onTune = {})
     }
 
     private val asking = NotesRound(practiceNotes = StaffNotes.DEFAULT_PRACTICE, currentMidi = 60)
@@ -195,18 +197,18 @@ class TabletFitTest {
 
     @Test
     fun the_tuner_in_which_fits() = assertFitsEverywhere {
-        Tuner(TunerUiState(permissionGranted = true, isListening = true, mode = TunerMode.IDENTIFY))
+        Tuner(listening(null, mode = TunerMode.IDENTIFY))
     }
 
     @Test
     fun the_tuner_in_tune_fits() = assertFitsEverywhere {
-        Tuner(TunerUiState(permissionGranted = true, isListening = true, mode = TunerMode.TARGET))
+        Tuner(listening(null))
     }
 
     @Test
     fun the_tuning_guide_fits() = assertFitsEverywhere(stays = R.string.tune_guide_warm_up_title) {
         // The card's title, as only the upright guide has the "How to tune" heading.
-        Tuner(TunerUiState(permissionGranted = true, isListening = true, mode = TunerMode.TARGET, guideCard = GuideCard.WARM_UP))
+        Tuner(listening(null).copy(guideCard = GuideCard.WARM_UP))
     }
 
     @Test
@@ -214,6 +216,12 @@ class TabletFitTest {
 
     @Test
     fun the_notes_question_fits() = assertFitsEverywhere { Notes(asking) }
+
+    @Test
+    fun the_fingers_tab_fits() = assertFitsEverywhere { Fingers(FingerPick()) }
+
+    @Test
+    fun the_fingers_tab_with_the_sign_waiting_fits() = assertFitsEverywhere { Fingers(FingerPick(8, signWaiting = true)) }
 
     @Test
     fun the_picker_fits() = assertFitsEverywhere(

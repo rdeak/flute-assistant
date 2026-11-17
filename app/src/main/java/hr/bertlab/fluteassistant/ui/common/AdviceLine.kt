@@ -27,13 +27,13 @@ import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 
 /**
- * The quieter line saying what to change: roll the flute, the air, the fingers, come closer, or
- * play a clear note. Under the tuner's status line, and under the flute's staff while it listens.
+ * The quieter line saying what to change: the air, the fingers, hold longer, come closer, or play a clear note.
+ * Under the flute's staff while it listens (the tuner says its advice on its own one line since 2026-11-18).
  * Empty text for [TunerAdvice.NONE] keeps the line's height, so nothing around it moves when
  * advice comes and goes.
  *
  * With [wrap] it is a small block for the narrow column of a phone on its side: up to four lines at
- * [wrapMaxFont] (19 sp), with no height of its own. A large text size shrinks it, as a fifth line
+ * [WrapMaxFont], with no height of its own. A large text size shrinks it, as a fifth line
  * would lose the end of the advice; a caller that gives it a height of its own makes it shrink to
  * that too. It never shrinks below [WordFloor], a size in dp and not sp: at the largest text size
  * a floor in sp is twice as big, and Croatian's longest word would not fit the 100 dp column at it.
@@ -45,8 +45,7 @@ fun AdviceLine(
     advice: TunerAdvice,
     modifier: Modifier = Modifier,
     wrap: Boolean = false,
-    wrapMaxFont: TextUnit = 19.sp,
-) = AdviceLine(AnnotatedString(advice.labelRes()?.let { stringResource(it) } ?: ""), modifier, wrap, wrapMaxFont)
+) = AdviceLine(AnnotatedString(advice.labelRes()?.let { stringResource(it) } ?: ""), modifier, wrap)
 
 /**
  * The same line for words that are not one of the advices: the flute's "Play B4" before the first note of
@@ -57,11 +56,10 @@ fun AdviceLine(
     text: AnnotatedString,
     modifier: Modifier = Modifier,
     wrap: Boolean = false,
-    wrapMaxFont: TextUnit = 19.sp,
 ) {
     val style = MaterialTheme.typography.bodyLarge
     if (wrap) {
-        WrappedAdvice(text, style.copy(lineHeight = 1.3.em), wrapMaxFont, modifier)
+        WrappedAdvice(text, style.copy(lineHeight = 1.3.em), WrapMaxFont, modifier)
         return
     }
     // The line height follows the size autoSize picks (the style's 28 over 22 at the normal size, so that
@@ -82,6 +80,9 @@ fun AdviceLine(
             .wrapContentHeight(),
     )
 }
+
+/** The wrapped block's text at the most. */
+private val WrapMaxFont = 19.sp
 
 /** [AdviceLine]'s block of up to four lines, no bigger than the biggest size at which every word of it fits a line. */
 @Composable

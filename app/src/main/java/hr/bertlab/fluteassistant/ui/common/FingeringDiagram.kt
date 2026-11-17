@@ -4,111 +4,116 @@
 package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.tuner.FluteKey
+import hr.bertlab.fluteassistant.domain.tuner.FluteFingerings
+import hr.bertlab.fluteassistant.ui.common.FingeringGeometry.Spot
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
+import kotlin.math.min
 
 /**
- * A flute seen from above, head joint on the left, on a rounded track: the thumb key, the
- * three left-hand keys, the G sharp lever, the three right-hand keys, the E flat key and the
- * two foot-joint rollers. Keys in [keys] are filled in [color] (the note's letter colour)
- * with an ink outline, the rest are open; with no [keys] every key is drawn open.
- * [noteLabel] names the note for accessibility. Draw it [FINGERING_ASPECT_RATIO] wide to tall.
+ * The flute seen from above by the player, the head joint on the left (since 2026-11-17, a teacher's ask: "not how
+ * they mark keys"; spec `2026-11-17-fingers-tab-design.md`): the tube with its lip plate and joints, the seven cups no
+ * finger rests on drawn faintly, and the fifteen keys a finger touches, each where it sits ([FingeringGeometry]).
+ * The keys [midi] presses (`FluteFingerings`) are filled in [color], the note's letter colour unless the caller says
+ * otherwise, with an ink outline, and the rest are open; the note is named for accessibility. With no [midi] every key
+ * is open and nothing is said. No words: the Fingers tab writes the hands' names round it. It keeps its own shape
+ * ([FINGERING_ASPECT_RATIO]), so a caller gives it a width or a height. The tuner, Listen to me and the Fingers tab
+ * all show this one picture.
  */
 @Composable
 fun FingeringDiagram(
-    keys: Set<FluteKey>?,
-    noteLabel: String?,
-    color: Color,
+    midi: Int?,
     modifier: Modifier = Modifier,
+    color: Color = if (midi != null) noteColor(midi) else Color.Unspecified,
 ) {
     val colors = FluteTheme.colors
-    val description = if (keys != null && noteLabel != null) stringResource(R.string.fingering_for, noteLabel) else null
+    val keys = midi?.let(FluteFingerings::keysFor)
+    val description = midi?.let { stringResource(R.string.fingering_for, noteLabel(it)) }
 
     Canvas(
-        modifier = modifier.then(
-            if (description != null) Modifier.semantics { contentDescription = description } else Modifier,
-        ),
+        modifier = modifier
+            .aspectRatio(FINGERING_ASPECT_RATIO)
+            .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
     ) {
-        val unit = size.width / SPAN
-        val radius = unit * 0.37f
-        val small = radius * 0.62f
-        val pressedStroke = Stroke(width = size.height * 3f / DESIGN_HEIGHT)
-        val openStroke = Stroke(width = size.height * 2.5f / DESIGN_HEIGHT)
-        val centreY = size.height / 2f
-        val lowY = centreY + radius * 0.55f // the little-finger keys sit a bit lower, as on the flute
+        val unit = min(size.width / FingeringGeometry.WIDTH, size.height / FingeringGeometry.HEIGHT)
+        fun u(value: Float) = value * unit
 
-        // The track: a pill nearly as tall as the canvas.
-        val trackHeight = size.height * 44f / DESIGN_HEIGHT
-        drawRoundRect(
-            color = colors.track,
-            topLeft = Offset(0f, centreY - trackHeight / 2f),
-            size = Size(size.width, trackHeight),
-            cornerRadius = CornerRadius(trackHeight / 2f),
-        )
-        drawRoundRect(
-            color = colors.border,
-            topLeft = Offset(0f, centreY - trackHeight / 2f),
-            size = Size(size.width, trackHeight),
-            cornerRadius = CornerRadius(trackHeight / 2f),
-            style = Stroke(width = size.height * 2f / DESIGN_HEIGHT),
-        )
+        // The tube.
+        val tubeTop = u(FingeringGeometry.CENTRE_Y - FingeringGeometry.TUBE_THICKNESS / 2)
+        val tubeSize = Size(u(FingeringGeometry.TUBE_RIGHT - FingeringGeometry.TUBE_LEFT), u(FingeringGeometry.TUBE_THICKNESS))
+        val tubeCorner = CornerRadius(tubeSize.height / 2)
+        drawRoundRect(colors.track, Offset(u(FingeringGeometry.TUBE_LEFT), tubeTop), tubeSize, tubeCorner)
+        drawRoundRect(colors.border, Offset(u(FingeringGeometry.TUBE_LEFT), tubeTop), tubeSize, tubeCorner, style = Stroke(u(2f)))
 
-        fun x(slot: Float) = (MARGIN + slot) * unit
-
-        fun circle(slot: Float, r: Float, y: Float, down: Boolean) {
-            val centre = Offset(x(slot), y)
-            drawCircle(if (down) color else colors.raised, r, centre)
-            drawCircle(if (down) colors.outline else colors.mutedText, r, centre, style = if (down) pressedStroke else openStroke)
-        }
-
-        fun paddle(slot: Float, width: Float, height: Float, y: Float, down: Boolean) {
-            val topLeft = Offset(x(slot) - width / 2f, y - height / 2f)
-            val corner = CornerRadius(width * 0.4f)
-            drawRoundRect(if (down) color else colors.raised, topLeft, Size(width, height), corner)
+        // The joints.
+        FingeringGeometry.JOINTS.forEach { x ->
             drawRoundRect(
-                if (down) colors.outline else colors.mutedText, topLeft, Size(width, height), corner,
-                style = if (down) pressedStroke else openStroke,
+                colors.border,
+                Offset(u(x), u(FingeringGeometry.CENTRE_Y - FingeringGeometry.JOINT_HEIGHT / 2)),
+                Size(u(FingeringGeometry.JOINT_WIDTH), u(FingeringGeometry.JOINT_HEIGHT)),
+                CornerRadius(u(2f)),
             )
         }
 
-        fun down(key: FluteKey) = keys?.contains(key) == true
+        // The lip plate and its hole.
+        spot(FingeringGeometry.LIP_PLATE, unit, colors.raised, colors.mutedText, line = 2f)
+        spot(FingeringGeometry.LIP_HOLE, unit, colors.mutedText, null, line = 0f)
 
-        paddle(THUMB_SLOT, radius * 1.15f, radius * 2.45f, centreY, down(FluteKey.THUMB))
-        circle(L1_SLOT, radius, centreY, down(FluteKey.L1))
-        circle(L1_SLOT + 1f, radius, centreY, down(FluteKey.L2))
-        circle(L1_SLOT + 2f, radius, centreY, down(FluteKey.L3))
-        circle(G_SHARP_SLOT, small, lowY, down(FluteKey.G_SHARP))
-        circle(R1_SLOT, radius, centreY, down(FluteKey.R1))
-        circle(R1_SLOT + 1f, radius, centreY, down(FluteKey.R2))
-        circle(R1_SLOT + 2f, radius, centreY, down(FluteKey.R3))
-        circle(E_FLAT_SLOT, small, lowY, down(FluteKey.E_FLAT))
-        paddle(C_SHARP_SLOT, small * 1.3f, small * 2.2f, lowY, down(FluteKey.C_SHARP))
-        paddle(LOW_C_SLOT, small * 1.3f, small * 2.2f, lowY, down(FluteKey.LOW_C))
+        // The cups no finger rests on.
+        FingeringGeometry.IDLE_CUPS.forEach { spot(it, unit, colors.raised, colors.border, line = 2f) }
+
+        // The arms from the tube to the keys that stand off it.
+        FingeringGeometry.ARMS.forEach { arm ->
+            drawLine(colors.border, Offset(u(arm.x1), u(arm.y1)), Offset(u(arm.x2), u(arm.y2)), u(3f), StrokeCap.Round)
+        }
+
+        // The keys.
+        FingeringGeometry.KEYS.forEach { (key, place) ->
+            val down = keys?.contains(key) == true
+            spot(
+                place, unit,
+                fill = if (down) color else colors.raised,
+                outline = if (down) colors.outline else colors.mutedText,
+                line = if (down) PRESSED_LINE else OPEN_LINE,
+            )
+        }
     }
 }
 
-/** Width over height of the diagram as the canvas drew it. */
-const val FINGERING_ASPECT_RATIO = 388f / 56f
-private const val DESIGN_HEIGHT = 56f
+/** One key, cup or plate: an oval when [Spot.round], else a rounded rectangle, turned about its centre. */
+private fun DrawScope.spot(place: Spot, unit: Float, fill: Color, outline: Color?, line: Float) {
+    val centre = Offset(place.x * unit, place.y * unit)
+    val size = Size(place.width * unit, place.height * unit)
+    val topLeft = Offset(centre.x - size.width / 2, centre.y - size.height / 2)
+    rotate(place.turn, pivot = centre) {
+        if (place.round) {
+            drawOval(fill, topLeft, size)
+            if (outline != null) drawOval(outline, topLeft, size, style = Stroke(line * unit))
+        } else {
+            val corner = CornerRadius(min(size.width, size.height) * CORNER_SHARE)
+            drawRoundRect(fill, topLeft, size, corner)
+            if (outline != null) drawRoundRect(outline, topLeft, size, corner, style = Stroke(line * unit))
+        }
+    }
+}
 
-// Horizontal slots, in key widths; the right hand starts after a wider gap.
-private const val MARGIN = 0.5f
-private const val THUMB_SLOT = 0f
-private const val L1_SLOT = 1f
-private const val G_SHARP_SLOT = 4f
-private const val R1_SLOT = 5.6f
-private const val E_FLAT_SLOT = 8.6f
-private const val C_SHARP_SLOT = 9.4f
-private const val LOW_C_SLOT = 10.1f
-private const val SPAN = LOW_C_SLOT + 2 * MARGIN
+/** The outline of a pressed key and of an open one, in design units (as the strip before it drew them). */
+private const val PRESSED_LINE = 3f
+private const val OPEN_LINE = 2.5f
+
+/** A lever's or a thumb key's corners, as a share of its shorter side. */
+private const val CORNER_SHARE = 0.42f

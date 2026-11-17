@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.SPEAKER_EMOJI
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteText
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
@@ -114,20 +115,24 @@ private fun WarmUpPicture() {
     }
 }
 
-/** The tuner's own "A little higher" over a flute whose head joint goes in, and "A little lower" over one where it comes out. */
+/**
+ * A flute whose head joint goes in, named "push in", over one where it comes out, "pull out": the words the tuner's line
+ * says on a flat or sharp A4 ("🔧 Push the head joint in a little"). Each stood under a chip with the tuner's "⬆️ A little
+ * higher" / "⬇️ A little lower" until 2026-11-18, when the one line began to say the move itself and those words left
+ * the screen (the user picked "drop the chips").
+ */
 @Composable
 private fun HeadJointPicture() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        JointMove(R.string.too_low, JointArrow.PUSH_IN, R.string.tune_guide_push_in)
-        JointMove(R.string.too_high, JointArrow.PULL_OUT, R.string.tune_guide_pull_out)
+        JointMove(JointArrow.PUSH_IN, R.string.tune_guide_push_in)
+        JointMove(JointArrow.PULL_OUT, R.string.tune_guide_pull_out)
     }
 }
 
-/** One of card 2's flutes: the tuner's [status] line over it, its head joint moved as [arrow] says, and the move's [label] under it. */
+/** One of card 2's flutes: its head joint moved as [arrow] says, and the move's [label] under it. */
 @Composable
-private fun JointMove(status: Int, arrow: JointArrow, label: Int) {
+private fun JointMove(arrow: JointArrow, label: Int) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        StatusChip(stringResource(status))
         val gap = if (arrow == JointArrow.PULL_OUT) PULLED_GAP else 0f
         FluteSide(Modifier.width(fluteWidth(gap)), jointGap = gap, arrow = arrow)
         Text(
@@ -142,7 +147,10 @@ private fun JointMove(status: Int, arrow: JointArrow, label: Int) {
     }
 }
 
-/** ‹ a note › and a Hear pill, an arrow down, then a long note and the note's ring filled with a tick. */
+/**
+ * ‹ a note ›, a finger and a speaker under it (tap the note to hear it: the tuner has had no Hear pill since
+ * 2026-11-18), an arrow down, then a long note and the note's ring filled with a tick.
+ */
 @Composable
 private fun EachNotePicture() {
     val midi = EXAMPLE_NOTE
@@ -152,16 +160,9 @@ private fun EachNotePicture() {
             NoteRing(midi, filled = false)
             ChevronDisc(left = false)
         }
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier
-                .border(3.dp, FluteTheme.colors.outline, RoundedCornerShape(24.dp))
-                .background(FluteTheme.colors.raised, RoundedCornerShape(24.dp))
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Emoji(TAP_EMOJI, fontSize = 24)
             Emoji(SPEAKER_EMOJI, fontSize = 22)
-            Text(stringResource(R.string.hear_note), color = FluteTheme.colors.text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
         }
         Emoji(DOWN_EMOJI, fontSize = 28)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -185,22 +186,6 @@ private fun LongNote(color: Color, width: Int = 80) {
             .size(width.dp, 16.dp)
             .background(color, RoundedCornerShape(8.dp))
             .border(2.dp, InkOnFill, RoundedCornerShape(8.dp)),
-    )
-}
-
-/** One of the tuner's lines in a quiet rounded box, as the tuner shows it. */
-@Composable
-private fun StatusChip(text: String) {
-    val colors = FluteTheme.colors
-    Text(
-        text,
-        color = colors.text,
-        fontSize = 18.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .background(colors.track, RoundedCornerShape(18.dp))
-            .border(2.dp, colors.border, RoundedCornerShape(18.dp))
-            .padding(horizontal = 12.dp, vertical = 3.dp),
     )
 }
 
@@ -447,3 +432,4 @@ private const val EXAMPLE_NOTE = 72
 
 private const val THERMOMETER_EMOJI = "🌡️" // thermometer
 private const val DOWN_EMOJI = "⬇️" // down arrow
+private const val TAP_EMOJI = "👆" // a finger pointing up: tap the note above it

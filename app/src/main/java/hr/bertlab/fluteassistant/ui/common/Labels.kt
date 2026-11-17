@@ -91,12 +91,22 @@ fun noteLabel(resources: Resources, midi: Int): String =
 fun noteLabel(midi: Int): String = noteLabel(LocalResources.current, midi)
 
 /**
+ * A note's name with no octave, in the user's language: "C♯" and "B", or "Cis" and "H" (the Fingers tab's keys,
+ * since 2026-11-17). [pitchClass] is taken modulo 12.
+ */
+fun noteName(resources: Resources, pitchClass: Int): String = resources.getStringArray(R.array.note_names)[Math.floorMod(pitchClass, 12)]
+
+@Composable
+@ReadOnlyComposable
+fun noteName(pitchClass: Int): String = noteName(LocalResources.current, pitchClass)
+
+/**
  * [noteLabel] split into the name and the octave figure ("B♭" and "4", "c" and "1", "h" and
  * ""), so the screens can raise the figure: the label reads "B♭⁴" or "c¹" on screen while
  * assistive technology still hears [noteLabel].
  */
 fun noteLabelParts(resources: Resources, midi: Int): Pair<String, String> {
-    val name = resources.getStringArray(R.array.note_names)[Math.floorMod(midi, 12)]
+    val name = noteName(resources, midi)
     val octave = Math.floorDiv(midi, 12) - 1 // scientific: C4 = 60
     if (!resources.getBoolean(R.bool.note_octaves_helmholtz)) return name to octave.toString()
     return when {

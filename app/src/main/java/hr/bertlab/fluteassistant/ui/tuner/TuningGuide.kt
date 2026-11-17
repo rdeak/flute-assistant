@@ -49,6 +49,7 @@ import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.TabPadding
 import hr.bertlab.fluteassistant.ui.common.WordFloor
 import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.noteLabel
@@ -89,7 +90,7 @@ private fun TuningGuideUpright(card: GuideCard, onCard: (GuideCard) -> Unit, onC
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = modifier
             .fillMaxSize()
-            .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 16.dp),
+            .padding(TabPadding),
     ) {
         // The heading row has the mode pills' height and shadow, so the card starts where the stage did.
         Row(
@@ -114,7 +115,7 @@ private fun TuningGuideUpright(card: GuideCard, onCard: (GuideCard) -> Unit, onC
             }
         }
         Stage(
-            padding = StagePadding,
+            padding = GuideStagePadding,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -206,7 +207,7 @@ private fun TuningGuideSideways(card: GuideCard, onCard: (GuideCard) -> Unit, on
                 }
             },
         ) { cardModifier ->
-            Stage(padding = StagePadding, modifier = cardModifier.testTag("guide_stage")) {
+            Stage(padding = GuideStagePadding, modifier = cardModifier.testTag("guide_stage")) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val pictureWidth = maxWidth * if (maxWidth >= WIDE_CARD) 0.5f else 0.4f
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
@@ -311,7 +312,7 @@ private fun StepIcon(
 ) = StepButton(icon, stringResource(description), enabled = to != null, onClick = { to?.let(onCard) }, modifier, shape, iconSize = 32.dp)
 
 private val HeadingHeight = 69.dp
-private val StagePadding = 20.dp
+private val GuideStagePadding = 20.dp
 private val WordsGap = 16.dp
 
 /** The title's share of the room its title and words have, at most. */

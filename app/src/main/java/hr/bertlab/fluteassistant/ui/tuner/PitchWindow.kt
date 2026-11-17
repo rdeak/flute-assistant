@@ -10,6 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.offset
@@ -30,8 +31,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -95,8 +99,12 @@ const val PITCH_WINDOW_ASPECT_RATIO = WINDOW_WIDTH / WINDOW_HEIGHT
  * note's colour; in tune (within [TunerUiState.IN_TUNE_CENTS], the status line's "Perfect!")
  * it fills, grows into the ring and gets a green tick and sparkles. A screen reader reads
  * [description] instead of the drawing. The drawing keeps the canvas's proportions and
- * shrinks to fit its constraints; it never grows past [maxScale] times the canvas's size, which is
- * 1 upright and what the card's height allows on a phone on its side.
+ * shrinks to fit its constraints; it never grows past [maxScale] times the canvas's size: what the card's room allows,
+ * up to `WINDOW_MAX_SCALE` upright since 2026-11-18, and what the card's height allows on a phone on its side.
+ *
+ * With [onTap] the whole window is one button, heard as [tapLabel]: in Tune mode, in silence, a tap plays the chosen note (since
+ * 2026-11-18, when the Hear button went: the picture is the button, as a flute on the Fingers tab is). No ripple: the
+ * sound and the line's "🔊 Listen" answer the tap.
  */
 @Composable
 fun PitchWindow(
@@ -106,6 +114,8 @@ fun PitchWindow(
     description: String,
     modifier: Modifier = Modifier,
     maxScale: Float = 1f,
+    onTap: (() -> Unit)? = null,
+    tapLabel: String? = null,
 ) {
     val colors = FluteTheme.colors
     val inTune = cents != null && abs(cents) <= TunerUiState.IN_TUNE_CENTS
@@ -117,7 +127,18 @@ fun PitchWindow(
 
     BoxWithConstraints(
         contentAlignment = Alignment.Center,
-        modifier = modifier.clearAndSetSemantics { contentDescription = description },
+        modifier = modifier
+            .then(if (onTap != null) Modifier.clickable(indication = null, interactionSource = null, onClick = onTap) else Modifier)
+            .clearAndSetSemantics {
+                contentDescription = description
+                if (onTap != null) {
+                    role = Role.Button
+                    onClick(tapLabel) {
+                        onTap()
+                        true
+                    }
+                }
+            },
     ) {
         val scale = minOf(maxScale, maxWidth / WINDOW_WIDTH.dp, maxHeight / WINDOW_HEIGHT.dp)
         fun sized(value: Float): Dp = (value * scale).dp

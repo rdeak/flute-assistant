@@ -1,10 +1,11 @@
 # Play Console answers for Flute Assistant
 
 Facts the answers rest on: the app is made for primary-school children learning the flute and
-runs entirely on the device. It has four tabs: a digital flute, a metronome, a tuner and a note
-reading game. The microphone is used only while the Tuner tab is open and while the flute tab
-listens after its "Listen to me" button is pressed; audio is analysed in memory for pitch and
-never stored, logged or transmitted. The metronome and the note reading game only play sound.
+runs entirely on the device. It has five tabs: a digital flute, a metronome, a tuner, a note
+reading game and a fingering chart. The microphone is used only while the Tuner tab is open and
+while the flute tab listens after its "Listen to me" button is pressed; audio is analysed in
+memory for pitch and never stored, logged or transmitted. The metronome and the note reading game
+only play sound, and the fingering chart neither plays nor listens.
 There is no account, no network access, no analytics, no ads, no SDK that collects data.
 Settings and the child's tunes are stored locally on the device.
 

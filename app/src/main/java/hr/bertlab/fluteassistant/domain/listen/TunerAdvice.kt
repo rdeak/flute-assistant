@@ -4,11 +4,11 @@
 package hr.bertlab.fluteassistant.domain.listen
 
 /**
- * The one short line under the status line saying what to change: nothing, come closer to the
- * phone or play one long clear note when the sound is unclear, roll the flute out for a flat
- * note and in for a sharp one, faster air for the octave below and gentler air for the octave
- * above the chosen note, or check the fingers for any other note. On the tuning note the tuner
- * names the head joint instead of rolling (since 2026-11-14).
+ * What to change, in a few words: nothing, come closer to the phone or play one long clear note
+ * when the sound is unclear, roll the flute out for a flat note and in for a sharp one, faster air
+ * for the octave below and gentler air for the octave above the chosen note, or check the fingers
+ * for any other note. On the tuning note the tuner names the head joint instead of rolling (since
+ * 2026-11-14). The tuner says it on its one line, the flute's listening room on its advice line.
  */
 enum class TunerAdvice {
     NONE, COME_CLOSER, CLEAR_NOTE, ROLL_OUT, ROLL_IN, FASTER_AIR, GENTLER_AIR, CHECK_FINGERS,
@@ -32,5 +32,12 @@ enum class TunerAdvice {
     /** The tuner's only: the tuning note chosen and played flat, so the head joint goes in a little. */
     HEAD_JOINT_IN,
     /** The tuner's only: the tuning note chosen and played sharp, so the head joint comes out a little. */
-    HEAD_JOINT_OUT,
+    HEAD_JOINT_OUT;
+
+    /**
+     * A fix on the flute itself, the head joint or rolling: the tuner's line keeps such words a while after the sound
+     * stops ([FixHold]) and opens the guide to tuning from them.
+     */
+    val isFluteFix: Boolean
+        get() = this == HEAD_JOINT_IN || this == HEAD_JOINT_OUT || this == ROLL_IN || this == ROLL_OUT
 }

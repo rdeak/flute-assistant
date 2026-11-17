@@ -4,6 +4,8 @@
 package hr.bertlab.fluteassistant.domain.tuner
 
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.C_SHARP
+import hr.bertlab.fluteassistant.domain.tuner.FluteKey.D_SHARP_TRILL
+import hr.bertlab.fluteassistant.domain.tuner.FluteKey.D_TRILL
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.E_FLAT
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.G_SHARP
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.L1
@@ -15,14 +17,27 @@ import hr.bertlab.fluteassistant.domain.tuner.FluteKey.R2
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.R3
 import hr.bertlab.fluteassistant.domain.tuner.FluteKey.THUMB
 
-/** The keys of a Boehm flute a fingering diagram shows, in playing order from the head joint down. */
+/**
+ * The fifteen keys a finger touches on a C-foot Boehm flute, from the head joint down: what the fingering picture
+ * draws (`ui/common/FingeringGeometry`). The two B flat levers are drawn and never pressed: B flat is "one and one".
+ */
 enum class FluteKey {
-    /** Left thumb (B key). */
+    /** Left thumb: the B flat lever beside the B key. */
+    THUMB_B_FLAT,
+    /** Left thumb: the B key. */
     THUMB,
     L1, L2, L3,
     /** Left little finger: the G sharp / A flat lever. */
     G_SHARP,
-    R1, R2, R3,
+    /** The side B flat lever, by the right first finger. */
+    B_FLAT_LEVER,
+    R1,
+    /** The D trill key, the right second finger's. */
+    D_TRILL,
+    R2,
+    /** The D sharp trill key, the right third finger's. */
+    D_SHARP_TRILL,
+    R3,
     /** Right little finger: the D sharp / E flat key. */
     E_FLAT,
     /** Right little finger on the foot joint: the C sharp roller. */
@@ -33,8 +48,8 @@ enum class FluteKey {
 
 /**
  * The basic fingering of every note a C-foot flute plays, c1 to c4 (MIDI 60 to 96), after the
- * Woodwind Fingering Guide's basic chart. B flat uses the "one and one" fingering. a3 sharp (94)
- * and h3 (95) need trill or sliver keys the diagram does not draw, so they have no entry.
+ * Woodwind Fingering Guide's basic chart (checked again on 2026-11-17). B flat uses the "one and one"
+ * fingering. b3 (94) and h3 (95) take a trill key, and every note has an entry.
  */
 object FluteFingerings {
     private val chart: Map<Int, Set<FluteKey>> = mapOf(
@@ -72,9 +87,11 @@ object FluteFingerings {
         91 to setOf(L1, L2, L3, E_FLAT),                              // g3
         92 to setOf(L2, L3, G_SHARP, E_FLAT),                         // gis3
         93 to setOf(THUMB, L2, R1, E_FLAT),                           // a3
+        94 to setOf(THUMB, R1, D_TRILL),                              // b3
+        95 to setOf(THUMB, L1, L3, D_SHARP_TRILL),                    // h3
         96 to setOf(L1, L2, L3, G_SHARP, R1),                         // c4 (C foot)
     )
 
-    /** The keys to press for [midi], or null when the chart has no plain fingering for it. */
+    /** The keys to press for [midi], or null outside the flute's range. */
     fun keysFor(midi: Int): Set<FluteKey>? = chart[midi]
 }

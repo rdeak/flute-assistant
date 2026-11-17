@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Flute Assistant: a single-module Android app (metronome, chromatic tuner, a note reading
-game and a digital flute) for primary-school children learning the flute. Package and applicationId are `hr.bertlab.fluteassistant`; the
+game, a digital flute and a fingering chart) for primary-school children learning the flute. Package and applicationId are `hr.bertlab.fluteassistant`; the
 project folder keeps the old name FluteTempo. Shipped languages: English (default resources) and
 Croatian (`values-hr`).
 
@@ -94,7 +94,8 @@ rules moved out of the ViewModels):
   (the tune, `TuneWriter`, `ListenRun`, bars, the songbook), `listen` (what the microphone's frames
   become: `NoteOnsetTracker`, `HearingTracker`, the thresholds in `ListenRules`), `metronome`
   (`MetronomeConfig`, `TempoBand`), `notes` (`NotesRound`, phrases, the sticker book), `tuner`
-  (`NoteMath`, fingerings) and `settings` (`SettingsStore`, the one storage interface, and
+  (`NoteMath`, fingerings), `fingers` (`FingerChart`, `FingerPick`: the Fingers tab's notes and keys) and
+  `settings` (`SettingsStore`, the one storage interface, and
   `MetronomeSettings`, the one owner of the metronome's tempo and beat, which the metronome tab and
   the flute both read and change there and nowhere else). A rule goes here and is tested here, on
   the JVM, with no dispatcher.
@@ -112,8 +113,8 @@ metronome's own stage (a composable and its state) as its speed panel.
 Each folder's CLAUDE.md loads when you work there and holds what must not be broken: `ui/` (the
 frame, the look and the structure every tab shares), `audio/metronome/` (metronome audio path,
 player contract), `ui/metronome/` (that tab), `playback/` (background playback), `ui/tuner/` (tuner
-path), `ui/notes/` (note reading game: Find and Hear, and the sticker book) and `ui/flute/` (digital
-flute). The matching `audio/` and `domain/` folders point there. For `ui/`, `ui/flute/` and
+path), `ui/notes/` (note reading game: Find and Hear, and the sticker book), `ui/flute/` (digital
+flute) and `ui/fingers/` (the fingering chart). The matching `audio/` and `domain/` folders point there. For `ui/`, `ui/flute/` and
 `ui/notes/` the long text (how it works, the reasons, who decided what) is `DESIGN.md` beside the
 CLAUDE.md, and the songbook's is `ui/flute/SONGBOOK.md`: these are not loaded by themselves, so
 read the part the CLAUDE.md names before you change that part.
@@ -148,13 +149,21 @@ tab's CLAUDE.md; these rules hold on all of them:
   same way (2026-11-06, `ui/DESIGN.md`, "Tablets"): the tab grows, and nothing is added.
 - Added at the user's request (2026-11-07): a day/night switch in the top bar before the flag, a moon or a
   sun with no words (`ui/DESIGN.md`). It is part of the frame like the flag, not a control on a tab.
-- Added at the user's request (2026-11-14): the tuner's 🔧 How? button in Tune mode and its four picture
-  cards on tuning the flute (`ui/tuner/CLAUDE.md`, "How to tune").
+- Added at the user's request (2026-11-14): the tuner's four picture cards on tuning the flute (`ui/tuner/CLAUDE.md`,
+  "How to tune"). Since 2026-11-18 (the calmer Tune view, the user's ask: "drop buttons hear how from view completly")
+  they open from the tuner's line when it names a fix on the flute, and a tap on the window plays the note: the 🔧 How?
+  and 🔊 Hear buttons are gone, and the tuner has one line of words.
 - Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
   pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
 - Added at the user's request (2026-11-16, reshaped 2026-11-17): the flute's ♯♭ key beside C6, which makes
   the next note key write its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭, both octaves), one tap per note; the
   keys stay the fifteen white ones in three rows (`ui/flute/CLAUDE.md`, "Sharps and flats").
+- Added at the user's request (2026-11-17, a teacher's ask): the fifth tab, Fingers 🖐️, last in the row: the chosen
+  note in every octave, each on its staff with the flute drawn as the player sees it, and seven letter keys and ♯♭ to
+  choose it. Nothing else on it (`ui/fingers/CLAUDE.md`; spec `docs/superpowers/specs/2026-11-17-fingers-tab-design.md`).
+  The same flute replaced the fingering strip in the tuner and Listen to me. Since 2026-11-18 a tap on a row's flute
+  opens that note in the tuner's Tune mode (the user's ask; no new control, the picture is the button), and the
+  phone's Back there returns to the Fingers tab.
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than
@@ -175,7 +184,7 @@ tab's CLAUDE.md; these rules hold on all of them:
 `core/log/Logger` (Hilt-provided, `AndroidLogger` in production, `FakeLogger` in tests) is the
 one way to log. Every line is a dotted event name plus `key=value` fields built by `LogLine`
 (two decimals for floating point, `none` for null, quoted text), under one tag per subsystem
-(`LogTags`: `FA.Tuner`, `FA.Metronome`, `FA.Playback`, `FA.Flute`, `FA.Notes`), so lines are greppable and a script
+(`LogTags`: `FA.Tuner`, `FA.Metronome`, `FA.Playback`, `FA.Flute`, `FA.Notes`, `FA.Fingers`), so lines are greppable and a script
 can split them on spaces. Levels: `v` per-frame detail, off unless switched on per tag at
 runtime; `d` periodic summaries and state changes, on in debug builds; `i` lifecycle; `w`/`e`
 failures with the exception. Guard costly `v` calls with `logger.isVerbose(tag)`. Never log
@@ -183,13 +192,13 @@ through `android.util.Log` directly, never log user-identifying data, and keep e
 stable: they are the interface a logcat session is read with.
 
 Each subsystem's events are listed beside its code: `ui/tuner/CLAUDE.md` (`FA.Tuner`),
-`audio/metronome/CLAUDE.md` (`FA.Metronome`, `FA.Playback`), `ui/flute/DESIGN.md` (`FA.Flute`) and
-`ui/notes/DESIGN.md` (`FA.Notes`). A debug build also
+`audio/metronome/CLAUDE.md` (`FA.Metronome`, `FA.Playback`), `ui/flute/DESIGN.md` (`FA.Flute`),
+`ui/notes/DESIGN.md` (`FA.Notes`) and `ui/fingers/CLAUDE.md` (`FA.Fingers`). A debug build also
 keeps every "Your turn" run on the phone (the audio, a per-frame table and the run's log lines
 aligned to it) for replay on the laptop: the `sessions` skill.
 
 ```sh
-adb logcat -s FA.Tuner FA.Metronome FA.Playback FA.Flute FA.Notes   # everything structured, debug build
+adb logcat -s FA.Tuner FA.Metronome FA.Playback FA.Flute FA.Notes FA.Fingers   # everything structured, debug build
 adb shell setprop log.tag.FA.Tuner VERBOSE               # per-frame tuner lines (any build)
 adb logcat -v time -s FA.Tuner | grep tuner.summary     # one line a second: did frames pass the gate?
 ```

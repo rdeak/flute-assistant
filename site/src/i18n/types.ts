@@ -4,7 +4,7 @@
 // Every word the site shows, for one language. A new language is a new file that satisfies this
 // type (TypeScript names any missing text) plus a line in ./index.ts.
 
-export type FeatureId = 'flute' | 'metronome' | 'tuner' | 'notes';
+export type FeatureId = 'flute' | 'metronome' | 'tuner' | 'notes' | 'fingers';
 
 export interface Feature {
   id: FeatureId;

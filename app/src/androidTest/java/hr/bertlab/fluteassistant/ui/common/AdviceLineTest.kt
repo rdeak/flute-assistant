@@ -11,14 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.DeviceConfigurationOverride
-import androidx.compose.ui.test.FontScale
-import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.then
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -48,7 +44,7 @@ class AdviceLineTest {
     private fun show() {
         compose.setContent {
             LocaleProvider(locale) {
-                DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(scale) then DeviceConfigurationOverride.ForcedSize(DpSize(width.dp, 200.dp))) {
+                UprightHost(DpSize(width.dp, 200.dp), scale) {
                     // The forced size makes its content fill it; the column lets the slot take the line's own height.
                     Column { Box(Modifier.testTag("slot")) { AdviceLine(advice) } }
                 }

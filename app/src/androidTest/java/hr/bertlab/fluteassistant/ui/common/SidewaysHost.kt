@@ -38,3 +38,14 @@ fun SidewaysHost(
         CompositionLocalProvider(LocalSideways provides sideways, content = content)
     }
 }
+
+/**
+ * A phone on its side in a test, by its window in dp, with what `SidewaysGeometry` makes of it: the tab's room beside
+ * the rail, the card's width and the column of buttons on the right. A test that needs more adds it as an extension.
+ */
+class Phone(val width: Int, val height: Int) {
+    val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
+    val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
+    val column: Float get() = SidewaysGeometry.columnWidth(height.toFloat())
+    override fun toString() = "$width x $height"
+}

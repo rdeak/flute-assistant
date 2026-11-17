@@ -42,7 +42,7 @@ import hr.bertlab.fluteassistant.domain.notes.NotesGame
 import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
-import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.Phone
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
@@ -81,13 +81,6 @@ class NotesSidewaysTest {
 
     /** The density `SidewaysHost` forces on the content now: what a dp comes to in pixels, and so how a dp length is rounded. */
     private var density = 1f
-
-    private class Phone(val width: Int, val height: Int) {
-        val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
-        val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
-        val column: Float get() = SidewaysGeometry.columnWidth(height.toFloat())
-        override fun toString() = "$width x $height"
-    }
 
     private fun show(
         initial: NotesRound,

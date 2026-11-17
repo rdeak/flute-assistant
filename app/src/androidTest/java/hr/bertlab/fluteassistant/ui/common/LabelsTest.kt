@@ -121,6 +121,19 @@ class LabelsTest {
     }
 
     @Test
+    fun a_note_name_has_no_octave_and_follows_the_language() {
+        val en = resources(Locale.ENGLISH)
+        val hr = resources(Locale("hr"))
+        assertEquals("C♯", noteName(en, 1))
+        assertEquals("B♭", noteName(en, 10))
+        assertEquals("B", noteName(en, 11))
+        assertEquals("Cis", noteName(hr, 1))
+        assertEquals("B", noteName(hr, 10))
+        assertEquals("H", noteName(hr, 11))
+        assertEquals(noteName(en, 1), noteName(en, 13))
+    }
+
+    @Test
     fun the_black_notes_are_spelled_as_flute_music_writes_them() {
         // Since 2026-11-16 (sharps and flats on the flute): one spelling for the app, C♯ E♭ F♯ G♯ B♭.
         val en = resources(Locale.ENGLISH)

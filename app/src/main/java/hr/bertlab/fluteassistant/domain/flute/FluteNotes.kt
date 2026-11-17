@@ -19,17 +19,15 @@ object FluteNotes {
     /** Every note the keys offer, lowest first. */
     val ALL: List<Int> = (LOWEST..HIGHEST).toList()
 
-    /** The staff place of [midi] (0 = c¹, as [StaffNotes.positionOf]): its letter's; −1 when the flute has no such key. */
-    fun positionOf(midi: Int): Int = if (midi in LOWEST..HIGHEST) StaffNotes.positionOf(NoteSpelling.naturalOf(midi)) else -1
+    /** The staff place of [midi] (0 = c¹, [NoteSpelling.placeOf]): its letter's; −1 when the flute has no such key. */
+    fun positionOf(midi: Int): Int = if (midi in LOWEST..HIGHEST) NoteSpelling.placeOf(midi) else -1
 
     /**
      * The black note the white key [key] writes under the ♯♭ key (since 2026-11-17): the one the app spells on that key's
-     * letter ([NoteSpelling]), so C, F and G take their sharp and E and B their flat; null for D and A, and for C6, whose
-     * sharp is past the flute's range.
+     * letter ([NoteSpelling.signedOf]), so C, F and G take their sharp and E and B their flat; null for D and A, and for
+     * C6, whose sharp is past the flute's range.
      */
-    fun signed(key: Int): Int? = listOf(key + 1, key - 1).firstOrNull {
-        it in LOWEST..HIGHEST && NoteSpelling.signOf(it) != null && NoteSpelling.naturalOf(it) == key
-    }
+    fun signed(key: Int): Int? = NoteSpelling.signedOf(key)?.takeIf { it in LOWEST..HIGHEST }
 
     /** The note the white key [key] writes: itself, or its black note ([signed]) while the ♯♭ key waits ([signWaiting]); null when it has none then. */
     fun written(key: Int, signWaiting: Boolean): Int? = if (signWaiting) signed(key) else key

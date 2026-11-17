@@ -20,6 +20,19 @@ const val TREBLE_CLEF_TIP_X = 1.55f
 const val TREBLE_CLEF_TIP_Y = -1.0f
 
 /**
+ * [drawTrebleClef] at the size of a staff whose lines are [lineGap] apart, its left at [x] and its curl on the G
+ * line, at [gLineY]: small, as the canvas draws it on the notes game's staff and on the Fingers tab's.
+ */
+fun DrawScope.drawStaffClef(lineGap: Float, gLineY: Float, x: Float, color: Color, strokeUnits: Float = 0.13f) {
+    val unit = lineGap * STAFF_CLEF_UNIT
+    drawTrebleClef(unit, Offset(x, gLineY - unit * STAFF_CLEF_CURL), color, strokeUnits)
+}
+
+/** A staff's clef: one of its units as a share of a line gap, and how far under its origin, in units, its curl is. */
+private const val STAFF_CLEF_UNIT = 0.62f
+private const val STAFF_CLEF_CURL = 3.15f
+
+/**
  * A stroked treble clef, drawn in [unit]s from [origin]: the hook and dot at the bottom, the
  * stem up to the loop at the top, the sweep back down and the curl around the G line. The notes
  * game and the flute's staff both draw it, each as faint as its canvas board, the line

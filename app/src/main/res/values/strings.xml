@@ -4,6 +4,8 @@
     <string name="tab_tuner">Tuner</string>
     <string name="tab_notes">Notes</string>
     <string name="tab_flute">Flute</string>
+    <!-- The fifth tab (2026-11-17): a fingering chart, the chosen note in every octave -->
+    <string name="tab_fingers">Fingers</string>
     <!-- The metronome tab's state for a screen reader while the drum beats -->
     <string name="tab_metronome_playing">Playing</string>
 
@@ -58,14 +60,15 @@
     <string name="play_a_note">👂 Play a note</string>
     <string name="lower_note">Lower note</string>
     <string name="higher_note">Higher note</string>
+    <!-- The tuner's window in Tune mode, for a screen reader: a tap plays the chosen note (2026-11-18; a pill until then) -->
     <string name="hear_note">Hear</string>
-    <!-- The tuner's Tune mode, beside Hear: opens the four picture cards on tuning the flute -->
-    <string name="tune_how">How?</string>
     <!-- The guide to tuning the flute: the words under the arrows on its head-joint picture -->
     <string name="tune_guide_push_in">push in</string>
     <string name="tune_guide_pull_out">pull out</string>
     <!-- The guide's heading, its buttons' names for a screen reader, its OK, and its four cards (title, words);
          the head-joint card's %1$s is the tuning note, A4 -->
+    <!-- The tuner's line, for a screen reader, when it names a fix on the flute: a tap opens the guide (no emoji, said aloud) -->
+    <string name="tune_line_how">How to tune</string>
     <string name="tune_guide_title">🔧 How to tune</string>
     <string name="tune_guide_back">Back</string>
     <string name="tune_guide_next">Next</string>
@@ -76,25 +79,26 @@
     <string name="tune_guide_head_joint_title">🎯 Tune on %1$s</string>
     <string name="tune_guide_head_joint_text">Play a long %1$s, as loud as you always play. Move the head joint a tiny bit, as thin as a coin, the way the tuner says. Play again.</string>
     <string name="tune_guide_each_note_title">👂 Check each note</string>
-    <string name="tune_guide_each_note_text">Pick a note with ‹ ›, tap 🔊 Hear, then play it long. Wait until the bubble stops moving, then look.</string>
+    <string name="tune_guide_each_note_text">Pick a note with ‹ ›, tap it to hear it, then play it long. Wait until the bubble stops moving, then look.</string>
     <string name="tune_guide_one_note_off_title">🔄 One note still off?</string>
-    <string name="tune_guide_one_note_off_text">Don\'t slide the head joint again. Roll the whole flute a little, the way the small line under the tuner says.</string>
+    <string name="tune_guide_one_note_off_text">Don\'t slide the head joint again. Roll the whole flute a little, the way the tuner says.</string>
     <!-- Status line while the reference note sounds from the speaker -->
     <string name="listen_status">🔊 Listen</string>
     <!-- Accessibility name of the fingering diagram; the argument is the note, e.g. "A4" -->
     <string name="fingering_for">Fingering for %1$s</string>
+    <!-- The Fingers tab (2026-11-17): the hands named round the flute in each note's row -->
+    <string name="hand_left">Left hand</string>
+    <string name="hand_right">Right hand</string>
+    <!-- What a tap on a row's flute does, for a screen reader (2026-11-18): the note opens in the tuner's Tune mode -->
+    <string name="fingers_tune">Open in the tuner</string>
     <!-- Shown in silence; the argument is the chosen note, e.g. "A4" -->
     <string name="play_note_prompt">👂 Play %1$s</string>
     <string name="in_tune">🎉 Perfect!</string>
-    <!-- Off the note: the line says which way to go, and its arrow points the way the pitch window's own arrow
-         does (since 2026-11-10; it said "Too low" with an arrow down beside the window's arrow up) -->
+    <!-- Off the note, in the flute's Listen to me: the line says which way to go, and its arrow points the way the
+         note's own arrow does (since 2026-11-10; it said "Too low" with an arrow down). The tuner's line says what to
+         change instead (since 2026-11-18): its window's bubble and arrow say up or down. -->
     <string name="too_low">⬆️ A little higher</string>
     <string name="too_high">⬇️ A little lower</string>
-    <!-- Target mode, a note that is not the chosen one; the argument is the heard note, e.g. "A4"; the arrow is the way to the chosen one -->
-    <string name="heard_lower_note">⬆️ That\'s %1$s</string>
-    <string name="heard_higher_note">⬇️ That\'s %1$s</string>
-    <string name="octave_too_low">⬆️ An octave higher</string>
-    <string name="octave_too_high">⬇️ An octave lower</string>
     <!-- What a screen reader says for the pitch window (ui/tuner/TunerScreen.kt) -->
     <string name="pitch_listening">Listening, no note heard yet</string>
     <string name="pitch_home">Home ring for %1$s, nothing heard yet</string>

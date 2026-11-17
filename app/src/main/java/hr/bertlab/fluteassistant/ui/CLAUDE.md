@@ -9,11 +9,13 @@ root CLAUDE.md, "Kid-friendly UI constraint".
 
 - One Activity. `MainScreen` hosts the frame (upright: `TitleBar` and `TabBar`; a phone on its
   side: `SideRail`) and the open tab. All ViewModels are Activity-scoped, so state and playback
-  survive tab switches; the one exception is the notes round, which the tab bar resets when that
-  tab is left.
+  survive tab switches; the two exceptions are the notes round, which the tab bar resets when that
+  tab is left, and a ♯♭ waiting on the Fingers tab, which leaving drops (`FingersViewModel.leave`).
+  What a tab drops when it is left is one branch of `MainScreen`'s `onLeaveTab`, a `when` over every
+  tab, so a new tab has to say.
 - Each tab is a stateful `XScreen` (ViewModel, permissions, lifecycle) and a stateless `XContent`
-  that takes the state and the callbacks; the flute and the notes tab take theirs as one object
-  (`FluteActions`, `NotesActions`). The `*Content` composables are what the UI tests render.
+  that takes the state and the callbacks; the flute, the notes tab and the tuner take theirs as one object
+  (`FluteActions`, `NotesActions`, `TunerActions`). The `*Content` composables are what the UI tests render.
 - A ViewModel holds no rules of its own: they are plain classes in `domain/` (root CLAUDE.md,
   "Architecture"), and the ViewModel gives them the clock, the sound, the storage and the log.
 - Shared pieces are in `ui/common` and never import a tab's package; a tab hands them what they
@@ -47,17 +49,44 @@ root CLAUDE.md, "Kid-friendly UI constraint".
 - **The phone's Back** is the way back the screen itself shows, wherever one is open: OK on the
   notes picker and the flute's speed panel, a tap on the open book on the shelf, Not now on the
   flute's microphone card, Stop while a tune runs, ✕ or OK on the tuner's guide, and it closes an open
-  tempo wheel first. With
+  tempo wheel first. On the tuner the Fingers tab's flute opened, it goes back to the Fingers tab (since 2026-11-18,
+  the user's ask; `MainScreen`'s `BackToTab`, composed before the tab so the guide takes Back first) until a tab is
+  chosen on the bar or the rail. With
   nothing open it is the phone's and leaves the app. A new panel gets a `BackHandler` and a test
   with `BackKey` (androidTest): `DESIGN.md`, "The phone's Back".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
 - `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both (the flute's level used
   it from 2026-11-16 until the levels went, 2026-11-17).
-  `FingeringDiagram` is shared by the tuner and the flute's listening room, and `AdviceLine` by
-  both too (it also takes the flute's "Play B4"): the same.
+  `FingeringDiagram` (the flute as the player sees it, its numbers in `FingeringGeometry`, since 2026-11-17) is
+  shared by the tuner, the flute's listening room and the Fingers tab, and `AdviceLine` is the flute's (it also takes
+  its "Play B4"; the tuner's one line took its advice on 2026-11-18): the same. A key (`KeyLook.kt`: its look, `KeyShape`, `KeyDepth`,
+  `drawKeyRing`, `SharpFlatPicture`, and the key itself, `ChunkyKey`, with `TapKey`, `SharpFlatKey` and
+  `KeyName`) and the staff's signs (`StaffSigns.kt`) are in `ui/common` since 2026-11-17, as the flute's keys and the
+  Fingers tab's are the same keys. `ChunkyKey` draws and speaks; each key brings its own gesture in its modifier.
+- **Five tabs.** The bar and the rail take their words' floor, their emoji and the word's growth with the text size
+  in dp (one `TabLook` each: `TabBar`'s `BarLook`, `SideRail`'s `RailLook` and `RailLookShort`; `TabItem` turns it
+  into text sizes): with five, a floor in sp cut "Metronome". `TabBarTest` and
+  `SideRailTest` hold every word whole at 360 and 412 dp wide, on the 360 and 411 dp rails, at twice the text.
+  A tab measures its own cell (`TabItem`): the word first, at its size, and the emoji in what is left, drawn smaller
+  where that is too little, so the rail's emoji sizes are the most and not what a 360 dp rail shows (about 19 of the
+  20). Do not work a cell's height out from the bar's paddings again, or guess a line's height: a line is as tall as
+  its font makes it, not its `lineHeight` (an emoji's is about 1.37 times its size, where the rail counted 1.2).
+- **One order** (the user, 2026-11-18: "idea is to make all tabs and views with same structure or order of
+  elements"). Upright, a tab reads from the top: its choice pills, the line of words saying what to do, the buttons,
+  then the card with the content. The tuner: Which?/Tune, its one line, then its card with the window and the flute
+  (since the calmer Tune view of 2026-11-18 it has no buttons of its own: the window is Hear and the line opens the
+  guide); the notes tab: Find/Hear, the feedback line, the hero row (flames, the note, Pick), the card with the staff. The one
+  exception is the user's own: the flute's listening room keeps its line under the fingering (`flute/CLAUDE.md`). A
+  new tab or view follows the order; sideways layouts keep their own.
+- **A tab opens another only through `MainScreen`.** The Fingers tab's flute opens its note in the tuner
+  (`onTuneNote`, since 2026-11-18): the Fingers tab gets a callback and knows no tuner, and `MainScreen` sets the
+  tuner first and then shows it, and keeps the way back for the phone's Back (`TabRoute`, the open tab and its way
+  back as one saved value, pinned by `TabRouteTest`; cleared by any tab
+  chosen on the bar or the rail).
 - **A test of a fit compares bounds.** `assertIsDisplayed` does not prove one: what spills past a
   window is still displayed. Compare `getUnclippedBoundsInRoot()` with the room, and ask
-  `GetTextLayoutResult` about words (`assertWhole`, `ui/common/WholeText.kt` in androidTest).
+  `GetTextLayoutResult` about words (`assertWhole`, `ui/common/WholeText.kt` in androidTest). What a layer
+  scales (a tab's emoji) keeps its full size in `getUnclippedBoundsInRoot()`: read `boundsInRoot` there.
 
 ## Sideways
 

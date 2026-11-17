@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.tuner
 
 import hr.bertlab.fluteassistant.audio.TONE_VOLUME
+import hr.bertlab.fluteassistant.domain.listen.FixHold
 import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.HearingTracker
 import hr.bertlab.fluteassistant.domain.listen.ListenRules
@@ -19,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -62,18 +64,18 @@ class TunerViewModelTest {
     }
 
     @Test
-    fun `the guide opens on the first card, moves and closes`() = runTest(dispatcher) {
+    fun `the guide opens on the card it is asked for, moves and closes`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         advanceUntilIdle()
         assertNull(vm.state.value.guideCard)
-        vm.openGuide()
-        assertEquals(GuideCard.WARM_UP, vm.state.value.guideCard)
+        vm.openGuide(GuideCard.HEAD_JOINT)
+        assertEquals(GuideCard.HEAD_JOINT, vm.state.value.guideCard)
         vm.showGuideCard(GuideCard.EACH_NOTE)
         assertEquals(GuideCard.EACH_NOTE, vm.state.value.guideCard)
         vm.closeGuide(GuideExit.BACK)
         assertNull(vm.state.value.guideCard)
-        vm.openGuide()
-        assertEquals(GuideCard.WARM_UP, vm.state.value.guideCard) // always from the start
+        vm.openGuide(GuideCard.ONE_NOTE_OFF)
+        assertEquals(GuideCard.ONE_NOTE_OFF, vm.state.value.guideCard) // the card the line names, not the last one shown
         assertTrue(vm.state.value.isListening) // the microphone stays on underneath
     }
 
@@ -290,6 +292,28 @@ class TunerViewModelTest {
         assertEquals(TunerMode.TARGET, TunerViewModel(engine, settings, tonePlayer, logger).state.value.mode)
     }
 
+    /** A tap on a flute of the Fingers tab (2026-11-18): Tune mode on that note, saved and logged as the child's, the guide closed. */
+    @Test
+    fun `tune opens a note in tune mode, closing the guide`() {
+        val vm = TunerViewModel(engine, settings, tonePlayer, logger)
+        vm.openGuide(GuideCard.HEAD_JOINT)
+        vm.tune(73)
+        assertEquals(TunerMode.TARGET, vm.state.value.mode)
+        assertEquals(73, vm.state.value.targetMidi)
+        assertNull(vm.state.value.guideCard)
+        assertEquals(TunerMode.TARGET, settings.tunerMode)
+        assertEquals(73, settings.targetNote)
+        assertEquals("fingers", logger.events("tuner.guide").last()["via"])
+        assertEquals(listOf(TunerMode.TARGET), logger.events("tuner.mode").map { it["mode"] })
+        assertEquals(listOf(73), logger.events("tuner.target").map { it["midi"] })
+
+        // Already in Tune mode, with no guide open: only the note moves, and only the note is logged.
+        vm.tune(60)
+        assertEquals(60, vm.state.value.targetMidi)
+        assertEquals(1, logger.events("tuner.mode").size)
+        assertEquals(1, logger.events("tuner.guide").count { it["action"] == "close" })
+    }
+
     @Test
     fun `choosing a mode is saved`() {
         val vm = TunerViewModel(engine, settings, tonePlayer, logger)
@@ -302,6 +326,7 @@ class TunerViewModelTest {
     fun `playing the target note sounds it and pauses the readings`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         advanceUntilIdle()
+        vm.setMode(TunerMode.TARGET)
         vm.setTargetNote(69)
 
         vm.playTargetNote()
@@ -324,9 +349,88 @@ class TunerViewModelTest {
     }
 
     @Test
+    fun `the chosen note plays only when a tap on the window asks, in tune mode and in silence`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        vm.playTargetNote() // Which? mode: the window is no button
+        vm.setMode(TunerMode.TARGET)
+        steady(440.0)
+        advanceUntilIdle()
+        vm.playTargetNote() // the child is playing: the note would blank the reading
+        assertTrue(tonePlayer.played.isEmpty())
+        assertFalse(vm.state.value.isPlayingReference)
+        assertNotNull(vm.state.value.reading)
+    }
+
+    /** A flat A4 in Tune mode, then silence until the reading clears: the line still names the head joint. */
+    private fun TestScope.fixThenSilence(vm: TunerViewModel) {
+        vm.setMode(TunerMode.TARGET)
+        steady(430.0)
+        advanceUntilIdle()
+        assertEquals(TunerLine.Advice(TunerAdvice.HEAD_JOINT_IN), vm.state.value.line)
+        silent(ListenRules.HOLD_FRAMES)
+        assertNull(vm.state.value.reading)
+        assertEquals(TunerLine.Advice(TunerAdvice.HEAD_JOINT_IN), vm.state.value.line)
+    }
+
+    /** [n] silent frames, one at a time: the fake engine buffers only so many. */
+    private fun TestScope.silent(n: Int) = repeat(n) {
+        engine.frames.tryEmit(silence)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `a fix on the flute stays on the line through the silence after it, then goes`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        fixThenSilence(vm) // the frame that cleared the reading was the first of the silence
+        silent(FixHold.HOLD_FRAMES - 1)
+        assertEquals(TunerLine.Advice(TunerAdvice.HEAD_JOINT_IN), vm.state.value.line)
+        silent(1)
+        assertEquals(TunerLine.PlayNote(69), vm.state.value.line)
+    }
+
+    @Test
+    fun `a held fix gives way at once to a new sound and to the note playing`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        fixThenSilence(vm)
+        steady(440.0)
+        advanceUntilIdle()
+        assertEquals(TunerLine.InTune, vm.state.value.line)
+        silent(ListenRules.HOLD_FRAMES)
+        assertEquals("it does not come back", TunerLine.PlayNote(69), vm.state.value.line)
+
+        steady(430.0)
+        advanceUntilIdle()
+        silent(ListenRules.HOLD_FRAMES)
+        vm.playTargetNote()
+        assertEquals(TunerLine.Listen, vm.state.value.line)
+        advanceTimeBy(TunerViewModel.REFERENCE_TONE_MS + 1L)
+        assertEquals("nor after the note", TunerLine.PlayNote(69), vm.state.value.line)
+    }
+
+    @Test
+    fun `opening the guide and leaving the tab drop a held fix`() = runTest(dispatcher) {
+        val vm = listeningViewModel()
+        advanceUntilIdle()
+        fixThenSilence(vm)
+        vm.openGuide(GuideCard.HEAD_JOINT)
+        vm.closeGuide(GuideExit.OK)
+        assertEquals(TunerLine.PlayNote(69), vm.state.value.line)
+
+        steady(430.0)
+        advanceUntilIdle()
+        silent(ListenRules.HOLD_FRAMES)
+        vm.stopListening()
+        assertEquals(TunerLine.PlayNote(69), vm.state.value.line)
+    }
+
+    @Test
     fun `stopping listening stops the tone`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         advanceUntilIdle()
+        vm.setMode(TunerMode.TARGET)
         vm.playTargetNote()
         vm.stopListening()
         assertFalse(vm.state.value.isPlayingReference)
@@ -359,6 +463,7 @@ class TunerViewModelTest {
     @Test
     fun `the reference tone neither counts as unclear sound nor leaves a stale hearing`() = runTest(dispatcher) {
         val vm = listeningViewModel(); advanceUntilIdle()
+        vm.setMode(TunerMode.TARGET)
         repeat(HearingTracker.UNCLEAR_FRAMES) { engine.frames.tryEmit(quiet()) }
         advanceUntilIdle()
         vm.playTargetNote()

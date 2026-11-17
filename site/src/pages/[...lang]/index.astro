@@ -22,7 +22,7 @@ export function getStaticPaths() {
 const { lang } = Astro.props as { lang: Lang };
 const t = language(lang).strings;
 const pageUrl = new URL(pagePath(lang, 'home'), Astro.site).href;
-const featureEmoji = { flute: '🎵', metronome: '🥁', tuner: '👂', notes: '🎼' } as const;
+const featureEmoji = { flute: '🎵', metronome: '🥁', tuner: '👂', notes: '🎼', fingers: '🖐️' } as const;
 ---
 
 <Base lang={lang} page="home" title={t.meta.title} description={t.meta.description}>

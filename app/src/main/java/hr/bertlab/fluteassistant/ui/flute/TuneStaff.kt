@@ -98,6 +98,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.drawSign
 import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
 import hr.bertlab.fluteassistant.ui.common.HIGH_EMOJI
 import hr.bertlab.fluteassistant.ui.common.LONG_EMOJI

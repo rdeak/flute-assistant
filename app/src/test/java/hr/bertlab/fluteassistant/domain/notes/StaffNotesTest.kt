@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.domain.notes
 
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -34,6 +35,8 @@ class StaffNotesTest {
         assertEquals(listOf(12), StaffNotes.ledgerLinesFor(12))
         assertEquals(listOf(12), StaffNotes.ledgerLinesFor(13))
         assertEquals(listOf(12, 14), StaffNotes.ledgerLinesFor(14))
+        // Past the game's notes too: the Fingers tab writes every note up to c4 on this staff.
+        assertEquals(listOf(12, 14, 16, 18, 20), StaffNotes.ledgerLinesFor(NoteSpelling.placeOf(96)))
     }
 
     @Test

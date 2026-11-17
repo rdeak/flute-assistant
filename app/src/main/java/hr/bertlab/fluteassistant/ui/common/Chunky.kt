@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
@@ -213,6 +215,13 @@ fun BigActionButton(
 /** The height of a [BigActionButton] upright; the round summary counts it in the room it needs, and its tests check it. */
 internal val BigActionHeight = 84.dp
 
+/** The room either side of an upright tab's column, and the room round it: every tab's, so the tabs line up. */
+val TabSide = 20.dp
+val TabPadding = PaddingValues(start = TabSide, end = TabSide, top = 4.dp, bottom = 16.dp)
+
+/** A [Stage]'s own padding inside its card, unless it asks for another. */
+val StagePadding = 16.dp
+
 /**
  * The rounded white (navy in dark mode) card each tab draws its main content on, with a
  * thin border: it is not pressable, so it has no ink outline or shadow.
@@ -221,7 +230,7 @@ internal val BigActionHeight = 84.dp
 fun Stage(
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.SpaceBetween,
-    padding: Dp = 16.dp,
+    padding: Dp = StagePadding,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val colors = FluteTheme.colors
@@ -244,16 +253,29 @@ val StageShape = RoundedCornerShape(32.dp)
  * the control it sits in, carry the meaning.
  */
 @Composable
-fun Emoji(emoji: String, fontSize: Int, modifier: Modifier = Modifier) {
+fun Emoji(emoji: String, fontSize: Int, modifier: Modifier = Modifier) = EmojiText(emoji, fontSize.sp, modifier)
+
+/**
+ * [Emoji] at a [size] in dp, exactly: a picture that large text must not grow out of its room. The size is not cut to
+ * a whole number of sp on the way, as the callers' own conversions are (19.67 dp was drawn at 19).
+ */
+@Composable
+fun Emoji(emoji: String, size: Dp, modifier: Modifier = Modifier) = EmojiText(emoji, size.asTextSize(), modifier)
+
+@Composable
+private fun EmojiText(emoji: String, font: TextUnit, modifier: Modifier) {
     Text(
         text = emoji,
-        style = MaterialTheme.typography.titleLarge.copy(fontSize = fontSize.sp, lineHeight = (fontSize * 1.2f).sp),
+        style = MaterialTheme.typography.titleLarge.copy(fontSize = font, lineHeight = font * 1.2f),
         modifier = modifier.clearAndSetSemantics { },
     )
 }
 
 /** The star a note earns, in the notes game's round and under a step of the flute's "Your turn". */
 const val STAR_EMOJI = "⭐" // star
+
+/** The speaker on whatever plays a note when tapped: the notes game's Hear and Sound, the tuning guide's "tap the note". */
+const val SPEAKER_EMOJI = "🔊" // speaker, loud
 
 /** A star for a note that took more than one try: still earned, but faint. */
 const val RETRY_STAR_ALPHA = 0.35f

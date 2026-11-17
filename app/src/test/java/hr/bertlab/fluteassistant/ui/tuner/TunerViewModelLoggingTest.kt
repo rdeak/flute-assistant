@@ -62,7 +62,7 @@ class TunerViewModelLoggingTest {
         vm.showGuideCard(GuideCard.EACH_NOTE) // closed: nothing to move
         assertTrue(logger.events("tuner.guide").isEmpty())
 
-        vm.openGuide()
+        vm.openGuide(GuideCard.HEAD_JOINT)
         vm.showGuideCard(GuideCard.EACH_NOTE)
         vm.closeGuide(GuideExit.BACK)
 
@@ -72,7 +72,8 @@ class TunerViewModelLoggingTest {
             assertEquals(LogTags.TUNER, it.tag)
             assertEquals('d', it.level)
         }
-        assertEquals(0, events[0]["page"])
+        assertEquals(1, events[0]["page"])
+        assertEquals("line", events[0]["via"]) // only the tuner's line opens it, since 2026-11-18
         assertEquals(2, events[1]["page"])
         assertEquals(2, events[2]["page"])
         assertEquals("back", events[2]["via"])

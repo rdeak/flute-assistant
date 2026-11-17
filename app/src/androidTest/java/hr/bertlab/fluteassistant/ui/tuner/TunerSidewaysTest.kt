@@ -16,6 +16,9 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasNoClickAction
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -32,6 +35,7 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
+import hr.bertlab.fluteassistant.ui.common.Phone
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
 import org.junit.Assert.assertEquals
@@ -61,18 +65,21 @@ class TunerSidewaysTest {
     private val notes = mutableListOf<Int>()
     private val modes = mutableListOf<TunerMode>()
     private var hears = 0
-    private var guideOpens = 0
+    private val opened = mutableListOf<GuideCard>()
     private var requests = 0
     private var settings = 0
     private var dismissals = 0
 
-    private class Phone(val width: Int, val height: Int) {
-        val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
-        val cardWidth: Float get() = SidewaysGeometry.cardWidth(contentWidth, height.toFloat())
-        val column: Float get() = SidewaysGeometry.columnWidth(height.toFloat())
-        val modeHeight: Float get() = if (height < 400) 80f else 92f
-        override fun toString() = "$width x $height"
-    }
+    private val Phone.modeHeight: Float get() = if (height < 400) 80f else 92f
+
+    private val actions = TunerActions(
+        onTargetNoteChange = { notes += it },
+        onModeChange = { modes += it },
+        onPlayNote = { hears++ },
+        onRequestPermission = { requests++ },
+        onOpenSettings = { settings++ },
+        onOpenGuide = { opened += it },
+    )
 
     private fun show(
         initial: TunerUiState,
@@ -85,15 +92,7 @@ class TunerSidewaysTest {
         compose.setContent {
             LocaleProvider(locale) {
                 SidewaysHost(width = phone.width, height = phone.height, fontScale = fontScale) {
-                    TunerContent(
-                        state = state.value,
-                        onTargetNoteChange = { notes += it },
-                        onModeChange = { modes += it },
-                        onPlayNote = { hears++ },
-                        onRequestPermission = { requests++ },
-                        onOpenSettings = { settings++ },
-                        onOpenGuide = { guideOpens++ },
-                    )
+                    TunerContent(state.value, actions)
                 }
             }
         }
@@ -120,19 +119,6 @@ class TunerSidewaysTest {
             }
         }
     }
-
-    /** [TunerScreenTest]'s `listening`: [frequency] heard (null for silence), [targetMidi] chosen. */
-    private fun listening(
-        frequency: Double?,
-        targetMidi: Int = FluteRange.DEFAULT_TARGET,
-        mode: TunerMode = TunerMode.TARGET,
-    ) = TunerUiState(
-        permissionGranted = true,
-        isListening = true,
-        reading = frequency?.let { NoteMath.frequencyToNote(it) },
-        targetMidi = targetMidi,
-        mode = mode,
-    )
 
     private fun on(each: Phone) {
         compose.runOnIdle { phone = each }
@@ -203,12 +189,14 @@ class TunerSidewaysTest {
     }
 
     @Test
-    fun tune_mode_has_arrows_and_hear() {
+    fun tune_mode_has_arrows_and_no_hear_or_how() {
         show(listening(null))
         window().assertIsDisplayed()
         lower().assertIsDisplayed()
         higher().assertIsDisplayed()
-        word("Hear").assertIsDisplayed()
+        // Since 2026-11-18 the window is Hear and the line opens the guide: no buttons for them.
+        word("Hear").assertDoesNotExist()
+        word("How?").assertDoesNotExist()
         word("Tune").assertIsDisplayed().assertIsSelected()
         word("Which?").assertIsDisplayed()
         // The arrows are the window's neighbours, 52 dp round, one either side.
@@ -296,7 +284,7 @@ class TunerSidewaysTest {
 
     /**
      * An error comes when the microphone will not open, so nothing is heard and there is no advice:
-     * the line takes the advice's box. Nothing around it moves, and it stays in that box at any text
+     * the one line says it, in its own box. Nothing around it moves, and it stays in that box at any text
      * size, on every phone.
      */
     private fun assertAnErrorMovesNothing(scale: Float, message: String = "I can't listen right now.", locale: Locale = Locale.ENGLISH) {
@@ -357,8 +345,9 @@ class TunerSidewaysTest {
         val window = bounds(window())
         val fingering = bounds(fingering())
         assertTrue("the fingering starts at ${fingering.top}, the window ends at ${window.bottom}", fingering.top >= window.bottom)
-        // Across the card: wider than it could have been beside the window.
-        assertTrue("the fingering is ${width(fingering())} wide", width(fingering()) > 320.dp)
+        // Under the window, no wider than 300 (since 2026-11-17, the flute picture is taller): wider, the window
+        // would give up more than the strip it replaced took.
+        assertNearBySize("the fingering", 300.dp, width(fingering()))
     }
 
     @Test
@@ -388,19 +377,9 @@ class TunerSidewaysTest {
                     listOf("Lower note", "Higher note").forEach { name ->
                         assertInside(each, "$label: $name", compose.onNodeWithContentDescription(name).assertIsDisplayed(), shadow = 4.dp)
                     }
-                    val hear = bounds(word("Hear").assertIsDisplayed())
-                    assertInside(each, "$label: Hear", word("Hear"), shadow = 5.dp)
-                    assertNear("$label: Hear's width", each.column.dp, hear.right - hear.left)
-                    assertTrue("$label: Hear ends at ${hear.bottom}, Which? starts at ${which.top}", hear.bottom <= which.top)
-                    assertNear("$label: Hear is at the top of the column", 14.dp, hear.top)
-                    val how = bounds(word("How?").assertIsDisplayed())
-                    assertInside(each, "$label: How?", word("How?"), shadow = 5.dp)
-                    assertNear("$label: How?'s width", each.column.dp, how.right - how.left)
-                    assertTrue("$label: How? starts at ${how.top}, Hear ends at ${hear.bottom}", how.top >= hear.bottom)
-                    assertTrue("$label: How? and its shadow end at ${how.bottom + 5.dp}, Which? starts at ${which.top}", how.bottom + 5.dp <= which.top)
-                } else {
-                    word("How?").assertDoesNotExist()
                 }
+                word("Hear").assertDoesNotExist()
+                word("How?").assertDoesNotExist()
             }
         }
     }
@@ -421,19 +400,41 @@ class TunerSidewaysTest {
         lower().performClick()
         higher().performClick()
         assertEquals(listOf(69, 71), notes)
-        word("Hear").performClick()
+        window().performClick() // the window is Hear in Tune mode (2026-11-18)
         assertEquals(1, hears)
         word("Which?").performClick()
         assertEquals(listOf(TunerMode.IDENTIFY), modes)
     }
 
     @Test
-    fun hear_waits_while_the_note_plays() {
+    fun the_window_waits_while_the_note_plays_and_is_no_button_in_which_mode() {
         show(listening(null).copy(isPlayingReference = true))
-        word("Hear").assertIsNotEnabled()
+        window().assert(hasNoClickAction())
         compose.runOnIdle { state.value = state.value.copy(isPlayingReference = false) }
         compose.waitForIdle()
-        word("Hear").assertIsEnabled()
+        window().assert(hasClickAction())
+        // Only in silence (2026-11-18): while the child plays, a finger on the bubble starts nothing.
+        compose.runOnIdle { state.value = listening(430.0) }
+        compose.waitForIdle()
+        window().assert(hasNoClickAction())
+        compose.runOnIdle { state.value = listening(null, mode = TunerMode.IDENTIFY) }
+        compose.waitForIdle()
+        window().assert(hasNoClickAction())
+    }
+
+    /** The one line keeps the room the two lines had, so nothing beside it moves whatever it says. */
+    @Test
+    fun the_fingering_stays_put_whatever_the_line_says() {
+        show(listening(null))
+        PHONES.forEach { each ->
+            on(each)
+            compose.runOnIdle { state.value = listening(null) }
+            compose.waitForIdle()
+            val silent = bounds(fingering())
+            compose.runOnIdle { state.value = listening(430.0) }
+            compose.waitForIdle()
+            assertEquals("$each: the fingering moved", silent, bounds(fingering()))
+        }
     }
 
     @Test
@@ -454,43 +455,45 @@ class TunerSidewaysTest {
         higher().assertIsEnabled()
     }
 
-    /** The mockup draws the words 40 and 22 high and the status line's first line at the top of its 48 dp. */
+    /** The one line (2026-11-18) stands right of the window, over the fingering, and says the advice, not the status. */
     @Test
     fun the_words_stand_to_the_right_of_the_window() {
         show(listening(430.0), Phone(915, 411))
         val window = bounds(window())
-        val status = bounds(word("⬆️ A little higher"))
-        val advice = bounds(word("🔧 Push the head joint in a little"))
-        assertTrue("the status starts at ${status.left}, the window ends at ${window.right}", status.left >= window.right)
-        assertTrue("the advice is under the status", advice.top >= status.bottom - SLACK)
-        assertTrue("the fingering is under the advice", bounds(fingering()).top >= advice.bottom - SLACK)
+        val line = bounds(word("🔧 Push the head joint in a little"))
+        word("⬆️ A little higher").assertDoesNotExist()
+        assertTrue("the line starts at ${line.left}, the window ends at ${window.right}", line.left >= window.right)
+        assertTrue("the fingering is under the line", bounds(fingering()).top >= line.bottom - SLACK)
     }
 
-    /** The longest words in each language: the octave and heard-note lines and the longest advice. */
-    private class Case(val state: TunerUiState, val english: List<String>, val croatian: List<String>)
+    @Test
+    fun the_head_joint_line_opens_the_guide_on_its_card() {
+        show(listening(430.0))
+        word("🔧 Push the head joint in a little").performClick()
+        assertEquals(listOf(GuideCard.HEAD_JOINT), opened)
+    }
+
+    /** The longest words in each language: the one line says the advice, or the prompt when there is none. */
+    private class Case(val state: TunerUiState, val english: String, val croatian: String)
 
     private val longest = listOf(
-        Case(listening(880.0), listOf("⬇️ An octave lower", "🍃 Gentler air"), listOf("⬇️ Oktavu niže", "🍃 Nježniji zrak")),
-        Case(listening(261.63, targetMidi = 72), listOf("⬆️ An octave higher", "💨 Faster air"), listOf("⬆️ Oktavu više", "💨 Brži zrak")),
-        Case(listening(329.63), listOf("⬆️ That's E4", "👀 Check your fingers"), listOf("⬆️ To je e1", "👀 Provjeri prste")),
-        Case(listening(440.0, targetMidi = 67), listOf("⬇️ That's A4", "👀 Check your fingers"), listOf("⬇️ To je a1", "👀 Provjeri prste")),
-        Case(listening(430.0), listOf("⬆️ A little higher", "🔧 Push the head joint in a little"), listOf("⬆️ Malo više", "🔧 Gurni glavu flaute malo unutra")),
-        Case(listening(443.0), listOf("⬇️ A little lower", "🔧 Pull the head joint out a little"), listOf("⬇️ Malo niže", "🔧 Izvuci glavu flaute malo van")),
+        Case(listening(880.0), "🍃 Gentler air", "🍃 Nježniji zrak"),
+        Case(listening(261.63, targetMidi = 72), "💨 Faster air", "💨 Brži zrak"),
+        Case(listening(329.63), "👀 Check your fingers", "👀 Provjeri prste"),
+        Case(listening(430.0), "🔧 Push the head joint in a little", "🔧 Gurni glavu flaute malo unutra"),
+        Case(listening(443.0), "🔧 Pull the head joint out a little", "🔧 Izvuci glavu flaute malo van"),
         Case(
             listening(NoteMath.midiToFrequency(72) * 0.985, targetMidi = 72),
-            listOf("⬆️ A little higher", "🔄 Roll the flute out a little"),
-            listOf("⬆️ Malo više", "🔄 Zakreni flautu malo od sebe"),
+            "🔄 Roll the flute out a little",
+            "🔄 Zakreni flautu malo od sebe",
         ),
         Case(
             listening(NoteMath.midiToFrequency(72) * 1.015, targetMidi = 72),
-            listOf("⬇️ A little lower", "🔄 Roll the flute in a little"),
-            listOf("⬇️ Malo niže", "🔄 Zakreni flautu malo k sebi"),
+            "🔄 Roll the flute in a little",
+            "🔄 Zakreni flautu malo k sebi",
         ),
-        Case(
-            listening(null).copy(hearing = Hearing.LOUD_UNCLEAR),
-            listOf("👂 Play A4", "🎵 Play one long, clear note"),
-            listOf("👂 Odsviraj a1", "🎵 Odsviraj jedan dug, čist ton"),
-        ),
+        Case(listening(null).copy(hearing = Hearing.LOUD_UNCLEAR), "🎵 Play one long, clear note", "🎵 Odsviraj jedan dug, čist ton"),
+        Case(listening(null), "👂 Play A4", "👂 Odsviraj a1"),
     )
 
     /** Every line whole, only between words, and out of the right column, on each phone. */
@@ -501,13 +504,12 @@ class TunerSidewaysTest {
             longest.forEach { case ->
                 compose.runOnIdle { state.value = case.state }
                 compose.waitForIdle()
-                (if (locale.language == "hr") case.croatian else case.english).forEach { line ->
-                    val node = word(line).assertIsDisplayed()
-                    assertWholeWords(each, line)
-                    assertInside(each, "\"$line\"", node)
-                    assertBesideTheColumn(each, "\"$line\"", node)
-                    assertTrue("$each: \"$line\" runs over the window", bounds(node).left >= bounds(window()).left)
-                }
+                val line = if (locale.language == "hr") case.croatian else case.english
+                val node = word(line).assertIsDisplayed()
+                assertWholeWords(each, line)
+                assertInside(each, "\"$line\"", node)
+                assertBesideTheColumn(each, "\"$line\"", node)
+                assertTrue("$each: \"$line\" runs over the window", bounds(node).left >= bounds(window()).left)
                 assertInside(each, "the fingering", fingering().assertIsDisplayed())
             }
         }
@@ -525,23 +527,28 @@ class TunerSidewaysTest {
     @Test
     fun the_longest_english_words_fit_at_large_text() = assertTheWordsFit(Locale.ENGLISH, 1.5f)
 
+    /** Since 2026-11-18 the advice goes through the one line, so its floor is in dp, as `AdviceLine`'s was (the review). */
+    @Test
+    fun the_longest_english_words_fit_at_the_largest_text() = assertTheWordsFit(Locale.ENGLISH, 2f)
+
+    @Test
+    fun the_longest_croatian_words_fit_at_the_largest_text() = assertTheWordsFit(Locale("hr"), 2f)
+
     @Test
     fun the_modes_fit_in_croatian_at_large_text() {
         show(listening(null), locale = Locale("hr"), fontScale = 1.5f)
         PHONES.forEach { each ->
             on(each)
-            listOf("Koji?", "Ugodi", "Slušaj", "Kako?").forEach { name ->
+            listOf("Koji?", "Ugodi").forEach { name ->
                 assertInside(each, name, word(name).assertIsDisplayed(), shadow = 5.dp)
                 assertWholeWords(each, name)
             }
         }
     }
 
-    // ---- How? ----
-
-    /** How? joins Hear above the pair, which stays where it stands in Which? mode, where neither is shown. */
+    /** The pair stays where it stands whatever the mode: since 2026-11-18 nothing stands over it in either. */
     @Test
-    fun the_mode_pair_does_not_move_when_how_is_added() {
+    fun the_mode_pair_stays_put_when_the_mode_changes() {
         show(listening(null, mode = TunerMode.IDENTIFY))
         listOf(Phone(915, 411), Phone(800, 360), Phone(640, 360)).forEach { each ->
             on(each)
@@ -551,42 +558,11 @@ class TunerSidewaysTest {
             val tune = bounds(word("Tune"))
             compose.runOnIdle { state.value = listening(null, mode = TunerMode.TARGET) }
             compose.waitForIdle()
-            word("How?").assertIsDisplayed()
             assertNear("$each: Which?'s top", which.top, bounds(word("Which?")).top)
             assertNear("$each: Which?'s bottom", which.bottom, bounds(word("Which?")).bottom)
             assertNear("$each: Tune's top", tune.top, bounds(word("Tune")).top)
         }
     }
-
-    @Test
-    fun how_opens_the_guide() {
-        show(listening(null))
-        word("How?").performClick()
-        assertEquals(1, guideOpens)
-    }
-
-    private fun assertHearAndHowFit(locale: Locale, fontScale: Float, words: List<String>) {
-        show(listening(null), locale = locale, fontScale = fontScale)
-        PHONES.forEach { each ->
-            on(each)
-            words.forEach { name ->
-                assertInside(each, "$name at $fontScale", word(name).assertIsDisplayed(), shadow = 5.dp)
-                assertWholeWords(each, name)
-            }
-        }
-    }
-
-    @Test
-    fun how_fits_in_english_at_large_text() = assertHearAndHowFit(Locale.ENGLISH, 1.5f, listOf("Hear", "How?"))
-
-    @Test
-    fun how_fits_in_english_at_the_largest_text() = assertHearAndHowFit(Locale.ENGLISH, 2f, listOf("Hear", "How?"))
-
-    @Test
-    fun how_fits_in_croatian_at_large_text() = assertHearAndHowFit(Locale("hr"), 1.5f, listOf("Slušaj", "Kako?"))
-
-    @Test
-    fun how_fits_in_croatian_at_the_largest_text() = assertHearAndHowFit(Locale("hr"), 2f, listOf("Slušaj", "Kako?"))
 
     // ---- Asking for the microphone ----
 

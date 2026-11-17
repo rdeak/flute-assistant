@@ -21,7 +21,10 @@ change that part). The songbook is in `SONGBOOK.md`.
 - `FluteContent(state, metronome, actions)` builds the tune, the keys and the Play row once, and
   `FluteSideways.kt` only says where they stand. `TuneStaff` draws from `StaffGeometry` (plain dp; where a
   step's heads, pills and bar lines stand is `StaffGeometry.layout`, the one place that knows a sign's room), its signs
-  from `StaffSigns.kt`; `FluteKeys` draws the keys, the ♯♭ key with the staff's own signs.
+  from `ui/common/StaffSigns.kt`; `FluteKeys` builds its keys from `ui/common/KeyLook.kt`'s `ChunkyKey` (shared with the
+  Fingers tab since 2026-11-17); the ♯♭ key is that file's `SharpFlatKey`, drawn with the staff's own signs
+  (`SharpFlatPicture`), and the ⌒ key its `TapKey`. Which black note a key writes is `NoteSpelling.signedOf`,
+  kept to the flute's range by `FluteNotes.signed`.
 - `audio/flute/`: the tone (`SustainedToneSynth`, `AudioTrackFluteTonePlayer`).
 
 ## Rules
@@ -64,7 +67,9 @@ change that part). The songbook is in `SONGBOOK.md`.
 - The room under the stage while it listens adds nothing while things go right: "Play B4" until the
   first note is judged, then silence; after a wrong note the wanted note's fingering over "Check
   your fingers" until the right one (the user's pick of 2026-11-10). Not the fingering under every
-  note, and no fingering on a phone on its side: `DESIGN.md`, "The room under the stage".
+  note, and no fingering on a phone on its side: `DESIGN.md`, "The room under the stage". The line stays in the
+  middle of the room, under the fingering: on 2026-11-18 it moved to the top of the room and the user put it back
+  the same day ("reset to previous position"), the one place that keeps out of the other tabs' words-first order.
 - The line says why, in a few words with an emoji, and a guess says "maybe" (the user's ask of
   2026-11-13): "⏳ Too short, hold longer" (⏳, the note's own mark; "Hold it until the ⭐" until the run moved
   on, the user's wording of 2026-11-15) for a note let go too early, "Maybe out

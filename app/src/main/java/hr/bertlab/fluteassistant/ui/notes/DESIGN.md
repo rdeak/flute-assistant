@@ -63,11 +63,16 @@ give the answer away; their semantic click answers at once.
 
 Moved here from the root CLAUDE.md on 2026-11-05; the games and the sticker book came on 2026-11-07.
 
-The notes tab has two games on one staff, chosen by two pills on top ("The two games"), then one hero row (the
+The notes tab has two games on one staff, chosen by two pills on top ("The two games"), then, while a note is asked
+for, one feedback line, then one hero row (the
 streak as up to five flames, sized in dp as pictures, since five at a larger text size would not fit their pill, the
 note's bubble or, in Hear, the speaker bubble, and a "Pick" button with a dot per chosen letter) over a stage with the
-staff and one feedback line, and ten round places at the bottom (a star for first time, a faint star for a retry,
-yellow for the current note); "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in octave
+staff, and ten round places at the bottom. The line stood under the staff, in the stage, until 2026-11-18, when the
+user asked for it under the game pills ("move ... below buttons find and hear") so that every tab reads in one order,
+the words, the buttons, the content (`../CLAUDE.md`, "One order"); up there the hand sliding on the staff, which comes
+from below, does not cover it either. The picker and the summary have no line, so their hero row stands 54 dp higher
+than while asking: keeping an empty line there would take that room from the summary's keys. The round places hold a star for first time, a faint star for a retry
+and yellow for the current note. "Pick" swaps the staff for the picker in place (no dialog): the fifteen notes in octave
 rows, highest on top, each chosen key a sticker that fills as the note is learned ("The sticker book"), the "Sound"
 switch row and a big OK, the way back (and the phone's Back, `ui/DESIGN.md`). The end-of-round summary has no numbers on screen either: a trophy, the
 keys of the notes asked, large, and Again ("The summary is one message" under "The sticker book").
@@ -186,7 +191,7 @@ given notes do not count.
   the same way. Nothing animates: the state flips per note,
   which is the pulse. Pinned by `the_note_sounding_lights_up`, `the_playback_after_the_last_note_lights_the_found_note`,
   `the_halo_stops_at_the_next_capsule` and `the_halo_is_a_whole_pitch_where_there_is_room`.
-- **The prompt.** In Hear, while the phrase is not playing and no finger is down, the line under the staff says
+- **The prompt.** In Hear, while the phrase is not playing and no finger is down, the feedback line says
   "❓ Find the next note" / "❓ Nađi sljedeću notu" (`hear_prompt`): the verb of the game the child already knows, and
   the slot's own symbol, so the words and the picture say the same. `FeedbackLine`'s order is now solved, playing,
   placing, wrong taps, hearing, then empty (Find's wait stays empty). **The floors:** the line is the longest of the

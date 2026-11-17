@@ -17,31 +17,28 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.graphics.toPixelMap
-import androidx.compose.ui.test.DeviceConfigurationOverride
-import androidx.compose.ui.test.FontScale
-import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasContentDescriptionExactly
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.then
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
-import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.Phone
 import hr.bertlab.fluteassistant.ui.common.SidewaysHost
+import hr.bertlab.fluteassistant.ui.common.UprightHost
 import hr.bertlab.fluteassistant.ui.common.assertWhole
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
@@ -174,16 +171,10 @@ class TuningGuideTest {
     private var upright by mutableStateOf(DpSize(412.dp, 653.dp))
     private var phone by mutableStateOf(Phone(915, 411))
 
-    private class Phone(val width: Int, val height: Int) {
-        val contentWidth: Float get() = width - SidewaysGeometry.railWidth(height.toFloat())
-        override fun toString() = "$width x $height"
-    }
-
-    private fun guide(card: GuideCard?) =
-        TunerUiState(permissionGranted = true, isListening = true, mode = TunerMode.TARGET, guideCard = card)
+    private fun guide(card: GuideCard?) = listening(null).copy(guideCard = card)
 
     @Composable
-    private fun Tuner() = TunerContent(state, {}, {}, {}, {}, {}, onGuideCard = { cards += it }, onCloseGuide = { exits += it })
+    private fun Tuner() = TunerContent(state, TunerActions(onGuideCard = { cards += it }, onCloseGuide = { exits += it }))
 
     /** The tuner on a phone on its side, or, with [sideways] false, the upright layout in the same room. */
     private fun showOnItsSide() {
@@ -199,7 +190,7 @@ class TuningGuideTest {
     private fun showUpright() {
         compose.setContent {
             LocaleProvider(locale) {
-                DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(scale) then DeviceConfigurationOverride.ForcedSize(upright)) { Tuner() }
+                UprightHost(upright, scale) { Tuner() }
             }
         }
     }
@@ -220,7 +211,7 @@ class TuningGuideTest {
         both { how ->
             compose.onNodeWithText("🌡️ Warm up first").assertIsDisplayed()
             assertEquals("$how: the status line", 0, compose.onAllNodes(hasText("👂 Play A4")).fetchSemanticsNodes().size)
-            assertEquals("$how: How?", 0, compose.onAllNodes(hasText("How?")).fetchSemanticsNodes().size)
+            assertEquals("$how: the window", 0, compose.onAllNodes(hasContentDescription("Home ring for A4, nothing heard yet")).fetchSemanticsNodes().size)
         }
     }
 
@@ -274,6 +265,38 @@ class TuningGuideTest {
         compose.onNodeWithText("🎯 Tune on A4").assertIsDisplayed()
         set { locale = Locale("hr") }
         compose.onNodeWithText("🎯 Ugodi na a1").assertIsDisplayed()
+    }
+
+    /** Since 2026-11-18 the tuner has no Hear button: the card says to tap the note, in both languages. */
+    @Test
+    fun check_each_note_says_to_tap_the_note() {
+        showOnItsSide()
+        set { state = guide(GuideCard.EACH_NOTE) }
+        both { how ->
+            compose.onNodeWithText("tap it to hear it", substring = true).assertIsDisplayed()
+            assertEquals("$how: Hear", 0, compose.onAllNodes(hasText("tap 🔊 Hear", substring = true)).fetchSemanticsNodes().size)
+        }
+        set { locale = Locale("hr") }
+        both { how ->
+            compose.onNodeWithText("dodirni ga da ga čuješ", substring = true).assertIsDisplayed()
+            assertEquals("$how: Slušaj", 0, compose.onAllNodes(hasText("dodirni 🔊 Slušaj", substring = true)).fetchSemanticsNodes().size)
+        }
+    }
+
+    /** The roll lines open card 4, which since 2026-11-18 points at the tuner's one line, not a small line under it. */
+    @Test
+    fun one_note_off_points_at_the_tuner_not_a_line_under_it() {
+        showOnItsSide()
+        set { state = guide(GuideCard.ONE_NOTE_OFF) }
+        both { how ->
+            compose.onNodeWithText("the way the tuner says", substring = true).assertIsDisplayed()
+            assertEquals("$how: the old line", 0, compose.onAllNodes(hasText("line under the tuner", substring = true)).fetchSemanticsNodes().size)
+        }
+        set { locale = Locale("hr") }
+        both { how ->
+            compose.onNodeWithText("kako kaže štimer", substring = true).assertIsDisplayed()
+            assertEquals("$how: mali redak", 0, compose.onAllNodes(hasText("mali redak", substring = true)).fetchSemanticsNodes().size)
+        }
     }
 
     /** Review Focus 3: turning the phone keeps the card on screen and does not close the guide. */

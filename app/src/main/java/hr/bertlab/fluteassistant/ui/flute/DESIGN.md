@@ -478,12 +478,14 @@ that locked within `NEAR_CENTS` (70) of it, "🍃 Maybe too high? Gentler air" /
 (`WrongNote.tooHigh`, gone since, and `TunerAdvice.TOO_HIGH`: the right fingers blown high sound like that, as the sharp flute of 2026-11-13 did on all 30
 of its b's heard as c; a guess, so "maybe"; "gentler air" is the tuner's own phrase; no "too low", since on that
 flute an f-sharp fingered for g came out just under the g and would have blamed the air), and over either stands the fingering of the note that was wanted (`FluteUiState.fingeringMidi`, the tuner's
-`FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage), until the right note is played: the
+`FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage; since 2026-11-17 the flute as the
+player sees it, 72 dp tall at the stage's 372 where the strip was 54), until the right note is played: the
 heard note says what came out, this says how to get the other. Nothing is added while things go right, which is why
 the user chose it over the fingering under every note (the child would read the picture and not the notes). Playing
-the tune back shows nothing there. On a short screen, where the room is not spread by weight, it grows to hold the
+the tune back shows nothing there. (On 2026-11-18 the line moved to the top of the room, over the fingering, and the
+user put it back under it the same day.) On a short screen, where the room is not spread by weight, it grows to hold the
 fingering and the tab scrolls. A phone on its side has the line alone, at the top of its column where the advice
-stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the diagram would be about 17 dp tall, and
+stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the diagram would be about 23 dp tall (17 with the strip before 2026-11-17), and
 from a music stand's distance its keys could not be read anyway. (From 2026-11-16 to 17 the room also held the
 levels' pair under the prompt, "Practice and Exam".) Tests: `ListenRunTest` (the advice and its order),
 `FluteUiStateTest` (the two values), `FluteScreenTest` ("The room under the stage") and `FluteSidewaysTest` (the line

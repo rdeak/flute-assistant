@@ -29,4 +29,5 @@ object LogTags {
     const val PLAYBACK = "FA.Playback"
     const val FLUTE = "FA.Flute"
     const val NOTES = "FA.Notes"
+    const val FINGERS = "FA.Fingers"
 }

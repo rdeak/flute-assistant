@@ -978,14 +978,41 @@ class NotesScreenTest {
         compose.onNodeWithText("Pick").assertIsDisplayed()
     }
 
+    /**
+     * The feedback line stands right under the game pills and over the hero row's buttons since 2026-11-18 (the user: "move
+     * ... below buttons find and hear"; "idea is to make all tabs and views with same structure or order of elements"):
+     * the words, then the buttons, then the staff, and the round's stars last.
+     */
     @Test
-    fun the_round_stars_sit_below_the_staff_and_its_feedback() {
+    fun the_feedback_stands_under_the_game_pills_and_over_the_buttons_and_the_staff() {
         show(asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1))
+        val find = compose.onNodeWithText("🔎 Find").getBoundsInRoot()
+        val pick = compose.onNodeWithContentDescription("Choose notes").getBoundsInRoot()
         val staff = compose.onNodeWithContentDescription(staffDescription).getBoundsInRoot()
         val feedback = compose.onNodeWithText("🙈 Try again").getBoundsInRoot()
         val stars = compose.onNodeWithContentDescription("Round progress, 0 of 10 notes").getBoundsInRoot()
-        assertTrue("feedback $feedback should be under the staff $staff", feedback.top >= staff.bottom)
-        assertTrue("stars $stars should be under the feedback $feedback", stars.top >= feedback.bottom)
+        assertTrue("feedback $feedback should be under the Find pill $find", feedback.top >= find.bottom)
+        assertTrue("the Pick button $pick should be under the feedback $feedback", pick.top >= feedback.bottom)
+        assertTrue("the staff $staff should be under the Pick button $pick", staff.top >= pick.bottom)
+        assertTrue("stars $stars should be under the staff $staff", stars.top >= staff.bottom)
+    }
+
+    /** Hear's line is in the same place: under the game pills and over the speaker bubble. */
+    @Test
+    fun hears_prompt_stands_under_the_game_pills_and_over_the_speaker() {
+        show(hearing())
+        val hear = compose.onNodeWithText("👂 Hear").getBoundsInRoot()
+        val speaker = compose.onNodeWithContentDescription("Hear it again").getBoundsInRoot()
+        val prompt = compose.onNodeWithText("❓ Find the next note").getBoundsInRoot()
+        assertTrue("the prompt $prompt should be under the Hear pill $hear", prompt.top >= hear.bottom)
+        assertTrue("the speaker $speaker should be under the prompt $prompt", speaker.top >= prompt.bottom)
+    }
+
+    /** The picker and the summary have no feedback line: it says what to do with a note asked for. */
+    @Test
+    fun the_summary_has_no_feedback_line() {
+        show(over(10))
+        compose.onNodeWithText("👆 Slide, let go").assertDoesNotExist()
     }
 
     @Test

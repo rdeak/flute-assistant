@@ -4,6 +4,7 @@
     <string name="tab_tuner">Štimer</string>
     <string name="tab_notes">Note</string>
     <string name="tab_flute">Flauta</string>
+    <string name="tab_fingers">Hvatovi</string>
     <!-- The metronome tab's state for a screen reader while the drum beats -->
     <string name="tab_metronome_playing">Svira</string>
 
@@ -53,9 +54,9 @@
     <string name="lower_note">Niži ton</string>
     <string name="higher_note">Viši ton</string>
     <string name="hear_note">Slušaj</string>
-    <string name="tune_how">Kako?</string>
     <string name="tune_guide_push_in">gurni unutra</string>
     <string name="tune_guide_pull_out">izvuci van</string>
+    <string name="tune_line_how">Kako ugoditi flautu</string>
     <string name="tune_guide_title">🔧 Kako ugoditi flautu</string>
     <string name="tune_guide_back">Natrag</string>
     <string name="tune_guide_next">Dalje</string>
@@ -66,19 +67,19 @@
     <string name="tune_guide_head_joint_title">🎯 Ugodi na %1$s</string>
     <string name="tune_guide_head_joint_text">Odsviraj dug %1$s, glasno kao i inače. Pomakni glavu flaute za malo, debljinu novčića, kako kaže štimer. Odsviraj opet.</string>
     <string name="tune_guide_each_note_title">👂 Provjeri svaki ton</string>
-    <string name="tune_guide_each_note_text">Odaberi ton s ‹ ›, dodirni 🔊 Slušaj, pa ga odsviraj dugo. Pričekaj da se mjehurić smiri, pa pogledaj.</string>
+    <string name="tune_guide_each_note_text">Odaberi ton s ‹ ›, dodirni ga da ga čuješ, pa ga odsviraj dugo. Pričekaj da se mjehurić smiri, pa pogledaj.</string>
     <string name="tune_guide_one_note_off_title">🔄 Jedan ton još ne štima?</string>
-    <string name="tune_guide_one_note_off_text">Ne pomiči više glavu flaute. Zakreni cijelu flautu malo, kako kaže mali redak ispod štimera.</string>
+    <string name="tune_guide_one_note_off_text">Ne pomiči više glavu flaute. Zakreni cijelu flautu malo, kako kaže štimer.</string>
     <string name="listen_status">🔊 Slušaj</string>
-    <string name="fingering_for">Prstomet za %1$s</string>
+    <string name="fingering_for">Hvat za %1$s</string>
+    <!-- The Fingers tab (2026-11-17): the hands named round the flute in each note's row -->
+    <string name="hand_left">Lijeva ruka</string>
+    <string name="hand_right">Desna ruka</string>
+    <string name="fingers_tune">Otvori u štimeru</string>
     <string name="play_note_prompt">👂 Odsviraj %1$s</string>
     <string name="in_tune">🎉 Savršeno!</string>
     <string name="too_low">⬆️ Malo više</string>
     <string name="too_high">⬇️ Malo niže</string>
-    <string name="heard_lower_note">⬆️ To je %1$s</string>
-    <string name="heard_higher_note">⬇️ To je %1$s</string>
-    <string name="octave_too_low">⬆️ Oktavu više</string>
-    <string name="octave_too_high">⬇️ Oktavu niže</string>
     <!-- What a screen reader says for the pitch window (ui/tuner/TunerScreen.kt) -->
     <string name="pitch_listening">Slušam, još ništa ne čujem</string>
     <string name="pitch_home">Kućica za %1$s, još ništa ne čujem</string>

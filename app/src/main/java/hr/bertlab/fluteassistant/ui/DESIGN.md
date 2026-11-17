@@ -9,7 +9,7 @@ the frame, a shared piece or a sideways or tablet layout. Each tab's own screen 
 screen keeps are in the root CLAUDE.md, "Kid-friendly UI constraint". User-visible strings: the root
 CLAUDE.md too.
 
-The top bar shows the app icon and names the open tab; the tab bar is four emoji-and-word buttons.
+The top bar shows the app icon and names the open tab; the tab bar is five emoji-and-word buttons.
 That is the upright frame. On a phone on its side a rail stands in for both ("Sideways", at the end).
 On a tablet the same frames stay phone-sized and the tab between them grows ("Tablets", after it).
 
@@ -17,10 +17,14 @@ On a tablet the same frames stay phone-sized and the tab between them grows ("Ta
   the app's sound even while nothing is playing. `MainScreen` hosts a top bar (the app icon, `AppLogo`, and the open tab's name plus, at the end, the `ThemeSwitch` and the `LanguageSwitch`: since 2026-11-05 one
   flag button that opens a list of the flags, with no words and sized in dp so they keep to their circles at any text size, over `ui/common/AppLanguage`; selecting one calls
   `AppCompatDelegate.setApplicationLocales`, which re-creates the Activity) and a bottom bar
-  switching between the four tabs (`AppTab`: flute, metronome, tuner, notes; since 2026-11-04 the
+  switching between the five tabs (`AppTab`: flute, metronome, tuner, notes, fingers; since 2026-11-04 the
   flute is first and the app opens on it, the first entry always being the start tab, and the drum
   sits beside it as the tab the speed knob opens; before that the order was just the build order,
-  never a decision; Play screenshots follow the same order). All ViewModels are
+  never a decision; Play screenshots follow the same order; the fingering chart came last on 2026-11-17, a
+  teacher's ask, so the four a child knew stayed where they were). With five the bar's cells are 73 dp wide on a
+  412 dp phone and 62 on a 360 one: its emoji (28), its word (14, growing to 1.3 times at most) and the word's
+  floor (9) are in dp and its line height relative, the rail's rules, as a floor of 10 sp cut "Metronome" at
+  360 dp and at a little larger text. All ViewModels are
   Activity-scoped so state and playback survive tab switches and that re-creation; a turn of the
   phone re-creates nothing (`configChanges` in the manifest, "Sideways" below);
   the one exception is the game's round, which the tab bar resets (`NotesViewModel.resetRound`)
@@ -130,10 +134,14 @@ under the tab bar). Each panel that takes a tab's place takes Back as its own wa
   (`FluteContent`, a handler in each branch, and Compose asks the one composed last first);
 - the metronome tab: an open tempo wheel closes (`MetronomeContent`);
 - the tuner tab: the guide to tuning the flute closes (`TuningGuide`, since 2026-11-14);
+- the tuner opened from the Fingers tab's flute: back to the Fingers tab, its note still chosen (since 2026-11-18, the
+  user: "go back from tuner to fingering when user land on tuner from fingering"). `MainScreen` keeps the way back
+  (`TabRoute.back`) and takes Back with `BackToTab`, composed before the tab, so an open guide closes first; a tab
+  chosen on the bar or the rail forgets it (`TabRouteTest`, `BackToTabTest`);
 - the language list and the credits are a popup and a dialog and always closed on Back.
 
 With nothing open Back is the phone's: it leaves the app, as before, and a running metronome plays on. The tuner
-takes none but for its guide (its microphone card has no way back: the tab is the microphone). The handlers stand above each
+takes none but for its guide and the way back to the Fingers tab (its microphone card has no way back: the tab is the microphone). The handlers stand above each
 `LocalSideways` branch, so a phone on its side has them too. Tests press it with `BackKey` (androidTest, `ui/common`):
 `Watch()` in the content, `press`, and `taken` for "Back is the phone's here"; a Back nothing takes would close the
 test's own Activity, so `press` refuses one.
@@ -169,16 +177,28 @@ the tuner and the flute's Your turn must read from arm's length and need no tap 
   and border) although the border takes no layout room, so the real inset is 32: upright's `FitsHeight`
   counts the same 38, and the spare 6 dp gives c3's stem its room.
 - **The frame.** `SideRail` replaces `TitleBar` and `TabBar`: from the top the logo (`CreditsLogo`, its
-  long press opens the credits), the four tabs as emoji over word in `AppTab` order with the open one a
+  long press opens the credits), the five tabs as emoji over word in `AppTab` order with the open one a
   yellow pill (`TabItem`, shared with the tab bar), and the flag (`AppLanguageSwitch`). It never
   rearranges, not even when a tune starts. The drum hops on every beat as in the tab bar, and a screen
   reader still hears "Playing". There is no title: the yellow tab says which is open, and a screen reader
-  hears it as the selected tab. The rail's words may shrink to 7 dp (the bar's floor is 10 sp) because
+  hears it as the selected tab. The rail's words may shrink to 7 dp (the bar's floor is 9 dp) because
   "Metronome" was cut short at large text and a cut word is worse than a small one. The rail's sizes are
-  in dp where the text size would break the 60 dp cell of a short rail: the floor and the emoji over the word
-  do not grow with the text (a floor of 7 sp is 14 dp at twice the text, wider than "Metronome" has room for), and
-  the word grows to 1.3 times at most (`RailWordGrowth`; at twice the emoji and the word took the whole cell and
-  the open tab's outline cut the word). The language list
+  in dp where the text size would break a cell: the floor and the emoji over the word do not grow with the text (a
+  floor of 7 sp is 14 dp at twice the text, wider than "Metronome" has room for), and the word grows only a little
+  (at twice the emoji and the word took the whole cell and the open tab's outline cut the word). With five tabs
+  (2026-11-17) a cell is about 48 dp tall on the short rail and 55 on the 411 dp one (60 and 66 with four): the
+  short rail's emoji is 20 dp at the most and its word does not grow (`RailLookShort`, `wordGrowth` 1.0), the taller
+  rail's emoji is 24 at the most and its word grows to 1.1 times (`RailLook`), the most `SideRailTest` passed with at
+  twice the text. Each tab fits its emoji to its own cell (`TabItem`, since the review of 2026-11-17): it measures
+  its word, which keeps its size, and draws the emoji in what the word and the outline leave, through a layer's
+  scale, down to 0.6 of its size (12 dp of the 20), so the word keeps clear of the outline at any height. An emoji's
+  line is about 1.37 times its size on a phone (the emulator, 2026-11-17), and so the 360 dp rail draws its emoji at
+  about 19 dp and the 411 dp rail at about 23.5; a window shorter than the rail was drawn for (a phone on its side
+  with the display size set larger, about 320 dp) draws it smaller still. Until then the rail worked the cell's
+  height out by hand from its paddings and gaps, counted an emoji's line as 1.2 times its size and the cell's other
+  needs as 24 dp (`RailCellRoom`), and cut the size to a whole number of sp: the documents said 20 at 360, the rail
+  drew 19, and five tabs' numbers would have had to be searched again for a sixth. The bar's tabs fit themselves the
+  same way, though its 66 dp never asks them to. The language list
   opens beside the rail (`LanguageSwitch.listOffset`): above the flag it would cover the tabs. A camera
   cutout: the rail's background runs under the one on its side and its contents stand clear, and the tab's
   box clears the one on the other (`EndCutout`); sideways `Scaffold` gets `WindowInsets.systemBars` rather

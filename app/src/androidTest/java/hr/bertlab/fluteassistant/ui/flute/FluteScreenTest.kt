@@ -1198,7 +1198,7 @@ class FluteScreenTest {
         show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), Locale("hr"))
         compose.onNodeWithText("🪈 Odsviraj c1").assertIsDisplayed()
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, wrong = WrongNote(0, 64)))
-        compose.onNodeWithContentDescription("Prstomet za c1").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Hvat za c1").assertIsDisplayed()
         compose.onNodeWithText("👀 Provjeri prste").assertIsDisplayed()
         state.value = FluteUiState(tune = twoNotes, listening = Listening(index = 0, walk = Walk(0, 0, Walk.Phase.SHORT)))
         compose.onNodeWithText("⏳ Prekratko, drži dulje").assertIsDisplayed()

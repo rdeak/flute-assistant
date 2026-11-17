@@ -25,6 +25,69 @@ private fun off(midi: Int, cents: Double) =
 
 class TunerUiStateTest {
 
+    /** Tune mode on A4 with [frequency] heard, or nothing. */
+    private fun tune(frequency: Double?) =
+        TunerUiState(mode = TunerMode.TARGET, targetMidi = 69, reading = frequency?.let { NoteMath.frequencyToNote(it) })
+
+    /** The window plays the chosen note only in Tune mode's silence (2026-11-18). */
+    @Test
+    fun `a tap on the window plays the note only in tune mode and in silence`() {
+        assertTrue(tune(null).tapPlaysNote)
+        assertFalse("while the note plays", tune(null).copy(isPlayingReference = true).tapPlaysNote)
+        assertFalse("while the child plays", tune(430.0).tapPlaysNote)
+        assertFalse("in Which?", tune(null).copy(mode = TunerMode.IDENTIFY).tapPlaysNote)
+    }
+
+    /** The tuner's one line (2026-11-18): what to change when there is something, else how the sound is. */
+    @Test
+    fun `the line says what to change when there is something, else how the sound is`() {
+        assertEquals(TunerLine.PlayNote(69), tune(null).line)
+        assertEquals(TunerLine.PlayAnyNote, tune(null).copy(mode = TunerMode.IDENTIFY).line)
+        assertEquals(TunerLine.InTune, tune(440.0).line)
+        assertEquals("flat on the tuning note", TunerLine.Advice(TunerAdvice.HEAD_JOINT_IN), tune(430.0).line)
+        assertEquals("another note", TunerLine.Advice(TunerAdvice.CHECK_FINGERS), tune(392.0).line)
+        assertEquals("the octave above", TunerLine.Advice(TunerAdvice.GENTLER_AIR), tune(880.0).line)
+        assertEquals(TunerLine.Advice(TunerAdvice.COME_CLOSER), tune(null).copy(hearing = Hearing.QUIET_UNCLEAR).line)
+        assertEquals(TunerLine.Listen, tune(null).copy(isPlayingReference = true).line)
+    }
+
+    @Test
+    fun `a failed microphone takes the line from everything else`() {
+        assertEquals(TunerLine.MicFailed, tune(null).copy(micFailed = true).line)
+        assertEquals(TunerLine.MicFailed, tune(430.0).copy(micFailed = true, heldFix = TunerAdvice.ROLL_IN).line)
+    }
+
+    /** A fix on the flute stays on the line in the silence after it (`FixHold`), and only there. */
+    @Test
+    fun `a held fix is on the line in plain silence and gives way to anything else`() {
+        val held = tune(null).copy(heldFix = TunerAdvice.HEAD_JOINT_IN)
+        assertTrue(held.isPlainSilence)
+        assertEquals(TunerLine.Advice(TunerAdvice.HEAD_JOINT_IN), held.line)
+        assertEquals("a new sound", TunerLine.InTune, held.copy(reading = NoteMath.frequencyToNote(440.0)).line)
+        assertEquals("other words", TunerLine.Advice(TunerAdvice.COME_CLOSER), held.copy(hearing = Hearing.QUIET_UNCLEAR).line)
+        assertEquals("the note playing", TunerLine.Listen, held.copy(isPlayingReference = true).line)
+    }
+
+    @Test
+    fun `plain silence is nothing heard, nothing to say and nothing playing`() {
+        assertTrue(tune(null).isPlainSilence)
+        assertFalse("a note", tune(440.0).isPlainSilence)
+        assertFalse("unclear sound", tune(null).copy(hearing = Hearing.LOUD_UNCLEAR).isPlainSilence)
+        assertFalse("the note playing", tune(null).copy(isPlayingReference = true).isPlainSilence)
+        assertFalse("a failed microphone", tune(null).copy(micFailed = true).isPlainSilence)
+    }
+
+    /** The calmer Tune view (2026-11-18): the flute in the note's colour only while it helps. */
+    @Test
+    fun `the flute is lit before a sound and on another note or octave, not on the chosen one`() {
+        assertTrue("nothing heard: how to play it", tune(null).fingeringLit)
+        assertTrue("G4 for A4", tune(392.0).fingeringLit)
+        assertTrue("the octave above", tune(880.0).fingeringLit)
+        assertFalse("A4 flat", tune(430.0).fingeringLit)
+        assertFalse("A4 sharp", tune(450.0).fingeringLit)
+        assertFalse("in tune", tune(440.0).fingeringLit)
+    }
+
     @Test
     fun `cents off target follow the chosen note`() {
         val a4 = NoteMath.frequencyToNote(440.0)

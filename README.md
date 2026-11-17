@@ -1,26 +1,29 @@
 # Flute Assistant
 
 An Android app for primary-school children learning the flute. It has a digital flute, a
-metronome, a chromatic tuner and a note reading game, in English and Croatian.
+metronome, a chromatic tuner, a note reading game and a fingering chart, in English and Croatian.
 
 <p align="center">
-  <img src="docs/release/play-listing/screenshots/en/1-flute.jpg" width="200" alt="Flute tab">
-  <img src="docs/release/play-listing/screenshots/en/2-metronome.jpg" width="200" alt="Metronome tab">
-  <img src="docs/release/play-listing/screenshots/en/3-tuner.jpg" width="200" alt="Tuner tab">
-  <img src="docs/release/play-listing/screenshots/en/4-notes.jpg" width="200" alt="Notes tab">
+  <img src="docs/release/play-listing/screenshots/en/1-flute.jpg" width="160" alt="Flute tab">
+  <img src="docs/release/play-listing/screenshots/en/2-metronome.jpg" width="160" alt="Metronome tab">
+  <img src="docs/release/play-listing/screenshots/en/3-tuner.jpg" width="160" alt="Tuner tab">
+  <img src="docs/release/play-listing/screenshots/en/4-notes.jpg" width="160" alt="Notes tab">
+  <img src="docs/release/play-listing/screenshots/en/5-fingers.jpg" width="160" alt="Fingers tab">
 </p>
 
 ## What it does
 
 | Tab       | What the child does                                                                                                                                                                                                                                                                                                                                                         |
 |-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Flute     | Holds any of fifteen keys, from middle C up two octaves, to sound a note: the longer the hold, the longer the note. The tune is written on a five-line staff with the note names under it and plays back at the metronome's speed; with "Listen to me" the phone hears the child's own flute and puts a star under each note played right. Six little books keep six tunes. |
+| Flute     | Holds any of fifteen keys, from middle C up two octaves, to sound a note: the longer the hold, the longer the note. A ♯♭ key makes the next key play its sharp or flat, and a ⌒ key joins two notes into a slur. The tune is written on a five-line staff with the note names under it and plays back at the metronome's speed; with "Listen to me" the phone hears the child's own flute and puts a star under each note played right, or a sign for what to change (held too short or too long, a little high or low, tongued where it should be slurred). Six little books keep six tunes. |
 | Metronome | Drags an animal round the tempo ring (snail to cheetah) or taps one to jump to its speed, sets two to six beats in a bar and watches the animal hop on the beats. The click keeps going while the phone is in a pocket or another app is open, with a notification to stop it.                                                                                              |
-| Tuner     | Plays a note and sees it float above or below its home ring, with "A little lower" or "A little higher" and one tip on what to change, until it settles in the ring for "Perfect!". Or picks the note to play, hears it, sees the fingering and tunes to it.                                                                                                                              |
-| Notes     | Reads a note name, slides a finger to its place on the treble staff and lets go. Ten notes a round, flames for hits in a row, a star for each note found first time, and at the end a trophy over the notes asked, each filling with its colour as it is learned. The child chooses which notes to practise.                                                                                                                                                          |
+| Tuner     | Plays a note and sees it float above or below its home ring, with one line saying what to change (roll the flute in a little, gentler air, push the head joint in), until it settles in the ring for "Perfect!". Or picks the note to play, taps it to hear it, sees the fingering on a drawing of the flute and tunes to it; a tap on a tip about the flute opens four picture cards on tuning it. |
+| Notes     | Reads a note name, slides a finger to its place on the treble staff and lets go, or in Hear writes a short tune down by ear. Ten notes a round, flames for hits in a row, a star for each note found first time, and at the end a trophy over the notes asked, each filling with its colour as it is learned. The child chooses which notes to practise. |
+| Fingers   | Picks a note with seven letter keys and a ♯♭ key and sees it in every octave the flute plays, from middle C up three octaves: the note on the staff, its name, and the flute as the player sees it, with the keys to press filled in. Every key a finger touches on a concert flute is drawn, the trill keys and the B♭ levers included. A tap on a flute opens that note in the tuner. |
 
 The screens show no jargon and almost no numbers: no BPM, hertz or cents (the only figures are the
-tempo in the middle of the ring and the small octave on note names). Tempo is an animal on the ring,
+tempo in the middle of the ring, the time signature on the flute's staff and the small octave on note
+names). Tempo is an animal on the ring,
 tuning is a bubble floating up or down to its ring, and the game's score is stars, flames and an
 animal, even in the round summary.
 
@@ -42,9 +45,9 @@ is built and how to add a language is in `site/README.md`.
 | Architecture    | MVVM with `StateFlow`, Hilt, coroutines and Flow                                                                   |
 | Audio           | Own DSP on `AudioTrack` and `AudioRecord`: click synthesis, YIN pitch detection, a sustained-tone synth            |
 | Dependencies    | AndroidX, plus Hilt and kotlinx.coroutines. No audio, networking or image libraries                                |
-| Size            | About 17,000 lines of app code and 17,500 lines of tests (about 580 rule and view-model tests, about 430 screen tests) |
+| Size            | About 21,000 lines of app code and 25,000 lines of tests (about 970 rule and view-model tests, about 560 screen tests) |
 | Languages       | English and Croatian, switchable in the app                                                                        |
-| Status          | 1.0.1 is on the Play internal testing track and a GitHub Release. Store listing in both languages is ready         |
+| Status          | 2.0.0 is in production on Google Play and a GitHub Release, with the store listing in both languages               |
 
 ## Architecture
 
@@ -53,7 +56,7 @@ The code is layered by package under `app/src/main/java/hr/bertlab/fluteassistan
 ```
 domain/    the rules, pure Kotlin with no Android import, a package per feature: how a held key writes
            the tune, how "Your turn" judges playing, the notes game's round, the listening thresholds,
-           note math, the settings interface
+           note math and the flute's fingerings, the Fingers tab's notes and keys, the settings interface
 data/      the SharedPreferences settings store
 audio/     metronome, tuner and flute-tone engines
 playback/  foreground service that keeps the metronome alive off screen
@@ -103,8 +106,8 @@ notification mirroring the player's state, stops itself when playback ends, and 
   value is the median of five frames, held for about 0.9 s through silence or an unsteady pitch
   before it clears.
 - In target mode the reading is measured against the note the child chose. Within 70 cents of that
-  note or its octaves it still counts as that note, so a note played sixty cents flat reads "Too
-  low" and is not renamed as its neighbour.
+  note or its octaves it still counts as that note, so a note played sixty cents flat is that note
+  played low and is not renamed as its neighbour.
 - "In tune" is 10 cents wide, twice a professional tuner's window, because it is judging a beginner.
   The thresholds live in one place and the gauge draws its zones from them. There is no tolerance
   setting on purpose.
@@ -143,7 +146,8 @@ not wait for the old one. The render loop is plain Kotlin so this close path is 
 ## Observability
 
 `core/log/Logger` is the only way to log. Each line is a dotted event name plus `key=value` fields,
-under one tag per subsystem (`FA.Tuner`, `FA.Metronome`, `FA.Playback`, `FA.Flute`), so lines can be
+under one tag per subsystem (`FA.Tuner`, `FA.Metronome`, `FA.Playback`, `FA.Flute`, `FA.Notes`,
+`FA.Fingers`), so lines can be
 grepped and split on spaces. Event names are treated as an interface and kept stable. Per-frame
 detail is off unless switched on per tag at runtime, in any build. The tuner writes one
 `tuner.summary` line about every second with counts per frame decision, probability against the gate

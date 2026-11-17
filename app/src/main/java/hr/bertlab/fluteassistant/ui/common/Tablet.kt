@@ -45,11 +45,7 @@ internal object TabletGeometry {
     /** The most the tab grows: past it a desktop window would get toy-sized controls. */
     private const val MAX_ZOOM = 2f
 
-    /**
-     * Upright, a phone's key and the most a zoomed one is: about 104 dp on a 10-inch tablet. The 58 is
-     * also the flute's `KeyHeight` and `SidewaysGeometry.KEY_HEIGHT_MIN`; change the three together.
-     */
-    private const val KEY_HEIGHT = 58f
+    /** Upright, the most a key is before the zoom, from a phone's [KEY_HEIGHT] (`KeyLook.kt`): a zoomed one is about 104 dp on a 10-inch tablet. */
     private const val KEY_HEIGHT_MAX = 72f
 
     /** The flute's three key rows, which share what the height spares. */
