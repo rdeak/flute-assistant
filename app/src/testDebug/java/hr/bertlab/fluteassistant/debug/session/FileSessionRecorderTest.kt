@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.core.log.LogTags
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.MarkChange
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
@@ -59,7 +60,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a run makes a folder with the three files and says where`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame())
         r.end(mapOf(0 to StepMark.FIRST_TRY))
@@ -72,9 +73,27 @@ class FileSessionRecorderTest {
     }
 
     @Test
+    fun `the rules written down are the ones the run was given`() {
+        val r = recorder()
+        val moved = ListenRun.Setup(
+            tune, pulse,
+            rules = NoteOnsetTracker.Rules(minLevel = 0.3f, stepFromSounding = false),
+            run = ListenRun.Rules(lengthSlack = 1.0, slurCheck = false),
+        )
+        r.start(moved)
+        r.end(emptyMap())
+        val rules = lines(sessions().single())[1].removePrefix("session.rules ").split(' ').associate { it.substringBefore('=') to it.substringAfter('=') }
+        assertEquals("0.3", rules["minLevel"])
+        assertEquals("0", rules["stepFromSounding"])
+        assertEquals("1.0", rules["lengthSlack"])
+        assertEquals("0", rules["slurCheck"])
+        assertEquals("a rule not moved keeps its default", "25.0", rules["tuneCents"])
+    }
+
+    @Test
     fun `the header names the facts, the rules, the pulse and every tune item`() {
         val r = recorder()
-        r.start(tune, pulse, floor = 0.2345f)
+        r.start(ListenRun.Setup(tune, pulse, floor = 0.2345f))
         r.opened(48_000, "UNPROCESSED")
         r.end(emptyMap())
         val lines = lines(sessions().single())
@@ -116,7 +135,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a frame is one csv row at the stated precision`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame())
         r.frame(frame(f = null, p = 0.0, level = 0.05f, minLevel = 0.04f, decision = FrameDecision.SILENT, sounding = null, onset = null, floor = 0.05f, verdict = null, waited = 3, expected = 72, heardNow = 60, advice = TunerAdvice.COME_CLOSER, repeatHeld = true, finishing = true, hearing = Hearing.QUIET_UNCLEAR))
@@ -131,7 +150,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a walking frame says where the animal is`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame(walk = Walk(3, 2, Walk.Phase.SHORT), advice = TunerAdvice.HOLD_LONGER))
         r.end(emptyMap())
@@ -143,7 +162,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a frame of a note sounding off its pitch keeps its arrow`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame(walk = Walk(0, 0, Walk.Phase.SOUNDING), advice = TunerAdvice.TOO_HIGH, pitch = Pitch.HIGH))
         r.end(emptyMap())
@@ -154,7 +173,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a step onset and the other verdicts are spelled out`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame(onset = NoteOnsetTracker.Onset(72, fresh = false), verdict = Verdict.WRONG))
         r.frame(frame(onset = NoteOnsetTracker.Onset(72, fresh = true), verdict = Verdict.RETRY))
@@ -167,7 +186,7 @@ class FileSessionRecorderTest {
     @Test
     fun `ms follows the opened rate`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(44_100, "MIC")
         r.frame(frame())
         r.end(emptyMap())
@@ -179,7 +198,7 @@ class FileSessionRecorderTest {
     fun `audio is written only between start and end`() {
         val r = recorder()
         r.samples(floatArrayOf(9f, 9f), 2) // nothing open: ignored
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(floatArrayOf(0.1f, 0.2f, 0.3f), 3)
         r.end(emptyMap())
@@ -194,7 +213,7 @@ class FileSessionRecorderTest {
     fun `a teed line carries the frame count, its tag and level, and the audio line the microphone`() {
         val r = recorder()
         r.line(LogTags.FLUTE, 'd', "flute.idle") // nothing open: dropped
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.line(LogTags.FLUTE, 'd', "flute.listen notes=2")
         r.opened(48_000, "MIC")
         r.frame(frame())
@@ -213,7 +232,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a microphone opened again inside one run keeps the first one's audio and says so`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(floatArrayOf(0.1f), 1)
         r.frame(frame())
@@ -237,7 +256,7 @@ class FileSessionRecorderTest {
             override val entries: Set<Map.Entry<Int, StepMark>> get() = throw IllegalStateException("no marks")
         }
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(FloatArray(2048), 2048)
         r.frame(frame())
@@ -248,7 +267,7 @@ class FileSessionRecorderTest {
         val dataBytes = (header[40].toInt() and 0xff) or ((header[41].toInt() and 0xff) shl 8) or ((header[42].toInt() and 0xff) shl 16) or ((header[43].toInt() and 0xff) shl 24)
         assertEquals("the data size the closed writer patched in", 2048 * 4, dataBytes)
         now += 1_000
-        r.start(tune, pulse, floor = null) // the failed run is over: a new one gets its own folder
+        r.start(ListenRun.Setup(tune, pulse)) // the failed run is over: a new one gets its own folder
         r.end(emptyMap())
         assertEquals(2, sessions().size)
     }
@@ -256,7 +275,7 @@ class FileSessionRecorderTest {
     @Test
     fun `the end line has the marks and the wav its length`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(FloatArray(2048), 2048)
         r.frame(frame())
@@ -271,7 +290,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a run with no microphone still closes cleanly`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.end(emptyMap())
         val dir = sessions().single()
         val audio = WavFile.read(File(dir, "audio.wav"))
@@ -286,14 +305,14 @@ class FileSessionRecorderTest {
         val r = recorder()
         val made = mutableListOf<String>()
         repeat(FileSessionRecorder.KEEP + 1) {
-            r.start(tune, pulse, floor = null)
+            r.start(ListenRun.Setup(tune, pulse))
             r.end(emptyMap())
             made += sessions().last().name
             now += 1_000
         }
         assertEquals("the oldest run's folder is gone, the newest twenty stand", made.drop(1), sessions().map { it.name })
         now -= 1_000L * (FileSessionRecorder.KEEP + 1)
-        r.start(tune, pulse, floor = null) // a start at the oldest time again: its folder was deleted, so this makes it anew, not a `_2`
+        r.start(ListenRun.Setup(tune, pulse)) // a start at the oldest time again: its folder was deleted, so this makes it anew, not a `_2`
         r.end(emptyMap())
         assertEquals(listOf(made[0]) + made.drop(2), sessions().map { it.name })
     }
@@ -302,7 +321,7 @@ class FileSessionRecorderTest {
     fun `two runs in one second get their own folders`() {
         val r = recorder()
         repeat(2) {
-            r.start(tune, pulse, floor = null)
+            r.start(ListenRun.Setup(tune, pulse))
             r.end(emptyMap())
         }
         val names = sessions().map { it.name }
@@ -314,7 +333,7 @@ class FileSessionRecorderTest {
     fun `a root that cannot be written drops the session without throwing`() {
         val file = folder.newFile("not-a-folder")
         val r = recorder(root = file)
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.samples(FloatArray(10), 10)
         r.frame(frame())
@@ -329,7 +348,7 @@ class FileSessionRecorderTest {
     fun `a failure of any kind inside the recorder is logged once and never thrown`() {
         // The recorder must never disturb the run on a child's phone: a bug in it is a log line, not a crash.
         val r = FileSessionRecorder(folder.root, facts, logger) { throw IllegalStateException("no clock") }
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(48_000, "MIC")
         r.frame(frame())
         r.end(emptyMap())
@@ -341,10 +360,10 @@ class FileSessionRecorderTest {
     @Test
     fun `a start while a run is open closes the one before`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.frame(frame())
         now += 1_000
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.end(emptyMap())
         val dirs = sessions()
         assertEquals(2, dirs.size)
@@ -355,7 +374,7 @@ class FileSessionRecorderTest {
     @Test
     fun `a mark that changed is the last cell of its row`() {
         val r = recorder()
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.frame(frame())
         r.frame(frame(changed = MarkChange(0, StepMark.LONG)))
         r.end(emptyMap())

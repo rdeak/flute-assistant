@@ -7,7 +7,6 @@ import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
-import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.Walk
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
@@ -224,7 +223,6 @@ class FluteUiStateTest {
         assertNull(ended.litIndex)
         assertFalse(ended.waiting)
         assertEquals(pace, ended.pace)
-        assertEquals(Pitch.HIGH, FluteUiState(tune = lamb, listening = Listening(index = 1, pitch = Pitch.HIGH)).pitch)
     }
 
     @Test

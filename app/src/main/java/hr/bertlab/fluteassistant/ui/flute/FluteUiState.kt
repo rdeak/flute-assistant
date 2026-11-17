@@ -8,13 +8,11 @@ import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
-import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 
 /**
@@ -128,15 +126,6 @@ data class FluteUiState(
 
     /** How many half beats into [animalIndex]'s step the animal stands: the last click's, in Play and in Your turn's walk; else the step's start. */
     val animalHalfBeat: Int get() = playing?.halfBeat ?: listening?.animalHalfBeat ?: 0
-
-    /** The wrong note last heard for the step waited on, a bubble under that step ([Listening.wrong]). */
-    val wrong: WrongNote? get() = listening?.wrong
-
-    /** The note the phone hears right now, a live bubble under the step waited on ([Listening.heardNow]). */
-    val heardNow: Int? get() = listening?.heardNow
-
-    /** Which way the note walked sounds off its pitch: the arrow beside its bubble ([Listening.pitch]). */
-    val pitch: Pitch? get() = listening?.pitch
 
     /** The child's speed when the run ended at another animal's than the knob's: the ended run's one line ([Listening.pace]). */
     val pace: Pace? get() = listening?.pace

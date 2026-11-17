@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -41,6 +40,8 @@ import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.SidewaysPlainButton
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.WordFloor
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.labelRes
 
 /*
@@ -81,9 +82,6 @@ private val NarrowStatusHeight = 64.dp
 private val AdviceHeight = 58.dp
 private val AdviceFont = 22.sp
 private val NarrowAdviceFont = 19.sp
-
-/** The floor of the microphone's error, in dp as a floor in sp doubles at the largest text size. */
-private val ErrorMinFont = 12.dp
 
 /** The longest words shrink to this before they are cut; bigger than a bubble's number, and only a large text size on a small phone gets there. */
 private val StatusMinFont = 12.sp
@@ -241,8 +239,8 @@ private fun WindowBetweenArrows(
                 icon = AppIcons.ChevronLeft,
                 description = stringResource(R.string.lower_note),
                 enabled = state.targetMidi > FluteRange.LOWEST_MIDI,
-                size = arrow,
                 onClick = { onTargetNoteChange(state.targetMidi - 1) },
+                modifier = Modifier.size(arrow),
             )
         } else {
             Spacer(Modifier.size(arrow))
@@ -262,8 +260,8 @@ private fun WindowBetweenArrows(
                 icon = AppIcons.ChevronRight,
                 description = stringResource(R.string.higher_note),
                 enabled = state.targetMidi < FluteRange.HIGHEST_MIDI,
-                size = arrow,
                 onClick = { onTargetNoteChange(state.targetMidi + 1) },
+                modifier = Modifier.size(arrow),
             )
         } else {
             Spacer(Modifier.size(arrow))
@@ -302,7 +300,7 @@ private fun TunerWords(state: TunerUiState, wide: Boolean, modifier: Modifier = 
                     style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 1.25.em),
                     textAlign = TextAlign.Center,
                     autoSize = TextAutoSize.StepBased(
-                        minFontSize = with(LocalDensity.current) { ErrorMinFont.toSp() },
+                        minFontSize = WordFloor.asTextSize(),
                         maxFontSize = if (wide) AdviceFont else NarrowAdviceFont,
                     ),
                     modifier = Modifier.fillMaxSize(),

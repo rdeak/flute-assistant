@@ -193,7 +193,6 @@ class FluteViewModel @Inject constructor(
     fun onRestPressed() {
         stopRunning(reason = "key")
         activationJob?.cancel()
-        cancelJoin(reason = "rest") // a slur does not run over a rest; a waiting sign stays for the next note key
         if (writer.held?.midi != null) tonePlayer.noteOff()
         press(key = null)
     }
@@ -218,13 +217,11 @@ class FluteViewModel @Inject constructor(
         stopRunning(reason = "key")
         endHeld()
         activationJob?.cancel()
-        cancelJoin(reason = "breath") // the sign stays, as for the rest key
-        val added = writer.breath()
-        if (added) {
-            written()
-            save()
-        }
-        logger.d(LogTags.FLUTE, "flute.breath", "added" to added)
+        val breath = writer.breath()
+        if (breath.added || breath.dropped.any) written()
+        logDropped(breath.dropped, reason = "breath")
+        if (breath.added) save()
+        logger.d(LogTags.FLUTE, "flute.breath", "added" to breath.added)
     }
 
     /** Plays the tune from the first step, or stops a playback in progress. Nothing to play, or the flute listening: nothing happens. */
@@ -299,10 +296,11 @@ class FluteViewModel @Inject constructor(
      * lands on the first note, or on a rest that opens the tune, with a hop.
      */
     private fun beginRun() {
-        val run = ListenRun(writer.tune, pulse(), floor = roomFloor).also { this.run = it }
+        val setup = ListenRun.Setup(writer.tune, pulse(), floor = roomFloor)
+        val run = ListenRun(setup).also { this.run = it }
         listenSummary.reset()
         _state.update { it.copy(listening = run.listening, marks = emptyMap(), beatPulse = it.beatPulse + 1) }
-        recorder.start(writer.tune, pulse(), roomFloor)
+        recorder.start(setup) // the same value the run has: the session writes down what ran
         logger.d(LogTags.FLUTE, "flute.listen", "notes" to writer.tune.count { it is TuneNote })
     }
 
@@ -418,9 +416,13 @@ class FluteViewModel @Inject constructor(
     /** Drops the last step of the tune; ignored while a key is held or the tune is empty. Stops playback and listening first. */
     fun eraseLast() {
         stopRunning(reason = "erase")
-        // A waiting join or sign goes first, both of them, and nothing is erased.
-        if (dropWaiting(reason = "erase")) return
-        if (!writer.erase()) return
+        val erase = writer.erase()
+        if (erase.dropped.any) { // a waiting join or sign went first, and nothing was erased
+            written()
+            logDropped(erase.dropped, reason = "erase")
+            return
+        }
+        if (!erase.erased) return
         written()
         save()
         logger.d(LogTags.FLUTE, "flute.erase", "left" to writer.tune.size)
@@ -555,6 +557,7 @@ class FluteViewModel @Inject constructor(
         val press = writer.press(key, clock.nowMillis()) ?: return // a key not taken; onKeyPressed asks first
         growJob?.cancel()
         written()
+        logDropped(press.dropped, reason = "rest") // only the rest key drops a waiting join
         press.ended?.let(::logEnded)
         if (press.rejoinGapMs == null) {
             save()
@@ -653,27 +656,21 @@ class FluteViewModel @Inject constructor(
         dropWaiting(reason)
     }
 
-    /** Drops a waiting join and a waiting sign, each logged with what dropped it; says whether either waited. */
+    /** Drops a waiting join and a waiting sign, shown and logged with what dropped them; says whether either waited. */
     private fun dropWaiting(reason: String): Boolean {
-        val join = cancelJoin(reason)
-        val sign = cancelSign(reason)
-        return join || sign
+        val dropped = writer.dropWaiting()
+        if (dropped.any) written()
+        logDropped(dropped, reason)
+        return dropped.any
     }
 
-    /** Drops a waiting sign, logged with what dropped it; says whether one waited. */
-    private fun cancelSign(reason: String): Boolean {
-        if (!writer.cancelSign()) return false
-        written()
-        logger.d(LogTags.FLUTE, "flute.sign_cancel", "reason" to reason)
-        return true
-    }
-
-    /** Drops a waiting join, logged with what dropped it; says whether one waited. */
-    private fun cancelJoin(reason: String): Boolean {
-        if (!writer.cancelJoin()) return false
-        written()
-        logger.d(LogTags.FLUTE, "flute.join_cancel", "reason" to reason)
-        return true
+    /**
+     * What the writer dropped ([dropped]: which key or event drops what is the writer's rule), logged with what dropped
+     * it: `flute.join_cancel`, then `flute.sign_cancel`.
+     */
+    private fun logDropped(dropped: TuneWriter.Dropped, reason: String) {
+        if (dropped.join) logger.d(LogTags.FLUTE, "flute.join_cancel", "reason" to reason)
+        if (dropped.sign) logger.d(LogTags.FLUTE, "flute.sign_cancel", "reason" to reason)
     }
 
     /**

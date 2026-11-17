@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.debug.session
 
 import hr.bertlab.fluteassistant.audio.tuner.AudioRecordTunerEngine
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.Pulse
@@ -34,7 +35,7 @@ class PinnedSessionTest {
         val run = ListenPath.run(samples, FluteSound.RATE, tune, Pulse(90))
         val root = folder.newFolder(name)
         val r = FileSessionRecorder(root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, Pulse(90), floor = null)
+        r.start(ListenRun.Setup(tune, Pulse(90)))
         r.opened(FluteSound.RATE, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)

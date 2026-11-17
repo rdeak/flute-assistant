@@ -319,8 +319,14 @@ def build(session, folder):
                 glyph = (PITCH_GLYPH if has_walk else {}).get(v, MARK_GLYPH.get(v, v))
                 word = (PITCH_WORD if has_walk else {}).get(v, MARK_WORD.get(v, v))
                 glyph_at(i, r, color, html.escape(word), glyph)
-    # the walk: a star on the frame a note was long enough, a mark on the frame one was cut short. A session
-    # cut off before its end line has no marks: there a step that stumbled first (a wrong note, a cut) is faint.
+    # the walk: a star on the frame a note was long enough, a mark on the frame one was cut short.
+    # The mark a note earned at that moment is the one the run logged for it (flute.held's mark, since 2026-11-14):
+    # only the run knows it (the scissors of a joined note tongued outrank its arrow, ListenRun.earn), so it is read
+    # and not worked out again here. A session from before logged no mark, and there it is inferred as it always was:
+    # the arrow on the frame before, else the end line's mark; and a session cut off before its end line has no marks,
+    # so a step that stumbled first (a wrong note, a cut) is faint.
+    logged = {f["index"]: f["mark"].upper() for (event, f, _) in session["events"]
+              if event == "flute.held" and f.get("index") is not None and f.get("mark") not in (None, "none")}
     stumbled = set()
     before = (None, None)
     # Steps whose mark changed after it was given: their "long enough" shows the mark of that moment, not the end line's.
@@ -333,11 +339,13 @@ def build(session, folder):
             stumbled.add(now[0])
         if now != before and now[1] in ("DONE", "SHORT", "CUT"):
             if now[1] == "DONE":
-                # The arrow the phone showed on the frame before (the `pitch` cell, since 2026-11-14) is the note's mark;
-                # else the end line's mark, else a star.
-                arrow = (rows[i - 1].get("pitch") or "") if i > 0 else ""
-                given = None if now[0] in changed_steps else marks.get(int(now[0]))
-                mark = arrow if arrow in ("HIGH", "LOW") else given or ("RETRY" if now[0] in stumbled else "FIRST_TRY")
+                mark = logged.get(now[0])
+                if mark not in STAR_GLYPH:
+                    # No mark logged: the arrow the phone showed on the frame before (the `pitch` cell) is the note's
+                    # mark; else the end line's mark, else a star.
+                    arrow = (rows[i - 1].get("pitch") or "") if i > 0 else ""
+                    given = None if now[0] in changed_steps else marks.get(int(now[0]))
+                    mark = arrow if arrow in ("HIGH", "LOW") else given or ("RETRY" if now[0] in stumbled else "FIRST_TRY")
                 glyph_at(i, r, STAR_COLOR[mark], "step %s was long enough: %s" % (now[0], STAR_WORD.get(mark, mark)), STAR_GLYPH[mark])
             elif now[1] == "CUT":
                 glyph_at(i, r, "var(--critical)", "step %s was let go too early: the hourglass, and the run moved on" % now[0], STAR_GLYPH["SHORT"], size=13)

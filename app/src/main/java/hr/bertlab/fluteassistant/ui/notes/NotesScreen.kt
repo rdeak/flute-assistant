@@ -64,6 +64,7 @@ import hr.bertlab.fluteassistant.ui.common.ModeChoice
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -385,7 +386,7 @@ private fun PickButton(practiceNotes: Set<Int>, progress: NoteProgress, onChoose
     val description = stringResource(R.string.choose_notes)
     val wordStyle = MaterialTheme.typography.titleMedium
     val backpack = with(LocalDensity.current) { 20.dp.toSp().value.toInt() }
-    val wordFloor = with(LocalDensity.current) { PickWordFloor.toSp() }
+    val wordFloor = PickWordFloor.asTextSize()
     ChunkyButton(
         onClick = onChoose,
         shape = CircleShape,

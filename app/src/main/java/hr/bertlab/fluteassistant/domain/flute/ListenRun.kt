@@ -9,6 +9,10 @@ import hr.bertlab.fluteassistant.domain.listen.HearingTracker
 import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.RuleTable
+import hr.bertlab.fluteassistant.domain.listen.countRule
+import hr.bertlab.fluteassistant.domain.listen.flagRule
+import hr.bertlab.fluteassistant.domain.listen.numberRule
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
 import kotlin.math.roundToLong
@@ -52,17 +56,37 @@ import kotlin.math.roundToLong
  * until after its last note (no rest, no next note, no ✋ for the tune's last).
  *
  * Pure Kotlin. The flute's view model feeds it the microphone, and the tests and the replay of a
- * recorded session feed it audio, so all three hear a run by the same rules. [rules] and [floor]
- * (the room's level the tracker starts from, the one the run before ended with) are the tracker's;
- * [run] are the run's own ([Rules]; [Rules.PITCH_ONLY] is the pitch-only rule of before 2026-11-11).
+ * recorded session feed it audio, so all three hear a run by the same rules. What it runs under is one value, [setup]
+ * ([Setup]: the tune, the pulse, the tracker's rules and the room's level it starts from, and the run's own [Rules];
+ * [Rules.PITCH_ONLY] is the pitch-only rule of before 2026-11-11).
  */
-class ListenRun(
-    private val tune: List<TuneItem>,
-    private val pulse: Pulse,
-    rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
-    floor: Float? = null,
-    private val run: Rules = Rules(),
-) {
+class ListenRun(val setup: Setup) {
+
+    constructor(
+        tune: List<TuneItem>,
+        pulse: Pulse,
+        rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
+        floor: Float? = null,
+        run: Rules = Rules(),
+    ) : this(Setup(tune, pulse, rules, floor, run))
+
+    /**
+     * Everything one run runs under: the [tune], the metronome's [pulse], the tracker's [rules] and the room's level it
+     * starts from ([floor], the one the run before ended with), and the run's own rules ([run]). The view model makes
+     * one and gives the same value to the run and to the session's recorder, so a session writes down what ran.
+     */
+    data class Setup(
+        val tune: List<TuneItem>,
+        val pulse: Pulse,
+        val rules: NoteOnsetTracker.Rules = NoteOnsetTracker.Rules(),
+        val floor: Float? = null,
+        val run: Rules = Rules(),
+    )
+
+    private val tune = setup.tune
+    private val pulse = setup.pulse
+    private val run = setup.run
+
     /**
      * The run's own rules, beside the tracker's [NoteOnsetTracker.Rules] and made like them: a value whose
      * defaults are the constants, which the app runs with, a session writes down ([fields]) and a replay moves
@@ -113,42 +137,34 @@ class ListenRun(
         val slurStopDrop: Double = SLUR_STOP_DROP,
     ) {
         /** Name and value of every rule, in the order a session's `session.rules` line has them after the tracker's. */
-        fun fields(): List<Pair<String, String>> = listOf(
-            "repeatAdviceFrames" to repeatAdviceFrames.toString(), "finishFrames" to finishFrames.toString(),
-            "lengthSlack" to lengthSlack.toString(), "maxNeedMs" to maxNeedMs.toString(),
-            "restartCuts" to if (restartCuts) "1" else "0", "graceFrames" to graceFrames.toString(),
-            "walkRests" to if (walkRests) "1" else "0",
-            "highCents" to highCents.toString(), "tuneCents" to tuneCents.toString(), "tuneFrames" to tuneFrames.toString(),
-            "shortMovesOn" to if (shortMovesOn) "1" else "0",
-            "paceMinPairs" to paceMinPairs.toString(), "paceOff" to paceOff.toString(),
-            "longSlack" to longSlack.toString(),
-            "slurCheck" to if (slurCheck) "1" else "0", "slurStopDrop" to slurStopDrop.toString(),
-        )
+        fun fields(): List<Pair<String, String>> = TABLE.fields(this)
 
         /** These rules with the one named [name] set to [value] (rounded for a frame count, not 0 for a yes); an unknown name is refused. */
-        fun with(name: String, value: Double): Rules = when (name) {
-            "lengthSlack" -> copy(lengthSlack = value)
-            "maxNeedMs" -> copy(maxNeedMs = value)
-            "repeatAdviceFrames" -> copy(repeatAdviceFrames = Math.round(value).toInt())
-            "finishFrames" -> copy(finishFrames = Math.round(value).toInt())
-            "restartCuts" -> copy(restartCuts = value != 0.0)
-            "graceFrames" -> copy(graceFrames = Math.round(value).toInt())
-            "walkRests" -> copy(walkRests = value != 0.0)
-            "highCents" -> copy(highCents = value)
-            "tuneCents" -> copy(tuneCents = value)
-            "tuneFrames" -> copy(tuneFrames = Math.round(value).toInt())
-            "shortMovesOn" -> copy(shortMovesOn = value != 0.0)
-            "paceMinPairs" -> copy(paceMinPairs = Math.round(value).toInt())
-            "paceOff" -> copy(paceOff = value)
-            "longSlack" -> copy(longSlack = value)
-            "slurCheck" -> copy(slurCheck = value != 0.0)
-            "slurStopDrop" -> copy(slurStopDrop = value)
-            else -> throw IllegalArgumentException("no rule named $name")
-        }
+        fun with(name: String, value: Double): Rules = TABLE.with(this, name, value)
 
         companion object {
+            /** Every rule once, in the order of a session's line: a new rule is a constructor parameter and a line here. */
+            private val TABLE = RuleTable<Rules>(
+                countRule("repeatAdviceFrames", { it.repeatAdviceFrames }) { r, v -> r.copy(repeatAdviceFrames = v) },
+                countRule("finishFrames", { it.finishFrames }) { r, v -> r.copy(finishFrames = v) },
+                numberRule("lengthSlack", { it.lengthSlack }) { r, v -> r.copy(lengthSlack = v) },
+                numberRule("maxNeedMs", { it.maxNeedMs }) { r, v -> r.copy(maxNeedMs = v) },
+                flagRule("restartCuts", { it.restartCuts }) { r, v -> r.copy(restartCuts = v) },
+                countRule("graceFrames", { it.graceFrames }) { r, v -> r.copy(graceFrames = v) },
+                flagRule("walkRests", { it.walkRests }) { r, v -> r.copy(walkRests = v) },
+                numberRule("highCents", { it.highCents }) { r, v -> r.copy(highCents = v) },
+                numberRule("tuneCents", { it.tuneCents }) { r, v -> r.copy(tuneCents = v) },
+                countRule("tuneFrames", { it.tuneFrames }) { r, v -> r.copy(tuneFrames = v) },
+                flagRule("shortMovesOn", { it.shortMovesOn }) { r, v -> r.copy(shortMovesOn = v) },
+                countRule("paceMinPairs", { it.paceMinPairs }) { r, v -> r.copy(paceMinPairs = v) },
+                numberRule("paceOff", { it.paceOff }) { r, v -> r.copy(paceOff = v) },
+                numberRule("longSlack", { it.longSlack }) { r, v -> r.copy(longSlack = v) },
+                flagRule("slurCheck", { it.slurCheck }) { r, v -> r.copy(slurCheck = v) },
+                numberRule("slurStopDrop", { it.slurStopDrop }) { r, v -> r.copy(slurStopDrop = v) },
+            )
+
             /** The names [with] knows. */
-            val NAMES: Set<String> = Rules().fields().map { it.first }.toSet()
+            val NAMES: Set<String> = TABLE.names
 
             /**
              * No length rule: no slack to run out of, no longest hold and no note too long, so every note is long
@@ -282,7 +298,7 @@ class ListenRun(
     private class Start(val ms: Double, val clean: Boolean)
 
     private val check = TuneCheck(tune, run.highCents)
-    private val tracker = NoteOnsetTracker(rules, floor)
+    private val tracker = NoteOnsetTracker(setup.rules, setup.floor)
     private val hearingTracker = HearingTracker()
     /** Frames since the last note was counted while its sound goes on. */
     private var framesFinishing = 0

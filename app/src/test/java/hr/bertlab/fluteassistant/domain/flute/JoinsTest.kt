@@ -4,6 +4,8 @@
 package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.j
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.q
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -11,9 +13,6 @@ import org.junit.Test
 
 /** Runs of joined notes (since 2026-11-16, the ⌒ key): what the staff draws and what Listen to me hears as one note. */
 class JoinsTest {
-
-    private fun q(midi: Int) = TuneNote(midi, QUARTER)
-    private fun j(midi: Int) = TuneNote(midi, QUARTER, joined = true)
 
     @Test
     fun `a run of joined notes is one slur`() =
@@ -53,6 +52,17 @@ class JoinsTest {
         assertEquals(4, Joins.lastHeardWith(tune, 4))
         assertFalse(Joins.heardWithBefore(tune, 0))
         assertFalse("not joined: a written repeat", Joins.heardWithBefore(tune, 4))
+    }
+
+    @Test
+    fun `a walk across notes heard as one stands on the note it has reached`() {
+        val tune = listOf(q(60), j(60), j(72), q(62)) // a tie and an octave slur: three quarters heard as one
+        assertEquals(0 to 0, Joins.placeOf(tune, 0, 0))
+        assertEquals(0 to 1, Joins.placeOf(tune, 0, 1))
+        assertEquals("the second note's head", 1 to 0, Joins.placeOf(tune, 0, 2))
+        assertEquals(2 to 1, Joins.placeOf(tune, 0, 5))
+        assertEquals("past them all it stays on the last", 2 to 4, Joins.placeOf(tune, 0, 8))
+        assertEquals("a note with nothing joined on keeps its own half beats", 3 to 5, Joins.placeOf(tune, 3, 5))
     }
 
     @Test

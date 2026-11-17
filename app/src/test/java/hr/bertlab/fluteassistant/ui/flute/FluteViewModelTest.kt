@@ -14,6 +14,7 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.q
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
@@ -975,8 +976,7 @@ class FluteViewModelTest {
 
     // ---- Your turn: the flute listens ----
 
-    /** A quarter: at the default 120 a minute it lasts 500 ms and is long enough after 125, the three frames that lock it. */
-    private fun q(midi: Int) = TuneNote(midi, QUARTER)
+    // A quarter (`q`): at the default 120 a minute it lasts 500 ms and is long enough after 125, the three frames that lock it.
 
     /** A frame of a note at a real flute's level at the phone (the recorded sessions: 0.67 and over), clear of the tracker's floor. */
 
@@ -1048,14 +1048,14 @@ class FluteViewModelTest {
     fun `a wrong note shows the note heard until the right note, which then earns a faint star`() = runTest(dispatcher) {
         val vm = listeningViewModel()
         play(65)
-        assertEquals(WrongNote(index = 0, midi = 65), vm.current.wrong)
+        assertEquals(WrongNote(index = 0, midi = 65), vm.current.listening?.wrong)
         assertEquals(0, vm.current.listening?.index)
         assertTrue(vm.current.marks.isEmpty())
         assertEquals("wrong", logger.events("flute.heard").single()["verdict"])
         advanceTimeBy(10_000) // no timer takes it away: the child reads it at their own pace
-        assertEquals(WrongNote(index = 0, midi = 65), vm.current.wrong)
+        assertEquals(WrongNote(index = 0, midi = 65), vm.current.listening?.wrong)
         play(60)
-        assertNull(vm.current.wrong)
+        assertNull(vm.current.listening?.wrong)
         assertEquals(mapOf(0 to StepMark.RETRY), vm.current.marks)
         assertEquals(1, vm.current.listening?.index)
         assertEquals("retry", logger.events("flute.heard").last()["verdict"])
@@ -1066,14 +1066,14 @@ class FluteViewModelTest {
         val vm = listeningViewModel()
         play(60)
         play(65)
-        assertEquals(WrongNote(index = 1, midi = 65), vm.current.wrong)
+        assertEquals(WrongNote(index = 1, midi = 65), vm.current.listening?.wrong)
         play(67)
-        assertEquals(WrongNote(index = 1, midi = 67), vm.current.wrong)
+        assertEquals(WrongNote(index = 1, midi = 67), vm.current.listening?.wrong)
         play(60) // the step just judged, ignored
         assertEquals("ignored", logger.events("flute.heard").last()["verdict"])
-        assertEquals(WrongNote(index = 1, midi = 67), vm.current.wrong)
+        assertEquals(WrongNote(index = 1, midi = 67), vm.current.listening?.wrong)
         play(62)
-        assertNull(vm.current.wrong)
+        assertNull(vm.current.listening?.wrong)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.RETRY), vm.current.marks)
     }
 
@@ -1106,16 +1106,16 @@ class FluteViewModelTest {
     @Test
     fun `the note heard now shows under the waited step and goes with the sound`() = runTest(dispatcher) {
         val vm = listeningViewModel()
-        assertNull(vm.current.heardNow)
+        assertNull(vm.current.listening?.heardNow)
         repeat(ListenRules.LOCK_FRAMES) { emit(pitched(65)) } // a wrong note, still sounding
-        assertEquals(65, vm.current.heardNow)
-        assertEquals(WrongNote(index = 0, midi = 65), vm.current.wrong)
+        assertEquals(65, vm.current.listening?.heardNow)
+        assertEquals(WrongNote(index = 0, midi = 65), vm.current.listening?.wrong)
         repeat(NoteOnsetTracker.ONSET_GAP_FRAMES) { emit(silent) }
-        assertNull("silence: nothing is heard now", vm.current.heardNow)
-        assertEquals("the wrong note stays to be read", WrongNote(index = 0, midi = 65), vm.current.wrong)
+        assertNull("silence: nothing is heard now", vm.current.listening?.heardNow)
+        assertEquals("the wrong note stays to be read", WrongNote(index = 0, midi = 65), vm.current.listening?.wrong)
         sound(60) // the right note, counted, still sounding
         assertEquals(1, vm.current.listening?.index)
-        assertNull("the tail of the note just counted is not what the next step hears", vm.current.heardNow)
+        assertNull("the tail of the note just counted is not what the next step hears", vm.current.listening?.heardNow)
     }
 
     @Test
@@ -1123,7 +1123,7 @@ class FluteViewModelTest {
         val vm = listeningViewModel(q(60), q(60))
         sound(60)
         assertEquals(1, vm.current.listening?.index)
-        assertEquals(60, vm.current.heardNow)
+        assertEquals(60, vm.current.listening?.heardNow)
     }
 
     @Test
@@ -1224,7 +1224,7 @@ class FluteViewModelTest {
         assertEquals("pill", pill)
         assertFalse(stopped.isListening)
         assertNull(stopped.listening)
-        assertNull(stopped.wrong)
+        assertNull(stopped.listening?.wrong)
         assertEquals(1, stopped.marks.size)
         val (erased, erase) = ended { eraseLast() }
         assertEquals("erase", erase)
@@ -1509,7 +1509,7 @@ class FluteViewModelTest {
         assertEquals(1, vm.current.marks.size)
         vm.openBook(1)
         assertTrue(vm.current.marks.isEmpty())
-        assertNull(vm.current.wrong)
+        assertNull(vm.current.listening?.wrong)
     }
 
     @Test

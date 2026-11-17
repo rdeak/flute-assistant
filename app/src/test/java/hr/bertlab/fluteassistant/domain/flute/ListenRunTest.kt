@@ -7,6 +7,9 @@ import hr.bertlab.fluteassistant.domain.flute.NoteLength.EIGHTH
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.HALF
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.QUARTER
 import hr.bertlab.fluteassistant.domain.flute.NoteLength.WHOLE
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.h
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.j
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.q
 import hr.bertlab.fluteassistant.domain.listen.TestFrames.framesFor
 import hr.bertlab.fluteassistant.domain.listen.TestFrames.pitched
 import hr.bertlab.fluteassistant.domain.listen.TestFrames.silent
@@ -28,9 +31,6 @@ import org.junit.Test
 /** A "Your turn" fed hand-made frames, no microphone and no coroutines; real sound is `ListenPathTest`'s. */
 class ListenRunTest {
 
-    private fun q(midi: Int) = TuneNote(midi, QUARTER)
-    private fun h(midi: Int) = TuneNote(midi, HALF)
-    private fun j(midi: Int) = TuneNote(midi, QUARTER, joined = true)
     /** The rule of before 2026-11-11, pitch only: every note is long enough at its onset. */
     private fun pitchOnly(tune: List<TuneItem>) = ListenRun(tune, Pulse(60), run = ListenRun.Rules.PITCH_ONLY)
 

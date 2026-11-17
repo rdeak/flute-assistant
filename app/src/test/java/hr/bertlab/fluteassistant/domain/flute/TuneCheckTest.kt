@@ -3,6 +3,8 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.j
+import hr.bertlab.fluteassistant.domain.flute.TestTunes.q
 import hr.bertlab.fluteassistant.domain.listen.TestFrames
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -11,9 +13,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TuneCheckTest {
-
-    private fun q(midi: Int) = TuneNote(midi, NoteLength.QUARTER)
-    private fun j(midi: Int) = TuneNote(midi, NoteLength.QUARTER, joined = true)
 
     /** The frequency of [midi] [cents] off it: where a note locked. */
     private fun hz(midi: Int, cents: Double) = TestFrames.hz(midi, cents)

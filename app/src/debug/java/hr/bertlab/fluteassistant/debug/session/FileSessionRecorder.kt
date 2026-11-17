@@ -12,14 +12,11 @@ import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
 import hr.bertlab.fluteassistant.domain.flute.ListenRun
-import hr.bertlab.fluteassistant.domain.flute.Pulse
 import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneBreath
-import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.flute.Verdict
-import hr.bertlab.fluteassistant.domain.listen.NoteOnsetTracker
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import java.io.BufferedWriter
@@ -66,7 +63,7 @@ class FileSessionRecorder(
     private val lock = Any()
     private var session: Session? = null
 
-    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = guarded {
+    override fun start(setup: ListenRun.Setup) = guarded {
         session?.let { close(it, marks = emptyMap()) }
         val dir = newFolder()
         val log = File(dir, LOG).bufferedWriter()
@@ -76,13 +73,13 @@ class FileSessionRecorder(
         val at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).format(Date(now()))
         line(
             s, "session.start", "at" to at, "app" to facts.app, "code" to facts.code, "device" to facts.device,
-            "sdk" to facts.sdk, "floor" to floor?.let { level(it) },
+            "sdk" to facts.sdk, "floor" to setup.floor?.let { level(it) },
         )
-        // The app runs with the tracker's rules and the run's at their defaults, which is what is written down.
-        val rules = NoteOnsetTracker.Rules().fields() + ListenRun.Rules().fields()
+        // The rules the run runs under, the tracker's and then its own: what is written down is what ran.
+        val rules = setup.rules.fields() + setup.run.fields()
         line(s, "session.rules", *rules.toTypedArray())
-        line(s, "session.pulse", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
-        tune.forEachIndexed { index, item ->
+        line(s, "session.pulse", "bpm" to setup.pulse.bpm, "time" to setup.pulse.timeSignature.label)
+        setup.tune.forEachIndexed { index, item ->
             when (item) {
                 is TuneNote -> {
                     // A note joined to the one before says so (since 2026-11-16); older lines have no such field.

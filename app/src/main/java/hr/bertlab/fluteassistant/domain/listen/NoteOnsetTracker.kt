@@ -71,46 +71,36 @@ class NoteOnsetTracker(
         val stepFromSounding: Boolean = true,
     ) {
         /** Name and value of every rule, in declaration order, the value as Kotlin prints it. */
-        fun fields(): List<Pair<String, String>> = listOf(
-            "gate" to gate.toString(), "lockFrames" to lockFrames.toString(), "lockCents" to lockCents.toString(),
-            "smoothing" to smoothing.toString(), "switchFrames" to switchFrames.toString(), "holdFrames" to holdFrames.toString(),
-            "nearCents" to nearCents.toString(), "onsetGapFrames" to onsetGapFrames.toString(),
-            "gapLevelRatio" to gapLevelRatio.toString(), "floorMargin" to floorMargin.toString(), "floorRise" to floorRise.toString(),
-            "recentFrames" to recentFrames.toString(), "attackFrames" to attackFrames.toString(), "stopDrop" to stopDrop.toString(),
-            "restartRise" to restartRise.toString(), "restartFrames" to restartFrames.toString(),
-            "minLevel" to minLevel.toString(), "stepFromSounding" to if (stepFromSounding) "1" else "0",
-        )
+        fun fields(): List<Pair<String, String>> = TABLE.fields(this)
 
         /** These rules with the one named [name] set to [value] (rounded for a frame count); an unknown name is refused. */
-        fun with(name: String, value: Double): Rules {
-            val n = Math.round(value).toInt()
-            val f = value.toFloat()
-            return when (name) {
-                "gate" -> copy(gate = value)
-                "lockFrames" -> copy(lockFrames = n)
-                "lockCents" -> copy(lockCents = value)
-                "smoothing" -> copy(smoothing = n)
-                "switchFrames" -> copy(switchFrames = n)
-                "holdFrames" -> copy(holdFrames = n)
-                "nearCents" -> copy(nearCents = value)
-                "onsetGapFrames" -> copy(onsetGapFrames = n)
-                "gapLevelRatio" -> copy(gapLevelRatio = f)
-                "floorMargin" -> copy(floorMargin = f)
-                "floorRise" -> copy(floorRise = f)
-                "recentFrames" -> copy(recentFrames = n)
-                "attackFrames" -> copy(attackFrames = n)
-                "stopDrop" -> copy(stopDrop = f)
-                "restartRise" -> copy(restartRise = f)
-                "restartFrames" -> copy(restartFrames = n)
-                "minLevel" -> copy(minLevel = f)
-                "stepFromSounding" -> copy(stepFromSounding = value != 0.0)
-                else -> throw IllegalArgumentException("no rule named $name")
-            }
-        }
+        fun with(name: String, value: Double): Rules = TABLE.with(this, name, value)
 
         companion object {
+            /** Every rule once, in declaration order: a new rule is a constructor parameter and a line here. */
+            private val TABLE = RuleTable<Rules>(
+                numberRule("gate", { it.gate }) { r, v -> r.copy(gate = v) },
+                countRule("lockFrames", { it.lockFrames }) { r, v -> r.copy(lockFrames = v) },
+                numberRule("lockCents", { it.lockCents }) { r, v -> r.copy(lockCents = v) },
+                countRule("smoothing", { it.smoothing }) { r, v -> r.copy(smoothing = v) },
+                countRule("switchFrames", { it.switchFrames }) { r, v -> r.copy(switchFrames = v) },
+                countRule("holdFrames", { it.holdFrames }) { r, v -> r.copy(holdFrames = v) },
+                numberRule("nearCents", { it.nearCents }) { r, v -> r.copy(nearCents = v) },
+                countRule("onsetGapFrames", { it.onsetGapFrames }) { r, v -> r.copy(onsetGapFrames = v) },
+                levelRule("gapLevelRatio", { it.gapLevelRatio }) { r, v -> r.copy(gapLevelRatio = v) },
+                levelRule("floorMargin", { it.floorMargin }) { r, v -> r.copy(floorMargin = v) },
+                levelRule("floorRise", { it.floorRise }) { r, v -> r.copy(floorRise = v) },
+                countRule("recentFrames", { it.recentFrames }) { r, v -> r.copy(recentFrames = v) },
+                countRule("attackFrames", { it.attackFrames }) { r, v -> r.copy(attackFrames = v) },
+                levelRule("stopDrop", { it.stopDrop }) { r, v -> r.copy(stopDrop = v) },
+                levelRule("restartRise", { it.restartRise }) { r, v -> r.copy(restartRise = v) },
+                countRule("restartFrames", { it.restartFrames }) { r, v -> r.copy(restartFrames = v) },
+                levelRule("minLevel", { it.minLevel }) { r, v -> r.copy(minLevel = v) },
+                flagRule("stepFromSounding", { it.stepFromSounding }) { r, v -> r.copy(stepFromSounding = v) },
+            )
+
             /** The names [with] knows. */
-            val NAMES: Set<String> = Rules().fields().map { it.first }.toSet()
+            val NAMES: Set<String> = TABLE.names
         }
     }
 

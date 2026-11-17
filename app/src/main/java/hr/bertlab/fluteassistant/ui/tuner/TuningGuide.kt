@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -50,6 +49,8 @@ import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.WordFloor
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.noteLabel
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
@@ -102,7 +103,7 @@ private fun TuningGuideUpright(card: GuideCard, onCard: (GuideCard) -> Unit, onC
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 1.25.em),
                 color = FluteTheme.colors.text,
                 maxLines = 1,
-                autoSize = TextAutoSize.StepBased(minFontSize = floor(), maxFontSize = 26.sp),
+                autoSize = TextAutoSize.StepBased(minFontSize = WordFloor.asTextSize(), maxFontSize = 26.sp),
                 modifier = Modifier
                     .weight(1f)
                     .testTag("guide_heading"),
@@ -246,7 +247,7 @@ private fun CardWords(card: GuideCard, center: Boolean, modifier: Modifier) {
         GuideCard.ONE_NOTE_OFF -> stringResource(R.string.tune_guide_one_note_off_title) to stringResource(R.string.tune_guide_one_note_off_text)
     }
     val align = if (center) TextAlign.Center else TextAlign.Start
-    val floor = floor()
+    val floor = WordFloor.asTextSize()
     BoxWithConstraints(modifier) {
         // The title is measured first; capped at 40% of the room, so at a large text size on a short tab it
         // cannot take the room the words, which are the instruction, need.
@@ -296,8 +297,8 @@ private fun Dots(card: GuideCard) {
 }
 
 /**
- * A ‹ or › of the guide, to the card [to]: a chunky button with the drawn chevron, named for a screen reader, faded
- * when there is no such card.
+ * A ‹ or › of the guide, to the card [to]: the tuner's [StepButton] with a larger chevron, faded when there is no such
+ * card.
  */
 @Composable
 private fun StepIcon(
@@ -307,15 +308,7 @@ private fun StepIcon(
     onCard: (GuideCard) -> Unit,
     modifier: Modifier,
     shape: Shape = CircleShape,
-) {
-    ChunkyButton(onClick = { to?.let(onCard) }, enabled = to != null, shape = shape, modifier = modifier) {
-        Icon(icon, contentDescription = stringResource(description), modifier = Modifier.size(32.dp))
-    }
-}
-
-/** 12 dp in sp: a floor in sp would double at the largest text size (`SidewaysPlainButton`'s rule). */
-@Composable
-private fun floor() = with(LocalDensity.current) { 12.dp.toSp() }
+) = StepButton(icon, stringResource(description), enabled = to != null, onClick = { to?.let(onCard) }, modifier, shape, iconSize = 32.dp)
 
 private val HeadingHeight = 69.dp
 private val StagePadding = 20.dp

@@ -430,7 +430,8 @@ takes what the builds before it did from one table for both sets, `Replay.BEFORE
 detected once (`Session.frames`) for every value. A session that recorded the walk (`walk,halfBeat,phase` in
 `frames.csv`) has it compared in the replay's diff, so "diff: none" also says the notes were earned and cut short on
 the phone's frames; `tools/session-report.py` draws ♪ where a right pitch began a note, ★ or ☆ where it was long
-enough and ✂ where it was cut short (an older table keeps the star at the onset, where it was earned then).
+enough (the mark the run logged in `flute.held`, read and not worked out again since 2026-11-17; inferred only for a
+session from before that line had a mark) and ✂ where it was cut short (an older table keeps the star at the onset, where it was earned then).
 
 The first runs with the walk (2026-11-12, issue #4's phone test: one child, twenty runs over a cable, a scale of whole
 notes and two tunes of quarters and half notes at 60, 80 and 100 a minute; the user: the notes took "much more time than
@@ -689,7 +690,7 @@ into 0.28 and ✂️; `ListenPathTest`, "a softer joined note after a breath-siz
 logs it (`stopDrop`). A length sign wins the mark over ✂️ and ✂️ over an arrow. The line ranks under ✋ and under the live pitch line while the note sounds, over the marked arrow,
 "Too short" and "Check your fingers". A tie, or a slur to the same letter in another octave (Listen to me hears a letter
 in any octave, so not that step), is one note (`Joins.lastHeardWith`): walked across all its notes on their clicks, the
-animal stepping onto the second (`animalX`), its length theirs together, both pills the same mark, no ✂️ inside it (a
+animal stepping onto the second (`Joins.placeOf`, which `animalX` draws), its length theirs together, both pills the same mark, no ✂️ inside it (a
 breath dips like a tongue), never ✋ when it ends the tune. An octave slur broken by a real gap after its first note
 sounded its own length is not "too short" on two notes held their length (the final review): its first note earns its
 own mark and the later one ✂️ with the join line (`ListenRun.breakSlur`, `TuneCheck.earnBroken`), a gap being a tongue;

@@ -14,7 +14,7 @@ import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.ListenFrame
 import hr.bertlab.fluteassistant.domain.flute.ListenRecorder
-import hr.bertlab.fluteassistant.domain.flute.Pulse
+import hr.bertlab.fluteassistant.domain.flute.ListenRun
 import hr.bertlab.fluteassistant.domain.flute.Shelf
 import hr.bertlab.fluteassistant.domain.flute.Songbook
 import hr.bertlab.fluteassistant.domain.flute.StepMark
@@ -217,17 +217,15 @@ class FakeLogger(var verbose: Boolean = false) : Logger {
 
 /** Remembers every call of the flute's session recorder; [onStart] and [onEnd] run first, so a test can look around at that moment. */
 class FakeListenRecorder : ListenRecorder {
-    data class Start(val tune: List<TuneItem>, val pulse: Pulse, val floor: Float?)
-
-    val started = mutableListOf<Start>()
+    val started = mutableListOf<ListenRun.Setup>()
     val frames = mutableListOf<ListenFrame>()
     val ended = mutableListOf<Map<Int, StepMark>>()
     var onStart: () -> Unit = {}
     var onEnd: () -> Unit = {}
 
-    override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) {
+    override fun start(setup: ListenRun.Setup) {
         onStart()
-        started += Start(tune, pulse, floor)
+        started += setup
     }
 
     override fun frame(frame: ListenFrame) {

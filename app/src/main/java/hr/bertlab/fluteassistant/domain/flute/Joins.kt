@@ -55,6 +55,24 @@ object Joins {
         return end
     }
 
+    /**
+     * Where a walk [halfBeat] half beats into the notes heard as one from [head] stands: the step among them it has
+     * reached, and the half beats into that step. Listen to me walks a tie or an octave slur as one note, counted from
+     * its first note's head ([lastHeardWith]); the staff draws the animal on the note it is over. Past the last of
+     * them it stays on the last, however far.
+     */
+    fun placeOf(tune: List<TuneItem>, head: Int, halfBeat: Int): Pair<Int, Int> {
+        var index = head
+        var left = halfBeat
+        while (heardWithBefore(tune, index + 1)) {
+            val length = tune[index].length?.halfBeats ?: 0
+            if (left < length) break
+            left -= length
+            index++
+        }
+        return index to left
+    }
+
     /** Whether the note at [index] is joined to a note of another letter before it: a slur Listen to me can hear. */
     fun joinsOtherLetter(tune: List<TuneItem>, index: Int): Boolean = joinedInLetter(tune, index) == false
 

@@ -36,7 +36,8 @@ root CLAUDE.md, "Kid-friendly UI constraint".
 - Text on a bright fill is `InkOnFill`; a note's colour is `noteColor(midi)`. Everything pressable
   is a `ChunkyButton` / `Modifier.chunky`; a faded one goes through `fadedUnless` (`Modifier.alpha`
   cuts the shadow off flat). Emoji that are pictures are sized in dp, so large text does not grow
-  them out of their room.
+  them out of their room. The smallest a shrinking word gets is a size in dp too (`Dp.asTextSize()` and `WordFloor`,
+  `ui/common/TextFloor.kt`): a floor in sp doubles at the largest text and pushes the word out.
 - The credits stay behind a long press on the logo, with the website's address as plain text (never
   a link, so a child cannot leave the app), and since 2026-11-11 no privacy or licence lines (the
   user's call; Play asks for the policy in the app, so a review that flags it starts here, see

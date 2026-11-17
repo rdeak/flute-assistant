@@ -1322,6 +1322,27 @@ class FluteScreenTest {
         assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 6, first + 2 * beat + 26, 152f, 168f) > 0)
     }
 
+    @Test
+    fun a_slur_stays_under_its_notes_when_the_staff_has_scrolled() {
+        needsDevice()
+        // Twelve quarters, then e joined to f: the pair starts 383 dp into the row, past a phone's width, so the staff
+        // scrolls to show it. The slur's layer is moved by the row's scroll and not drawn again: it must move with it.
+        val tune = List(12) { TuneNote(60, NoteLength.QUARTER) } +
+            TuneNote(64, NoteLength.QUARTER) + TuneNote(65, NoteLength.QUARTER, joined = true)
+        show(FluteUiState(tune = tune))
+        compose.waitForIdle()
+        val rowNode = compose.onNodeWithContentDescription("Your tune, 14 notes")
+        val rowLeft = rowNode.getBoundsInRoot().left
+        val e = (compose.onNodeWithContentDescription("E4, 1 beat").getBoundsInRoot().left - rowLeft).value
+        val f = (compose.onNodeWithContentDescription("F4, 1 beat, joined to the note before").getBoundsInRoot().left - rowLeft).value
+        val unscrolled = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + 12 * StaffGeometry.BEAT_WIDTH + 3 * StaffGeometry.BAR_SLOT
+        assertTrue("the staff must have scrolled for this to test anything: e stands $e dp into the row", e < unscrolled - 1f)
+        // e¹ at 147 and f¹ at 138: the slur hangs under both heads, below the staff's bottom line and over the names.
+        val row = rowNode.captureToImage().toPixelMap()
+        val ink = inkIn(row, e + StaffGeometry.HEAD_X + 8, f + StaffGeometry.HEAD_X - 8, 155f, 172f)
+        assertTrue("the slur under e and f, where they stand now", ink > 0)
+    }
+
     // ---- The ⌒ key (2026-11-16): left of 💤, faded with nothing to join, down while a join waits ----
 
     @Test

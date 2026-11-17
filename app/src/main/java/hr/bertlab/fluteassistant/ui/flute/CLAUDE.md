@@ -9,7 +9,8 @@ change that part). The songbook is in `SONGBOOK.md`.
 - `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `FluteNotes` (the flute's 25 notes,
   C4 to C6, and the black note each white key writes under the ♯♭ key), `Tune` (lengths, the
   stored string, `playSteps` for Play), `TuneWriter` (a key held makes a note: growth at the writing pace, the rejoin
-  window, the cap, breath, the join, the sign, erase), `Bars` (how the staff writes bars, ties and
+  window, the cap, breath, the join, the sign, erase; which key drops a waiting join or sign is its rule too, it says what
+  it dropped, `TuneWriter.Dropped`, and the view model only shows and logs that), `Bars` (how the staff writes bars, ties and
   signs), `Joins` (runs of
   joined notes: the arcs, and what Listen to me hears as one note), `TuneCheck` and `ListenRun` ("Your
   turn"; what the screen shows of one is `Listening`, in `Listening.kt`), `Songbook`.
@@ -55,7 +56,9 @@ change that part). The songbook is in `SONGBOOK.md`.
   written time and any rests after it (ringed and walked as in Play, `Walk.Phase.REST`,
   `ListenRun.Rules.walkRests`), to the head of the next note, where it waits; a note started during
   a rest counts at once. `ListenRun`'s own rules are
-  one value (`ListenRun.Rules`: a session records it, a replay moves it): add a rule there.
+  one value (`ListenRun.Rules`: a session records it, a replay moves it): add a rule there, as a constructor parameter
+  and a line in its table. What a run runs under (the tune, the pulse, both sets of rules, the room's floor) is
+  `ListenRun.Setup`: the view model gives the same value to the run and to the recorder, so a session writes down what ran.
   `DESIGN.md`, "Each note held for its length". A miss never shows
   silence: the heard note, or the listening dots, stands under the step waited on.
 - The room under the stage while it listens adds nothing while things go right: "Play B4" until the

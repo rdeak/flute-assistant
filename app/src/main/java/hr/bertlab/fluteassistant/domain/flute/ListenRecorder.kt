@@ -43,20 +43,20 @@ data class MarkChange(val index: Int, val mark: StepMark)
 
 /**
  * Keeps a "Your turn" run for inspection afterwards: [start] when the child presses the button
- * (before the microphone opens, with the tune on the staff, the pulse it was written in and the
- * room's floor the tracker still holds), [frame] for every frame the run processed, in
+ * (before the microphone opens, with what the run runs under, [ListenRun.Setup]: the tune on the staff, the pulse,
+ * the room's floor the tracker still holds and the rules in force), [frame] for every frame the run processed, in
  * order, [end] with the marks when the run is over. The debug build records every run into a
  * folder on the phone (`ui/flute/CLAUDE.md`, "Sessions"); the release build binds [None] and
  * keeps nothing.
  */
 interface ListenRecorder {
-    fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?)
+    fun start(setup: ListenRun.Setup)
     fun frame(frame: ListenFrame)
     fun end(marks: Map<Int, StepMark>)
 
     /** Keeps nothing: the release build's recorder. */
     object None : ListenRecorder {
-        override fun start(tune: List<TuneItem>, pulse: Pulse, floor: Float?) = Unit
+        override fun start(setup: ListenRun.Setup) = Unit
         override fun frame(frame: ListenFrame) = Unit
         override fun end(marks: Map<Int, StepMark>) = Unit
     }

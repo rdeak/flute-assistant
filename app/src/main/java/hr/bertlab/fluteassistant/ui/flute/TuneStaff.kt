@@ -59,7 +59,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
-import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -86,6 +86,7 @@ import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.flute.JoinArc
 import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.LineMark
+import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.Pitch
 import hr.bertlab.fluteassistant.domain.flute.StepMark
@@ -94,7 +95,6 @@ import hr.bertlab.fluteassistant.domain.flute.TuneBreath
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
-import hr.bertlab.fluteassistant.domain.flute.WrongNote
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.Emoji
@@ -108,6 +108,7 @@ import hr.bertlab.fluteassistant.ui.common.RETRY_STAR_ALPHA
 import hr.bertlab.fluteassistant.ui.common.SHORT_EMOJI
 import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
 import hr.bertlab.fluteassistant.ui.common.TONGUED_EMOJI
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
 import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
@@ -193,9 +194,9 @@ private data class StaffInk(
  * quarters of the drawn size), with each note's name in a pill right under it ([NameRow]: the
  * same room, so notes and names line up and scroll as one) and, under the names, a row for what
  * each note earned in "Your turn" ([MarkRow]: a star in [marks] under the head, faint after a
- * retry; under the step waited on the note the phone hears right now ([heardNow]) as a bubble in
+ * retry; under the step waited on the note the phone hears right now ([Listening.heardNow] of [listening]) as a bubble in
  * its own colour, so the child sees it listening, else the wrong note last heard for it
- * ([wrong]) until the next note is judged, else grey listening dots). While the tune runs the knob's [animal] walks the
+ * ([Listening.wrong]) until the next note is judged, else grey listening dots). While the tune runs the knob's [animal] walks the
  * staff at the knob's height ([WalkingAnimal]), hopping on to each beat's place. The faint treble clef
  * and the metronome tab's time signature stand at the left while the steps scroll past after
  * them, written in bars of [timeSignature] by [Bars.write]. Each note sits at its true height,
@@ -228,9 +229,7 @@ fun TuneStaff(
     modifier: Modifier = Modifier,
     marks: Map<Int, StepMark> = emptyMap(),
     animal: StaffAnimal? = null,
-    wrong: WrongNote? = null,
-    heardNow: Int? = null,
-    pitch: Pitch? = null,
+    listening: Listening? = null,
     scale: Float = 1f,
     listState: LazyListState = rememberLazyListState(),
     joinWaiting: Boolean = false,
@@ -265,8 +264,7 @@ fun TuneStaff(
             } else {
                 TuneMarks(
                     tune = tune, litIndex = litIndex, heldIndex = heldIndex, signature = timeSignature, marks = marks, animal = animal,
-                    wrong = wrong, heardNow = heardNow, pitch = pitch, ink = ink, measurer = measurer, listState = listState,
-                    joinWaiting = joinWaiting,
+                    listening = listening, ink = ink, measurer = measurer, listState = listState, joinWaiting = joinWaiting,
                 )
             }
         }
@@ -340,7 +338,7 @@ private fun EmptyHint() {
     val colors = FluteTheme.colors
     val sideways = LocalSideways.current
     val style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
-    val smallest = if (sideways) with(LocalDensity.current) { HintFloor.toSp() } else 14.sp
+    val smallest = if (sideways) HintFloor.asTextSize() else 14.sp
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
@@ -385,9 +383,7 @@ private fun TuneMarks(
     signature: TimeSignature,
     marks: Map<Int, StepMark>,
     animal: StaffAnimal?,
-    wrong: WrongNote?,
-    heardNow: Int?,
-    pitch: Pitch?,
+    listening: Listening?,
     ink: StaffInk,
     measurer: TextMeasurer,
     listState: LazyListState,
@@ -441,9 +437,9 @@ private fun TuneMarks(
                             growing = mark.index == heldIndex,
                             mark = marks[mark.index],
                             waiting = waiting,
-                            heard = wrong?.takeIf { it.index == mark.index }?.midi,
-                            heardNow = heardNow.takeIf { waiting },
-                            pitch = pitch.takeIf { waiting },
+                            heard = listening?.wrong?.takeIf { it.index == mark.index }?.midi,
+                            heardNow = listening?.heardNow.takeIf { waiting },
+                            pitch = listening?.pitch.takeIf { waiting },
                             ink = ink,
                         )
                     }
@@ -491,21 +487,29 @@ private fun SlurLayer(tune: List<TuneItem>, lineMarks: List<LineMark>, starts: L
     Box(
         Modifier
             .fillMaxSize()
-            .drawBehind {
-                val info = listState.layoutInfo
-                val first = info.visibleItemsInfo.firstOrNull() ?: return@drawBehind
-                val firstStart = starts.getOrNull(first.index) ?: return@drawBehind
-                // The first item shown is the reference, as for the walking animal.
-                val origin = info.beforeContentPadding + first.offset - firstStart * s * density
-                clipRect(top = -size.height, bottom = size.height * 2) {
-                    translate(left = origin) {
-                        scale(density * s, pivot = Offset.Zero) {
-                            for (drawing in drawings) drawPath(drawing.path, drawing.color, style = drawing.style)
-                        }
-                    }
+            // Clipped at the row's sides only, as the walking animal is.
+            .drawWithContent { clipRect(top = -size.height, bottom = size.height * 2) { this@drawWithContent.drawContent() } },
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                // The row's place is read here, so a scroll only moves this layer: the arcs are not drawn again, and
+                // neither is the stage under them.
+                .graphicsLayer {
+                    val info = listState.layoutInfo
+                    val first = info.visibleItemsInfo.firstOrNull()
+                    val firstStart = first?.let { starts.getOrNull(it.index) }
+                    alpha = if (firstStart == null) 0f else 1f
+                    // The first item shown is the reference, as for the walking animal.
+                    if (first != null && firstStart != null) translationX = info.beforeContentPadding + first.offset - firstStart * s * density
                 }
-            },
-    )
+                .drawBehind {
+                    scale(density * s, pivot = Offset.Zero) {
+                        for (drawing in drawings) drawPath(drawing.path, drawing.color, style = drawing.style)
+                    }
+                },
+        )
+    }
 }
 
 /** The y of a note's head on the staff. */
@@ -598,19 +602,11 @@ private fun waitingArc(place: StepPlace, note: TuneNote, ink: Color, muted: Colo
 
 /** Where [animal] stands along the row, in dp at rest from its first mark ([starts]); null when its step is not on the line. */
 internal fun animalX(animal: StaffAnimal, tune: List<TuneItem>, lineMarks: List<LineMark>, starts: List<Float>): Float? {
-    var step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == animal.index }
-    if (step < 0) return null
-    var halfBeat = animal.halfBeat
+    if (tune.getOrNull(animal.index) == null) return null
     // Listen to me walks a tie (or an octave slur) as one note: past its first note the animal goes on onto the next.
-    while (true) {
-        val index = (lineMarks[step] as LineMark.Step).index
-        val length = tune[index].length?.halfBeats ?: 0
-        if (halfBeat < length || !Joins.heardWithBefore(tune, index + 1)) break
-        val next = lineMarks.indexOfFirst { it is LineMark.Step && it.index == index + 1 }
-        if (next < 0) break
-        halfBeat -= length
-        step = next
-    }
+    val (index, halfBeat) = Joins.placeOf(tune, animal.index, animal.halfBeat)
+    val step = lineMarks.indexOfFirst { it is LineMark.Step && it.index == index }
+    if (step < 0) return null
     val mark = lineMarks[step] as LineMark.Step
     return starts[step] + StaffGeometry.signRoom(mark) + StaffGeometry.beatX(mark.parts, halfBeat)
 }

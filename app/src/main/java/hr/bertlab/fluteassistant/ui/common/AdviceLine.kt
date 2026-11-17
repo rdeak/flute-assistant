@@ -35,7 +35,7 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
  * With [wrap] it is a small block for the narrow column of a phone on its side: up to four lines at
  * [wrapMaxFont] (19 sp), with no height of its own. A large text size shrinks it, as a fifth line
  * would lose the end of the advice; a caller that gives it a height of its own makes it shrink to
- * that too. It never shrinks below [WrapMinFont], a size in dp and not sp: at the largest text size
+ * that too. It never shrinks below [WordFloor], a size in dp and not sp: at the largest text size
  * a floor in sp is twice as big, and Croatian's longest word would not fit the 100 dp column at it.
  * Nor does it grow to a size where a word is wider than the line and would be split inside it, as
  * four lines are room enough to split one: the longest word is measured and caps the size.
@@ -67,7 +67,7 @@ fun AdviceLine(
     // The line height follows the size autoSize picks (the style's 28 over 22 at the normal size, so that
     // size looks as before); in sp it stayed 28 sp, 42 dp at 1.5x, and no advice fitted the 28 dp box
     // at a large text size. The floor is in dp for the same reason as the wrapped block's.
-    val floor = with(LocalDensity.current) { OneLineMinFont.toSp() }
+    val floor = WordFloor.asTextSize() // the one line was 14 sp once, which is 21 dp at 1.5x
     Text(
         text = text,
         style = style.copy(lineHeight = OneLineHeight),
@@ -98,7 +98,7 @@ private fun WrappedAdvice(text: AnnotatedString, style: TextStyle, maxFont: Text
         // A word's width grows with the size, so the size it fills the line at follows from the one measured.
         val wordFits = if (widestWord == 0) maxFont else with(density) { (constraints.maxWidth * REFERENCE_PX / widestWord * WORD_ROOM).toSp() }
         val largest = smaller(maxFont, wordFits)
-        val smallest = smaller(with(density) { WrapMinFont.toSp() }, largest)
+        val smallest = smaller(WordFloor.asTextSize(), largest)
         Text(
             text = text,
             style = style,
@@ -113,12 +113,6 @@ private fun WrappedAdvice(text: AnnotatedString, style: TextStyle, maxFont: Text
 
 /** The lesser of two sizes, which are not [Comparable] but compare. */
 private fun smaller(a: TextUnit, b: TextUnit): TextUnit = if (a < b) a else b
-
-/** The smallest the wrapped advice gets, whatever the text size: what 12 sp is at the normal one. */
-private val WrapMinFont = 12.dp
-
-/** The smallest the one-line advice gets, whatever the text size (it was 14 sp, which is 21 dp at 1.5x). */
-private val OneLineMinFont = 12.dp
 
 /** The one-line advice's line height relative to its size: bodyLarge's 28 sp over its 22 sp. */
 private val OneLineHeight = (28f / 22f).em

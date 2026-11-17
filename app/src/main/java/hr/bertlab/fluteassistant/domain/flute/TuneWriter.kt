@@ -78,9 +78,21 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     /**
      * What a press did: [ended] is the key that was held until it; [rejoinGapMs] says the press
      * went on with the key let go of that long ago (null: a new note or rest); [elapsedMs] is how
-     * far into its hold the key now is, which is where its growing goes on from.
+     * far into its hold the key now is, which is where its growing goes on from; [dropped] is the
+     * waiting join the rest key dropped (a note key spends a join and a sign, it drops neither).
      */
-    data class Press(val ended: Ended?, val rejoinGapMs: Long?, val elapsedMs: Long)
+    data class Press(val ended: Ended?, val rejoinGapMs: Long?, val elapsedMs: Long, val dropped: Dropped = Dropped())
+
+    /** What waited for the next note key and was dropped unused: a [join], a [sign]. */
+    data class Dropped(val join: Boolean = false, val sign: Boolean = false) {
+        val any: Boolean get() = join || sign
+    }
+
+    /** What a tap of the breath key did: whether a breath was [added], and the waiting join it [dropped] (a sign stays). */
+    data class Breath(val added: Boolean, val dropped: Dropped)
+
+    /** What a tap of the erase key did: it [dropped] what waited and erased nothing, or it [erased] the last step (false: refused). */
+    data class Erase(val dropped: Dropped, val erased: Boolean)
 
     /** The key the finger let go of last, while a press of it may still go on with its hold. */
     private data class LetGo(val key: Held, val pressedAt: Long, val at: Long, val length: NoteLength)
@@ -114,6 +126,7 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
         val joined = joinWaiting && midi != null
         // The rest key cancels a waiting join (a slur does not run over a rest); a note key spends it on the note it adds,
         // and a key that bounces (the same hold going on, below) keeps it for the next note.
+        val dropped = Dropped(join = joinWaiting && midi == null)
         if (midi == null || again == null) joinWaiting = false
         if (midi != null && again == null) signWaiting = false
         if (again == null) {
@@ -121,7 +134,7 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
             val atCap = tune.size >= Tune.MAX_NOTES
             held = Held(midi, index = tune.size.takeUnless { atCap }, key = key)
             if (!atCap) tune = tune + if (midi == null) TuneRest(NoteLength.EIGHTH) else TuneNote(midi, NoteLength.EIGHTH, joined)
-            return Press(ended, rejoinGapMs = null, elapsedMs = 0)
+            return Press(ended, rejoinGapMs = null, elapsedMs = 0, dropped)
         }
         // A touch screen can report one hold as several (its palm rejection cancelling a flat finger
         // and starting it over, or a bounce): within the window the gap counts as held. Longer ago
@@ -131,7 +144,7 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
         pressedAt = now - elapsed
         held = again.key
         grow(Tune.lengthOf(elapsed, WRITING_PULSE))
-        return Press(ended, rejoinGapMs = gap, elapsedMs = elapsed)
+        return Press(ended, rejoinGapMs = gap, elapsedMs = elapsed, dropped)
     }
 
     /** The held key's note or rest reached [length]; nothing changes at the cap, where it was not added. */
@@ -195,28 +208,35 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     /** Drops a waiting sign; says whether one waited. */
     fun cancelSign(): Boolean = signWaiting.also { signWaiting = false }
 
-    /** Marks a breath, unless the tune is at the cap or its last step is one already; says whether it was added. */
-    fun breath(): Boolean {
-        joinWaiting = false // a breath in the middle of a slur would contradict it
+    /**
+     * Marks a breath, unless the tune is at the cap or its last step is one already, and drops a waiting join (a breath
+     * in the middle of a slur would contradict it); a waiting sign stays for the next note key.
+     */
+    fun breath(): Breath {
+        val dropped = Dropped(join = cancelJoin())
         letGo = null
-        if (tune.size >= Tune.MAX_NOTES || tune.lastOrNull() == TuneBreath) return false
-        tune = tune + TuneBreath
-        return true
+        val added = tune.size < Tune.MAX_NOTES && tune.lastOrNull() != TuneBreath
+        if (added) tune = tune + TuneBreath
+        return Breath(added, dropped)
     }
 
     /**
-     * Drops the last step; refused (false) while a key is held or the tune is empty. A waiting join or sign goes first:
-     * both dropped, nothing erased (true).
+     * Drops the last step; refused while a key is held or the tune is empty. A waiting join or sign goes first: both
+     * dropped, nothing erased.
      */
-    fun erase(): Boolean {
-        val join = cancelJoin()
-        val sign = cancelSign()
-        if (join || sign) return true
-        if (held != null || tune.isEmpty()) return false
+    fun erase(): Erase {
+        val dropped = dropWaiting()
+        if (dropped.any || held != null || tune.isEmpty()) return Erase(dropped, erased = false)
         tune = tune.dropLast(1)
         letGo = null // the step let go of last may be the one erased
-        return true
+        return Erase(dropped, erased = true)
     }
+
+    /**
+     * Drops a waiting join and a waiting sign, for what takes the tab from the keys (Play, Listen to me, the book, the
+     * speed panel, leaving the tab); says what waited.
+     */
+    fun dropWaiting(): Dropped = Dropped(join = cancelJoin(), sign = cancelSign())
 
     /** Another book's [tune] takes this one's place. */
     fun open(tune: List<TuneItem>) {

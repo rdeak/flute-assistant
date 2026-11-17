@@ -59,6 +59,7 @@ import hr.bertlab.fluteassistant.domain.tuner.Accidental
 import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.fadedUnless
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -513,8 +514,8 @@ private fun FluteKey(
         if (face != null && face != midi) {
             // A signed name is longer ("gis¹", "C♯⁴"): it shrinks to fit on one line, as the black keys' names did (the
             // final review of 2026-11-17: a fixed size was cut at the largest text). The floor is in dp, as one in sp
-            // doubles at the largest text and was still too wide there (the pill pair's `PillWordFloor` does the same).
-            val floor = with(LocalDensity.current) { SignedNameFloor.toSp() }
+            // doubles at the largest text and was still too wide there (`asTextSize`; less than `WordFloor`, for a key's room).
+            val floor = SignedNameFloor.asTextSize()
             Text(
                 noteText(face),
                 style = MaterialTheme.typography.titleLarge,

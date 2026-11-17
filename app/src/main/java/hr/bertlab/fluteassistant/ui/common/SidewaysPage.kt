@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -124,7 +123,7 @@ fun SidewaysPlainButton(
     height: Dp = 84.dp,
 ) {
     val big = height >= 92.dp
-    val wordFloor = with(LocalDensity.current) { 12.dp.toSp() }
+    val wordFloor = WordFloor.asTextSize()
     ChunkyButton(
         onClick = onClick,
         shape = RoundedCornerShape(30.dp),

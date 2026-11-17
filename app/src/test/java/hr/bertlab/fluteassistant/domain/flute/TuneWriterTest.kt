@@ -128,25 +128,25 @@ class TuneWriterTest {
         full.grow(WHOLE)
         assertEquals(TuneWriter.Ended(62, heldMs = 300, length = QUARTER, added = false), full.release(300))
         assertEquals(Tune.MAX_NOTES, full.tune.size)
-        assertFalse(full.breath())
+        assertFalse(full.breath().added)
     }
 
     @Test
     fun `a breath is never added twice in a row`() {
         tap(60, at = 0, heldMs = 100)
-        assertTrue(writer.breath())
-        assertFalse(writer.breath())
+        assertTrue(writer.breath().added)
+        assertFalse(writer.breath().added)
         assertEquals(listOf(TuneNote(60, EIGHTH), TuneBreath), writer.tune)
     }
 
     @Test
     fun `erase drops the last step, but not while a key is held or from an empty tune`() {
-        assertFalse(writer.erase())
+        assertFalse(writer.erase().erased)
         tap(60, at = 0, heldMs = 100)
         writer.press(62, 1_000)
-        assertFalse(writer.erase())
+        assertFalse(writer.erase().erased)
         writer.release(1_100)
-        assertTrue(writer.erase())
+        assertTrue(writer.erase().erased)
         assertEquals(listOf(TuneNote(60, EIGHTH)), writer.tune)
     }
 
@@ -178,9 +178,11 @@ class TuneWriterTest {
     fun `the rest key cancels a waiting join`() {
         tap(60, at = 0, heldMs = 300)
         writer.join()
-        tap(null, at = 1000, heldMs = 300)
+        assertEquals("the press says it dropped the join", TuneWriter.Dropped(join = true), writer.press(null, 1000)!!.dropped)
+        writer.release(1300)
         assertFalse(writer.joinWaiting)
-        tap(62, at = 2000, heldMs = 300)
+        assertEquals("a note key spends a join, it drops nothing", TuneWriter.Dropped(), writer.press(62, 2000)!!.dropped)
+        writer.release(2300)
         assertFalse((writer.tune[2] as TuneNote).joined)
     }
 
@@ -188,7 +190,7 @@ class TuneWriterTest {
     fun `the breath cancels a waiting join`() {
         tap(60, at = 0, heldMs = 300)
         writer.join()
-        writer.breath()
+        assertEquals("the breath says it dropped the join", TuneWriter.Dropped(join = true), writer.breath().dropped)
         assertFalse(writer.joinWaiting)
     }
 
@@ -196,10 +198,10 @@ class TuneWriterTest {
     fun `erase while a join waits cancels the join and erases nothing, the next erase erases`() {
         tap(60, at = 0, heldMs = 300)
         writer.join()
-        assertTrue(writer.erase())
+        assertEquals(TuneWriter.Erase(TuneWriter.Dropped(join = true), erased = false), writer.erase())
         assertEquals(1, writer.tune.size)
         assertFalse(writer.joinWaiting)
-        assertTrue(writer.erase())
+        assertEquals(TuneWriter.Erase(TuneWriter.Dropped(), erased = true), writer.erase())
         assertTrue(writer.tune.isEmpty())
     }
 
@@ -313,11 +315,11 @@ class TuneWriterTest {
         tap(60, at = 0, heldMs = 300)
         writer.join()
         writer.sign()
-        assertTrue(writer.erase())
+        assertEquals(TuneWriter.Erase(TuneWriter.Dropped(join = true, sign = true), erased = false), writer.erase())
         assertEquals(1, writer.tune.size)
         assertFalse(writer.joinWaiting)
         assertFalse(writer.signWaiting)
-        assertTrue(writer.erase())
+        assertTrue(writer.erase().erased)
         assertTrue(writer.tune.isEmpty())
     }
 
@@ -325,7 +327,7 @@ class TuneWriterTest {
     fun `erase drops a waiting sign alone and erases nothing`() {
         tap(60, at = 0, heldMs = 300)
         writer.sign()
-        assertTrue(writer.erase())
+        assertEquals(TuneWriter.Erase(TuneWriter.Dropped(sign = true), erased = false), writer.erase())
         assertEquals(1, writer.tune.size)
         assertFalse(writer.signWaiting)
     }

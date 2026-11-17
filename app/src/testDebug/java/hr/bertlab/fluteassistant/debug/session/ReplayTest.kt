@@ -63,7 +63,7 @@ class ReplayTest {
     ): File {
         val run = ListenPath.run(samples, rate, tune, pulse, rules, run = run)
         val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, pulse, floor = null)
+        r.start(ListenRun.Setup(tune, pulse))
         r.opened(rate, "MIC")
         for (step in run.steps) {
             r.samples(samples.copyOfRange((step.frame - 1) * hop, step.frame * hop), hop)
@@ -299,7 +299,7 @@ class ReplayTest {
     @Test
     fun `the rows are timed at the rate the session was recorded at`() {
         val r = FileSessionRecorder(folder.root, FileSessionRecorder.Facts("1.0.2", 1, "JVM", 0), FakeLogger()) { 0L }
-        r.start(tune, Pulse(90), floor = null)
+        r.start(ListenRun.Setup(tune, Pulse(90)))
         r.opened(44_100, "MIC")
         r.samples(FloatArray(hop), hop)
         r.frame(ListenFrame(PitchFrame(null, 0.0, 0f), FrameDecision.SILENT, null, null, null, null, 0, 71, null, TunerAdvice.NONE, false, false, Hearing.CLEAR))
