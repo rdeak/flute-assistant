@@ -7,7 +7,7 @@ import type { Strings } from './types';
 // from the current app, tools/play-screenshots.sh): when a tab changes, both change together.
 export const en: Strings = {
   meta: {
-    title: 'Flute Assistant – flute tuner, metronome and notes for kids',
+    title: 'Flute Assistant: flute tuner, metronome and notes for kids',
     description:
       'A free Android app for children learning the flute: a digital flute, a metronome with animals, a flute tuner, a note reading game and a flute fingering chart. No ads, works offline.',
     ogImageAlt:
@@ -99,7 +99,7 @@ export const en: Strings = {
     title: 'For parents: safe, simple and free',
     lead: 'Flute Assistant is made for children, so we left out the things parents worry about.',
     items: [
-      { icon: '🎁', title: 'Free, really', text: 'No price, no in-app purchases and no subscription.' },
+      { icon: '🎁', title: 'Free', text: 'No in-app purchases and no subscription.' },
       { icon: '🚫', title: 'No ads', text: 'Nothing to tap by mistake and no links out of the app.' },
       { icon: '🙂', title: 'No account', text: 'No sign-up and no password. Open it and play.' },
       {
@@ -176,7 +176,7 @@ export const en: Strings = {
       'The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License.',
   },
   privacy: {
-    title: 'Privacy policy – Flute Assistant',
+    title: 'Flute Assistant privacy policy',
     description:
       'How Flute Assistant and this website handle data: the app collects nothing, and nothing leaves your device.',
     back: 'Back to Flute Assistant',

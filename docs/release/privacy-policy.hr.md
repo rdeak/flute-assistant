@@ -1,10 +1,10 @@
 # Pravila privatnosti za Flute Assistant
 
-Posljednja izmjena: 11. studenoga 2026.
+Posljednja izmjena: 18. studenoga 2026.
 
-Flute Assistant („aplikacija“) je metronom, štimer, igra čitanja nota i digitalna flauta za
-Android, napravljena za djecu koja uče svirati flautu, a objavljuje je bertlab. Ova pravila
-objašnjavaju što aplikacija radi s podacima na vašem uređaju.
+Flute Assistant („aplikacija“) je metronom, štimer, igra čitanja nota, digitalna flauta i
+tablica hvatova za Android, napravljena za djecu koja uče svirati flautu, a objavljuje je
+bertlab. Ova pravila objašnjavaju što aplikacija radi s podacima na vašem uređaju.
 
 Ovo je prijevod. Mjerodavna je [engleska verzija](/privacy/).
 
@@ -22,17 +22,20 @@ Zvuk se analizira u stvarnom vremenu, samo u memoriji uređaja. Nikad se ne snim
 sluša nakon što ste pritisnuli „Poslušaj me“, i samo dok je aplikacija na ekranu. Android traži
 dopuštenje kad ga jedna od njih prvi put zatreba, a možete ga u svakom trenutku povući u
 postavkama Androida. Metronom i igra čitanja nota ne koriste mikrofon; oni samo puštaju zvuk.
+Tablica hvatova ne pušta zvuk i ne sluša.
 
 ## Podaci spremljeni na uređaju
 
 Vaše se postavke spremaju lokalno, u privatnu pohranu aplikacije, da budu tu i sljedeći put kad
-otvorite aplikaciju: tempo metronoma i broj doba u taktu, način rada štimera i nota koju ste
-odabrali za ugađanje, note koje ste odabrali za vježbu u igri čitanja, treba li pronađena nota
-zazvučati te pjesmice u šest knjižica digitalne flaute, svaka sa svojim tempom i brojem doba u
-taktu. Zvjezdice koje daje „Poslušaj me“ ne spremaju se. Ništa od toga ne otkriva tko ste i nikad
-ne napušta uređaj. Deinstalacijom aplikacije sve se briše. Ako koristite sigurnosnu kopiju
-uređaja na Androidu, ti podaci mogu biti uključeni u vašu vlastitu sigurnosnu kopiju kojom
-upravlja Google ili proizvođač uređaja, prema njihovim uvjetima.
+otvorite aplikaciju: tempo metronoma i broj doba u taktu; način rada štimera i nota koju ste
+odabrali za ugađanje; u igri čitanja note koje ste odabrali za vježbu, koja je od njezine dvije igre
+otvorena, treba li pronađena nota zazvučati i koliko dobro znate svaku notu; pjesmice u šest
+knjižica digitalne flaute, svaka sa svojim tempom i brojem doba u taktu, i koja je knjižica
+otvorena; dnevni ili noćni izgled te jezik koji ste odabrali. Zvjezdice koje daje „Poslušaj me“ ne
+spremaju se. Ništa od toga ne otkriva tko ste i nikad ne napušta uređaj. Deinstalacijom aplikacije
+sve se briše. Ako koristite sigurnosnu kopiju uređaja na Androidu, ti podaci mogu biti uključeni u
+vašu vlastitu sigurnosnu kopiju kojom upravlja Google ili proizvođač uređaja, prema njihovim
+uvjetima.
 
 ## Obavijesti
 

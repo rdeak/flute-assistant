@@ -7,7 +7,7 @@ import type { Strings } from './types';
 // parent or teacher decides is said to them (vi: "Preuzmite"). Quotation marks „…“.
 export const hr: Strings = {
   meta: {
-    title: 'Flute Assistant – štimer, metronom i note za male flautiste',
+    title: 'Flute Assistant: štimer, metronom i note za male flautiste',
     description:
       'Besplatna Android aplikacija za djecu koja uče flautu: digitalna flauta, metronom sa životinjama, štimer, igra čitanja nota i hvatovi za flautu. Bez oglasa, radi bez interneta.',
     ogImageAlt: 'Flute Assistant: Android robot svira flautu.',
@@ -96,7 +96,7 @@ export const hr: Strings = {
     title: 'Za roditelje: sigurno, jednostavno i besplatno',
     lead: 'Flute Assistant je napravljen za djecu, pa smo izostavili sve zbog čega bi se roditelji brinuli.',
     items: [
-      { icon: '🎁', title: 'Stvarno besplatno', text: 'Bez cijene, bez kupnje unutar aplikacije i bez pretplate.' },
+      { icon: '🎁', title: 'Besplatno', text: 'Bez kupnje unutar aplikacije i bez pretplate.' },
       { icon: '🚫', title: 'Bez oglasa', text: 'Ništa za slučajno dodirnuti i nema poveznica izvan aplikacije.' },
       { icon: '🙂', title: 'Bez računa', text: 'Nema registracije ni lozinke. Dijete otvori aplikaciju i odmah svira.' },
       {
@@ -173,7 +173,7 @@ export const hr: Strings = {
       'Android robot preuzet je ili izmijenjen iz djela koje je stvorio i podijelio Google te se koristi u skladu s uvjetima licencije Creative Commons 3.0 Attribution.',
   },
   privacy: {
-    title: 'Pravila privatnosti – Flute Assistant',
+    title: 'Pravila privatnosti za Flute Assistant',
     description:
       'Kako Flute Assistant i ova stranica postupaju s podacima: aplikacija ništa ne prikuplja i ništa ne napušta vaš uređaj.',
     back: 'Natrag na Flute Assistant',

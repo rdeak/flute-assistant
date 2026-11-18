@@ -1,10 +1,10 @@
 # Privacy Policy for Flute Assistant
 
-Last updated: 11 November 2026
+Last updated: 18 November 2026
 
-Flute Assistant (the "app") is a metronome, tuner, note reading game and digital flute for
-Android made for children learning the flute, published by bertlab. This policy explains what
-the app does with information on your device.
+Flute Assistant (the "app") is a metronome, tuner, note reading game, digital flute and
+fingering chart for Android made for children learning the flute, published by bertlab. This
+policy explains what the app does with information on your device.
 
 ## Summary
 
@@ -20,17 +20,20 @@ recorded, saved to storage, or sent anywhere. The microphone is active only whil
 is open, or while the digital flute is listening after you pressed "Listen to me", and only
 while the app is on screen. Android asks for the permission the first time one of them needs
 it, and you can revoke it at any time in Android Settings. The metronome and the note reading
-game do not use the microphone; they only play sound.
+game do not use the microphone; they only play sound. The fingering
+chart neither plays nor listens.
 
 ## Data stored on your device
 
-Your settings are stored locally in the app's private storage so they are there the next time
-you open the app: the metronome tempo and beats in a bar, the tuner mode and the note you chose
-to tune to, the notes you chose to practise in the reading game, whether a found note is played,
-and the tunes in the digital flute's six books, each with its tempo and beats in a bar. The stars
-"Listen to me" gives are not saved. None of this identifies you and it never leaves
-the device. Uninstalling the app deletes it. If you use Android's device backup, this data may
-be included in your own backup managed by Google or your device maker, under their terms.
+Your settings are stored locally in the app's private storage so they are there the next time you
+open the app: the metronome's tempo and beats in a bar; the tuner's mode and the note you chose to
+tune to; in the reading game, the notes you chose to practise, which of its two games is open,
+whether a found note is played and how well you know each note; the tunes in the digital flute's six
+books, each with its tempo and beats in a bar, and which book is open; the day or night look; and
+the language you picked. The stars "Listen to me" gives are not saved. None of this identifies you
+and it never leaves the device. Uninstalling the app deletes it. If you use Android's device backup,
+this data may be included in your own backup managed by Google or your device maker, under their
+terms.
 
 ## Notifications
 
