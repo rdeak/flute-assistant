@@ -11,7 +11,7 @@ export const en: Strings = {
     description:
       'A free Android app for children learning the flute: a digital flute, a metronome with animals, a flute tuner, a note reading game and a flute fingering chart. No ads, works offline.',
     ogImageAlt:
-      'Flute Assistant: the Android robot playing the flute, with the words Flute, metronome, tuner and notes.',
+      'Flute Assistant: the Android robot playing the flute, with the words Flute, metronome, tuner, notes and fingers.',
   },
   skipLink: 'Skip to content',
   languageMenu: 'Language',
