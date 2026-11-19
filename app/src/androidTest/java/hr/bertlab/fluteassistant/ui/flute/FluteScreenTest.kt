@@ -39,6 +39,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -99,6 +100,7 @@ class FluteScreenTest {
     private val activated = mutableListOf<Int>()
     private var playToggles = 0
     private var signs = 0
+    private val octaves = mutableListOf<Int>()
     private var erases = 0
     private val restEvents = mutableListOf<String>()
     private var breaths = 0
@@ -148,6 +150,7 @@ class FluteScreenTest {
                             onBreath = { breaths++ },
                             onJoin = { joins++ },
                             onSign = { signs++ },
+                            onOctave = { octaves += it },
                             onTogglePlayback = { playToggles++ },
                             onEraseLast = { erases++ },
                             onBpmChange = { bpm ->
@@ -179,18 +182,12 @@ class FluteScreenTest {
     }
 
     @Test
-    fun shows_the_keys_in_octave_rows_highest_on_top_with_a_hint_before_the_first_tap() {
+    fun shows_the_letter_keys_with_a_hint_before_the_first_tap() {
         show(FluteUiState())
         compose.onNodeWithText("👆 Tap or hold a note").assertIsDisplayed()
         compose.onNodeWithContentDescription("Flute keys").assertExists()
         val c4 = compose.onNodeWithContentDescription("C4").getBoundsInRoot()
-        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
-        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
         val d4 = compose.onNodeWithContentDescription("D4").getBoundsInRoot()
-        assertTrue("C6 $c6 should sit above C5 $c5", c6.bottom <= c5.top)
-        assertTrue("C5 $c5 should sit above C4 $c4", c5.bottom <= c4.top)
-        assertTrue("the octave rows should share a left edge: $c4 $c5 $c6", abs((c4.left - c5.left).value) <= 1f)
-        assertTrue("the octave rows should share a left edge: $c4 $c5 $c6", abs((c5.left - c6.left).value) <= 1f)
         assertTrue("D4 $d4 should be right of C4 $c4", d4.left >= c4.right)
         // 58 dp, as on the canvas; the layout rounds it to whole pixels (152 px, 57.9 dp, on a 2.625 screen).
         assertTrue("a key should be 58 dp tall, was ${c4.height}", abs((c4.height - 58.dp).value) <= 0.5f)
@@ -200,10 +197,10 @@ class FluteScreenTest {
     fun pressing_a_key_reports_press_and_release_separately() {
         show(FluteUiState())
         compose.onNodeWithContentDescription("G4").performTouchInput { down(center) }
-        assertEquals(listOf(67), pressed)
+        assertEquals(listOf(4), pressed)
         assertTrue(released.isEmpty())
         compose.onNodeWithContentDescription("G4").performTouchInput { up() }
-        assertEquals(listOf(67), released)
+        assertEquals(listOf(4), released)
     }
 
     @Test
@@ -213,8 +210,8 @@ class FluteScreenTest {
         show(FluteUiState())
         compose.onNodeWithContentDescription("G4").performTouchInput { down(center) }
         compose.onNodeWithContentDescription("G4").performTouchInput { cancel() }
-        assertEquals(listOf(67), pressed)
-        assertEquals(listOf(67), released)
+        assertEquals(listOf(4), pressed)
+        assertEquals(listOf(4), released)
         compose.onNodeWithContentDescription("Rest").performTouchInput { down(center) }
         compose.onNodeWithContentDescription("Rest").performTouchInput { cancel() }
         assertEquals(listOf("press", "release"), restEvents)
@@ -378,31 +375,6 @@ class FluteScreenTest {
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
         state.value = FluteUiState()
         assertEquals(before, compose.onNodeWithContentDescription("C4").getBoundsInRoot())
-    }
-
-    @Test
-    fun the_rest_breath_and_erase_keys_stand_one_key_wide_at_the_top_row_end() {
-        show(FluteUiState())
-        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
-        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
-        val g5 = compose.onNodeWithContentDescription("G5").getBoundsInRoot()
-        val b5 = compose.onNodeWithContentDescription("B5").getBoundsInRoot()
-        val breath = compose.onNodeWithContentDescription("Breathe").getBoundsInRoot()
-        val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
-        val erase = compose.onNodeWithContentDescription("Erase the last note").getBoundsInRoot()
-        for (key in listOf(breath, rest, erase)) {
-            assertTrue("$key should sit in C6's row $c6", abs((key.top - c6.top).value) <= 1f && abs((key.bottom - c6.bottom).value) <= 1f)
-            assertTrue("$key should be one key wide, C5 is $c5", abs((key.width - c5.width).value) <= 1f)
-        }
-        assertTrue(
-            "C6 $c6, then Rest $rest, Breathe $breath and the sponge $erase, in that order",
-            c6.right < rest.left && rest.right < breath.left && breath.right < erase.left,
-        )
-        // The three stand apart from c3 by more than a key: a tool, not a note.
-        assertTrue("Rest $rest should stand clear of C6 $c6 by more than a key", rest.left - c6.right > c5.width)
-        assertTrue("Rest $rest should start where G5 $g5 does", abs((rest.left - g5.left).value) <= 1f)
-        assertTrue("the sponge $erase should end where B5 $b5 does", abs((erase.right - b5.right).value) <= 1f)
-        assertTrue("C6 $c6 should be as wide as C5 $c5", abs((c6.width - c5.width).value) <= 1f)
     }
 
     @Test
@@ -952,9 +924,11 @@ class FluteScreenTest {
 
     @Test
     fun the_staff_grows_while_the_tune_runs() {
-        show(FluteUiState(tune = twoNotes))
+        show(FluteUiState(tune = twoNotes), height = 653.dp)
         val rest = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
-        assertTrue("at rest the staff is ${rest.height}, expected $TuneStaffHeight", abs((rest.height - TuneStaffHeight).value) <= 1f)
+        // On a tab of 653 dp (a Galaxy A55) the staff's box is the released 257 and the 35 the tab has to spare.
+        val box = TuneStaffHeight + 35.dp
+        assertTrue("at rest the staff is ${rest.height}, expected $box", abs((rest.height - box).value) <= 1f)
         state.value = state.value.copy(listening = Listening(index = 0))
         val running = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
         val expected = tuneStaffHeight(RunningStaffScale)
@@ -963,7 +937,7 @@ class FluteScreenTest {
 
     /**
      * What a Galaxy A55 with three navigation buttons leaves the tab, about 652 dp (2026-11-10): the
-     * stage, the keys and the Play row need 642 of it. The height check counted 664, so that phone
+     * stage, the keys and the Play row needed 642 of it (610 since 2026-11-18). The height check counted 664, so that phone
      * was laid out as one too short: its spare height lay under the Play row instead of round the
      * keys, and Stop stood 100 dp over Play's place.
      */
@@ -971,7 +945,8 @@ class FluteScreenTest {
     fun a_phone_that_only_just_holds_the_tab_is_laid_out_like_a_taller_one() {
         show(FluteUiState(tune = twoNotes), height = 652.dp)
         val keys = compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot()
-        val expected = FluteKeysMinHeight + 10.dp
+        // Since 2026-11-18 what the tab has over its least (618) goes to the staff's box first, up to 63 dp: 34 here.
+        val expected = FluteKeysMinHeight
         assertTrue("the keys' room should take the spare height: ${keys.height}, expected $expected", abs((keys.height - expected).value) <= 1f)
         val play = compose.onNodeWithText("Play").getBoundsInRoot()
         state.value = state.value.copy(listening = Listening(index = 0))
@@ -1315,11 +1290,13 @@ class FluteScreenTest {
         // The first head stands NOTES_START - NOTES_CLIP + HEAD_X into the row, a beat (29 dp) apart; c¹ at 165, d¹ at 156.
         val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
         val beat = StaffGeometry.BEAT_WIDTH
-        assertTrue("a slur under c and d", inkIn(row, first + 6, first + beat - 6, 171f, 186f) > 0)
-        assertEquals("nothing under d and e, not joined", 0, inkIn(row, first + beat + 6, first + 2 * beat - 6, 162f, 180f))
+        // Since 2026-11-18 the staff's box has what the screen spares over it, up to 63 dp, and the staff stands that much lower.
+        val room = roomOf(row)
+        assertTrue("a slur under c and d", inkIn(row, first + 6, first + beat - 6, 171f + room, 186f + room) > 0)
+        assertEquals("nothing under d and e, not joined", 0, inkIn(row, first + beat + 6, first + 2 * beat - 6, 162f + room, 180f + room))
         state.value = state.value.copy(joinWaiting = true)
         val waiting = compose.onNodeWithContentDescription("Your tune, 3 notes").captureToImage().toPixelMap()
-        assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 6, first + 2 * beat + 26, 152f, 168f) > 0)
+        assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 6, first + 2 * beat + 26, 152f + room, 168f + room) > 0)
     }
 
     @Test
@@ -1337,28 +1314,16 @@ class FluteScreenTest {
         val f = (compose.onNodeWithContentDescription("F4, 1 beat, joined to the note before").getBoundsInRoot().left - rowLeft).value
         val unscrolled = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + 12 * StaffGeometry.BEAT_WIDTH + 3 * StaffGeometry.BAR_SLOT
         assertTrue("the staff must have scrolled for this to test anything: e stands $e dp into the row", e < unscrolled - 1f)
-        // e¹ at 147 and f¹ at 138: the slur hangs under both heads, below the staff's bottom line and over the names.
+        // e¹ at 147 and f¹ at 138: the slur hangs under both heads, below the staff's bottom line and over the names;
+        // all of it lower by the room the box has over the staff (the final review of 2026-11-18: with the room left out
+        // the window held a staff line, and the test could not fail).
         val row = rowNode.captureToImage().toPixelMap()
-        val ink = inkIn(row, e + StaffGeometry.HEAD_X + 8, f + StaffGeometry.HEAD_X - 8, 155f, 172f)
+        val room = roomOf(row)
+        val ink = inkIn(row, e + StaffGeometry.HEAD_X + 8, f + StaffGeometry.HEAD_X - 8, 155f + room, 172f + room)
         assertTrue("the slur under e and f, where they stand now", ink > 0)
     }
 
     // ---- The ⌒ key (2026-11-16): left of 💤, faded with nothing to join, down while a join waits ----
-
-    @Test
-    fun the_join_key_stands_left_of_the_rest_key() {
-        show(FluteUiState())
-        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
-        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
-        val f5 = compose.onNodeWithContentDescription("F5").getBoundsInRoot()
-        val join = compose.onNodeWithContentDescription("Join to the next note").getBoundsInRoot()
-        val rest = compose.onNodeWithContentDescription("Rest").getBoundsInRoot()
-        assertTrue("$join should sit in C6's row $c6", abs((join.top - c6.top).value) <= 1f && abs((join.bottom - c6.bottom).value) <= 1f)
-        assertTrue("$join should be one key wide", abs((join.width - c5.width).value) <= 1f)
-        assertTrue("$join should stand over F5 $f5", abs((join.left - f5.left).value) <= 1f)
-        assertTrue("$join should come just before Rest $rest", join.right < rest.left && rest.left - join.right < c5.width / 2)
-        assertTrue("two columns between C6 and ⌒: the ♯♭ key and an empty one", join.left - c6.right > c5.width * 2)
-    }
 
     @Test
     fun the_join_key_is_faded_with_nothing_to_join_and_selected_while_a_join_waits() {
@@ -1390,37 +1355,22 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Spoji sa sljedećom notom").assertExists()
     }
 
-    // ---- The ♯♭ key (2026-11-17): beside C6, the next note its letter's sharp or flat ----
+    // ---- The ♯♭ key (2026-11-17; first in the tools' row since 2026-11-18): the next note its letter's sharp or flat ----
 
     private val signKey = "Sharp or flat for the next note"
 
     @Test
-    fun the_sign_key_stands_beside_c6_with_one_empty_column_before_the_tools() {
-        show(FluteUiState())
-        val c6 = compose.onNodeWithContentDescription("C6").getBoundsInRoot()
-        val c5 = compose.onNodeWithContentDescription("C5").getBoundsInRoot()
-        val d5 = compose.onNodeWithContentDescription("D5").getBoundsInRoot()
-        val f5 = compose.onNodeWithContentDescription("F5").getBoundsInRoot()
-        val sign = compose.onNodeWithContentDescription(signKey).getBoundsInRoot()
-        val join = compose.onNodeWithContentDescription("Join to the next note").getBoundsInRoot()
-        assertTrue("$sign should sit in C6's row $c6", abs((sign.top - c6.top).value) <= 1f && abs((sign.bottom - c6.bottom).value) <= 1f)
-        assertTrue("$sign should be one key wide", abs((sign.width - c5.width).value) <= 1f)
-        assertTrue("$sign should stand over D5 $d5", abs((sign.left - d5.left).value) <= 1f)
-        assertTrue("⌒ $join should still stand over F5 $f5", abs((join.left - f5.left).value) <= 1f)
-        assertTrue("one empty column between ♯♭ $sign and ⌒ $join", join.left - sign.right > c5.width)
-    }
-
-    @Test
-    fun while_the_sign_waits_the_keys_show_their_signed_notes_and_d_a_c6_fade() {
+    fun while_the_sign_waits_the_keys_show_their_signed_notes_and_d_a_fade() {
         show(FluteUiState())
         compose.onNodeWithContentDescription(signKey).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
         compose.onNodeWithContentDescription("E♭4").assertDoesNotExist()
         state.value = state.value.copy(signWaiting = true)
         compose.onNodeWithContentDescription(signKey).assertIsSelected()
-        for (name in listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4", "C♯5", "E♭5", "F♯5", "G♯5", "B♭5")) {
+        // C6 takes its sharp since the range runs to C7 (2026-11-18).
+        for (name in listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4")) {
             compose.onNodeWithContentDescription(name).assertIsEnabled()
         }
-        for (name in listOf("D4", "A4", "D5", "A5", "C6")) compose.onNodeWithContentDescription(name).assertIsNotEnabled()
+        for (name in listOf("D4", "A4")) compose.onNodeWithContentDescription(name).assertIsNotEnabled()
         compose.onNodeWithContentDescription("C4").assertDoesNotExist()
         state.value = state.value.copy(signWaiting = false)
         compose.onNodeWithContentDescription("C4").assertIsEnabled()
@@ -1432,13 +1382,13 @@ class FluteScreenTest {
         // The key's face goes from E♭ back to E while the finger is down (the press spent the sign): the hold must go on.
         show(FluteUiState(signWaiting = true))
         compose.onNodeWithContentDescription("E♭4").performTouchInput { down(center) }
-        assertEquals(listOf(64), pressed)
+        assertEquals(listOf(2), pressed)
         compose.runOnIdle { state.value = state.value.copy(signWaiting = false) }
         compose.waitForIdle()
         assertTrue("let go of while still held: $released", released.isEmpty())
         compose.onNodeWithContentDescription("E4").performTouchInput { up() }
-        assertEquals(listOf(64), pressed)
-        assertEquals(listOf(64), released)
+        assertEquals(listOf(2), pressed)
+        assertEquals(listOf(2), released)
     }
 
     @Test
@@ -1450,8 +1400,8 @@ class FluteScreenTest {
         compose.waitForIdle()
         assertTrue("let go of while still held: $released", released.isEmpty())
         compose.onNodeWithContentDescription("D4").performTouchInput { up() }
-        assertEquals(listOf(62), pressed)
-        assertEquals(listOf(62), released)
+        assertEquals(listOf(1), pressed)
+        assertEquals(listOf(1), released)
     }
 
     @Test
@@ -1481,9 +1431,9 @@ class FluteScreenTest {
             }
         }
         val names = if (locale == Locale.ENGLISH) {
-            listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4", "C♯5", "E♭5", "F♯5", "G♯5", "B♭5")
+            listOf("C♯4", "E♭4", "F♯4", "G♯4", "B♭4")
         } else {
-            listOf("cis1", "es1", "fis1", "gis1", "b1", "cis2", "es2", "fis2", "gis2", "b2")
+            listOf("cis1", "es1", "fis1", "gis1", "b1")
         }
         for (name in names) {
             assertWhole("360 dp, $locale, text $fontScale", compose.onNodeWithText(name, useUnmergedTree = true), textScale = fontScale)
@@ -1493,7 +1443,7 @@ class FluteScreenTest {
     @Test
     fun a_held_signed_note_lights_its_white_key() {
         // The final review of 2026-11-17: E's key wrote an E♭ and is held; it is E's key that is down, not none.
-        show(FluteUiState(tune = listOf(TuneNote(63, NoteLength.EIGHTH)), held = Held(63, index = 0, key = 64)))
+        show(FluteUiState(tune = listOf(TuneNote(63, NoteLength.EIGHTH)), held = Held(63, index = 0, key = 2)))
         val e = compose.onNodeWithText("E4", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val d = compose.onNodeWithText("D4", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertTrue("E's key should be down for its E♭: its name sits lower than D's ($e, $d)", (e.top - d.top).value > 2f)
@@ -1525,7 +1475,7 @@ class FluteScreenTest {
         show(FluteUiState(signWaiting = true), Locale("hr"))
         compose.onNodeWithContentDescription("Povisilica ili snizilica za sljedeću notu").assertIsSelected()
         compose.onNodeWithContentDescription("b1").assertIsEnabled() // h1's key writes b1 (B♭4)
-        compose.onNodeWithContentDescription("es2").assertIsEnabled()
+        compose.onNodeWithContentDescription("es1").assertIsEnabled()
     }
 
     // ---- Sharps and flats on the staff (2026-11-16) ----
@@ -1556,14 +1506,21 @@ class FluteScreenTest {
         assertEquals(39f, natural.width.value, 0.5f)
     }
 
-    /** Ink pixels of [step] in its first [width] dp, within 10 dp of [y], the staff's lines left out. */
+    /**
+     * The room the box of a captured row or step has over the staff, in dp (since 2026-11-18): the staff stands that
+     * much lower in it than `StaffGeometry`'s numbers say.
+     */
+    private fun roomOf(captured: PixelMap): Float = captured.height / compose.density.density - StaffGeometry.TOTAL_HEIGHT
+
+    /** Ink pixels of [step] in its first [width] dp, within 10 dp of [y] on the staff, the staff's lines left out. */
     private fun signInk(step: PixelMap, width: Float, y: Float): Int {
         val d = compose.density
         val ink = LightFluteColors.text
-        val lines = (0..4).map { StaffGeometry.TOP_LINE_Y + it * StaffGeometry.LINE_GAP }
+        val room = roomOf(step)
+        val lines = (0..4).map { StaffGeometry.TOP_LINE_Y + room + it * StaffGeometry.LINE_GAP }
         var count = 0
         for (x in with(d) { 2.dp.roundToPx() } until with(d) { width.dp.roundToPx() }) {
-            for (py in with(d) { (y - 10f).dp.roundToPx() } until with(d) { (y + 10f).dp.roundToPx() }) {
+            for (py in with(d) { (y + room - 10f).dp.roundToPx() } until with(d) { (y + room + 10f).dp.roundToPx() }) {
                 val inDp = py / d.density
                 if (lines.any { kotlin.math.abs(it - inDp) < 1.6f }) continue
                 if (step[x, py].near(ink)) count++
@@ -1581,5 +1538,162 @@ class FluteScreenTest {
         assertTrue("the natural", signInk(compose.onNodeWithContentDescription("F4, 1 beat").captureToImage().toPixelMap(), 13f, f) > 0)
         // That a plain step draws no sign is held by its width (`a_signed_step_is_ten_dp_wider`): its tilted head starts
         // 4.5 dp in, so a pixel window before it would be too narrow to say anything.
+    }
+
+    // ---- The staff's room for a tune above c³ (2026-11-18) ----
+
+    private val upToC7 = listOf(TuneNote(72, NoteLength.QUARTER), TuneNote(96, NoteLength.QUARTER))
+
+    @Test
+    fun a_tune_up_to_c4_leaves_the_keys_where_they_stand() {
+        show(FluteUiState(tune = twoNotes))
+        val staff = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
+        val keys = compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot()
+        val play = compose.onNodeWithText("Play").getBoundsInRoot()
+        state.value = FluteUiState(tune = upToC7)
+        val high = compose.onNodeWithContentDescription("Your tune, 2 notes").getBoundsInRoot()
+        assertTrue("the staff's box keeps its height: $staff, $high", abs((high.height - staff.height).value) <= 0.5f && abs((high.top - staff.top).value) <= 0.5f)
+        assertEquals(keys, compose.onNodeWithContentDescription("Flute keys").getBoundsInRoot())
+        assertEquals(play, compose.onNodeWithText("Play").getBoundsInRoot())
+        compose.onNode(hasContentDescription("C7, 1 beat") and hasAnyAncestor(hasContentDescription("Your tune, 2 notes"))).assertIsDisplayed()
+    }
+
+    @Test
+    fun on_a_653_dp_tab_the_box_is_292_and_a_tune_up_to_c4_is_fitted_into_it() {
+        assertTheBoxStands(tab = 653.dp, box = 292.dp)
+    }
+
+    @Test
+    fun on_a_tab_too_short_the_box_is_the_released_257_and_the_tab_scrolls() {
+        assertTheBoxStands(tab = 600.dp, box = TuneStaffHeight)
+    }
+
+    /** On a [tab] that tall the staff's box is [box], whatever the tune, and the keys and Play never move under it. */
+    private fun assertTheBoxStands(tab: Dp, box: Dp) {
+        show(FluteUiState(tune = twoNotes), height = tab)
+        val staff = compose.onNodeWithContentDescription("Your tune, 2 notes").getUnclippedBoundsInRoot()
+        val keys = compose.onNodeWithContentDescription("Flute keys").getUnclippedBoundsInRoot()
+        val play = compose.onNodeWithText("Play").getUnclippedBoundsInRoot()
+        assertTrue("the staff's box is ${staff.height}, expected $box", abs((staff.height - box).value) <= 1f)
+        state.value = FluteUiState(tune = upToC7)
+        val high = compose.onNodeWithContentDescription("Your tune, 2 notes").getUnclippedBoundsInRoot()
+        assertTrue("with a tune up to c4 the box is ${high.height}, expected $box", abs((high.height - box).value) <= 1f)
+        assertEquals(keys, compose.onNodeWithContentDescription("Flute keys").getUnclippedBoundsInRoot())
+        assertEquals(play, compose.onNodeWithText("Play").getUnclippedBoundsInRoot())
+    }
+
+    @Test
+    fun a_tune_up_to_c4_keeps_the_listening_room_while_it_runs() {
+        show(FluteUiState(tune = twoNotes, listening = Listening(index = 0)), height = 653.dp)
+        val ordinary = compose.onNodeWithContentDescription("Your tune, 2 notes").getUnclippedBoundsInRoot()
+        val stop = compose.onNodeWithText("Stop").getBoundsInRoot()
+        val animal = compose.onNodeWithTag(WALKING_ANIMAL_TAG).getUnclippedBoundsInRoot()
+        val animalY = (animal.top + animal.bottom) / 2 - ordinary.top
+        assertTrue("over a tune up to c3 the animal walks at 27 as before, was $animalY", abs((animalY - 27.dp).value) <= 1f)
+        state.value = FluteUiState(tune = upToC7, listening = Listening(index = 0))
+        val high = compose.onNodeWithContentDescription("Your tune, 2 notes").getUnclippedBoundsInRoot()
+        assertTrue("a tune up to c4 runs ${high.height} tall, no taller than ${ordinary.height}", high.height <= ordinary.height + 1.dp)
+        assertTrue("Stop stays where it was", abs((compose.onNodeWithText("Stop").getBoundsInRoot().top - stop.top).value) <= 1f)
+        val animalHigh = compose.onNodeWithTag(WALKING_ANIMAL_TAG).getUnclippedBoundsInRoot()
+        val animalYHigh = (animalHigh.top + animalHigh.bottom) / 2 - high.top
+        assertTrue("over a tune up to c4 the animal walks higher, at $animalYHigh", abs((animalYHigh - 20.86.dp).value) <= 1f)
+    }
+
+    // ---- The octave pills (2026-11-18): c¹–h¹ … c⁴ over one row of letter keys named for the chosen octave ----
+
+    private val tools = listOf("Sharp or flat for the next note", "Join to the next note", "Rest", "Breathe", "Erase the last note")
+
+    @Test
+    fun the_pills_stand_over_the_letters_and_the_tools_under_them() {
+        show(FluteUiState())
+        fun bounds(name: String) = compose.onNodeWithContentDescription(name).getBoundsInRoot()
+        val pills = listOf("Octave 4", "Octave 5", "Octave 6", "Octave 7").map(::bounds)
+        val letters = listOf("C4", "D4", "E4", "F4", "G4", "A4", "B4").map(::bounds)
+        val (sign, join, rest, breath, erase) = tools.map(::bounds)
+        val c = letters.first()
+        for (key in letters) assertTrue("$key should share C4's row $c", abs((key.top - c.top).value) <= 1f && abs((key.width - c.width).value) <= 1f)
+        for (key in listOf(sign, join, rest, breath, erase)) {
+            assertTrue("$key should be one key wide in the row under the letters", abs((key.width - c.width).value) <= 1f && abs((key.top - sign.top).value) <= 1f)
+        }
+        assertTrue("the tools $sign under the letters $c", sign.top >= c.bottom)
+        for ((pill, next) in pills.zipWithNext()) assertTrue("$pill left of $next, level", pill.right <= next.left && abs((pill.top - next.top).value) <= 1f)
+        assertTrue("the pills ${pills.first()} over the letters $c", pills.first().bottom <= c.top + 1.dp)
+        assertTrue("the pills span the keys", abs((pills.first().left - c.left).value) <= 1f && abs((pills.last().right - letters.last().right).value) <= 1f)
+        // The tools stand in columns 1 2, 4 5 and 7.
+        assertTrue("♯♭ under C", abs((sign.left - letters[0].left).value) <= 1f)
+        assertTrue("⌒ under D", abs((join.left - letters[1].left).value) <= 1f)
+        assertTrue("💤 under F", abs((rest.left - letters[3].left).value) <= 1f)
+        assertTrue("😮‍💨 under G", abs((breath.left - letters[4].left).value) <= 1f)
+        assertTrue("🧽 under B", abs((erase.right - letters[6].right).value) <= 1f)
+        assertTrue("a key should be 58 dp tall, was ${c.height}", abs((c.height - 58.dp).value) <= 0.5f)
+        assertTrue("a key should be 48 dp wide on a 412 dp phone, was ${c.width}", c.width >= 47.dp)
+        // The pill is 40 dp tall with a 3 dp shadow (32 until 2026-11-19: "very hard to read"), and the 8 dp under it are its too.
+        assertTrue("a pill is touched over at least 50 dp, was ${pills.first().height}", pills.first().height >= 50.dp)
+        val name = compose.onNodeWithText("C4–B4", useUnmergedTree = true).getBoundsInRoot()
+        assertTrue("the pill's name is drawn at about 22 dp: its line is ${name.height} tall", name.height >= 24.dp)
+        compose.onNodeWithContentDescription("Octave 4").assertIsSelected()
+        compose.onNodeWithContentDescription("Octave 5").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+    }
+
+    @Test
+    fun a_pill_renames_the_keys() {
+        show(FluteUiState())
+        val before = compose.onNodeWithContentDescription("D4").getBoundsInRoot()
+        state.value = state.value.copy(octave = 3)
+        for (name in listOf("C6", "D6", "E6", "F6", "G6", "A6", "B6")) compose.onNodeWithContentDescription(name).assertIsEnabled()
+        compose.onNodeWithContentDescription("D4").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Octave 6").assertIsSelected()
+        assertEquals("the same key, named d3 now", before, compose.onNodeWithContentDescription("D6").getBoundsInRoot())
+        compose.onNodeWithText("D6", useUnmergedTree = true).assertExists() // the name is on the key, not only said
+    }
+
+    @Test
+    fun in_octave_four_only_c_is_a_key() {
+        show(FluteUiState(octave = 4))
+        compose.onNodeWithContentDescription("C7").assertIsEnabled()
+        for (name in listOf("D7", "E7", "F7", "G7", "A7", "B7")) compose.onNodeWithContentDescription(name).assertIsNotEnabled()
+        state.value = state.value.copy(signWaiting = true)
+        compose.onNodeWithContentDescription("C7").assertIsNotEnabled()
+    }
+
+    @Test
+    fun tapping_a_pill_reports_its_octave() {
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("Octave 6").performTouchInput { down(center) }
+        assertEquals("on the finger going down", listOf(3), octaves)
+        compose.onNodeWithContentDescription("Octave 6").performTouchInput { up() }
+        compose.onNodeWithContentDescription("Octave 7").performSemanticsAction(SemanticsActions.OnClick)
+        assertEquals(listOf(3, 4), octaves)
+    }
+
+    @Test
+    fun a_key_held_while_the_octave_changes_is_not_let_go() {
+        // The key's name goes from C4 to C5 under the finger; it still sounds C4, and the same finger lets it go.
+        show(FluteUiState())
+        compose.onNodeWithContentDescription("C4").performTouchInput { down(center) }
+        compose.runOnIdle { state.value = state.value.copy(octave = 2) }
+        compose.waitForIdle()
+        assertTrue("let go of while still held: $released", released.isEmpty())
+        compose.onNodeWithContentDescription("C5").performTouchInput { up() }
+        assertEquals(listOf(0), pressed)
+        assertEquals(listOf(0), released)
+    }
+
+    @Test
+    fun the_pills_show_the_notes_of_their_octave() {
+        // The user, 2026-11-18: "replace 1, 2, 3, 4 labels with c1-h1, c2-h2, c3-h3, and c4".
+        show(FluteUiState())
+        for (range in listOf("C4–B4", "C5–B5", "C6–B6", "C7")) compose.onNodeWithText(range, useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("4", useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    @Test
+    fun in_croatian_the_pills_show_c1_to_h1_and_the_keys_carry_the_octave() {
+        show(FluteUiState(octave = 3), Locale("hr"))
+        for (range in listOf("c1–h1", "c2–h2", "c3–h3", "c4")) compose.onNodeWithText(range, useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Oktava 3").assertIsSelected()
+        compose.onNodeWithContentDescription("Oktava 1").assertExists()
+        compose.onNodeWithContentDescription("d3").assertIsEnabled()
+        compose.onNodeWithContentDescription("h3").assertIsEnabled()
     }
 }

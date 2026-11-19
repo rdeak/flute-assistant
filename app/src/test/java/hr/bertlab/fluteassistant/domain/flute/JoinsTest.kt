@@ -44,6 +44,14 @@ class JoinsTest {
     }
 
     @Test
+    fun `a slur from c3 to c4 is one note to Listen to me`() {
+        val tune = listOf(q(84), j(96), q(86))
+        assertEquals(listOf(JoinArc(0, 1, tie = false)), Joins.arcs(tune))
+        assertTrue(Joins.heardWithBefore(tune, 1))
+        assertEquals(1, Joins.lastHeardWith(tune, 0))
+    }
+
+    @Test
     fun `notes heard as one end where the letter changes`() {
         val tune = listOf(q(60), j(60), j(72), j(62), q(62))
         assertEquals(2, Joins.lastHeardWith(tune, 0))

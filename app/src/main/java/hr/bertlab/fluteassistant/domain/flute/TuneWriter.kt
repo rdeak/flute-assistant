@@ -5,13 +5,15 @@ package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
 /**
  * The key under a finger: the note it wrote and sounds ([midi]), or null for the rest key, where its note or rest sits
- * in the tune ([index]; null at the cap, where a press sounds but is not added), and the white key itself ([key]; since
- * 2026-11-17 the ♯♭ key makes a white key write its black note, so the two can differ: E's key writes E♭).
+ * in the tune ([index]; null at the cap, where a press sounds but is not added), and the letter key itself ([key], 0 = C
+ * to 6 = B, since 2026-11-18; by default the note's own letter, E's for an E♭). The key stays the same when the octave
+ * pills rename it under the finger.
  */
-data class Held(val midi: Int?, val index: Int?, val key: Int? = midi) {
+data class Held(val midi: Int?, val index: Int?, val key: Int? = midi?.let(NoteSpelling::letterOf)) {
     /** Whether the key is the rest key. */
     val isRest: Boolean get() = midi == null
 }
@@ -41,10 +43,15 @@ data class Held(val midi: Int?, val index: Int?, val key: Int? = midi) {
  * takes 1.05 s of holding at any speed. The knob sets how fast Play plays and how long Listen to me asks a note to last.
  *
  * The ♯♭ key (since 2026-11-17, [sign]) makes the next note key pressed write its letter's black note
- * ([FluteNotes.signed], [writes]): one tap per note, as the join. While it waits D, A and C6 write nothing (a press of
+ * ([FluteNotes.inOctave], [writes]): one tap per note, as the join. While it waits D and A write nothing (a press of
  * one changes nothing, not even a held key); a note key spends it, the rest key and a breath leave it, a second tap,
- * [erase], another book and [cancelSign] drop it. A key held is known by its white key ([Held.key]), so a key let go of
+ * [erase], another book and [cancelSign] drop it. A key held is known by its letter ([Held.key]), so a key let go of
  * and pressed again goes on with the note it wrote, signed or not.
+ *
+ * The keys are seven letters, and the four octaves are pills over them (since 2026-11-18, [chooseOctave]): a letter
+ * writes its note in the chosen octave ([octave], [FluteNotes.inOctave]), which stays until another pill is tapped. A
+ * key is its letter, so a key held when the octave changes keeps its note; a pill ends the rejoin window and drops no
+ * waiting join or sign. In octave 4 only c⁴ writes.
  *
  * Pure Kotlin and clock-free: the view model passes the time of every press and release, and does the sounding, the
  * growing over time, the saving and the logging.
@@ -64,6 +71,10 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
 
     /** The next note key pressed will write its letter's black note ([sign]). */
     var signWaiting: Boolean = false
+        private set
+
+    /** The octave the letter keys write in, 1 to 4 ([chooseOctave], since 2026-11-18). Kept until another is chosen, through another book too. */
+    var octave: Int = 1
         private set
 
     /** Whether the ⌒ key has a note to join the next one to ([Joins.canJoinAfter]). */
@@ -100,18 +111,18 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     private var pressedAt = 0L
     private var letGo: LetGo? = null
 
-    /** The note a press of the white key [key] writes now: [key], or its black note while the sign waits (null: none). */
-    fun writes(key: Int): Int? = FluteNotes.written(key, signWaiting)
+    /** The note a press of the letter key [key] writes now: its own in the chosen octave, or its black note while the sign waits (null: none). */
+    fun writes(key: Int): Int? = FluteNotes.inOctave(key, signWaiting, octave)
 
     /**
-     * Whether a press of the white key [key] at [now] would be taken: a key that writes a note now ([writes]), or the
+     * Whether a press of the letter key [key] at [now] would be taken: a key that writes a note now ([writes]), or the
      * key let go of a moment ago, whose hold a press goes on with even when it writes nothing now (D held, ♯♭ tapped,
      * the touch screen splitting the hold; the final review of 2026-11-17).
      */
     fun takes(key: Int, now: Long): Boolean = rejoinable(key, now) != null || writes(key) != null
 
     /**
-     * The white key [key] (null: the rest key) went down at [now]. Null, and nothing changes, for a note key that is not
+     * The letter key [key] (null: the rest key) went down at [now]. Null, and nothing changes, for a note key that is not
      * taken ([takes]).
      */
     fun press(key: Int?, now: Long): Press? {
@@ -207,6 +218,19 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
 
     /** Drops a waiting sign; says whether one waited. */
     fun cancelSign(): Boolean = signWaiting.also { signWaiting = false }
+
+    /**
+     * A tap of an octave pill: the letter keys write in [octave] from now on (true); the chosen one again, or one the
+     * pills do not have, changes nothing at all (false). It never ends a held key, which is known by its letter
+     * ([Held.key]), drops no waiting join or sign, and ends the rejoin window, as the sign does: the same key again
+     * writes its new note.
+     */
+    fun chooseOctave(octave: Int): Boolean {
+        if (octave == this.octave || octave !in FluteNotes.OCTAVES) return false
+        this.octave = octave
+        forget()
+        return true
+    }
 
     /**
      * Marks a breath, unless the tune is at the cap or its last step is one already, and drops a waiting join (a breath

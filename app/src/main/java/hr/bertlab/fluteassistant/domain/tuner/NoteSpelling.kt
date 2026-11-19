@@ -11,7 +11,7 @@ enum class Accidental { SHARP, FLAT, NATURAL }
  * (C = 0 to B = 6), and a black note carries a sign, as beginners' flute music writes them: C♯, E♭, F♯, G♯ and B♭. A
  * sharp sits on the letter below, a flat on the letter above. The names (`note_names`), the colours (`noteColor`, the
  * letter's) and the staff place (the letter's, [placeOf]) all follow it, and so does which black note a letter's key
- * writes under a ♯♭ key ([blackOf], [signedOf]: the flute's and the Fingers tab's). Pure Kotlin.
+ * writes under a ♯♭ key ([blackOf]: the flute's and the Fingers tab's). Pure Kotlin.
  */
 object NoteSpelling {
     private val LETTER = intArrayOf(0, 0, 1, 2, 2, 3, 3, 4, 4, 5, 6, 6)
@@ -42,16 +42,6 @@ object NoteSpelling {
 
     /** The pitch class of the black note written on [letter] with a sign (C♯ E♭ F♯ G♯ B♭), or null for D and A, which have none. */
     fun blackOf(letter: Int): Int? = BLACK[letter]
-
-    /**
-     * The black note written on the white note [natural]'s letter, in its octave: C4 gives C♯4 and E4 gives E♭4. Null
-     * for D and A, and for a note that is not white.
-     */
-    fun signedOf(natural: Int): Int? {
-        if (signOf(natural) != null) return null
-        val letter = letterOf(natural)
-        return blackOf(letter)?.let { natural + it - whiteOf(letter) }
-    }
 
     /**
      * Where [midi] is written on the treble staff, one place a line or a space, on its letter: c1 (MIDI 60) is 0, on

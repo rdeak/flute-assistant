@@ -351,4 +351,105 @@ class StaffGeometryTest {
         assertTrue(misses.joinToString("\n"), misses.isEmpty())
     }
 
+
+    // ---- The room over the staff for a tune above c³ (2026-11-18): every released number stands, the box gets taller ----
+
+    @Test
+    fun `the room over the staff fits the tune`() {
+        fun room(vararg midi: Int) = StaffGeometry.roomOver(midi.map { TuneNote(it, NoteLength.QUARTER) })
+        assertEquals(0f, StaffGeometry.roomOver(emptyList()))
+        assertEquals(0f, room(60, 84))
+        assertEquals(9f, room(86))
+        assertEquals(18f, room(88))
+        assertEquals("b3 (B♭6) on h3's place", 54f, room(94))
+        assertEquals(54f, room(95))
+        assertEquals(63f, room(72, 96))
+        assertEquals(63f, StaffGeometry.HIGH_ROOM)
+    }
+
+    @Test
+    fun `every note up to c4 stays inside the box with its own room`() {
+        for (position in 0..21) {
+            val room = maxOf(0, position - 14) * StaffGeometry.STEP
+            val extent = StaffGeometry.noteExtent(position)
+            assertTrue("position $position reaches ${extent.start + room}", extent.start + room >= -StaffGeometry.OVERFLOW_TOP)
+        }
+        // c⁴'s stem, with all the room, reaches where c³'s does with none.
+        assertEquals(StaffGeometry.noteExtent(14).start, StaffGeometry.noteExtent(21).start + StaffGeometry.HIGH_ROOM)
+    }
+
+    @Test
+    fun `the resting staff keeps the released height for every highest note`() {
+        for (steps in 0..7) {
+            val room = steps * StaffGeometry.STEP
+            assertEquals("room $room", StaffGeometry.TOTAL_HEIGHT, (StaffGeometry.TOTAL_HEIGHT + room) * StaffGeometry.restingScale(room), 0.01f)
+        }
+        assertEquals(1f, StaffGeometry.restingScale(0f))
+        assertEquals("up to d3, 3% smaller", 0.966f, StaffGeometry.restingScale(9f), 0.001f)
+        assertEquals("up to g3, 12%", 0.877f, StaffGeometry.restingScale(36f), 0.001f)
+        assertEquals("up to c4, 20%", 0.803f, StaffGeometry.restingScale(63f), 0.001f)
+    }
+
+    @Test
+    fun `the staff's box takes the tab's spare height, up to the room c4 needs`() {
+        assertEquals(257f, StaffGeometry.uprightBox(-20f))
+        assertEquals(257f, StaffGeometry.uprightBox(0f))
+        assertEquals("a Galaxy A55: 653 of tab, 618 needed", 292f, StaffGeometry.uprightBox(35f))
+        assertEquals(320f, StaffGeometry.uprightBox(63f))
+        assertEquals(320f, StaffGeometry.uprightBox(150f))
+    }
+
+    @Test
+    fun `a taller box draws a high tune at full size while it has the room`() {
+        // The A55's box, 292 dp (the released 257 and 35 to spare): up to f3 at full size, c4 9% smaller.
+        assertEquals(1f, StaffGeometry.restingScale(0f, box = 292f))
+        assertEquals(1f, StaffGeometry.restingScale(27f, box = 292f))
+        assertEquals("up to g3 needs 293: almost", 0.997f, StaffGeometry.restingScale(36f, box = 292f), 0.001f)
+        assertEquals(0.9125f, StaffGeometry.restingScale(63f, box = 292f), 0.0001f)
+        // A box with all the room, on a taller phone: every tune at full size.
+        assertEquals(1f, StaffGeometry.restingScale(63f, box = StaffGeometry.TOTAL_HEIGHT + StaffGeometry.HIGH_ROOM))
+    }
+
+    @Test
+    fun `a tune up to c3 runs as before, and one above it no taller`() {
+        assertEquals(RunningStaffScale, StaffGeometry.runningScale(0f))
+        for (steps in 0..7) {
+            val room = steps * StaffGeometry.STEP
+            assertTrue("room $room", (StaffGeometry.TOTAL_HEIGHT + room) * StaffGeometry.runningScale(room) <= StaffGeometry.TOTAL_HEIGHT * RunningStaffScale + 0.01f)
+        }
+        assertEquals(1.07f, StaffGeometry.runningScale(63f), 0.005f)
+    }
+
+    @Test
+    fun `the running animal covers at most four dp of the top note's head at every scale, and its hop stays in the box`() {
+        assertEquals("as before over a tune up to c3", StaffGeometry.ANIMAL_Y, StaffGeometry.animalY(RunningStaffScale))
+        // Every scale a running staff takes, upright or on its side. The highest note of a box with its room stands where c³ does.
+        val topNote = StaffGeometry.yOf(14) - StaffGeometry.HEAD_RY - 0.25f - StaffGeometry.HEAD_EDGE
+        var step = 0
+        while (0.9f + step * 0.01f <= RunningStaffScale + 0.001f) {
+            val s = 0.9f + step * 0.01f
+            val half = StaffGeometry.ANIMAL_SIZE * s / 2
+            val y = StaffGeometry.animalY(s)
+            assertTrue("scale $s: its hop leaves the box at $y", y - half - 8f >= -0.01f)
+            assertTrue("scale $s: it covers ${y + half - topNote * s} dp of the top head", y + half - topNote * s <= 4f + 0.01f)
+            step++
+        }
+        assertEquals("over a tune up to c4, as high as its hop allows", 20.86f, StaffGeometry.animalY(StaffGeometry.runningScale(63f)), 0.05f)
+    }
+
+    @Test
+    fun `the knob and the book keep their corner with room over the staff`() {
+        // Writing a tune up to c⁴ upright and on its side, running it, and writing one up to d³.
+        val drawn = listOf(
+            StaffGeometry.restingScale(63f) to 63f, 0.956f to 63f, StaffGeometry.runningScale(63f) to 63f, StaffGeometry.restingScale(9f) to 9f,
+        )
+        for ((s, room) in drawn) {
+            assertTrue("scale $s room $room: ${StaffGeometry.knobClefAir(s, room)} dp to the clef", StaffGeometry.knobClefAir(s, room) >= 4.5f)
+            assertEquals("the knob stays where it is", StaffGeometry.knobTop(1f), StaffGeometry.knobTop(s, room))
+            val top = StaffGeometry.bookButtonTop(s, room)
+            // Under the clef's lowest bound (its ink ends above it), inside the box.
+            assertTrue("scale $s room $room: book at $top", top >= (StaffGeometry.CLEF_BOTTOM + room) * s - 0.5f)
+            assertTrue("scale $s room $room", top + StaffGeometry.BOOK_BUTTON_HEIGHT + StaffGeometry.CORNER_SHADOW <= (StaffGeometry.TOTAL_HEIGHT + room) * s)
+        }
+    }
 }

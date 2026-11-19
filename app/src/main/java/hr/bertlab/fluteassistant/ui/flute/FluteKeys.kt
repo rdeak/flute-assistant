@@ -6,6 +6,7 @@ package hr.bertlab.fluteassistant.ui.flute
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,6 +18,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,16 +37,21 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.FluteNotes
-import hr.bertlab.fluteassistant.domain.notes.StaffNotes
-import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 import hr.bertlab.fluteassistant.ui.common.ChunkyKey
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.KeyDepth
@@ -52,28 +60,44 @@ import hr.bertlab.fluteassistant.ui.common.KeyHeight
 import hr.bertlab.fluteassistant.ui.common.KeyName
 import hr.bertlab.fluteassistant.ui.common.SharpFlatKey
 import hr.bertlab.fluteassistant.ui.common.TapKey
+import hr.bertlab.fluteassistant.ui.common.asTextSize
+import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteLabel
+import hr.bertlab.fluteassistant.ui.common.noteLabelParts
 import hr.bertlab.fluteassistant.ui.common.noteText
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
+import hr.bertlab.fluteassistant.ui.theme.Sun
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private val KeyRowGap = 12.dp
 
-/** The keys' height when the screen is too short to give them more: three rows at their minimum. */
-val FluteKeysMinHeight: Dp = (KeyHeight + KeyDepth) * 3 + KeyRowGap * 2
+/**
+ * The octave pills over the letters (since 2026-11-18): a pill, its shadow, and the room under it that is still its touch
+ * area. 40 dp tall with a name at 22 since 2026-11-19 (32 and 17 for a day: the user, "very hard to read", who gave them
+ * the room from the staff's box).
+ */
+private val PillHeight = 40.dp
+private val PillDepth = 3.dp
+private val PillsHeight = PillHeight + PillDepth + 8.dp
+private val PillGap = 8.dp
+private val PillShape = RoundedCornerShape(20.dp)
+private val PillNameSize = 22.dp
+
+/** The least a pill's name shrinks to, in dp, on the narrowest keys' column at the largest text. */
+private val PillNameFloor = 10.dp
+
+/** The keys' height when the screen is too short to give them more: the pills and two rows at their minimum (three rows until 2026-11-18). */
+val FluteKeysMinHeight: Dp = PillsHeight + (KeyHeight + KeyDepth) * 2 + KeyRowGap
+
+/** Seven keys a row: the letters, and under them the tools in five of the seven columns. */
+private const val KeysPerRow = 7
 
 /** The breath, rest and erase emoji, in dp so a large font scale cannot push the breath emoji out of a 40 dp key. */
 private const val TOOL_EMOJI_DP = 24f
-
-/** The plain keys at the end of the top row: join, rest, breath, erase. */
-private const val ToolKeyCount = 4
-
-/** The ♯♭ key beside C6 (since 2026-11-17), one note key wide, in the top row's second column. */
-private const val SharpFlatKeyCount = 1
 
 /** The ⌒ key's picture: the staff's own slur ([slurPath]), from (2, 3) to (28, 3) dp in a box this size. */
 private val JoinPictureWidth = 30.dp
@@ -87,33 +111,28 @@ private const val EraseRepeatDelayMs = 400L
 private const val EraseRepeatMs = 120L
 
 /**
- * The fifteen keys ([StaffNotes.ALL]) in three rows, one per octave, highest on top as on
- * the staff (c3 alone, then c2 to h2, then c1 to h1), each key in its letter's colour with
- * its name; the key of [litMidi] (E's key for an E♭) sinks onto its shadow inside a yellow ring. While
- * [signWaiting] each key shows the black note it will write, or is faded when it writes none ([FluteKey]). A finger down
- * calls [FluteActions.onKeyPressed] at once and the finger lifting, or sliding off, calls [FluteActions.onKeyReleased]; sliding
- * onto another key does not press it, so every note in the tune is a deliberate tap. A
- * screen reader activates a key through [FluteActions.onKeyActivated]. Every row is [keyHeight] tall, [KeyHeight] as
- * on the canvas unless the phone is on its side, and the three rows sit centred in the height they
- * are given. A key's width comes from the width given, less [keyGap] between each two keys.
+ * The flute's keys (since 2026-11-18; spec `2026-11-18-flute-every-octave-design.md`, Revision 3): the four octaves as
+ * pills ([OctavePills]: c¹–h¹, c²–h², c³–h³, c⁴), the chosen one ([octave]) yellow; under them the seven letter keys, C to B, each in its
+ * letter's colour and named for the note it writes in that octave ([keyNotes]: c¹, d³; its black note while
+ * [signWaiting]; faded where it writes none: D and A then, and all of octave 4 but c⁴); and under those the tools in
+ * columns 1 2, 4 5 and 7: ♯♭ ([SharpFlatKey], [FluteActions.onSign]), ⌒ (down while [joinWaiting], faded unless
+ * [joinEnabled]), 💤 (held like a note key, sunk while [restLit]), 😮‍💨, and 🧽 (repeating while held, faded unless
+ * [eraseEnabled]). The key of [litLetter] sinks onto its shadow inside a yellow ring.
  *
- * Beside c3 stands the ♯♭ key ([SharpFlatKey]), over d2, which calls [FluteActions.onSign] as the finger goes down and
- * stays down while [signWaiting]; a slip off c3 lands on it. At the end of the top row, after one empty column, stand
- * four plain keys, each one note key wide and over a note key of the row below (f2, g2, a2, h2), so a tool is never
- * bigger than a note:
- * - the join key (⌒, its picture the slur it draws), which calls [FluteActions.onJoin] as the finger goes down, stays
- *   down while [joinWaiting] and is faded and inert unless [joinEnabled];
- * - the rest key (💤), held like a note key ([FluteActions.onRestPressed], [FluteActions.onRestReleased],
- *   [FluteActions.onRestActivated]) and sunk while [restLit];
- * - the breath key (😮‍💨), which calls [FluteActions.onBreath] as the finger goes down;
- * - the erase key (🧽), which calls [FluteActions.onEraseLast] as the finger goes down and again and again while it
- *   stays, like a keyboard's backspace, faded and inert while [eraseEnabled] is false.
+ * A finger down on a letter calls [FluteActions.onKeyPressed] with the letter (0 = C to 6 = B) at once, and the finger
+ * lifting, or sliding off, calls [FluteActions.onKeyReleased]; sliding onto another key does not press it, so every note
+ * in the tune is a deliberate tap. A screen reader activates a key through [FluteActions.onKeyActivated]. A pill calls
+ * [FluteActions.onOctave] as the finger goes down.
  *
- * When each key came and where it stood before is in `DESIGN.md`, "The keys".
+ * Every key row is [keyHeight] tall, [KeyHeight] unless the phone is on its side or the tab is zoomed, and the pills and
+ * the two rows sit centred in the height they are given. A key's width comes from the width given, less [keyGap]
+ * between each two keys. When each key came and where it stood before is in `DESIGN.md`, "The keys" and "Octaves".
  */
 @Composable
 fun FluteKeys(
-    litMidi: Int?,
+    octave: Int,
+    keyNotes: List<Int?>,
+    litLetter: Int?,
     restLit: Boolean,
     eraseEnabled: Boolean,
     actions: FluteActions,
@@ -125,82 +144,121 @@ fun FluteKeys(
     signWaiting: Boolean = false,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
-    val rows = remember { StaffNotes.ALL.groupBy { Math.floorDiv(it, 12) }.toSortedMap().values.reversed() }
-    val keysPerRow = remember(rows) { rows.maxOf { it.size } }
     BoxWithConstraints(modifier = modifier) {
-        // One note key's width, in whole pixels: seven keys that each rounded up ran 4 px over the
-        // row on a 420 dpi phone, so the rows are measured in pixels and centred, and the top row's
-        // tools stand exactly over the columns below (the rows end up to 6 px short, split between
-        // the sides).
+        // One key's width, in whole pixels: seven keys that each rounded up ran 4 px over the row on a 420 dpi phone, so
+        // the rows are measured in pixels and centred, and the tools stand exactly under the letters' columns.
         val keyWidth = with(LocalDensity.current) {
-            ((constraints.maxWidth - keyGap.roundToPx() * (keysPerRow - 1)) / keysPerRow).toDp()
+            ((constraints.maxWidth - keyGap.roundToPx() * (KeysPerRow - 1)) / KeysPerRow).toDp()
         }
-        val key = Modifier.width(keyWidth).fillMaxHeight() // every key of every row: one column wide, as tall as its row
+        val key = Modifier.width(keyWidth).fillMaxHeight() // every key of both rows: one column wide, as tall as its row
+        val row = Modifier
+            .fillMaxWidth()
+            .height(keyHeight + KeyDepth)
+            .padding(bottom = KeyDepth)
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .semantics { contentDescription = groupLabel },
-            verticalArrangement = Arrangement.spacedBy(KeyRowGap, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            rows.forEach { row ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(keyHeight + KeyDepth)
-                        .padding(bottom = KeyDepth),
-                    horizontalArrangement = Arrangement.spacedBy(keyGap, Alignment.CenterHorizontally),
-                ) {
-                    row.forEach { midi ->
-                        FluteKey(
-                            midi = midi,
-                            // The key of the note held or playing: E's key for an E♭, as the white key wrote it.
-                            lit = litMidi != null && midi == NoteSpelling.naturalOf(litMidi),
-                            signWaiting = signWaiting,
-                            onPress = actions.onKeyPressed,
-                            onRelease = actions.onKeyReleased,
-                            onActivate = actions.onKeyActivated,
-                            modifier = key,
-                        )
-                    }
-                    if (row.size < keysPerRow) {
-                        // The short top row: c3, the ♯♭ key, the empty middle, then the join, the rest, the
-                        // breath and the erase key, each one note key wide. The middle is as wide as the key
-                        // columns it covers, so the row measures as the full rows do and the four stand
-                        // over the last four keys of the row below, the sponge ending where h2 does.
-                        SharpFlatKey(
-                            waiting = signWaiting,
-                            onSign = actions.onSign,
-                            modifier = key,
-                        )
-                        val emptyColumns = keysPerRow - row.size - SharpFlatKeyCount - ToolKeyCount
-                        if (emptyColumns > 0) {
-                            Spacer(Modifier.width(keyWidth * emptyColumns + keyGap * (emptyColumns - 1)))
-                        }
-                        JoinKey(
-                            waiting = joinWaiting,
-                            enabled = joinEnabled,
-                            onJoin = actions.onJoin,
-                            modifier = key,
-                        )
-                        RestKey(
-                            lit = restLit,
-                            onPress = actions.onRestPressed,
-                            onRelease = actions.onRestReleased,
-                            onActivate = actions.onRestActivated,
-                            modifier = key,
-                        )
-                        BreathKey(
-                            onBreath = actions.onBreath,
-                            modifier = key,
-                        )
-                        EraseKey(
-                            enabled = eraseEnabled,
-                            onErase = actions.onEraseLast,
-                            modifier = key,
-                        )
-                    }
+            OctavePills(octave, actions.onOctave, Modifier.width(keyWidth * KeysPerRow + keyGap * (KeysPerRow - 1)))
+            Row(row, horizontalArrangement = Arrangement.spacedBy(keyGap, Alignment.CenterHorizontally)) {
+                for (letter in 0 until KeysPerRow) {
+                    FluteKey(
+                        letter = letter,
+                        note = keyNotes.getOrNull(letter),
+                        white = FluteNotes.whiteIn(letter, octave),
+                        lit = letter == litLetter,
+                        onPress = actions.onKeyPressed,
+                        onRelease = actions.onKeyReleased,
+                        onActivate = actions.onKeyActivated,
+                        modifier = key,
+                    )
                 }
             }
+            Spacer(Modifier.height(KeyRowGap))
+            Row(row, horizontalArrangement = Arrangement.spacedBy(keyGap, Alignment.CenterHorizontally)) {
+                SharpFlatKey(waiting = signWaiting, onSign = actions.onSign, modifier = key)
+                JoinKey(waiting = joinWaiting, enabled = joinEnabled, onJoin = actions.onJoin, modifier = key)
+                Spacer(key)
+                RestKey(
+                    lit = restLit,
+                    onPress = actions.onRestPressed,
+                    onRelease = actions.onRestReleased,
+                    onActivate = actions.onRestActivated,
+                    modifier = key,
+                )
+                BreathKey(onBreath = actions.onBreath, modifier = key)
+                Spacer(key)
+                EraseKey(enabled = eraseEnabled, onErase = actions.onEraseLast, modifier = key)
+            }
+        }
+    }
+}
+
+/**
+ * The four octaves as pills over the letter keys (since 2026-11-18): each names the notes its octave holds, c¹–h¹,
+ * c²–h², c³–h³ and c⁴ alone (the user: "replace 1, 2, 3, 4 labels with c1-h1, c2-h2, c3-h3, and c4"; C4–B4 to C7 in
+ * English), the chosen one ([octave]) yellow and down. A pill acts as the finger goes down ([onOctave]); its touch area
+ * takes the room under it. A screen reader hears "Octave" and the octave's figure, so the pill of c⁴ and the key c⁴
+ * are not one name.
+ */
+@Composable
+private fun OctavePills(octave: Int, onOctave: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val resources = LocalResources.current
+    Row(modifier = modifier.height(PillsHeight), horizontalArrangement = Arrangement.spacedBy(PillGap)) {
+        for (each in FluteNotes.OCTAVES) {
+            val low = FluteNotes.whiteIn(0, each)
+            // The highest white note the flute has in that octave: h, or c itself in the top one.
+            val high = (KeysPerRow - 1 downTo 0).firstNotNullOf { FluteNotes.inOctave(it, signed = false, octave = each) }
+            val lowName = noteText(low)
+            val highName = noteText(high)
+            val name = if (high == low) lowName else buildAnnotatedString {
+                append(lowName)
+                append("–")
+                append(highName)
+            }
+            val figure = noteLabelParts(resources, low).second
+            OctavePill(name, figure, chosen = each == octave, onTap = { onOctave(each) }, modifier = Modifier.weight(1f).fillMaxHeight())
+        }
+    }
+}
+
+/** One octave pill showing [name]: a button a screen reader hears as "Octave [figure]", selected while [chosen]. */
+@Composable
+private fun OctavePill(name: AnnotatedString, figure: String, chosen: Boolean, onTap: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(R.string.flute_octave, figure)
+    val colors = FluteTheme.colors
+    val currentOnTap by rememberUpdatedState(onTap)
+    Box(
+        modifier = modifier
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = label
+                if (chosen) selected = true
+                onClick {
+                    currentOnTap()
+                    true
+                }
+            }
+            .pointerInput(Unit) { detectTapGestures(onPress = { currentOnTap() }) },
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(PillHeight)
+                .chunky(PillShape, if (chosen) Sun else colors.raised, colors.outline, PillDepth, pressed = chosen),
+        ) {
+            Text(
+                name,
+                style = MaterialTheme.typography.titleLarge,
+                color = if (chosen) InkOnFill else colors.text,
+                maxLines = 1,
+                autoSize = TextAutoSize.StepBased(minFontSize = PillNameFloor.asTextSize(), maxFontSize = PillNameSize.asTextSize()),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
         }
     }
 }
@@ -349,55 +407,54 @@ private fun ToolEmoji(emoji: String) = Emoji(emoji, fontSize = emojiSizeFor(TOOL
 
 
 /**
- * A note key: the white key [midi], in its letter's colour. While the ♯♭ key waits ([signWaiting], since 2026-11-17) its
- * face and name are the black note it writes ([FluteNotes.signed]), or it is faded and a screen reader hears it disabled
- * when it writes none (D, A, C6). It always reports [midi], the white key, and its gesture is keyed on that alone: the
- * face changes under a finger the moment a press spends the sign, and a finger already on D when the sign is tapped
- * holds its note on, so neither may restart the gesture (whose `finally` would let the key go). The view model ignores
- * a press of a key that writes nothing.
+ * A letter key (since 2026-11-18), 0 = C to 6 = B, in its letter's colour, named for the note it writes ([note]: c¹,
+ * d³, or its black note while the ♯♭ key waits). Where it writes none (D and A while the sign waits, and all of octave
+ * 4 but c⁴) it is faded, heard as disabled, and shows the name of its white note there ([white]: d⁴). It always reports
+ * [letter], and its gesture is keyed on that alone: the name changes under a finger when a press spends the sign and
+ * when a pill is tapped while the key is held, and neither may restart the gesture (whose `finally` would let the key
+ * go). The view model ignores a press of a key that writes nothing.
  */
 @Composable
 private fun FluteKey(
-    midi: Int,
+    letter: Int,
+    note: Int?,
+    white: Int,
     lit: Boolean,
-    signWaiting: Boolean,
     onPress: (Int) -> Unit,
     onRelease: (Int) -> Unit,
     onActivate: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val face = FluteNotes.written(midi, signWaiting)
-    val writes = face != null
-    // The gesture block is keyed on the key alone, so it reads the latest callbacks through state.
+    // The gesture block is keyed on the letter alone, so it reads the latest callbacks through state.
     val currentOnPress by rememberUpdatedState(onPress)
     val currentOnRelease by rememberUpdatedState(onRelease)
     ChunkyKey(
-        label = noteLabel(face ?: midi),
-        color = noteColor(midi),
+        label = noteLabel(note ?: white),
+        color = noteColor(white),
         down = lit,
-        onActivate = { onActivate(midi) },
-        enabled = writes,
-        modifier = modifier.pointerInput(midi) {
+        onActivate = { onActivate(letter) },
+        enabled = note != null,
+        modifier = modifier.pointerInput(letter) {
             detectTapGestures(
                 onPress = {
-                    currentOnPress(midi)
+                    currentOnPress(letter)
                     try {
                         tryAwaitRelease() // up, or the finger slid off: both let go of the key
                     } finally {
                         // Turning the phone takes the key off the screen and cancels the gesture
                         // here, with no up to come; the Activity lives on, so nothing else would
                         // end the note. The ViewModel ignores a key that is no longer the one held.
-                        currentOnRelease(midi)
+                        currentOnRelease(letter)
                     }
                 },
             )
         },
     ) {
-        if (face != null && face != midi) {
-            // A signed name is longer ("gis¹", "C♯⁴"): it shrinks to fit on one line, as the black keys' names did.
-            KeyName(noteText(face), maxSize = 22.sp)
+        if (note != null && note != white) {
+            // A signed name is longer ("gis¹", "C♯⁴"): it shrinks to fit on one line.
+            KeyName(noteText(note), maxSize = 22.sp)
         } else {
-            Text(noteText(face ?: midi), style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp), color = InkOnFill, maxLines = 1)
+            Text(noteText(note ?: white), style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp), color = InkOnFill, maxLines = 1)
         }
     }
 }

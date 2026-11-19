@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import hr.bertlab.fluteassistant.domain.flute.Book
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.flute.Held
 import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.Listening
@@ -14,6 +15,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
 /**
  * Play in progress: the step of the tune playing ([index]) and how many half beats into it the
@@ -57,6 +59,8 @@ data class FluteUiState(
     val joinWaiting: Boolean = false,
     /** The ♯♭ key was tapped: the next note key pressed writes its letter's sharp or flat (since 2026-11-17). */
     val signWaiting: Boolean = false,
+    /** The octave the letter keys write in, 1 to 4: the chosen pill (since 2026-11-18). */
+    val octave: Int = 1,
 ) {
     /** Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full. */
     val canJoin: Boolean get() = Joins.canJoinAfter(tune)
@@ -95,8 +99,20 @@ data class FluteUiState(
     /** Whether there is a note to check: rests and breaths alone give "Your turn" nothing to do. */
     val canListen: Boolean get() = tune.any { it is TuneNote }
 
-    /** The note key drawn pressed: the playing note's, else the held key. */
-    val litMidi: Int? get() = playing?.let { (tune.getOrNull(it.index) as? TuneNote)?.midi } ?: held?.midi
+    /**
+     * The note each letter key writes now, 0 = C to 6 = B: its own in the chosen octave ([FluteNotes.inOctave]), its
+     * black note while the sign waits; null where it writes nothing (D and A then, and all of octave 4 but c⁴).
+     */
+    val keyNotes: List<Int?> get() = List(7) { FluteNotes.inOctave(it, signWaiting, octave) }
+
+    /**
+     * The letter key drawn pressed: the playing note's letter while the keys show its octave (E's for an E♭; none while
+     * the pills are elsewhere), else the held key, which stays down under its finger when the octave changes.
+     */
+    val litLetter: Int?
+        get() = playing?.let { (tune.getOrNull(it.index) as? TuneNote)?.midi }
+            ?.let { midi -> NoteSpelling.letterOf(midi).takeIf { FluteNotes.octaveOf(midi) == octave } }
+            ?: held?.key
 
     /** Whether the rest key is drawn pressed: held, or its rest playing. */
     val restLit: Boolean get() = held?.isRest == true || playing?.let { tune.getOrNull(it.index) is TuneRest } == true

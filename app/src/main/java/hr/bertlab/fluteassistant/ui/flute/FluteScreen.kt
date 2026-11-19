@@ -116,6 +116,7 @@ fun FluteScreen(
             onBreath = viewModel::onBreath,
             onJoin = viewModel::onJoin,
             onSign = viewModel::onSign,
+            onOctave = viewModel::onOctave,
             onEraseLast = viewModel::eraseLast,
             onTogglePlayback = viewModel::togglePlayback,
             onYourTurn = {
@@ -157,6 +158,8 @@ class FluteActions(
     val onJoin: () -> Unit = {},
     /** The ♯♭ key: the next note key pressed writes its letter's sharp or flat (since 2026-11-17). */
     val onSign: () -> Unit = {},
+    /** An octave pill, 1 to 4: the letter keys write in that octave (since 2026-11-18). */
+    val onOctave: (Int) -> Unit = {},
     val onEraseLast: () -> Unit = {},
     /** Play. */
     val onTogglePlayback: () -> Unit = {},
@@ -185,8 +188,9 @@ private val PlayShadow = 8.dp
 /**
  * Everything below this height cannot hold the keys: the column's own padding (4 dp over, 16 under),
  * the stage (the staff with the names under it, in the stage's 16 dp padding, which holds its
- * border), three key rows and the Play row with its shadow, and the two gaps between them. It is
- * 642 dp, what the column measures; until 2026-11-10 it counted 22 dp more, so a phone that leaves
+ * border), the octave pills and two key rows and the Play row with its shadow, and the two gaps between them. It is
+ * 618 dp since 2026-11-19, what the column measures (642 with three key rows until 2026-11-18), and what a tab has over it goes
+ * to the staff's box first, up to the 63 dp c⁴ needs. Until 2026-11-10 it counted 22 dp more, so a phone that leaves
  * the tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too
  * short, its spare height under the Play row and Stop far over Play's place. (628 from 2026-11-16, when
  * the black keys scrolled in rows of their own, until 2026-11-17.)
@@ -202,9 +206,9 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  * in the last "Your turn", and over the staff's top left the [SpeedKnob], the
  * metronome's animal for the tempo in [metronome], where printed music writes the tempo, and under
  * the clef, beside the names, the [BookButton], the sweet of the open book ([FluteUiState.openBook]),
- * whose tap is [FluteActions.onShelfOpen]; then the octave rows of [FluteKeys], with the rest, the breath and
- * the erase key ([FluteActions.onEraseLast], faded while the tune is empty) at the end of the top row, apart
- * from c3, taking the height left, and the Play row: two big buttons sharing its width, each stacking its icon over its
+ * whose tap is [FluteActions.onShelfOpen]; then [FluteKeys]: the octave pills, the seven letter keys and the tools'
+ * row with the erase key ([FluteActions.onEraseLast], faded while the tune is empty) at its end, taking the height
+ * left, and the Play row: two big buttons sharing its width, each stacking its icon over its
  * word, "Play" (green, [FluteActions.onTogglePlayback], faded while the tune is empty) and "Your turn" (blue,
  * [FluteActions.onYourTurn], faded while the tune holds no note). On an ordinary phone held
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
@@ -212,7 +216,8 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  *
  * While the tune runs ([FluteUiState.isRunning]: Play, or Your turn with the microphone open, or a
  * Your turn that ended with its speed line, the microphone closed, until Stop) the
- * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]), so it
+ * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]; a tune above c³ a little
+ * less, [StaffGeometry.runningScale], with only the room its highest note needs), so it
  * reads from a music stand at arm's length, with the knob's animal walking the staff at the knob's
  * height ([StaffAnimal]: over the playing step, hopping on to each beat's place on each click, or
  * waiting over the step the child is to play), the knob itself empty and inert, and the book button faded and inert,
@@ -364,7 +369,12 @@ fun FluteContent(
             }
         } else {
             val fits = maxHeight >= FitsHeight
-            val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
+            // What the tab's height has over its least goes to the staff's box first, up to the room c⁴ needs (since
+            // 2026-11-18), then to the keys: on a zoomed tab into their height, else round them.
+            val spare = (maxHeight - FitsHeight).value
+            val uprightStaffBox = StaffGeometry.uprightBox(spare)
+            val staffSpare = uprightStaffBox - StaffGeometry.TOTAL_HEIGHT
+            val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight(spare - staffSpare).dp else KeyHeight
             val running = state.isRunning
             // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
             // Or, once a run ended at another animal's speed than the knob's, that one line until Stop (2026-11-14).
@@ -374,11 +384,22 @@ fun FluteContent(
             // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
             // out in places of their own, and a staff made anew at each swap would scroll in from its start.
             val staffPlace = rememberLazyListState()
+            // The room a tune that goes above c³ needs over the staff (since 2026-11-18), worked out once per tune: while
+            // listening the state changes on every microphone frame. Upright, while the child writes, the staff's box
+            // never changes, so the keys never move: the tune is drawn at full size while the box has its room, smaller
+            // where it has not. On its side the card's height says how large the staff can be.
+            val needed = remember(state.tune) { StaffGeometry.roomOver(state.tune) }
             val staffScale = when {
-                !running -> if (sideways && zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f
-                sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT)
-                else -> RunningStaffScale
+                !running && sideways -> minOf(
+                    if (zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f,
+                    SidewaysGeometry.restingStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT + needed),
+                )
+                !running -> StaffGeometry.restingScale(needed, uprightStaffBox)
+                sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT + needed)
+                else -> StaffGeometry.runningScale(needed)
             }
+            // The room the staff is drawn with: all its box has upright while the child writes, else what the tune needs.
+            val room = if (!running && !sideways) uprightStaffBox / staffScale - StaffGeometry.TOTAL_HEIGHT else needed
             // The walking animal's hop: it hops only on the staff, so only while the tune runs.
             val flash = rememberBeatFlash(state.beatPulse, running)
             val animal = if (running) {
@@ -402,6 +423,7 @@ fun FluteContent(
                         scale = staffScale,
                         listState = staffPlace,
                         joinWaiting = state.joinWaiting,
+                        room = room,
                     )
                     SpeedKnob(
                         bpm = metronome.config.bpm,
@@ -412,7 +434,7 @@ fun FluteContent(
                         },
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .offset(y = StaffGeometry.knobTop(staffScale).dp),
+                            .offset(y = StaffGeometry.knobTop(staffScale, room).dp),
                     )
                     BookButton(
                         sweet = Sweet.entries[state.openBook],
@@ -423,13 +445,15 @@ fun FluteContent(
                         },
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .offset(y = StaffGeometry.bookButtonTop(staffScale).dp),
+                            .offset(y = StaffGeometry.bookButtonTop(staffScale, room).dp),
                     )
                 }
             }
             val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, keyHeight, keyGap ->
                 FluteKeys(
-                    litMidi = state.litMidi,
+                    octave = state.octave,
+                    keyNotes = state.keyNotes,
+                    litLetter = state.litLetter,
                     restLit = state.restLit,
                     eraseEnabled = !state.isEmpty,
                     actions = actions,

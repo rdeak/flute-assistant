@@ -87,11 +87,24 @@ class SidewaysGeometryTest {
     }
 
     @Test
-    fun `a key is a third of what the height leaves, its shadow less, from 58 to 88`() {
-        assertDp(85.3f, SidewaysGeometry.keyHeight(411f))
-        assertDp(68.3f, SidewaysGeometry.keyHeight(360f))
-        assertDp(58f, SidewaysGeometry.keyHeight(300f))
+    fun `a key is half of what the height leaves under the pills, its shadow less, from 58 to 88`() {
+        // Two rows and the octave pills since 2026-11-18 (three rows before): every phone on its side gives its keys the most.
+        assertDp(88f, SidewaysGeometry.keyHeight(411f))
+        assertDp(85.5f, SidewaysGeometry.keyHeight(360f))
+        assertDp(60.5f, SidewaysGeometry.keyHeight(310f))
+        assertDp(58f, SidewaysGeometry.keyHeight(305f))
         assertDp(88f, SidewaysGeometry.keyHeight(800f))
+    }
+
+    @Test
+    fun `a staff with room for c4 is drawn as large as the card's height lets it`() {
+        // 2026-11-18: a tune above c³ has up to 63 dp of room over the released 257.
+        val tall = StaffGeometry.TOTAL_HEIGHT + StaffGeometry.HIGH_ROOM
+        assertScale(1f, SidewaysGeometry.restingStaffScale(360f, StaffGeometry.TOTAL_HEIGHT))
+        assertScale(0.956f, SidewaysGeometry.restingStaffScale(360f, tall))
+        assertScale(1f, SidewaysGeometry.restingStaffScale(411f, tall))
+        assertScale(0.956f, SidewaysGeometry.runningStaffScale(360f, tall))
+        assertScale(1.116f, SidewaysGeometry.runningStaffScale(411f, tall))
     }
 
     @Test
@@ -206,12 +219,12 @@ class SidewaysGeometryTest {
         assertDp(20f, SidewaysGeometry.FINGERING_GAP)
     }
 
-    /** The page needs its two margins, the keys at their least, the gap, and Play with its shadow: 16 + 213 + 8 + 92. */
+    /** The page needs its two margins, the keys at their least, the gap, and Play with its shadow: 16 + 189 + 8 + 92. */
     @Test
-    fun `writing needs 329 dp, which is the keys' least height and the buttons`() {
-        assertDp(329f, SidewaysGeometry.WRITING_MIN_HEIGHT)
+    fun `writing needs 305 dp, which is the keys' least height and the buttons`() {
+        assertDp(305f, SidewaysGeometry.WRITING_MIN_HEIGHT)
         assertDp(2 * SidewaysGeometry.MARGIN + FluteKeysMinHeight.value + 8f + 92f, SidewaysGeometry.WRITING_MIN_HEIGHT)
-        assertDp(313f, SidewaysGeometry.WRITING_MIN_HEIGHT - 2 * SidewaysGeometry.MARGIN)
+        assertDp(289f, SidewaysGeometry.WRITING_MIN_HEIGHT - 2 * SidewaysGeometry.MARGIN)
     }
 
     /** Where the keys fit the formula's own height is the least a key has, so nothing is lost by the scroll below it. */

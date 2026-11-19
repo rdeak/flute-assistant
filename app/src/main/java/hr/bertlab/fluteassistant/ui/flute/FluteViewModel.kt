@@ -29,7 +29,6 @@ import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.settings.MetronomeSettings
 import hr.bertlab.fluteassistant.domain.settings.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
@@ -86,7 +85,8 @@ import javax.inject.Inject
  * second tap cancelled one or there was nothing to join from), `flute.join_cancel` (reason: rest, breath, erase,
  * play, listen, book, speed or leave: a waiting join dropped), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its
  * second tap dropped it, since 2026-11-17), `flute.sign_cancel` (reason: erase, play, listen, book, speed or leave: a waiting sign
- * dropped), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
+ * dropped), `flute.octave` (octave: 1 to 4, when an octave pill changed the octave the keys write in, since
+ * 2026-11-18), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
  * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left),
  * `flute.speed_open` and `flute.speed_done` (bpm, time), `flute.shelf_open` (book: the open
  * one's index), `flute.book_open` (from, to, notes: the steps in the book opened, bpm and time:
@@ -155,12 +155,13 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * A finger went down on the white key [key]: sound the note it writes at once and add it to the tune, or go on with its
-     * note ([TuneWriter]). While the ♯♭ key waits it writes its letter's black note, and D, A and C6 do nothing but go
-     * on with a hold the touch screen split ([TuneWriter.takes]). The keys are the white ones only (since 2026-11-17).
+     * A finger went down on the letter key [key] (0 = C to 6 = B, since 2026-11-18): sound the note it writes at once, its
+     * own in the chosen octave, and add it to the tune, or go on with its note ([TuneWriter]). While the ♯♭ key waits it
+     * writes its letter's black note, and D and A do nothing but go on with a hold the touch screen split
+     * ([TuneWriter.takes]); in octave 4 only c⁴ writes.
      */
     fun onKeyPressed(key: Int) {
-        if (key !in StaffNotes.ALL || !writer.takes(key, clock.nowMillis())) return
+        if (key !in 0..6 || !writer.takes(key, clock.nowMillis())) return
         stopRunning(reason = "key")
         activationJob?.cancel()
         press(key)
@@ -549,7 +550,7 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * The white key [key] (null: the rest key) went down: the writer adds its step or goes on with the
+     * The letter key [key] (null: the rest key) went down: the writer adds its step or goes on with the
      * one let go of, and it grows from there while the key stays down. A new step is a write to
      * the tune and is saved; a hold that only goes on is not.
      */
@@ -611,7 +612,9 @@ class FluteViewModel @Inject constructor(
 
     /** Shows what the writer holds: the tune, the key under a finger, and whether a join or a sign waits. */
     private fun written() {
-        _state.update { it.copy(tune = writer.tune, held = writer.held, joinWaiting = writer.joinWaiting, signWaiting = writer.signWaiting) }
+        _state.update {
+            it.copy(tune = writer.tune, held = writer.held, joinWaiting = writer.joinWaiting, signWaiting = writer.signWaiting, octave = writer.octave)
+        }
     }
 
     /**
@@ -635,6 +638,18 @@ class FluteViewModel @Inject constructor(
         val waiting = writer.sign()
         written()
         logger.d(LogTags.FLUTE, "flute.sign", "waiting" to waiting)
+    }
+
+    /**
+     * An octave pill (since 2026-11-18, spec `2026-11-18-flute-every-octave-design.md`, Revision 3): the letter keys write
+     * in [octave], 1 to 4, until another pill is tapped. The chosen one again does nothing. It never ends a held key,
+     * whose note goes on under its finger, and drops no waiting join or sign.
+     */
+    fun onOctave(octave: Int) {
+        if (!writer.chooseOctave(octave)) return
+        stopRunning(reason = "key")
+        written()
+        logger.d(LogTags.FLUTE, "flute.octave", "octave" to octave)
     }
 
     /** Whether the note key [key] is the one held now. */

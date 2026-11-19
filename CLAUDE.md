@@ -154,10 +154,19 @@ tab's CLAUDE.md; these rules hold on all of them:
   they open from the tuner's line when it names a fix on the flute, and a tap on the window plays the note: the 🔧 How?
   and 🔊 Hear buttons are gone, and the tuner has one line of words.
 - Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
-  pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
-- Added at the user's request (2026-11-16, reshaped 2026-11-17): the flute's ♯♭ key beside C6, which makes
-  the next note key write its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭, both octaves), one tap per note; the
-  keys stay the fifteen white ones in three rows (`ui/flute/CLAUDE.md`, "Sharps and flats").
+  pair, left of 💤 in the tools' row (`ui/flute/CLAUDE.md`, "Legato").
+- Added at the user's request (2026-11-16, reshaped 2026-11-17): the flute's ♯♭ key, which makes the next note key
+  write its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭), one tap per note (`ui/flute/CLAUDE.md`, "Sharps and flats").
+- Added at the user's request (2026-11-18, "support all octave covered by fingers"; "go with b approach (with numbers
+  1, 2, 3, 4) and show d1, d2, d3, d4 depending which octave is selected"): the flute writes c¹ to c⁴, the Fingers
+  tab's range, with seven letter keys named for the chosen octave (d¹, d², d³), the four octaves as pills over them, each
+  naming its notes (c¹–h¹, c²–h², c³–h³, c⁴: "replace 1, 2, 3, 4 labels with c1-h1, c2-h2, c3-h3, and c4"), and the
+  tools in one row under them; the staff has room for
+  c⁴ (`ui/flute/CLAUDE.md`, "Octaves"). A key carries its formal name (h¹, C4) and writes exactly that note, and only a
+  pill changes the octave. Two other ways were built the same day and withdrawn after the user showed them to a child
+  and an adult: bare letters with the note nearest the last one and ⬇ ⬆ that moved a note after it was written (they
+  could not find how to change the octave), and the released three rows with a key that moved them an octave up (they
+  could not find d³). Do not hide the octave figure, work the octave out for the child, or bring either back.
 - Added at the user's request (2026-11-17, a teacher's ask): the fifth tab, Fingers 🖐️, last in the row: the chosen
   note in every octave, each on its staff with the flute drawn as the player sees it, and seven letter keys and ♯♭ to
   choose it. Nothing else on it (`ui/fingers/CLAUDE.md`; spec `docs/superpowers/specs/2026-11-17-fingers-tab-design.md`).

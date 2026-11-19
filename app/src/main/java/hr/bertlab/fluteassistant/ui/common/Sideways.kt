@@ -54,24 +54,30 @@ internal object SidewaysGeometry {
     /** The room between the keys and the button row under them: the page's margin, as `FluteWritingSideways` spaces them. */
     private const val KEYS_TO_BUTTONS = MARGIN
 
-    /** The keys' three rows have two gaps between them, of upright's `KeyRowGap` (12). */
-    private const val KEY_ROW_GAPS = 12f * 2
+    /** The flute's key rows: the letters and the tools (since 2026-11-18; three octave rows before). */
+    private const val KEY_ROWS = 2
+
+    /** The two rows have one gap between them, upright's `KeyRowGap` (12). */
+    private const val KEY_ROW_GAPS = 12f
+
+    /** The octave pills over the letters (since 2026-11-18): 43 dp and the 8 under them (`FluteKeys`' `PillsHeight`). */
+    private const val OCTAVE_PILLS = 51f
 
     /**
-     * What the keys' column spends besides the three rows' keys: the two margins, the button row
-     * under the keys, its gap and the gaps between the rows.
+     * What the keys' column spends besides the two rows' keys: the two margins, the button row
+     * under the keys, its gap, the gap between the rows and the octave pills.
      */
-    private const val KEYS_SPENT = MARGIN * 2 + KEYS_BUTTONS + KEYS_TO_BUTTONS + KEY_ROW_GAPS
+    private const val KEYS_SPENT = MARGIN * 2 + KEYS_BUTTONS + KEYS_TO_BUTTONS + KEY_ROW_GAPS + OCTAVE_PILLS
 
     /** A key is `KeyLook.kt`'s [KEY_HEIGHT] at the least, and every key row has its own shadow ([KEY_DEPTH]), which the mockup counted only once. */
     private const val KEY_HEIGHT_MAX = 88f
 
     /**
-     * The window height under which writing cannot give its keys their least (three rows of
-     * [KEY_HEIGHT] and their shadows) and still have the buttons under them: 329. Under it the
+     * The window height under which writing cannot give its keys their least (the pills and two rows of
+     * [KEY_HEIGHT] and their shadows) and still have the buttons under them: 305 (329 with three rows, until 2026-11-18). Under it the
      * keys' column scrolls, as upright's tab does; the phones the layout was drawn for are all taller.
      */
-    const val WRITING_MIN_HEIGHT = KEYS_SPENT + 3 * (KEY_HEIGHT + KEY_DEPTH)
+    const val WRITING_MIN_HEIGHT = KEYS_SPENT + KEY_ROWS * (KEY_HEIGHT + KEY_DEPTH)
 
     private const val RING_MAX = 304f
 
@@ -162,9 +168,16 @@ internal object SidewaysGeometry {
 
     fun keyGap(contentWidth: Float): Float = if (contentWidth < NARROW_CONTENT) KEY_GAP_NARROW else KEY_GAP
 
-    /** A third of what the height leaves for the rows, less each row's shadow: 85 at 411, 68 at 360. */
+    /** Half what the height leaves for the two rows, less each row's shadow, at most [KEY_HEIGHT_MAX]: 85 at 360, 88 from 365. */
     fun keyHeight(height: Float): Float =
-        ((height - KEYS_SPENT) / 3 - KEY_DEPTH).coerceIn(KEY_HEIGHT, KEY_HEIGHT_MAX)
+        ((height - KEYS_SPENT) / KEY_ROWS - KEY_DEPTH).coerceIn(KEY_HEIGHT, KEY_HEIGHT_MAX)
+
+    /**
+     * The resting staff's scale (since 2026-11-18): 1 where the card's height has room for a staff [staffHeight] tall at
+     * rest, below that the largest at which it fits. The released staff (257) fits every phone; one with room for c⁴
+     * (320) is drawn at about 0.96 at 360 dp tall.
+     */
+    fun restingStaffScale(height: Float, staffHeight: Float): Float = minOf(1f, innerHeight(height) / staffHeight)
 
     /**
      * The running staff's scale: the upright one's 4/3 where the card's height allows it, below that

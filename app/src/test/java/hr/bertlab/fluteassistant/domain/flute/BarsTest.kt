@@ -188,6 +188,10 @@ class BarsTest {
         assertEquals(listOf(Accidental.SHARP, null, Accidental.NATURAL), signs(n(66), n(67), n(65)))
 
     @Test
+    fun `a sign above c3 is written and cancelled as below it`() =
+        assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL), signs(n(90), n(89))) // F♯6 then F6
+
+    @Test
     fun `a natural holds, so the next one needs none`() {
         assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL, null), signs(n(66), n(65), n(65)))
         assertEquals(listOf(Accidental.SHARP, Accidental.NATURAL, Accidental.SHARP, Accidental.NATURAL), signs(n(66), n(65), n(66), n(65)))

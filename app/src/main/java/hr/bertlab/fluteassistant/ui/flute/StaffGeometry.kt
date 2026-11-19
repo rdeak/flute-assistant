@@ -3,9 +3,12 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.NoteLength
 import hr.bertlab.fluteassistant.domain.flute.StepPart
+import hr.bertlab.fluteassistant.domain.flute.TuneItem
+import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_X
 import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_Y
@@ -23,6 +26,13 @@ import kotlin.math.hypot
  * above the line of pills, rather than make the staff that much taller; both stay inside what the
  * scrolling row lets a child draw beyond it (30 dp). Kept apart from the drawing so a unit test can
  * check that no note, at any height and length, lit or tied, goes further.
+ *
+ * Since 2026-11-18 (spec `2026-11-18-flute-every-octave-design.md`, Revision 3) the flute writes up to c⁴, five ledger
+ * lines over the staff. Every number here stands: a tune that goes above c³ needs room over the staff ([roomOver], up
+ * to [HIGH_ROOM]), and the staff is drawn that much lower in a box that much taller. Upright, while the child writes,
+ * the box is this height and what the tab has to spare ([uprightBox]) and never changes; the staff stands at its
+ * bottom, at full size while the box has the room the tune needs ([restingScale]). While the tune runs it has only the
+ * room it needs and is no taller than before ([runningScale]): a tune with no note above c³ runs exactly as before.
  */
 internal object StaffGeometry {
     /** One note step: a line to the next space. */
@@ -72,6 +82,38 @@ internal object StaffGeometry {
     /** The arrow's middle, right of the bubble's middle: just past its edge, overlapping it by a dp as in the mockup. */
     const val PITCH_ARROW_X = (MARKS_HEIGHT + PITCH_ARROW_SIZE) / 2 - 1
     const val TOTAL_HEIGHT = MARKS_TOP + MARKS_HEIGHT
+
+    /** The room c⁴ needs over the box, which holds notes up to c³ (since 2026-11-18): seven steps, from c³'s place (14) to c⁴'s (21). */
+    const val HIGH_ROOM = 63f
+
+    /** c³'s place (c¹ = 0): the highest note the box holds with no room over it. */
+    private const val C3_PLACE = 14
+
+    /**
+     * The room [tune] needs over the box, in dp at rest: a step ([STEP]) for each place its highest note stands over
+     * c³ (a black note counts by its letter's place), [HIGH_ROOM] at c⁴; none with no note above c³. With its room the
+     * highest note stands where c³ stands with none.
+     */
+    fun roomOver(tune: List<TuneItem>): Float {
+        val top = tune.filterIsInstance<TuneNote>().maxOfOrNull { FluteNotes.positionOf(it.midi) } ?: return 0f
+        return ((top - C3_PLACE) * STEP).coerceIn(0f, HIGH_ROOM)
+    }
+
+    /**
+     * The staff's box upright while the child writes (since 2026-11-18): [TOTAL_HEIGHT] and what the tab's height has to
+     * [spare] over its least, up to [HIGH_ROOM]: 300 on a Galaxy A55, whose tab has 43 dp to spare, 320 from 63 dp.
+     */
+    fun uprightBox(spare: Float): Float = TOTAL_HEIGHT + spare.coerceIn(0f, HIGH_ROOM)
+
+    /**
+     * The scale of the staff while the child writes, upright, when the tune needs [room] over it and its box is [box]
+     * tall (the released [TOTAL_HEIGHT] and what the tab's height has to spare, up to [HIGH_ROOM]): 1 while the box has
+     * the room, else what fits the tune in it, so the box and the keys under it never move.
+     */
+    fun restingScale(room: Float, box: Float = TOTAL_HEIGHT): Float = minOf(1f, box / (TOTAL_HEIGHT + room))
+
+    /** The scale of the running staff upright with [room] over it: [RunningStaffScale], or less, so it is never taller than a tune up to c³ runs. */
+    fun runningScale(room: Float): Float = minOf(RunningStaffScale, TOTAL_HEIGHT * RunningStaffScale / (TOTAL_HEIGHT + room))
 
     /** A tie between two pills of one note: [PILL_TIE_GAP] under them, dipping [PILL_TIE_DIP]. */
     const val PILL_TIE_GAP = 4f
@@ -139,16 +181,16 @@ internal object StaffGeometry {
      * which keeps its size, goes up as far: the staff is centred in a taller card there, so there is
      * room. A staff drawn bigger (a tune running) takes the clef away from it, and the knob stays.
      */
-    fun knobTop(scale: Float): Float = -KNOB_LIFT - (1f - minOf(scale, 1f)) * CLEF_TIP_Y
+    fun knobTop(scale: Float, room: Float = 0f): Float = -KNOB_LIFT - maxOf(0f, CLEF_TIP_Y - (CLEF_TIP_Y + room) * minOf(scale, 1f))
 
     /**
      * The air, with the staff drawn at [scale], between the clef's line at its tip and the nearest of
      * the knob's shadow and its badge (the knob's own disc is above its shadow); under zero they overlap.
      */
-    fun knobClefAir(scale: Float): Float {
-        val top = knobTop(scale)
+    fun knobClefAir(scale: Float, room: Float = 0f): Float {
+        val top = knobTop(scale, room)
         val tipX = CLEF_TIP_X * scale
-        val tipY = CLEF_TIP_Y * scale
+        val tipY = (CLEF_TIP_Y + room) * scale
         val knob = CORNER_BUTTON / 2
         val badge = KNOB_BADGE / 2
         val badgeMiddle = CORNER_BUTTON + KNOB_BADGE_OVERHANG - badge
@@ -162,18 +204,37 @@ internal object StaffGeometry {
      * from a moving true-size mockup; it walked the marks row before): it leaves the knob and walks
      * the staff near the knob's height (the knob's middle until the knob went up by [KNOB_LIFT]; the
      * animal's line stayed, as its hop must keep inside the box), its middle [ANIMAL_Y] from the top
-     * of the staff's box at every scale, as the knob does not grow with the running staff; [ANIMAL_SIZE] tall at rest
+     * of the staff's box, as the knob does not grow with the running staff, or higher where the staff is drawn smaller
+     * ([animalY], since 2026-11-18); [ANIMAL_SIZE] tall at rest
      * scale (the running staff draws it a third bigger). Its hop (8 dp) keeps it inside the box,
      * and it stands over the stems of the notes from f² up, never over a head but c³'s top edge.
      */
     const val ANIMAL_Y = CORNER_BUTTON / 2
     const val ANIMAL_SIZE = 24f
 
+    /** How much of the top note's head the animal may stand over: c³'s 3.1 dp at [RunningStaffScale], and a little more. */
+    private const val ANIMAL_COVER = 4f
+
+    /** The animal's hop, `HopDistance` (8 dp): at its top the animal is still inside the box. */
+    private const val HOP = 8f
+
+    /**
+     * Where the animal's middle walks, from the box's top, with the staff drawn at [scale] (since 2026-11-18, the user's
+     * pick "b, higher"): [ANIMAL_Y], unless there it would stand over more than [ANIMAL_COVER] of the top note's head,
+     * which happens on a staff drawn smaller (a tune above c³, a phone on its side): then as high as its hop keeps it
+     * inside the box. The highest note a box holds, with its room, stands where c³ does.
+     */
+    fun animalY(scale: Float): Float {
+        val half = ANIMAL_SIZE * scale / 2
+        val headTop = (yOf(C3_PLACE) - HEAD_RY - 0.25f - HEAD_EDGE) * scale // the head's tilt adds a quarter dp
+        return if (ANIMAL_Y + half - headTop <= ANIMAL_COVER) ANIMAL_Y else half + HOP
+    }
+
     /** The book button's height: a book stands taller than it is wide, and the cell under the clef has 90 dp of room. */
     const val BOOK_BUTTON_HEIGHT = 64f
 
     /** Where the book button's top is at [scale] (1 at rest, [RunningStaffScale] while the tune runs): centred on the names' pills. */
-    fun bookButtonTop(scale: Float): Float = (NAMES_TOP + PILL_HEIGHT / 2) * scale - BOOK_BUTTON_HEIGHT / 2
+    fun bookButtonTop(scale: Float, room: Float = 0f): Float = (NAMES_TOP + room + PILL_HEIGHT / 2) * scale - BOOK_BUTTON_HEIGHT / 2
 
     /** The time signature's figures: centred at this x, each across two spaces of the staff. */
     const val SIGNATURE_X = 48f

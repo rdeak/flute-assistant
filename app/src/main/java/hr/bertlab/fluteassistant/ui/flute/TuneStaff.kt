@@ -59,9 +59,11 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -148,8 +150,11 @@ val TuneStaffHeight = StaffGeometry.TOTAL_HEIGHT.dp
  */
 const val RunningStaffScale = 4f / 3f
 
-/** The staff's height at [scale]: [TuneStaffHeight] at rest, a third more while the tune runs. */
-fun tuneStaffHeight(scale: Float): Dp = (StaffGeometry.TOTAL_HEIGHT * scale).dp
+/**
+ * The staff's height at [scale] with [room] over it ([StaffGeometry.roomOver], since 2026-11-18; none for a tune up to
+ * c³): [TuneStaffHeight] at rest, a third more while the tune runs.
+ */
+fun tuneStaffHeight(scale: Float, room: Float = 0f): Dp = ((StaffGeometry.TOTAL_HEIGHT + room) * scale).dp
 
 /**
  * The knob's animal while the tune runs: over which step it stands and how many half beats into it
@@ -173,6 +178,26 @@ internal const val BREATH_EMOJI = "😮‍💨" // face exhaling
 
 /** How much bigger than [StaffGeometry]'s dp everything on the staff is drawn: 1 at rest, [RunningStaffScale] while the tune runs. */
 private val LocalStaffScale = compositionLocalOf { 1f }
+
+/**
+ * The room over the staff in its box, in dp at rest: everything is drawn that much lower. What a tune above c³ needs
+ * ([StaffGeometry.roomOver]) while it runs and on a phone on its side; upright while the child writes, all the room the
+ * box has (`FluteContent`: the tab's spare height, up to [StaffGeometry.HIGH_ROOM]).
+ */
+private val LocalStaffRoom = compositionLocalOf { 0f }
+
+/** The walking animal's box, the knob's size, for the tests to find where it stands. */
+internal const val WALKING_ANIMAL_TAG = "staff_animal"
+
+/**
+ * Draws [block] in the staff's own dp, at rest, with the staff drawn at [scale] and [room] over it: the staff stands
+ * that much lower in its box, which is that much taller, so the released numbers hold for everything on it.
+ */
+private inline fun DrawScope.atStaff(scale: Float, room: Float, crossinline block: DrawScope.() -> Unit) {
+    scale(density * scale, pivot = Offset.Zero) {
+        translate(top = room) { block() }
+    }
+}
 
 /**
  * The theme's colours as the staff uses them. A data class, so a staff recomposed with the same theme hands every
@@ -234,6 +259,7 @@ fun TuneStaff(
     scale: Float = 1f,
     listState: LazyListState = rememberLazyListState(),
     joinWaiting: Boolean = false,
+    room: Float = 0f,
 ) {
     val colors = FluteTheme.colors
     val ink = StaffInk(line = colors.text, outline = colors.outline, card = colors.card, rest = colors.mutedText)
@@ -241,9 +267,9 @@ fun TuneStaff(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(tuneStaffHeight(scale))
+            .height(tuneStaffHeight(scale, room))
             .drawBehind {
-                scale(density * scale, pivot = Offset.Zero) {
+                atStaff(scale, room) {
                     val width = size.width / (density * scale)
                     for (line in 0..4) {
                         val y = TOP_LINE_Y + line * StaffGeometry.STEP * 2
@@ -258,7 +284,7 @@ fun TuneStaff(
                 }
             },
     ) {
-        CompositionLocalProvider(LocalStaffScale provides scale) {
+        CompositionLocalProvider(LocalStaffScale provides scale, LocalStaffRoom provides room) {
             TimeSignatureMark(timeSignature, ink, measurer)
             if (tune.isEmpty()) {
                 EmptyHint()
@@ -306,13 +332,14 @@ private fun DrawScope.drawEmoji(layout: TextLayoutResult, x: Float, y: Float) {
 @Composable
 private fun TimeSignatureMark(signature: TimeSignature, ink: StaffInk, measurer: TextMeasurer) {
     val s = LocalStaffScale.current
+    val room = LocalStaffRoom.current
     val description = stringResource(R.string.flute_time_signature, signature.beatsPerBar, signature.noteValue)
     val top = staffText(measurer, signature.beatsPerBar.toString(), StaffGeometry.SIGNATURE_SIZE)
     val bottom = staffText(measurer, signature.noteValue.toString(), StaffGeometry.SIGNATURE_SIZE)
     val half = StaffGeometry.SIGNATURE_SIZE / 2
     Spacer(
         modifier = Modifier
-            .offset(x = ((StaffGeometry.SIGNATURE_X - half) * s).dp, y = (TOP_LINE_Y * s).dp)
+            .offset(x = ((StaffGeometry.SIGNATURE_X - half) * s).dp, y = ((TOP_LINE_Y + room) * s).dp)
             .size((StaffGeometry.SIGNATURE_SIZE * s).dp, ((BOTTOM_LINE_Y - TOP_LINE_Y) * s).dp)
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
@@ -336,6 +363,7 @@ private fun TimeSignatureMark(signature: TimeSignature, ink: StaffInk, measurer:
 @Composable
 private fun EmptyHint() {
     val s = LocalStaffScale.current
+    val room = LocalStaffRoom.current
     val colors = FluteTheme.colors
     val sideways = LocalSideways.current
     val style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold)
@@ -346,7 +374,7 @@ private fun EmptyHint() {
             .padding(
                 start = (StaffGeometry.HINT_START * s).dp,
                 end = (StaffGeometry.HINT_END_PADDING * s).dp,
-                top = (StaffGeometry.HINT_TOP * s).dp,
+                top = ((StaffGeometry.HINT_TOP + room) * s).dp,
             )
             .fillMaxWidth()
             .height((StaffGeometry.HINT_HEIGHT * s).dp)
@@ -478,6 +506,7 @@ private fun SlurLayer(tune: List<TuneItem>, lineMarks: List<LineMark>, starts: L
     val waitingOn = (tune.lastOrNull() as? TuneNote)?.takeIf { joinWaiting }
     if (arcs.isEmpty() && waitingOn == null) return
     val s = LocalStaffScale.current
+    val room = LocalStaffRoom.current
     val muted = FluteTheme.colors.mutedText
     // Built once per tune and look, not on every frame the row scrolls or the animal hops.
     val drawings = remember(tune, lineMarks, starts, waitingOn, ink.line, muted) {
@@ -505,7 +534,7 @@ private fun SlurLayer(tune: List<TuneItem>, lineMarks: List<LineMark>, starts: L
                     if (first != null && firstStart != null) translationX = info.beforeContentPadding + first.offset - firstStart * s * density
                 }
                 .drawBehind {
-                    scale(density * s, pivot = Offset.Zero) {
+                    atStaff(s, room) {
                         for (drawing in drawings) drawPath(drawing.path, drawing.color, style = drawing.style)
                     }
                 },
@@ -614,7 +643,7 @@ internal fun animalX(animal: StaffAnimal, tune: List<TuneItem>, lineMarks: List<
 
 /**
  * The knob's animal while the tune runs, walking the staff at the knob's height
- * ([StaffGeometry.ANIMAL_Y]) over the step it stands for (the user's pick of the evening of
+ * ([StaffGeometry.animalY]: [StaffGeometry.ANIMAL_Y], or higher over a staff drawn smaller) over the step it stands for (the user's pick of the evening of
  * 2026-11-04, "A": like the metronome's beat bubbles, never two hops in one place): over the
  * step's head when the step begins, then on each click over that beat's place
  * ([StaffGeometry.beatX]), so a half note is two places and a whole note four; it slides to each
@@ -638,7 +667,7 @@ private fun WalkingAnimal(animal: StaffAnimal, target: Float, starts: List<Float
         modifier = Modifier
             .fillMaxSize()
             .drawWithContent {
-                // Clipped at the row's sides only: the hop and c³'s stem may reach above the box.
+                // Clipped at the row's sides only: the hop and the highest note's stem may reach above the box.
                 clipRect(top = -size.height, bottom = size.height * 2) { this@drawWithContent.drawContent() }
             },
     ) {
@@ -653,8 +682,9 @@ private fun WalkingAnimal(animal: StaffAnimal, target: Float, starts: List<Float
                     val firstStart = first?.let { starts.getOrNull(it.index) } ?: return@offset IntOffset(-box.roundToPx() * 4, 0)
                     // The first item shown is the reference, so a pixel rounded per item never adds up.
                     val middle = info.beforeContentPadding + first.offset + ((x.value - firstStart) * s).dp.toPx()
-                    IntOffset((middle - box.toPx() / 2).roundToInt(), (StaffGeometry.ANIMAL_Y.dp - box / 2).roundToPx())
-                },
+                    IntOffset((middle - box.toPx() / 2).roundToInt(), (StaffGeometry.animalY(s).dp - box / 2).roundToPx())
+                }
+                .testTag(WALKING_ANIMAL_TAG),
         ) {
             Emoji(
                 animal.emoji,
@@ -694,6 +724,7 @@ private fun StepMark(
     ink: StaffInk,
 ) {
     val s = LocalStaffScale.current
+    val room = LocalStaffRoom.current
     val name = when (item) {
         is TuneNote -> lengthDescription(noteLabel(item.midi), item.length).let {
             if (item.joined) stringResource(R.string.flute_note_joined, it) else it
@@ -713,16 +744,16 @@ private fun StepMark(
     Box(
         modifier = Modifier
             .zIndex(if (lit || growing) -1f else 0f)
-            .size((layout.width * s).dp, tuneStaffHeight(s))
+            .size((layout.width * s).dp, tuneStaffHeight(s, room))
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
-                scale(density * s, pivot = Offset.Zero) {
+                atStaff(s, room) {
                     drawStep(item, step, layout, lit, growing, ink)
                 }
             },
     ) {
-        NameRow(item, step.parts, lit, layout, Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp))
-        MarkRow(mark, heard, heardNow, pitch, waiting, Modifier.offset(x = (layout.room * s).dp, y = (StaffGeometry.MARKS_TOP * s).dp))
+        NameRow(item, step.parts, lit, layout, Modifier.offset(y = ((StaffGeometry.NAMES_TOP + room) * s).dp))
+        MarkRow(mark, heard, heardNow, pitch, waiting, Modifier.offset(x = (layout.room * s).dp, y = ((StaffGeometry.MARKS_TOP + room) * s).dp))
     }
 }
 
@@ -1089,17 +1120,18 @@ private fun DrawScope.drawRest(cx: Float, length: NoteLength, color: Color) {
 @Composable
 private fun BarLineMark(ink: StaffInk) {
     val s = LocalStaffScale.current
+    val room = LocalStaffRoom.current
     Box(
         contentAlignment = Alignment.TopCenter,
         modifier = Modifier
-            .size((BAR_SLOT * s).dp, tuneStaffHeight(s))
+            .size((BAR_SLOT * s).dp, tuneStaffHeight(s, room))
             .drawBehind {
-                scale(density * s, pivot = Offset.Zero) {
+                atStaff(s, room) {
                     drawLine(ink.line, Offset(BAR_SLOT / 2, TOP_LINE_Y), Offset(BAR_SLOT / 2, BOTTOM_LINE_Y), BAR_LINE_WIDTH)
                 }
             },
     ) {
-        Box(Modifier.offset(y = (StaffGeometry.NAMES_TOP * s).dp)) { PillBarLine() }
+        Box(Modifier.offset(y = ((StaffGeometry.NAMES_TOP + room) * s).dp)) { PillBarLine() }
     }
 }
 
@@ -1107,14 +1139,15 @@ private fun BarLineMark(ink: StaffInk) {
 @Composable
 private fun BreathMark(ink: StaffInk, measurer: TextMeasurer) {
     val s = LocalStaffScale.current
+    val room = LocalStaffRoom.current
     val description = stringResource(R.string.flute_breath_here)
     val face = staffText(measurer, BREATH_EMOJI, BREATH_FACE_SIZE)
     Spacer(
         modifier = Modifier
-            .size((BREATH_SLOT * s).dp, tuneStaffHeight(s))
+            .size((BREATH_SLOT * s).dp, tuneStaffHeight(s, room))
             .clearAndSetSemantics { contentDescription = description }
             .drawBehind {
-                scale(density * s, pivot = Offset.Zero) {
+                atStaff(s, room) {
                     val x = BREATH_SLOT / 2
                     drawPath(
                         Path().apply {

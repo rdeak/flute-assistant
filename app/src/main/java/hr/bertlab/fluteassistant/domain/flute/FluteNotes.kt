@@ -4,31 +4,47 @@
 package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
 /**
- * The flute's own notes (since 2026-11-16): every semitone from C4 to C6, the white notes and the black ones between
- * them (C♯ E♭ F♯ G♯ B♭, spelled by [NoteSpelling]). The keys are the white ones, and the ♯♭ key makes one write its
- * black note ([signed], since 2026-11-17). The notes game keeps its fifteen white notes ([StaffNotes]); the flute's
- * tune and its staff use this list. A black note sits on its letter's staff place.
+ * The flute's own notes: every semitone from C4 to C7 (c¹ to c⁴, since 2026-11-18; C4 to C6 from 2026-11-16), the
+ * tuner's and the Fingers tab's range ([FluteRange]), the black ones spelled by [NoteSpelling] (C♯ E♭ F♯ G♯ B♭). The
+ * keys are seven letters and the four octaves as pills over them (since 2026-11-18; spec
+ * `2026-11-18-flute-every-octave-design.md`, Revision 3): a letter writes its note in the chosen octave ([inOctave]),
+ * its black note while the ♯♭ key waits. The notes game keeps its fifteen white notes ([StaffNotes]); the flute's tune
+ * and its staff use this list. A black note sits on its letter's staff place.
  */
 object FluteNotes {
-    const val LOWEST = 60
-    const val HIGHEST = 84
+    const val LOWEST = FluteRange.LOWEST_MIDI
+    const val HIGHEST = FluteRange.HIGHEST_MIDI
 
-    /** Every note the keys offer, lowest first. */
+    /** The octaves the pills offer: 1 (c¹ to h¹) to 4, where only c⁴ is a note of the flute. */
+    val OCTAVES: IntRange = 1..4
+
+    /** Every note the flute writes, lowest first. */
     val ALL: List<Int> = (LOWEST..HIGHEST).toList()
 
-    /** The staff place of [midi] (0 = c¹, [NoteSpelling.placeOf]): its letter's; −1 when the flute has no such key. */
+    /** The staff place of [midi] (0 = c¹, [NoteSpelling.placeOf]): its letter's; −1 when the flute has no such note. */
     fun positionOf(midi: Int): Int = if (midi in LOWEST..HIGHEST) NoteSpelling.placeOf(midi) else -1
 
     /**
-     * The black note the white key [key] writes under the ♯♭ key (since 2026-11-17): the one the app spells on that key's
-     * letter ([NoteSpelling.signedOf]), so C, F and G take their sharp and E and B their flat; null for D and A, and for
-     * C6, whose sharp is past the flute's range.
+     * The white note of the letter key [letter] (0 = C to 6 = B) in [octave], whether the flute has it or not: the name
+     * a key shows (d⁴ has a name and writes nothing).
      */
-    fun signed(key: Int): Int? = NoteSpelling.signedOf(key)?.takeIf { it in LOWEST..HIGHEST }
+    fun whiteIn(letter: Int, octave: Int): Int = LOWEST + 12 * (octave - 1) + NoteSpelling.whiteOf(letter)
 
-    /** The note the white key [key] writes: itself, or its black note ([signed]) while the ♯♭ key waits ([signWaiting]); null when it has none then. */
-    fun written(key: Int, signWaiting: Boolean): Int? = if (signWaiting) signed(key) else key
+    /**
+     * The note the letter key [letter] writes in [octave]: its white note, or while the ♯♭ key waits ([signed]) its black
+     * note in the app's one spelling ([NoteSpelling.blackOf]: none for D and A). Null when it has none, when the note is
+     * past the flute's range (all of octave 4 but c⁴), and for a letter or an octave the keys do not have.
+     */
+    fun inOctave(letter: Int, signed: Boolean, octave: Int): Int? {
+        if (letter !in 0..6 || octave !in OCTAVES) return null
+        val pitchClass = if (signed) NoteSpelling.blackOf(letter) ?: return null else NoteSpelling.whiteOf(letter)
+        return (LOWEST + 12 * (octave - 1) + pitchClass).takeIf { it in LOWEST..HIGHEST }
+    }
+
+    /** The octave [midi] is written in, by its letter (B♭ with B): 1 for c¹ to h¹, 4 for c⁴. */
+    fun octaveOf(midi: Int): Int = Math.floorDiv(NoteSpelling.naturalOf(midi) - LOWEST, 12) + 1
 }

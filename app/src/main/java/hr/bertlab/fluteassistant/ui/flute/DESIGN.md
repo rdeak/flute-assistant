@@ -16,7 +16,7 @@ grouped the state; the behaviour described below did not change):
 - `FluteUiState` has one part per way the tab can be. Where this text says `heldMidi`, `restHeld` or
   `heldIndex`, that is `held` (a `Held`); `playingIndex` and `playingHalfBeat` are `playing` (a
   `Playing`); `isListening`, `listenIndex`, `wrong`, `hearing`, `heardNow`, `repeatHeld` and
-  `finishing` are `listening` (a `Listening`, null when not listening). `litIndex`, `litMidi`,
+  `finishing` are `listening` (a `Listening`, null when not listening). `litIndex`, `litLetter`,
   `restLit`, `animalIndex`, `waiting`, `advice` and the like are still derived on `FluteUiState`.
 - `FluteContent` takes the state, the metronome's state and one `FluteActions` object.
 - The metronome's tempo and beat have one owner, `MetronomeSettings` (`domain/settings`). Where
@@ -52,7 +52,7 @@ halting): a silence is only ever a rest the child put there. The stored string
 (`"60:2,r:2,b,67:4,69:2:s"`: a note's MIDI or `r` for a rest, then half beats, and `b` for a breath; a third field `s`
 on a note joined to the one before since 2026-11-16, "Legato";
 `decode` is lenient and ignores a third field, `sanitize` keeps only the flute's notes (`FluteNotes.ALL`, every semitone
-from C4 to C6 since 2026-11-16; the white notes of `StaffNotes.ALL` before) and
+from C4 to C7 since 2026-11-18, C4 to C6 from 2026-11-16; the white notes of `StaffNotes.ALL` before) and
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
 snapped (never under 300), converted at the stored tempo; since 2026-11-04 the tune is one of the
 songbook's six books (`SONGBOOK.md`), each stored as `"<bpm>;<time signature name>;<that string>"` under
@@ -98,9 +98,10 @@ grows. Text on the staff (the time signature, the emoji) is measured at a fixed 
 stays in the staff at any font scale. The staff with its names is `TuneStaffHeight` (241 dp, the staff 175) at every tune, so
 the keys never move; c³'s stem (87 dp above the top line) may reach 12 dp into the stage's padding
 and c¹'s ring and tie 8 dp into the gap above the names, which `StaffGeometryTest` checks for
-every height; with the names the stage fits a 412 x 915 phone without scrolling. The tab needs 642 dp
-upright (`FitsHeight` in `FluteScreen.kt`: the stage, three key rows, the Play row, their gaps and the
-column's padding; 628 while the black keys scrolled in rows of their own, 2026-11-16 to 17, "Sharps and flats"),
+every height; with the names the stage fits a 412 x 915 phone without scrolling. The tab needs 618 dp
+upright since 2026-11-19 (610 for a day, with smaller pills) (`FitsHeight` in `FluteScreen.kt`: the stage, the pills and two key rows, the Play row, their
+gaps and the column's padding; what a phone has over it goes to the staff's box first, up to 63 dp, "Octaves"), 642
+before (three key rows; 628 while the black keys scrolled in rows of their own, 2026-11-16 to 17, "Sharps and flats"),
 and whatever a phone has over that goes over and under the keys, so that Stop
 stands where Play was; under it the keys keep their least height and the tab scrolls. Until 2026-11-10
 `FitsHeight` counted 664, so the user's Galaxy A55, whose three navigation buttons leave the tab 653 dp
@@ -164,7 +165,8 @@ end of the Play row), and Play and Your turn share the Play row's width. It is f
 tune is empty, and its gesture is attached only while it is enabled, so a hold that empties the tune
 stops repeating and lets the key up.
 
-The keys (`FluteKeys.kt`): the fifteen keys in three octave rows, highest on top, each in its
+The keys (`FluteKeys.kt`; since 2026-11-18 the octave pills, one row of letter keys and one of tools, "Octaves" below;
+what follows is how they stood until then): the fifteen keys in three octave rows, highest on top, each in its
 letter's colour, a key sounding for as long as it is held (from 2026-11-16 to 17 the black keys stood in scrolling
 rows of their own; since then the ♯♭ key beside c³ writes them, "Sharps and flats" below). At the end of the top
 row, a clear gap
@@ -752,7 +754,64 @@ and reads as F♯ played low, ⬆️ (in tune and at +40 it is a wrong note); pi
 `NoteSpellingTest`, `FluteNotesTest` (`signed`), `BarsTest` (the signs), `TuneWriterTest` (the sign), `NoteOnsetTrackerTest`,
 `ListenRunTest` and `ListenPathTest` (semitone slurs, the limit), `StaffGeometryTest`, `FluteViewModelTest` (the sign's
 wiring and cancels), `FluteScreenTest` (the ♯♭ key, the faces, a key held through a change of face, the signs' pixels on
-the emulator), `FluteSidewaysTest` (the ♯♭ key on its side).
+the emulator), `FluteSidewaysTest` (the ♯♭ key on its side). Since 2026-11-18 the keys are letters, the ♯♭ key stands
+first in the tools' row, and `FluteNotes.signed` and `written` are gone (`NoteSpelling.blackOf` in `FluteNotes.inOctave`).
+
+Octaves (2026-11-18; spec `docs/superpowers/specs/2026-11-18-flute-every-octave-design.md`, Revision 3; plan
+`docs/superpowers/plans/2026-11-18-flute-octave-pills.md`, both local; mockups and `gen.py` in
+`.superpowers/brainstorm/41363-1795014466/`). The user: "analyze how to set notes on flute tab to support all octave
+covered by fingers, I like how notes are defined in fingers but it should supports 1, 2, 3... and have enough space to
+draw notes in notes lines". Three builds in one day, the first two shown by the user to a child and an adult.
+(1) Letters with no octave on them (the Fingers tab's names, my pick), each writing the note nearest the last one, and
+⬇ ⬆ that moved the note just written (the user's "after", also my pick): "they were not able to find how to change
+octave, also notes button should be lowercase eg h1 in croatian (should follow formal way of marking notes)". Nothing
+on that screen said octaves exist. Kept as `.superpowers/sdd/2026-11-18-flute-high-notes-key/letters-build.patch`.
+(2) Of three layouts drawn at true size (`content/redo-v5.html`: A arrows that stay, B octave pills, C the released
+rows and one key) the user took B, then C on my word (beginner tunes cross h¹ and c² all the time, and two octaves in
+sight need no switching): the released three rows and a key in the top row that moved them an octave up. "it's not
+logical, they had hard time to find eg d3". Kept as `c-build.patch` beside the first. (3) B, the user's own first idea
+("it should supports 1, 2, 3"): "go with b approach (with numbers 1, 2, 3, 4) and show d1, d2, d3, d4 depending which
+octave is selected". What the two tests teach: a key must say what it writes, and where a note is must not depend on
+a rule or a mode the screen does not show; one tap more at an octave crossing is cheaper than either.
+The keys (`FluteKeys`): four pills over the letters (`OctavePills`: 40 dp with a 3 dp shadow and their name at 22,
+since 2026-11-19: they were 32 and 17 for a day, and the user found them "very hard to read" and offered the room
+from the staff ("maybe if we can reduce size of notes lines section little bit"), so the box gave 8 dp; the 8 dp under
+them in their touch area; each names the notes its octave holds, c¹–h¹ c²–h² c³–h³ and c⁴ alone, C4–B4 to C7 in English: they
+showed 1 2 3 4 for an hour, until the user's "replace 1, 2, 3, 4 labels with c1-h1, c2-h2, c3-h3, and c4"; the name
+shrinks to fit a narrow column), the chosen one yellow and down, a button heard as "Octave 1" (the note names' own
+figure, `noteLabelParts`: 4 to 7 in English; not the range, or the pill of c⁴ and the key c⁴ would be one name) and
+selected; seven letter keys, each named for the note
+it writes (`FluteUiState.keyNotes`, `FluteNotes.inOctave(letter, signed, octave)`), faded where it writes none (D and A
+while ♯♭ waits; in octave 4 all but c⁴, which show d⁴ to h⁴ faded, as the flute's range ends at c⁴; with ♯♭ waiting
+there, all seven); 12 dp; the tools in columns 1 2, 4 5 and 7. A pill acts as the finger goes down
+(`FluteViewModel.onOctave`, `TuneWriter.chooseOctave`, `flute.octave`); the chosen one again does nothing at all (no
+log, the rejoin window stands). The octave starts at 1, is kept while the app is open (another book, Play and Listen
+to me leave it) and is not stored (my calls). A key is its letter: the gesture is keyed on it, `Held.key` holds it and
+`FluteUiState.litLetter` names it, so a name changing under a finger (a pill tapped while the key is held, a press
+that spends the sign) never restarts the gesture, and the held note goes on sounding and growing; a pill ends the
+window in which a key let go of goes on with its note, as ♯♭ does, and drops no waiting ♯♭ or ⌒. Play lights a letter
+key only while the pills show the playing note's octave. The tests name a key by the note it writes through a helper
+that taps that note's pill first (`key(midi)`), so the older tests keep their meaning.
+The staff (a model that leaves every released number alone): a tune above c³ needs room over the box
+(`StaffGeometry.roomOver`: 9 dp for each staff step its highest note stands over c³, `HIGH_ROOM` 63 at c⁴, so with its
+room the highest note stands where c³ does with none); `TuneStaff` draws everything that much lower (`atStaff`, and the
+names, marks, signature and hint offset by it) in a box that much taller. Upright, while the child writes, the box is
+the released 257 dp and what the tab's height has over its least, up to 63 (`FluteScreen`; the tab needs 618 dp, so an
+A55's 653 give a box of 292 and a tab of 681 the full 320), and it never changes, so the keys never move; the staff
+is drawn with all the room the box has, and a tune at full size unless its highest note needs more than that
+(`restingScale(room, box)`: on the A55 up to g³ at full size, 9% smaller up to c⁴; my call, where the mock drew the
+whole staff 5% smaller). On a phone on its side the card's height sets the scale (`SidewaysGeometry.restingStaffScale`,
+0.96 at 360 dp tall for a tune up to c⁴). While the tune runs the staff has only the room its highest note needs and
+is no taller than before (`runningScale`, 1.07 up to c⁴), so the listening room keeps its height and a tune up to c³
+runs exactly as before; the animal, whose line does not scale, walks higher where 27 dp would put it over more than
+4 dp of the top note's head (`animalY`; the builder check of the first design found c⁴ losing half its head, and from
+`content/rabbit-v2.html` the user picked "b, higher"; on a phone on its side this holds for tunes up to c³ too, where
+the animal at 27 already covered 5.7 dp). The knob stays (`knobTop(scale, room)`), and the book stays centred on the
+names (`bookButtonTop(scale, room)`; with room and a staff drawn smaller its top may touch the clef's lowest bound).
+The tuner and the Fingers tab already covered c¹ to c⁴; the notes game keeps c¹ to c³ (the user: "go with a, your
+recommendation"). Tests: `FluteNotesTest`, `TuneWriterTest`, `FluteUiStateTest`, `FluteViewModelTest`,
+`StaffGeometryTest`, `SidewaysGeometryTest`, `TabletGeometryTest`, `FluteScreenTest`, `FluteSidewaysTest`, and
+`ListenPathTest` (three h³ heard as the same notes two octaves down).
 
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
@@ -761,7 +820,8 @@ length, added: false at the cap, joined: joined to the note before, since 2026-1
 since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, play, listen, book, speed or leave: a waiting join
 dropped; since 2026-11-16), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its second tap
 dropped it; since 2026-11-17), `flute.sign_cancel` (reason: erase, play, listen, book, speed or leave: a waiting sign
-dropped; since 2026-11-17), `flute.rest` (heldMs, length, added, per rest
+dropped; since 2026-11-17), `flute.octave` (octave: 1 to 4, when an octave pill changed the octave the keys write in;
+since 2026-11-18), `flute.rest` (heldMs, length, added, per rest
 ended), `flute.rejoin` (midi: the note gone on with, E♭ for E's key when the ♯♭ key wrote it; `none` for the rest; gapMs: a key let go of and pressed again within
 `HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
 or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
@@ -814,14 +874,15 @@ speed panel's `TempoWheelState` live above the branch, so an open panel or shelf
 
 - **Writing** (`FluteWritingSideways`; mockup `fit-v2.html`, the user's pick: the same keys as upright):
   the rail, the staff's card, then the keys with Play and Listen to me under them. There is no right
-  column, so no `SidewaysPage`: beside the keys it left the staff about three beats. The three key rows
-  keep their upright order and contents (the ♯♭, join, rest, breath and sponge keys on top). Keys are 48 wide and
-  `SidewaysGeometry.keyHeight` tall (85 at 411, 68 at 360, never under upright's 58) with gaps of 6 and
+  column, so no `SidewaysPage`: beside the keys it left the staff about three beats. The pills and the two key rows
+  keep their upright order and contents (three key rows until 2026-11-18). Keys are 48 wide and
+  `SidewaysGeometry.keyHeight` tall (half what the height leaves under the pills: 85 at 360 and 88 from 365; 85 at 411 and 68
+  at 360 with three rows; never under upright's 58) with gaps of 6 and
   12 (`FluteKeys(keyHeight, keyGap)`); under 630 dp of content they are 40 wide with 4 dp gaps, which is
   what upright gives on a phone that narrow. Play (left) and Listen to me share the keys' width, 84
   tall, in upright's order. The card takes the width left: 427 dp at 915, 11 beats at rest scale
   (upright shows 9), 8 beats at 800, 5 at 640, with the staff centred in its height; the knob and the book
-  keep their corners. Under `WRITING_MIN_HEIGHT` (329 dp, shorter than any phone it was drawn for) the keys'
+  keep their corners. Under `WRITING_MIN_HEIGHT` (305 dp, 329 with three rows, shorter than any phone it was drawn for) the keys'
   column scrolls like upright's tab instead of overflowing onto Play (from 2026-11-16 to 17, with the black keys'
   scrolling rows, the keys kept 58 and 48 dp here and the rows scrolled). The empty staff's hint (`EmptyHint`)
   may take two lines sideways: at 640 it is about 92 dp wide and one line was cut.
@@ -861,8 +922,9 @@ speed panel's `TempoWheelState` live above the branch, so an open panel or shelf
 ## Tablets
 
 The one tab that adjusts anything on top of a tablet's zoom (`ui/DESIGN.md`, "Tablets"; spec
-`2026-11-06-tablet-design.md`), and only while `LocalTabZoom` is over 1. Upright the keys take a third of
-what the height spares over `FitsHeight`, from 58 up to 72 (`TabletGeometry.uprightKeyHeight`), about 104 dp
+`2026-11-06-tablet-design.md`), and only while `LocalTabZoom` is over 1. Upright the keys take half of
+what the height spares over `FitsHeight` and the staff's 63 dp (a third, with three rows, until 2026-11-18), from 58
+up to 72 (`TabletGeometry.uprightKeyHeight`), about 104 dp
 on a 10-inch tablet: the phone's 58 left a band of nothing either side of them (from 2026-11-16 to 17
 the black keys' rows kept them 58 and scrolled). Sideways, writing, the keys'
 column is 336 rather than 372 and the resting staff 0.91 rather than 1 (`TabletGeometry.sidewaysKeys`,
