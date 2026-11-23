@@ -7,6 +7,7 @@ import android.media.AudioTrack
 import android.os.Process
 import hr.bertlab.fluteassistant.audio.LowLatencyStream
 import hr.bertlab.fluteassistant.audio.toneAmplitude
+import hr.bertlab.fluteassistant.audio.writeFully
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import java.util.concurrent.ConcurrentLinkedQueue

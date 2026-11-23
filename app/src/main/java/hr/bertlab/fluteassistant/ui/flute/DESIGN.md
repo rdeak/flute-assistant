@@ -113,7 +113,8 @@ under `SustainedToneSynth`, a phase-continuous oscillator with an attack (30 ms)
 release (120 ms) envelope and a retrigger fade (10 ms), so a note on, a note off or a takeover
 never clicks; `AudioTrackFluteTonePlayer` (`FluteTonePlayer`) streams it from an URGENT_AUDIO
 thread like the metronome (float PCM, low latency, media attributes, no audio focus), writing
-silence while nothing is held and every block written in full (`writeFully`, retried through
+silence while nothing is held and every block written in full (`writeFully` in `audio/WriteFully.kt`,
+which the metronome's loop uses too, retried through
 a route rebuild so a sustained tone never skips samples); on `close()` the thread
 (`ToneRenderLoop`, the loop body kept pure Kotlin so the close path is unit-tested) lets a
 sounding note release and plays the track buffer out before it gives the track back, never

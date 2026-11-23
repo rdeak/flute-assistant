@@ -37,8 +37,8 @@ import javax.inject.Singleton
  *
  * Design:
  * - A dedicated high-priority thread renders small PCM blocks with [MetronomeRenderer] and
- *   writes them with blocking writes, so timing is governed by the audio clock, not by
- *   handlers or timers. Click positions are sample-accurate.
+ *   writes them with blocking writes, every block in full ([renderWhile]), so timing is
+ *   governed by the audio clock, not by handlers or timers. Click positions are sample-accurate.
  * - The track is a [LowLatencyStream]: the device's native output rate, float PCM and the fast
  *   mixer path where available, with media attributes. Audio focus is requested so other media pauses, and
  *   playback stops when focus is lost or when headphones are unplugged
@@ -53,7 +53,8 @@ import javax.inject.Singleton
  *
  * Logs under [LogTags.METRONOME]: `metronome.start` / `metronome.stop` per session, why a
  * session ended on its own (`metronome.focus_lost`, `metronome.noisy`, `metronome.ended`),
- * the track's geometry and underrun count, and every failure as `metronome.error`.
+ * the track's geometry, its underrun count and how many writes it took less than all of, and
+ * every failure as `metronome.error`.
  */
 @Singleton
 class AudioTrackMetronomePlayer @Inject constructor(
@@ -206,6 +207,7 @@ class AudioTrackMetronomePlayer @Inject constructor(
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
             var stream: LowLatencyStream? = null
+            var shortWrites = 0 // writes the track took less than all of; each is retried
             try {
                 stream = LowLatencyStream.open() // may throw on unsupported formats
                 val track = stream.track
@@ -220,30 +222,29 @@ class AudioTrackMetronomePlayer @Inject constructor(
                 )
 
                 val renderer = MetronomeRenderer(stream.sampleRate) // synthesises its clicks now, not on the first beat
-                val block = FloatArray(stream.blockFrames)
                 val timestamp = AudioTimestamp()
 
                 track.play()
-                while (running) {
-                    val events = renderer.render(block, config.get())
-                    val written = track.write(block, 0, block.size, AudioTrack.WRITE_BLOCKING)
-                    if (written < 0) {
-                        logger.w(LogTags.METRONOME, "metronome.error", "reason" to "write_failed", "code" to written)
-                        break
-                    }
-                    if (written == 0) {
-                        sleep(1) // nothing accepted (route being rebuilt): avoid a hot spin
-                        continue
-                    }
-                    if (events.isNotEmpty()) publish(events, stream, timestamp)
-                }
+                val ended = renderer.renderWhile(
+                    running = { running },
+                    block = FloatArray(stream.blockFrames),
+                    config = { config.get() },
+                    write = { block, offset, count ->
+                        track.write(block, offset, count, AudioTrack.WRITE_BLOCKING).also { if (it in 0 until count) shortWrites++ }
+                    },
+                    onClicks = { publish(it, stream, timestamp) },
+                )
+                if (ended < 0) logger.w(LogTags.METRONOME, "metronome.error", "reason" to "write_failed", "code" to ended)
             } catch (e: RuntimeException) {
                 // UnsupportedOperationException / IllegalArgumentException from the builder,
                 // IllegalStateException from play(): report and stop instead of killing the process.
                 logger.w(LogTags.METRONOME, "metronome.error", "reason" to "exception", "message" to e.message, error = e)
             } finally {
                 stream?.let {
-                    logger.d(LogTags.METRONOME, "metronome.track_closed", "session" to sessionId, "underruns" to it.track.underrunCount)
+                    logger.d(
+                        LogTags.METRONOME, "metronome.track_closed",
+                        "session" to sessionId, "underruns" to it.track.underrunCount, "shortWrites" to shortWrites,
+                    )
                     it.close()
                 }
                 onThreadExited(this)
