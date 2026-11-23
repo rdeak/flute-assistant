@@ -3,18 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.tuner
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
-import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,15 +17,13 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -46,8 +33,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
@@ -58,14 +43,18 @@ import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.ModeChoice
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.StagePadding
+import hr.bertlab.fluteassistant.ui.common.TabGap
 import hr.bertlab.fluteassistant.ui.common.TabPadding
 import hr.bertlab.fluteassistant.ui.common.TabSide
 import hr.bertlab.fluteassistant.ui.common.WordFloor
 import hr.bertlab.fluteassistant.ui.common.asTextSize
+import hr.bertlab.fluteassistant.ui.common.bounce
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteLabel
+import hr.bertlab.fluteassistant.ui.common.rememberBounce
+import hr.bertlab.fluteassistant.ui.common.rememberMicrophonePermission
 import hr.bertlab.fluteassistant.ui.theme.FluteColors
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 
@@ -79,25 +68,16 @@ fun TunerScreen(
     viewModel: TunerViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val activity = LocalActivity.current
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        // After a no, the phone says whether it would show its question again; when it would not, only its settings are left.
-        val canAskAgain = activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO) } ?: true
-        viewModel.onPermissionAnswer(granted, canAskAgain)
-    }
+    val mic = rememberMicrophonePermission(viewModel::onPermissionAnswer)
 
     // Check the permission whenever the screen appears; ask the system only once automatically
     // (the card below offers a manual retry).
     LaunchedEffect(Unit) {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
+        val granted = mic.isGranted()
         viewModel.onPermissionResult(granted)
         if (!granted && !state.permissionRequested) {
             viewModel.onPermissionRequested()
-            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            mic.request()
         }
     }
 
@@ -108,27 +88,19 @@ fun TunerScreen(
     // that run opens the microphone. Hence the `else`: opening it in this run too opened it
     // twice, the first time only for the key change to close it again (TunerScreenMicrophoneTest).
     LifecycleStartEffect(state.permissionGranted) {
-        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
+        val granted = mic.isGranted()
         if (granted != state.permissionGranted) viewModel.onPermissionResult(granted)
         else if (granted) viewModel.startListening()
         onStopOrDispose { viewModel.stopListening() }
     }
 
-    val actions = remember(viewModel, permissionLauncher, context) {
+    val actions = remember(viewModel, mic) {
         TunerActions(
             onTargetNoteChange = viewModel::setTargetNote,
             onModeChange = viewModel::setMode,
             onPlayNote = viewModel::playTargetNote,
-            onRequestPermission = { permissionLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-            onOpenSettings = {
-                context.startActivity(
-                    Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.fromParts("package", context.packageName, null),
-                    ),
-                )
-            },
+            onRequestPermission = mic.request,
+            onOpenSettings = mic.openSettings,
             onOpenGuide = viewModel::openGuide,
             onGuideCard = viewModel::showGuideCard,
             onCloseGuide = viewModel::closeGuide,
@@ -188,11 +160,7 @@ fun TunerContent(state: TunerUiState, actions: TunerActions, modifier: Modifier 
         if (state.permissionGranted) {
             TunerSideways(state, actions, modifier)
         } else {
-            MicrophonePermissionCard(
-                onRequestPermission = actions.onRequestPermission,
-                onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
-                modifier = modifier.fillMaxSize(),
-            )
+            TunerMicrophoneCard(state, actions, modifier.fillMaxSize())
         }
         return
     }
@@ -204,16 +172,10 @@ fun TunerContent(state: TunerUiState, actions: TunerActions, modifier: Modifier 
                 .fitOrScroll(fits = maxHeight >= minHeight, minHeight = minHeight)
                 .padding(TabPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(TabGap),
         ) {
             if (!state.permissionGranted) {
-                MicrophonePermissionCard(
-                    onRequestPermission = actions.onRequestPermission,
-                    onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
+                TunerMicrophoneCard(state, actions, Modifier.fillMaxWidth().weight(1f))
                 return@Column
             }
 
@@ -249,6 +211,16 @@ fun TunerContent(state: TunerUiState, actions: TunerActions, modifier: Modifier 
     }
 }
 
+/** The microphone card in the tab's place: it asks, and offers the phone's settings once the phone will not ask again. */
+@Composable
+private fun TunerMicrophoneCard(state: TunerUiState, actions: TunerActions, modifier: Modifier) {
+    MicrophonePermissionCard(
+        onRequestPermission = actions.onRequestPermission,
+        onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
+        modifier = modifier,
+    )
+}
+
 /**
  * The pitch window shrinks to fit a small phone; only below a least height (split screen, a tiny
  * phone) does the tab scroll instead: this much and the fingering's own height, under which the window,
@@ -264,7 +236,7 @@ private val TunerMinHeightLessFingering = 329.dp
  * stays readable and quiet by day and at night (`border`, the first grey, was nearly an open key's fill at night: the
  * final review of 2026-11-18).
  */
-private fun QuietKeys(colors: FluteColors): Color = lerp(colors.raised, colors.mutedText, 0.5f)
+private fun quietKeys(colors: FluteColors): Color = lerp(colors.raised, colors.mutedText, 0.5f)
 
 /**
  * The upright card's column: 16 dp between the window and the flute, and the card's free height round the two, not
@@ -275,6 +247,10 @@ private val StageArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVerti
 
 /** The upright tuner's card, for the tests. */
 internal const val TUNER_STAGE_TAG = "tuner_stage"
+
+/** The flute under or beside the sideways window, and the guide's card, for the tests. */
+internal const val FINGERING_TAG = "fingering"
+internal const val GUIDE_STAGE_TAG = "guide_stage"
 
 internal val TunerMode.emoji: String
     get() = when (this) {
@@ -324,14 +300,7 @@ internal fun StatusLine(
     maxLines: Int = 1,
     style: TextStyle = MaterialTheme.typography.headlineMedium,
 ) {
-    val inTune = line == TunerLine.InTune
-    val scale = remember { Animatable(1f) }
-    LaunchedEffect(inTune) {
-        if (inTune) {
-            scale.snapTo(1.3f)
-            scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
-        }
-    }
+    val scale = rememberBounce(on = line == TunerLine.InTune)
     val guideCard = (line as? TunerLine.Advice)?.advice?.guideCard
     val howToTune = stringResource(R.string.tune_line_how)
     Text(
@@ -358,10 +327,7 @@ internal fun StatusLine(
             )
             // Two lines sit in the middle of their box, as one line would at the top of it.
             .then(if (maxLines > 1) Modifier.wrapContentHeight(Alignment.CenterVertically) else Modifier)
-            .graphicsLayer {
-                scaleX = scale.value
-                scaleY = scale.value
-            },
+            .bounce(scale),
     )
 }
 
@@ -400,7 +366,7 @@ internal fun TunerWindow(state: TunerUiState, onPlayNote: () -> Unit, modifier: 
  * given: written once for both layouts, which pass their own [modifier] (the sideways one tags it for the tests).
  * The pressed keys are in the note's colour while it helps ([lit], `TunerUiState.fingeringLit`: before a sound, and
  * on another note or octave) and grey while the right note sounds, so the eyes go to the window (since 2026-11-18,
- * option B of the calmer Tune view; the grey is [QuietKeys]). The colour fades; nothing moves.
+ * option B of the calmer Tune view; the grey is [quietKeys]). The colour fades; nothing moves.
  */
 @Composable
 internal fun TunerFingering(midi: Int?, lit: Boolean, modifier: Modifier = Modifier) {
@@ -409,7 +375,7 @@ internal fun TunerFingering(midi: Int?, lit: Boolean, modifier: Modifier = Modif
         targetValue = when {
             midi == null -> colors.raised
             lit -> noteColor(midi)
-            else -> QuietKeys(colors)
+            else -> quietKeys(colors)
         },
         label = "fingering",
     )

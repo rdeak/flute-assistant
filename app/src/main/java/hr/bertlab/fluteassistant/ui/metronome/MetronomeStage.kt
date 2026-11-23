@@ -6,13 +6,17 @@ package hr.bertlab.fluteassistant.ui.metronome
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
@@ -23,13 +27,16 @@ import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.TabGap
+import hr.bertlab.fluteassistant.ui.common.TabPadding
+import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 
 /**
  * The ring shrinks to fit a small phone; only below this height (split screen, a tiny phone)
  * does the tab scroll instead.
  */
-val MetronomeMinHeight: Dp = 420.dp
+private val MetronomeMinHeight: Dp = 420.dp
 
 /**
  * Whether the tempo wheel is open, and where the wheel and the column around it sit, so a
@@ -98,14 +105,48 @@ fun MetronomeStage(
         TempoDial(
             bpm = state.config.bpm,
             onBpmChange = onBpmChange,
-            editing = wheel.editing,
-            onEditingChange = { wheel.editing = it },
-            onWheelPositioned = { wheel.wheelCoordinates = it },
+            wheel = wheel,
             flash = flash,
             modifier = Modifier
                 .weight(1f, fill = false)
                 .widthIn(max = 304.dp)
                 .aspectRatio(1f),
         )
+    }
+}
+
+/**
+ * The stage over one big [button], upright: the drum tab (Play) and the flute's speed panel (OK). It scrolls when the
+ * tab ([tabHeight]) is lower than [MetronomeMinHeight], and a touch anywhere in it closes an open [wheel]. The
+ * caller owns the [wheel] and its Back handler.
+ */
+@Composable
+fun MetronomeStageColumn(
+    state: MetronomeUiState,
+    wheel: TempoWheelState,
+    tabHeight: Dp,
+    onBpmChange: (Int) -> Unit,
+    onTimeSignatureChange: (TimeSignature) -> Unit,
+    modifier: Modifier = Modifier,
+    button: @Composable () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .fitOrScroll(fits = tabHeight >= MetronomeMinHeight, minHeight = MetronomeMinHeight)
+            .closesTempoWheel(wheel)
+            .padding(TabPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(TabGap),
+    ) {
+        MetronomeStage(
+            state = state,
+            wheel = wheel,
+            onBpmChange = onBpmChange,
+            onTimeSignatureChange = onTimeSignatureChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        )
+        button()
     }
 }

@@ -42,6 +42,6 @@ fun rememberBeatFlash(beatPulse: Long, active: Boolean): () -> Float {
     return flashValue
 }
 
-/** Lifts this by [HopDistance] at the flash's peak and lets it fall back as [flash] fades. */
-fun Modifier.hopOnBeat(flash: () -> Float): Modifier =
-    graphicsLayer { translationY = -HopDistance.toPx() * flash() }
+/** Lifts this by [distance] at the flash's peak and lets it fall back as [flash] fades. */
+fun Modifier.hopOnBeat(flash: () -> Float, distance: Dp = HopDistance): Modifier =
+    graphicsLayer { translationY = -distance.toPx() * flash() }

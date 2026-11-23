@@ -19,8 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
-import kotlin.math.roundToInt
 
 /**
  * One round button with the current language's flag; a tap opens a small list of every
@@ -48,29 +45,24 @@ import kotlin.math.roundToInt
  * their own, and a screen reader hears each language's endonym. The other flag is not faded, as a
  * faded flag looks as if it cannot be pressed. Picking any flag closes the list. Stateless about the
  * language: the host applies the choice. [listOffset] moves the list across from the button, for
- * the rail, where it opens beside the flag. Whether the list is open is kept here, unless the caller
- * passes [isOpen] and [onOpenChange] together and keeps it, so that it stays open when the button
- * moves between the top bar and the rail. The button's flag is sized in dp, as a flag of 24 sp is
+ * the rail, where it opens beside the flag. The caller keeps whether the list is open ([isOpen],
+ * [onOpenChange]), so that it stays open when the button moves between the top bar and the rail. The button's flag is sized in dp, as a flag of 24 sp is
  * bigger than the rail's 38 dp button at one and a half times the text size.
  */
 @Composable
 fun LanguageSwitch(
     current: AppLanguage,
     onSelect: (AppLanguage) -> Unit,
+    isOpen: Boolean,
+    onOpenChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     listOffset: Dp = 0.dp,
-    isOpen: Boolean? = null,
-    onOpenChange: ((Boolean) -> Unit)? = null,
 ) {
-    var ownOpen by remember { mutableStateOf(false) }
-    val open = isOpen ?: ownOpen
-    val setOpen = onOpenChange ?: { ownOpen = it }
-    val flagFont = with(LocalDensity.current) { FlagSize.toSp().value.roundToInt() }
     val label = stringResource(R.string.language)
     val colors = FluteTheme.colors
     Box(modifier) {
         ChunkyButton(
-            onClick = { setOpen(true) },
+            onClick = { onOpenChange(true) },
             modifier = Modifier
                 .size(48.dp)
                 .semantics {
@@ -78,11 +70,11 @@ fun LanguageSwitch(
                     stateDescription = current.endonym
                 },
         ) {
-            Emoji(current.flag, fontSize = flagFont)
+            Emoji(current.flag, size = FlagSize)
         }
         DropdownMenu(
-            expanded = open,
-            onDismissRequest = { setOpen(false) },
+            expanded = isOpen,
+            onDismissRequest = { onOpenChange(false) },
             offset = DpOffset(listOffset, 12.dp),
             shape = StageShape,
             containerColor = colors.card,
@@ -101,7 +93,7 @@ fun LanguageSwitch(
                         language = language,
                         selected = language == current,
                         onClick = {
-                            setOpen(false)
+                            onOpenChange(false)
                             if (language != current) onSelect(language)
                         },
                     )

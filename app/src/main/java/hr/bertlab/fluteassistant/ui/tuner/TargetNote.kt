@@ -22,6 +22,7 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
+import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 
 /**
  * The pitch window ([window], drawn around the chosen note [targetMidi]) between a ‹ and a › button that move the note
@@ -43,7 +44,7 @@ fun TargetNote(
     // The canvas drew a 132 x 300 dp window between 52 dp buttons; a short or narrow space
     // shrinks the window (and on a narrow one the buttons) rather than squeeze the buttons out.
     BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.Center) {
-        val button = if (maxWidth >= 260.dp) 52.dp else 44.dp
+        val button = if (maxWidth >= NarrowBelow) StepSize else NarrowStepSize
         val widest = maxWidth - (button + ButtonGap) * 2
         var windowHeight = minOf(PitchWindowHeight * WINDOW_MAX_SCALE, maxHeight).coerceAtLeast(MinWindowHeight)
         var windowWidth = windowHeight * PITCH_WINDOW_ASPECT_RATIO
@@ -101,8 +102,13 @@ internal fun StepArrows(
 /** The most the upright window grows, as a share of the canvas's size: 450 dp tall, on a tall phone. */
 internal const val WINDOW_MAX_SCALE = 1.5f
 
-/** Wider than the canvas's 12 dp, so the arrow beside the sound bubble clears the › button. */
-private val ButtonGap = 20.dp
+/** The ‹ and ›: 52 dp, and 44 where the room for the three is under 260 dp wide. */
+private val StepSize = SidewaysGeometry.ARROW_SIZE.dp
+private val NarrowStepSize = 44.dp
+private val NarrowBelow = 260.dp
+
+/** Wider than the canvas's 12 dp, so the arrow beside the sound bubble clears the › button; sideways counts the same. */
+private val ButtonGap = SidewaysGeometry.ARROW_GAP.dp
 
 /** The smallest the window gets before the tab scrolls instead. */
 private val MinWindowHeight = 120.dp

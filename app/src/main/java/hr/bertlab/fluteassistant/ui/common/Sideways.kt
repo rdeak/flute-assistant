@@ -44,21 +44,21 @@ internal object SidewaysGeometry {
     private const val COLUMN_SHORT = 100f
 
     /** Seven keys a row: 48 wide with 6 gaps (7 * 48 + 6 * 6), or 40 wide with 4 gaps below [NARROW_CONTENT]. */
-    private const val KEYS = 372f
+    internal const val KEYS = 372f
     private const val KEYS_NARROW = 304f
     private const val KEY_GAP_NARROW = 4f
 
-    /** The button row under the keys: Play and Listen to me are 84 tall, and their 8 dp shadow ends level with the page's margin. */
-    private const val KEYS_BUTTONS = 84f + 8f
+    /** The button row under the keys: Play and Listen to me are big action buttons, and their shadow ends level with the page's margin. */
+    private const val KEYS_BUTTONS = BIG_ACTION_HEIGHT + BIG_ACTION_DEPTH
 
     /** The room between the keys and the button row under them: the page's margin, as `FluteWritingSideways` spaces them. */
     private const val KEYS_TO_BUTTONS = MARGIN
 
     /** The flute's key rows: the letters and the tools (since 2026-11-18; three octave rows before). */
-    private const val KEY_ROWS = 2
+    internal const val KEY_ROWS = 2
 
-    /** The two rows have one gap between them, upright's `KeyRowGap` (12). */
-    private const val KEY_ROW_GAPS = 12f
+    /** The two rows have one gap between them, which upright's keys take from here (`FluteKeys`' `KeyRowGap`). */
+    internal const val KEY_ROW_GAPS = 12f
 
     /** The octave pills over the letters (since 2026-11-18): 43 dp and the 8 under them (`FluteKeys`' `PillsHeight`). */
     private const val OCTAVE_PILLS = 51f
@@ -94,13 +94,13 @@ internal object SidewaysGeometry {
     /** The common bars (2/4, 3/4, 4/4) have up to this many beats, and `BeatBubbles` spaces them more widely. */
     private const val FEW_BEATS = 4
 
-    /** The pitch window is 300 dp tall at scale 1 (`PitchWindow`'s `WINDOW_HEIGHT`); sideways its scale is the card's inside height over it. */
-    private const val PITCH_WINDOW_HEIGHT = 300f
+    /** The pitch window is 300 dp tall at scale 1 (`PitchWindow` draws it from this); sideways its scale is the card's inside height over it. */
+    internal const val PITCH_WINDOW_HEIGHT = 300f
 
-    /** The ‹ and › buttons either side of the pitch window (52, as upright's `TargetNote`). */
+    /** The ‹ and › buttons either side of the pitch window (upright's `TargetNote` takes them from here). */
     const val ARROW_SIZE = 52f
 
-    /** The room between the window and each arrow button: upright's `ButtonGap`, so the sound bubble's arrow clears the › button. */
+    /** The room between the window and each arrow button, upright too (`TargetNote`), so the sound bubble's arrow clears the › button. */
     const val ARROW_GAP = 20f
 
     /** The room between the window block and the words beside it, with the fingering under them. */
@@ -109,8 +109,8 @@ internal object SidewaysGeometry {
     /** What the tuner's row spends across besides the window: an arrow and its gap, either side. */
     private const val PITCH_WINDOW_SIDES = 2 * (ARROW_SIZE + ARROW_GAP)
 
-    /** The window is 132 dp wide at scale 1 (`PitchWindow`'s `WINDOW_WIDTH`). */
-    private const val PITCH_WINDOW_WIDTH = 132f
+    /** The window is 132 dp wide at scale 1 (`PitchWindow` draws it from this). */
+    internal const val PITCH_WINDOW_WIDTH = 132f
 
     /**
      * The least the fingering is given beside the window, 205 dp wide and about 40 tall. It is not

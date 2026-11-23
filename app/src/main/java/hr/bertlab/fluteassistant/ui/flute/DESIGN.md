@@ -51,7 +51,7 @@ The time between presses is not recorded (a child hunting for the next key would
 halting): a silence is only ever a rest the child put there. The stored string
 (`"60:2,r:2,b,67:4,69:2:s"`: a note's MIDI or `r` for a rest, then half beats, and `b` for a breath; a third field `s`
 on a note joined to the one before since 2026-11-16, "Legato";
-`decode` is lenient and ignores a third field, `sanitize` keeps only the flute's notes (`FluteNotes.ALL`, every semitone
+`decode` is lenient and ignores a third field, `sanitize` keeps only the flute's notes (`FluteRange.midiRange`, every semitone
 from C4 to C7 since 2026-11-18, C4 to C6 from 2026-11-16; the white notes of `StaffNotes.ALL` before) and
 never two breaths in a row, older builds drop `r` and `b`) reads a note value above 8 as a held time in ms from before lengths were
 snapped (never under 300), converted at the stored tempo; since 2026-11-04 the tune is one of the
@@ -204,7 +204,7 @@ writes, though a held key was counted at it then (since 2026-11-17 at the writin
 (`.superpowers/brainstorm/*/content/knob-drum.html`, `knob-drum-v2.html`) went from the animal with a drum
 badge, which the user liked with the two swapped, to this: "E" of the second page, because on the first
 swap's white 24 dp badge the near-white rabbit disappeared, so the badge is `Sun` and `KNOB_BADGE` (29 dp)
-across with a `KNOB_BADGE_EDGE` outline. Both emoji are sized in dp (`emojiSizeFor`), so a large font
+across with a `KNOB_BADGE_EDGE` outline. Both emoji are sized in dp (`Emoji(size = …)`), so a large font
 scale cannot push them out. The badge is the button's sibling, not its content, because `ChunkyButton`
 clips to its disc and the badge reaches `KNOB_BADGE_OVERHANG` (3 dp) past the knob's box, to `NOTES_CLIP`
 and no further (`StaffGeometryTest`); it has no gesture, so a tap on it goes through to
@@ -237,7 +237,7 @@ by the metronome as before and passed on to a running one), and one
 `BigActionButton` OK (`speed_done`, `AppIcons.Done`, `ActionGo`) alone where Play was: no keys,
 no sponge, no sound (Play on the tune is the preview), and OK the way back (the phone's Back does the
 same since 2026-11-10, closing an open wheel first: `ui/DESIGN.md`, "The phone's Back"). The panel's column is `fitOrScroll` at
-`MetronomeMinHeight` rather than `FitsHeight`, which describes the keys, so the ring shrinks on a
+the metronome's own least height (`MetronomeStageColumn`, which both tabs use) rather than `FitsHeight`, which describes the keys, so the ring shrinks on a
 short screen as on the metronome tab, and it carries `closesTempoWheel` with its own
 `rememberTempoWheelState()`. The knob's `onClick` calls `FluteViewModel.openSpeed()` and then sets
 `choosingSpeed`: it stops a tune playing back (`flute.stop`, reason `speed`) and ends a held key
@@ -638,7 +638,7 @@ name; the staff grew 16 dp for it) holds, per step, the ⭐ it earned (`STAR_EMO
 `RETRY_STAR_ALPHA` after a retry, both the notes game's) or the heard note's bubble (`HeardBubble`:
 a round bubble as tall as the row, `noteColor` fill, the ink outline, the name in `noteText` at up
 to 14 sp times the scale, the tuner's way of showing another note). Emoji on the staff are sized in
-dp (`emojiSizeFor`) like the staff's other text. A screen
+dp (`Emoji(size = …)`) like the staff's other text. A screen
 reader hears a step's mark after its length ("G4, 1 beat, got it" / "got it after a retry" /
 "play this one" / "heard A4"; `flute_mark_*`, `flute_mark_heard` taking the heard note's
 `noteLabel`, `flute_listen_here`). The staff scrolls (`animateScrollToItem` in `TuneMarks`, keyed
@@ -781,7 +781,7 @@ showed 1 2 3 4 for an hour, until the user's "replace 1, 2, 3, 4 labels with c1-
 shrinks to fit a narrow column), the chosen one yellow and down, a button heard as "Octave 1" (the note names' own
 figure, `noteLabelParts`: 4 to 7 in English; not the range, or the pill of c⁴ and the key c⁴ would be one name) and
 selected; seven letter keys, each named for the note
-it writes (`FluteUiState.keyNotes`, `FluteNotes.inOctave(letter, signed, octave)`), faded where it writes none (D and A
+it writes (`FluteNotes.inOctave(letter, signed, octave)`, which `FluteKeys` asks for each letter), faded where it writes none (D and A
 while ♯♭ waits; in octave 4 all but c⁴, which show d⁴ to h⁴ faded, as the flute's range ends at c⁴; with ♯♭ waiting
 there, all seven); 12 dp; the tools in columns 1 2, 4 5 and 7. A pill acts as the finger goes down
 (`FluteViewModel.onOctave`, `TuneWriter.chooseOctave`, `flute.octave`); the chosen one again does nothing at all (no

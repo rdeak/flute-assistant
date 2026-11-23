@@ -8,7 +8,8 @@ changes) -> `MetronomeRenderer` (mixes active click "voices" into PCM blocks fro
 `ClickSynth` makes, a woodblock and its accent for the bar's first beat, at the fixed `OUTPUT_GAIN`,
 and passes everything through `SoftLimiter`) ->
 `AudioTrackMetronomePlayer` (a dedicated URGENT_AUDIO thread doing blocking float-PCM writes to a
-low-latency streaming `AudioTrack`; stops on audio-focus loss and ACTION_AUDIO_BECOMING_NOISY).
+low-latency streaming `AudioTrack`, which it opens through `audio/OutputTracks.kt`'s `LowLatencyStream`, as the
+flute's tone player does; stops on audio-focus loss and ACTION_AUDIO_BECOMING_NOISY).
 Scheduler, renderer and synth have no Android dependencies and are unit-tested on the JVM.
 There is one click on every beat and one sound: subdivisions, the beep and bell sounds and the
 volume setting went on 2026-11-09 (root CLAUDE.md), and `metronome.start` lost their three fields.

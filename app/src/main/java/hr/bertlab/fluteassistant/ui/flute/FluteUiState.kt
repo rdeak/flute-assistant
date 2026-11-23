@@ -100,17 +100,11 @@ data class FluteUiState(
     val canListen: Boolean get() = tune.any { it is TuneNote }
 
     /**
-     * The note each letter key writes now, 0 = C to 6 = B: its own in the chosen octave ([FluteNotes.inOctave]), its
-     * black note while the sign waits; null where it writes nothing (D and A then, and all of octave 4 but c⁴).
-     */
-    val keyNotes: List<Int?> get() = List(7) { FluteNotes.inOctave(it, signWaiting, octave) }
-
-    /**
      * The letter key drawn pressed: the playing note's letter while the keys show its octave (E's for an E♭; none while
      * the pills are elsewhere), else the held key, which stays down under its finger when the octave changes.
      */
     val litLetter: Int?
-        get() = playing?.let { (tune.getOrNull(it.index) as? TuneNote)?.midi }
+        get() = playing?.let { noteAt(it.index) }
             ?.let { midi -> NoteSpelling.letterOf(midi).takeIf { FluteNotes.octaveOf(midi) == octave } }
             ?: held?.key
 

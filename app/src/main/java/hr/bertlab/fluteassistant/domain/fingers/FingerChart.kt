@@ -13,10 +13,10 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
  */
 object FingerChart {
     /** The notes of each pitch class, worked out once: the range and the twelve classes never change. */
-    private val NOTES: List<List<Int>> = List(12) { pitchClass -> FluteRange.midiRange.filter { Math.floorMod(it, 12) == pitchClass } }
+    private val NOTES: List<List<Int>> = List(12) { pitchClass -> FluteRange.midiRange.filter { NoteSpelling.pitchClassOf(it) == pitchClass } }
 
     /** The notes of [pitchClass] (0 = C to 11 = B) the flute plays, low to high: four for C, three for the rest. */
-    fun notesOf(pitchClass: Int): List<Int> = NOTES[Math.floorMod(pitchClass, 12)]
+    fun notesOf(pitchClass: Int): List<Int> = NOTES[NoteSpelling.pitchClassOf(pitchClass)]
 
     /** The most notes a pitch class has, C's four (c1 to c4): the Fingers tab sizes a row for this many, whatever the note. */
     val MOST_NOTES: Int = NOTES.maxOf { it.size }

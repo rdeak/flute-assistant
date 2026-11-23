@@ -38,7 +38,7 @@ sealed interface StepPart {
  */
 object Bars {
     /** How many half beats of the flute's beat (a quarter note) fill a bar of [signature]: 8 for 4/4, 6 for 6/8. */
-    fun halfBeatsPerBar(signature: TimeSignature): Int = signature.beatsPerBar * 8 / signature.noteValue
+    fun halfBeatsPerBar(signature: TimeSignature): Int = signature.beatsPerBar * signature.halfBeatsPerClick
 
     fun write(tune: List<TuneItem>, signature: TimeSignature): List<LineMark> {
         val bar = halfBeatsPerBar(signature)

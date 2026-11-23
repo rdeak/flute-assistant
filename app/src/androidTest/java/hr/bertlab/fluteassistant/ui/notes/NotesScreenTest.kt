@@ -134,7 +134,6 @@ class NotesScreenTest {
     private fun over(score: Int) = asking(60).copy(
         roundOver = true,
         results = List(score) { true } + List(NotesRound.ROUND_LENGTH - score) { false },
-        taps = 13,
         bestStreak = 5,
         roundMillis = 83_000L,
     )
@@ -393,7 +392,7 @@ class NotesScreenTest {
     /** The last note of a phrase is placed: "That's it!" while the phrase plays back as its feedback, not "Listen". */
     @Test
     fun the_last_note_of_a_phrase_says_thats_it_while_the_phrase_plays_back() {
-        show(hearing().copy(solved = true, phrasePlaying = true, results = listOf(true), taps = 1, streak = 1))
+        show(hearing().copy(solved = true, phrasePlaying = true, results = listOf(true), streak = 1))
         compose.onNodeWithText("🎉 That's it!").assertIsDisplayed()
         compose.onNodeWithText("👂 Listen").assertDoesNotExist()
     }
@@ -575,7 +574,7 @@ class NotesScreenTest {
         compose.onNodeWithText("👂 Listen").assertIsDisplayed()
 
         // The staff is locked then, so nothing else is said over it.
-        compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(60), lastWrongTap = 60, taps = 1) }
+        compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(60), lastWrongTap = 60) }
         compose.onNodeWithText("👂 Listen").assertIsDisplayed()
         compose.onNodeWithText("🙈 Try again").assertDoesNotExist()
 
@@ -714,7 +713,7 @@ class NotesScreenTest {
         assertTrue("a later slot has its ❓ at rest", rest.any(0.58f, 6f, 8f, ::isReddish))
         assertTrue("the last slot has its ❓ at rest", rest.any(0.74f, 6f, 8f, ::isReddish))
 
-        compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1) }
+        compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62) }
         compose.waitForIdle()
         val missed = staffPixels()
         assertFalse("no ❓ in the slot of the note to find after a miss", missed.any(0.42f, 6f, 8f, ::isRed))
@@ -985,7 +984,7 @@ class NotesScreenTest {
      */
     @Test
     fun the_feedback_stands_under_the_game_pills_and_over_the_buttons_and_the_staff() {
-        show(asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1))
+        show(asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62))
         val find = compose.onNodeWithText("🔎 Find").getBoundsInRoot()
         val pick = compose.onNodeWithContentDescription("Choose notes").getBoundsInRoot()
         val staff = compose.onNodeWithContentDescription(staffDescription).getBoundsInRoot()
@@ -1173,7 +1172,7 @@ class NotesScreenTest {
         val staff = compose.onNodeWithContentDescription(staffDescription)
         val staffBounds = staff.getBoundsInRoot()
         val before = staff.captureToImage().toPixelMap()
-        compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1) }
+        compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62) }
         val after = staff.captureToImage().toPixelMap()
         val columns = (after.width * 0.42f).toInt()..(after.width * 0.58f).toInt()
         val pitch = after.height / 14f
@@ -1190,13 +1189,13 @@ class NotesScreenTest {
 
     @Test
     fun a_right_answer_says_so() {
-        show(asking(60).copy(solved = true, results = listOf(true), taps = 1, streak = 1))
+        show(asking(60).copy(solved = true, results = listOf(true), streak = 1))
         compose.onNodeWithText("🎉 That's it!").assertIsDisplayed()
     }
 
     @Test
     fun a_wrong_answer_says_try_again() {
-        show(asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1))
+        show(asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62))
         compose.onNodeWithText("🙈 Try again").assertIsDisplayed()
         compose.onNodeWithText("C4").assertIsDisplayed() // the question stays
     }
@@ -1212,7 +1211,6 @@ class NotesScreenTest {
             asking(60).copy(
                 roundOver = true,
                 results = List(8) { true } + List(2) { false },
-                taps = 13,
                 bestStreak = 5,
                 roundMillis = 83_000L,
             ),
@@ -1484,7 +1482,7 @@ class NotesScreenTest {
 
     @Test
     fun the_streak_shows_as_flames_from_one() {
-        show(asking(60).copy(streak = 3, results = listOf(true, true, true), taps = 3))
+        show(asking(60).copy(streak = 3, results = listOf(true, true, true)))
         compose.onNodeWithContentDescription("Streak of 3").assertIsDisplayed()
         compose.onNodeWithText("🔥 3").assertDoesNotExist()
         compose.runOnIdle { state.value = state.value.copy(streak = 0) }

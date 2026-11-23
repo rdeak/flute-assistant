@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 /** Rows a [ValueWheel] shows at once: the chosen value and one neighbour on each side. */
-const val WHEEL_VISIBLE_ITEMS = 3
+private const val WHEEL_VISIBLE_ITEMS = 3
 
 /**
  * How much of the muted text colour a neighbour keeps. The neighbours are 24 sp bold, so they

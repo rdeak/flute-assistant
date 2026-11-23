@@ -22,7 +22,7 @@ class ForegroundServiceBackgroundPlayback @Inject constructor(
         } catch (e: IllegalStateException) {
             // Android 12+ refuses foreground services started while the app is in the background.
             // Playback itself is unaffected; it just will not outlive the screen.
-            logger.w(LogTags.PLAYBACK, "playback.error", "reason" to "service_refused", "message" to e.message)
+            logger.w(LogTags.PLAYBACK, "playback.error", "reason" to "service_refused", "message" to e.message, error = e)
         }
     }
 }

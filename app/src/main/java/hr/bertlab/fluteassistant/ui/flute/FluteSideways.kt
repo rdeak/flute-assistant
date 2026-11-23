@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -19,9 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
@@ -109,23 +106,22 @@ internal fun FluteWritingSideways(
  * A tune running, Play or Your turn, the screen a child reads from a music stand: the keys and the
  * two buttons are gone, the card widens to the right column, and the column holds the advice at its
  * top and Stop low on the right, in Listen to me's corner, under the thumb that started the run.
- * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`. [prompt], "Play B4" before the first note
- * of a "Your turn" is judged, stands where the advice does. The fingering a wrong note brings upright
+ * [tune] comes drawn at `SidewaysGeometry.runningStaffScale`. [line] is the one line of words, the advice or
+ * "Play B4" before the first note of a "Your turn" is judged, which the caller builds for both layouts. The fingering a wrong note brings upright
  * does not show here: the column is 116 dp wide and the diagram would be about 23 dp tall; its line,
  * "Check your fingers", is one of the advices and does.
  */
 @Composable
 internal fun FluteRunningSideways(
     tune: @Composable (Modifier) -> Unit,
-    advice: TunerAdvice,
+    line: @Composable () -> Unit,
     onStop: () -> Unit,
     modifier: Modifier = Modifier,
-    prompt: AnnotatedString? = null,
 ) {
     SidewaysPage(
         modifier = modifier,
         column = {
-            if (prompt != null) AdviceLine(prompt, wrap = true) else AdviceLine(advice, wrap = true)
+            line()
             SidewaysActionButton(
                 icon = AppIcons.Stop,
                 text = stringResource(R.string.stop),

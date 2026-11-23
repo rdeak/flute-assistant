@@ -16,23 +16,19 @@ import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
  * and its staff use this list. A black note sits on its letter's staff place.
  */
 object FluteNotes {
-    const val LOWEST = FluteRange.LOWEST_MIDI
-    const val HIGHEST = FluteRange.HIGHEST_MIDI
+    private const val LOWEST = FluteRange.LOWEST_MIDI
 
     /** The octaves the pills offer: 1 (c¹ to h¹) to 4, where only c⁴ is a note of the flute. */
     val OCTAVES: IntRange = 1..4
 
-    /** Every note the flute writes, lowest first. */
-    val ALL: List<Int> = (LOWEST..HIGHEST).toList()
-
     /** The staff place of [midi] (0 = c¹, [NoteSpelling.placeOf]): its letter's; −1 when the flute has no such note. */
-    fun positionOf(midi: Int): Int = if (midi in LOWEST..HIGHEST) NoteSpelling.placeOf(midi) else -1
+    fun positionOf(midi: Int): Int = if (midi in FluteRange.midiRange) NoteSpelling.placeOf(midi) else -1
 
     /**
      * The white note of the letter key [letter] (0 = C to 6 = B) in [octave], whether the flute has it or not: the name
      * a key shows (d⁴ has a name and writes nothing).
      */
-    fun whiteIn(letter: Int, octave: Int): Int = LOWEST + 12 * (octave - 1) + NoteSpelling.whiteOf(letter)
+    fun whiteIn(letter: Int, octave: Int): Int = baseOf(octave) + NoteSpelling.whiteOf(letter)
 
     /**
      * The note the letter key [letter] writes in [octave]: its white note, or while the ♯♭ key waits ([signed]) its black
@@ -42,9 +38,12 @@ object FluteNotes {
     fun inOctave(letter: Int, signed: Boolean, octave: Int): Int? {
         if (letter !in 0..6 || octave !in OCTAVES) return null
         val pitchClass = if (signed) NoteSpelling.blackOf(letter) ?: return null else NoteSpelling.whiteOf(letter)
-        return (LOWEST + 12 * (octave - 1) + pitchClass).takeIf { it in LOWEST..HIGHEST }
+        return (baseOf(octave) + pitchClass).takeIf { it in FluteRange.midiRange }
     }
 
     /** The octave [midi] is written in, by its letter (B♭ with B): 1 for c¹ to h¹, 4 for c⁴. */
-    fun octaveOf(midi: Int): Int = Math.floorDiv(NoteSpelling.naturalOf(midi) - LOWEST, 12) + 1
+    fun octaveOf(midi: Int): Int = (NoteSpelling.naturalOf(midi) - LOWEST).floorDiv(12) + 1
+
+    /** The C [octave] starts on: c¹ for 1. */
+    private fun baseOf(octave: Int): Int = LOWEST + 12 * (octave - 1)
 }

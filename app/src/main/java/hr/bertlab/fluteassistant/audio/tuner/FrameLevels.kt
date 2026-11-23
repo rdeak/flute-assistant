@@ -42,7 +42,8 @@ object FrameLevels {
         return if (quietest == Double.MAX_VALUE) level(window) else toLevel(quietest)
     }
 
-    private fun rms(window: FloatArray, from: Int, to: Int): Double {
+    /** Root mean square of [window] from [from] up to, not including, [to]. */
+    internal fun rms(window: FloatArray, from: Int, to: Int): Double {
         var energy = 0.0
         for (i in from until to) energy += window[i].toDouble() * window[i]
         return sqrt(energy / (to - from))

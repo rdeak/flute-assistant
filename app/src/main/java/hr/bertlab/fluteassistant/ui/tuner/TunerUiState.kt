@@ -110,8 +110,8 @@ data class TunerUiState(
             val cents = centsOffTarget ?: return TargetMismatch.NONE
             return when {
                 abs(cents) <= ListenRules.NEAR_CENTS -> TargetMismatch.NONE
-                abs(cents - 1200.0) <= ListenRules.NEAR_CENTS -> TargetMismatch.OCTAVE_UP
-                abs(cents + 1200.0) <= ListenRules.NEAR_CENTS -> TargetMismatch.OCTAVE_DOWN
+                abs(cents - OCTAVE_CENTS) <= ListenRules.NEAR_CENTS -> TargetMismatch.OCTAVE_UP
+                abs(cents + OCTAVE_CENTS) <= ListenRules.NEAR_CENTS -> TargetMismatch.OCTAVE_DOWN
                 else -> TargetMismatch.OTHER_NOTE
             }
         }
@@ -124,21 +124,27 @@ data class TunerUiState(
      * fixed with the lips, so only there does it name the head joint.
      */
     val advice: TunerAdvice
-        get() = when {
-            isPlayingReference -> TunerAdvice.NONE
-            status == TuningStatus.NONE -> when (hearing) {
-                Hearing.CLEAR -> TunerAdvice.NONE
-                Hearing.QUIET_UNCLEAR -> TunerAdvice.COME_CLOSER
-                Hearing.LOUD_UNCLEAR -> TunerAdvice.CLEAR_NOTE
-            }
-            status == TuningStatus.IN_TUNE -> TunerAdvice.NONE
-            else -> when (mismatch) {
-                TargetMismatch.OCTAVE_DOWN -> TunerAdvice.FASTER_AIR
-                TargetMismatch.OCTAVE_UP -> TunerAdvice.GENTLER_AIR
-                TargetMismatch.OTHER_NOTE -> TunerAdvice.CHECK_FINGERS
-                TargetMismatch.NONE -> when {
-                    isTuningNote -> if (status == TuningStatus.LOW) TunerAdvice.HEAD_JOINT_IN else TunerAdvice.HEAD_JOINT_OUT
-                    else -> if (status == TuningStatus.LOW) TunerAdvice.ROLL_OUT else TunerAdvice.ROLL_IN
+        get() {
+            if (isPlayingReference) return TunerAdvice.NONE
+            return when (val status = status) {
+                TuningStatus.NONE -> when (hearing) {
+                    Hearing.CLEAR -> TunerAdvice.NONE
+                    Hearing.QUIET_UNCLEAR -> TunerAdvice.COME_CLOSER
+                    Hearing.LOUD_UNCLEAR -> TunerAdvice.CLEAR_NOTE
+                }
+                TuningStatus.IN_TUNE -> TunerAdvice.NONE
+                TuningStatus.LOW, TuningStatus.HIGH -> when (mismatch) {
+                    TargetMismatch.OCTAVE_DOWN -> TunerAdvice.FASTER_AIR
+                    TargetMismatch.OCTAVE_UP -> TunerAdvice.GENTLER_AIR
+                    TargetMismatch.OTHER_NOTE -> TunerAdvice.CHECK_FINGERS
+                    TargetMismatch.NONE -> {
+                        val low = status == TuningStatus.LOW
+                        if (isTuningNote) {
+                            if (low) TunerAdvice.HEAD_JOINT_IN else TunerAdvice.HEAD_JOINT_OUT
+                        } else {
+                            if (low) TunerAdvice.ROLL_OUT else TunerAdvice.ROLL_IN
+                        }
+                    }
                 }
             }
         }
@@ -195,6 +201,9 @@ data class TunerUiState(
          * alone, so a professional's 5 cents would rarely settle on "Perfect!".
          */
         const val IN_TUNE_CENTS = 10.0
+
+        /** An octave, in cents. */
+        private const val OCTAVE_CENTS = 1200.0
     }
 }
 

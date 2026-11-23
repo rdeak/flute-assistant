@@ -33,7 +33,8 @@ phone's recorded sessions of 2026-11-05 showed (60 of 66 notes moved a frame or 
 mark changed; a comparison with TarsosDSP's YIN and McLeod on the same sessions found nothing
 else worth having, so the library was turned down). `YinPitchDetectorTest` pins both ends: a note
 that began inside the newest hop is heard, and a frame whose newest hop is silent has no pitch.
-`TunerViewModel` gates on probability (`MIN_PROBABILITY` 0.85 on top of YIN's own 0.2
+`ReadingTracker` (`domain/listen`, the tuner's reading rules since 2026-11-23; `TunerViewModel` feeds it every frame
+and mirrors its reading and identified note into the state) gates on probability (`MIN_PROBABILITY` 0.85 on top of YIN's own 0.2
 threshold: two stacked confidence gates whose combined cliff sits at about 9 dB breath-noise
 signal-to-noise, right where a beginner's airy tone lives; the KDoc on `MIN_PROBABILITY`
 explains how to read `tuner.summary` to confirm it on a phone and what the evidence-backed
@@ -117,7 +118,7 @@ the breath runs out) is no new note, since nobody played one, where the tuner's 
 Since 2026-11-16 the tracker also measures a step from the note it hears sounding, not only from the
 written pitch (`Rules.stepFromSounding`), so a semitone slurred on a flute off its pitch is a new note
 and not drift (`ui/flute/DESIGN.md`, "Sharps and flats"); that is the flute's rule, and the ring's own
-copy of `identify` in `TunerViewModel` has none and needs none.
+`identify`, in `ReadingTracker`, has none and needs none.
 All are read against `flute.heard` and `flute.listen_summary` on a phone and pinned by
 `ListenPathTest` on synthetic sound. Since 2026-11-05 the tracker takes every threshold it
 applies as a `Rules` value whose defaults are the constants (`NoteOnsetTracker.Rules`, with
@@ -125,8 +126,10 @@ applies as a `Rules` value whose defaults are the constants (`NoteOnsetTracker.R
 seeded room floor (`floor`, readable: the view model's tracker keeps it from one run to the
 next, and a replay must start where the phone started); the app builds it with the defaults, so
 nothing about the rules changed. The other piece is `FrameSummary` (its own file now, `internal`),
-the body of `tuner.summary` and of the flute's `flute.listen_summary`. `TunerViewModel` still
-runs its own copy of those rules; moving it onto the tracker is a refactor for another day, and
+the body of `tuner.summary` and of the flute's `flute.listen_summary`. The tuner's own rules are `ReadingTracker`'s
+(since 2026-11-23; they were in `TunerViewModel` until then): it and `NoteOnsetTracker` share the frequency window
+(`SmoothingWindow`: the lock and the median) and nothing else, as the flute's floor, gaps and `MIN_LEVEL` are not the
+tuner's, and
 the constants (`MIN_PROBABILITY`, `LOCK_FRAMES`, `LOCK_CENTS`, `SMOOTHING_WINDOW`,
 `SWITCH_FRAMES`, `NEAR_CENTS`, all in `domain/listen/ListenRules`) are referenced, never copied. The microphone card
 (`ui/common/MicrophonePermissionCard`) and the advice line (`ui/common/AdviceLine`) moved out of
@@ -180,7 +183,7 @@ coloured pictures, and on the A55's 653 dp tab the window ended where the flute 
   tall) and no wider than the arrows leave it (`TargetNote`); 382 dp tall on the A55's tab, 16 dp clear of the flute.
   The card's free height goes round the window and the flute, not between them.
 - **The flute lights up when it helps** (`TunerUiState.fingeringLit`, `TunerFingering`): its pressed keys are in the
-  note's colour before a sound (how to play it) and on another note or octave, and grey (`QuietKeys`, halfway from an
+  note's colour before a sound (how to play it) and on another note or octave, and grey (`quietKeys`, halfway from an
   open key to the muted words, readable at night) while the
   right note sounds, so the eyes go to the window. The colour fades; nothing moves. In Which? it is grey while a note
   sounds.
@@ -283,8 +286,8 @@ as the height leaves little choice. The numbers come from `SidewaysGeometry`, wh
   it; Yes low on the right, Settings at the top of the column, and the flute's Your turn adds its quiet Not
   now under Settings (it has no emoji). **Settings shows only once the phone will not ask again** (2026-11-10):
   it is the one button in the app that leaves it, and until then a child met it on the tuner's very first
-  opening. The card takes `onOpenSettings` as null until then; the screens' permission launchers ask
-  `shouldShowRequestPermissionRationale` after a no and tell the view model (`TunerViewModel.onPermissionAnswer`,
+  opening. The card takes `onOpenSettings` as null until then; the screens' `rememberMicrophonePermission` (`ui/common`, shared by both since 2026-11-23) asks
+  `shouldShowRequestPermissionRationale` after a no and tells the view model (`TunerViewModel.onPermissionAnswer`,
   `FluteViewModel.onMicResult`), which keeps `micBlocked` in its state, so it survives a tab switch; a grant ends it.
   After the app restarts the pill is back at the first "Yes" the phone refuses to ask for. A question dismissed
   without an answer counts as blocked too (the phone gives the same answers), which only shows the pill early.

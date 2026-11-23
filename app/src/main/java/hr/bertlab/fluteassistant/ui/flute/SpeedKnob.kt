@@ -70,7 +70,7 @@ fun SpeedKnob(
         ) {
             Emoji(
                 AppTab.METRONOME.emoji,
-                fontSize = emojiSizeFor(StaffGeometry.KNOB_DRUM),
+                size = StaffGeometry.KNOB_DRUM.dp,
                 modifier = Modifier.offset(x = -StaffGeometry.KNOB_DRUM_SHIFT.dp, y = -StaffGeometry.KNOB_DRUM_SHIFT.dp),
             )
         }
@@ -102,6 +102,6 @@ private fun AnimalBadge(emoji: String, pressed: Boolean, modifier: Modifier = Mo
             .background(Sun)
             .border(StaffGeometry.KNOB_BADGE_EDGE.dp, FluteTheme.colors.outline, CircleShape),
     ) {
-        Emoji(emoji, fontSize = emojiSizeFor(StaffGeometry.KNOB_BADGE_ANIMAL), modifier = Modifier.facingRight(emoji))
+        Emoji(emoji, size = StaffGeometry.KNOB_BADGE_ANIMAL.dp, modifier = Modifier.facingRight(emoji))
     }
 }

@@ -34,13 +34,13 @@ class StaffGeometryTest {
 
     @Test
     fun `every note, lit and tied, with its stem up, stays inside the staff's box and the room allowed around it`() {
-        for (position in 0 until StaffNotes.POSITIONS) {
+        for (position in 0 until StaffNotes.ALL.size) {
             val extent = StaffGeometry.noteExtent(position)
             assertTrue("position $position reaches ${extent.start}", extent.start >= -StaffGeometry.OVERFLOW_TOP)
             assertTrue("position $position reaches ${extent.endInclusive}", extent.endInclusive <= StaffGeometry.HEIGHT + StaffGeometry.OVERFLOW_BOTTOM)
         }
         // c³'s stem uses the room above all the way: the box is no taller than it needs to be.
-        assertEquals(-StaffGeometry.OVERFLOW_TOP, StaffGeometry.noteExtent(StaffNotes.POSITIONS - 1).start)
+        assertEquals(-StaffGeometry.OVERFLOW_TOP, StaffGeometry.noteExtent(StaffNotes.ALL.size - 1).start)
         // The stage's padding (16 dp, 3 of them its border) and the 14 dp gap above the line of pills hold what reaches out.
         assertTrue(StaffGeometry.OVERFLOW_TOP <= 16f - 3f && StaffGeometry.OVERFLOW_BOTTOM < 14f)
         // A rest's ring stays on the staff; the band covers the staff and the names under it, and stays in the whole.
@@ -72,10 +72,10 @@ class StaffGeometryTest {
         assertTrue(StaffGeometry.ANIMAL_Y + half <= StaffGeometry.TOP_LINE_Y * s)
         // Every head is under it, but the top edge of the highest note's, c³'s, by a few dp (the head's tilt adds a quarter dp to its height).
         val headTop = { position: Int -> (StaffGeometry.yOf(position) - StaffGeometry.HEAD_RY - 0.25f - StaffGeometry.HEAD_EDGE) * s }
-        for (position in 0 until StaffNotes.POSITIONS - 1) {
+        for (position in 0 until StaffNotes.ALL.size - 1) {
             assertTrue("position $position", headTop(position) >= StaffGeometry.ANIMAL_Y + half)
         }
-        assertTrue(headTop(StaffNotes.POSITIONS - 1) >= StaffGeometry.ANIMAL_Y + half - 4f)
+        assertTrue(headTop(StaffNotes.ALL.size - 1) >= StaffGeometry.ANIMAL_Y + half - 4f)
     }
 
     @Test

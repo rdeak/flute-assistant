@@ -31,8 +31,6 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.domain.metronome.fewerBeats
-import hr.bertlab.fluteassistant.domain.metronome.moreBeats
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.SidewaysActionButton
@@ -134,8 +132,6 @@ fun MetronomeStageSideways(
     // One flash shared by the bubbles and the knob, so the animal hops with the beat.
     val flash = rememberBeatFlash(state.beatPulse, state.isPlaying)
     val timeSignature = state.config.timeSignature
-    val fewer = timeSignature.fewerBeats()
-    val more = timeSignature.moreBeats()
 
     Stage(verticalArrangement = Arrangement.Center, modifier = modifier) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -165,28 +161,14 @@ fun MetronomeStageSideways(
                         stableRow = true,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(StepGap)) {
-                        BeatStepButton(
-                            text = "−",
-                            description = stringResource(R.string.fewer_beats),
-                            enabled = fewer != null,
-                            onClick = { fewer?.let(onTimeSignatureChange) },
-                            size = StepSize,
-                        )
-                        BeatStepButton(
-                            text = "+",
-                            description = stringResource(R.string.more_beats),
-                            enabled = more != null,
-                            onClick = { more?.let(onTimeSignatureChange) },
-                            size = StepSize,
-                        )
+                        FewerBeatsButton(timeSignature, onTimeSignatureChange, StepSize)
+                        MoreBeatsButton(timeSignature, onTimeSignatureChange, StepSize)
                     }
                 }
                 TempoDial(
                     bpm = state.config.bpm,
                     onBpmChange = onBpmChange,
-                    editing = wheel.editing,
-                    onEditingChange = { wheel.editing = it },
-                    onWheelPositioned = { wheel.wheelCoordinates = it },
+                    wheel = wheel,
                     flash = flash,
                     modifier = Modifier.size(ring),
                 )

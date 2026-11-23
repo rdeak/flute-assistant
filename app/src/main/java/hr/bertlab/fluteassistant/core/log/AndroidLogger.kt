@@ -3,6 +3,8 @@
 
 package hr.bertlab.fluteassistant.core.log
 
+import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.util.Log
 
 /**
@@ -10,6 +12,9 @@ import android.util.Log
  * debug lines are on in a [debuggable] build or with the same switch; the rest always write.
  */
 class AndroidLogger(private val debuggable: Boolean) : Logger {
+
+    /** The logger of the build [context] belongs to. */
+    constructor(context: Context) : this(debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
 
     override fun isVerbose(tag: String): Boolean = Log.isLoggable(tag, Log.VERBOSE)
 

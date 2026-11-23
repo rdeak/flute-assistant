@@ -31,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -73,14 +74,7 @@ fun MicrophonePermissionCard(
                 .weight(1f)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(160.dp)
-                    .chunky(CircleShape, Sun, colors.outline, depth = 8.dp),
-            ) {
-                Emoji(MICROPHONE_EMOJI, fontSize = 80)
-            }
+            MicrophoneDisc(UprightDiscSize, UprightDiscDepth, emojiFont = 80)
             Text(
                 text = stringResource(R.string.mic_permission_title),
                 style = MaterialTheme.typography.headlineMedium.copy(fontSize = 34.sp, lineHeight = 42.sp),
@@ -121,6 +115,23 @@ fun MicrophonePermissionCard(
     }
 }
 
+/** The yellow disc with the microphone on it, the card's picture. */
+@Composable
+private fun MicrophoneDisc(size: Dp, depth: Dp, emojiFont: Int) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(size)
+            .chunky(CircleShape, Sun, FluteTheme.colors.outline, depth = depth),
+    ) {
+        Emoji(MICROPHONE_EMOJI, fontSize = emojiFont)
+    }
+}
+
+/** The upright card's disc. */
+private val UprightDiscSize = 160.dp
+private val UprightDiscDepth = 8.dp
+
 /**
  * The card for a phone on its side (mockup `more.html`, "Asking for the microphone"). The disc
  * shrinks with the card's height and width, and the words beside it take what is left, wrapping
@@ -157,14 +168,7 @@ private fun MicrophonePermissionSideways(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(DiscGap, Alignment.CenterHorizontally),
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(disc)
-                            .chunky(CircleShape, Sun, colors.outline, depth = DiscDepth),
-                    ) {
-                        Emoji(MICROPHONE_EMOJI, fontSize = (disc.value * DISC_EMOJI_SHARE).toInt())
-                    }
+                    MicrophoneDisc(disc, DiscDepth, emojiFont = (disc.value * DISC_EMOJI_SHARE).toInt())
                     Column(
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier

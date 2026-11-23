@@ -18,9 +18,6 @@ object StaffNotes {
     /** Every note offered, lowest first: the white ones, written with no sign. */
     val ALL: List<Int> = (LOWEST_MIDI..HIGHEST_MIDI).filter { NoteSpelling.signOf(it) == null }
 
-    /** How many places the staff has: one per note in [ALL]. */
-    const val POSITIONS = 15
-
     /** c1 to g1: a first lesson's worth, and where the user story starts. */
     val DEFAULT_PRACTICE: Set<Int> = setOf(60, 62, 64, 65, 67)
 
@@ -40,7 +37,7 @@ object StaffNotes {
 
     /** The ledger lines a note at [position] needs, nearest the staff first; empty inside it. */
     fun ledgerLinesFor(position: Int): List<Int> = when {
-        position < LINE_POSITIONS.first() -> (0 downTo position step 2).toList().reversed().filter { it >= 0 }
+        position <= 0 -> listOf(0) // c1's own line; d1, the space over it, needs none
         position > LINE_POSITIONS.last() -> (LINE_POSITIONS.last() + 2..position step 2).toList()
         else -> emptyList()
     }
@@ -55,6 +52,16 @@ object StaffNotes {
         val lowest = minOf(STAFF_POSITIONS.first, chosen.minOrNull() ?: STAFF_POSITIONS.first)
         val highest = maxOf(STAFF_POSITIONS.last, chosen.maxOrNull() ?: STAFF_POSITIONS.last)
         return lowest..highest
+    }
+
+    /**
+     * [practice] with [midi] switched in the picker: added, or taken out unless it is the last note left. Only an
+     * offered note switches; a switch that is refused gives [practice] itself.
+     */
+    fun toggled(practice: Set<Int>, midi: Int): Set<Int> {
+        if (midi !in ALL) return practice
+        val switched = if (midi in practice) practice - midi else practice + midi
+        return switched.ifEmpty { practice }
     }
 
     /** Keeps only offered notes; a set with none left (an old build, corrupt storage) becomes the default. */

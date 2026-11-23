@@ -12,10 +12,8 @@ import androidx.core.app.ServiceCompat
 import dagger.hilt.android.AndroidEntryPoint
 import hr.bertlab.fluteassistant.audio.metronome.MetronomePlayer
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
@@ -39,7 +37,7 @@ class MetronomeService : Service() {
     @Inject
     lateinit var player: MetronomePlayer
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val scope = MainScope()
     private var watcher: Job? = null
     private lateinit var notifications: PlaybackNotifications
 
@@ -101,7 +99,7 @@ class MetronomeService : Service() {
 
     companion object {
         const val ACTION_STOP = "hr.bertlab.fluteassistant.action.STOP"
-        const val NOTIFICATION_ID = 1
+        private const val NOTIFICATION_ID = 1
         private const val NOTIFICATION_UPDATE_INTERVAL_MS = 250L
 
         fun intent(context: Context, action: String? = null): Intent =

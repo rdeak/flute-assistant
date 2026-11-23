@@ -10,8 +10,10 @@ import hr.bertlab.fluteassistant.domain.flute.StepPart
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_X
 import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_Y
+import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import kotlin.math.hypot
 
 /**
@@ -114,6 +116,30 @@ internal object StaffGeometry {
 
     /** The scale of the running staff upright with [room] over it: [RunningStaffScale], or less, so it is never taller than a tune up to c³ runs. */
     fun runningScale(room: Float): Float = minOf(RunningStaffScale, TOTAL_HEIGHT * RunningStaffScale / (TOTAL_HEIGHT + room))
+
+    /** How the staff is drawn in a tab: its [scale], and the [room] over it that it is drawn with. */
+    data class Fit(val scale: Float, val room: Float)
+
+    /**
+     * How a tune that needs [needed] of room over the staff is drawn in a tab [tabHeight] tall. Upright, while the
+     * child writes, the staff's box ([uprightBox]) never changes, so the keys never move: the tune is drawn at full
+     * size while the box has its room, smaller where it has not, and with all the room the box has. On its side the
+     * card's height says how large the staff can be, and a zoomed tab ([zoom] over 1) draws it larger. While the tune
+     * runs it is drawn with the room it needs.
+     */
+    fun fit(running: Boolean, sideways: Boolean, zoom: Float, tabHeight: Float, needed: Float, uprightBox: Float): Fit {
+        val scale = when {
+            !running && sideways -> minOf(
+                if (zoom > 1f) TabletGeometry.sidewaysStaffScale(zoom) else 1f,
+                SidewaysGeometry.restingStaffScale(tabHeight, TOTAL_HEIGHT + needed),
+            )
+            !running -> restingScale(needed, uprightBox)
+            sideways -> SidewaysGeometry.runningStaffScale(tabHeight, TOTAL_HEIGHT + needed)
+            else -> runningScale(needed)
+        }
+        val room = if (!running && !sideways) uprightBox / scale - TOTAL_HEIGHT else needed
+        return Fit(scale, room)
+    }
 
     /** A tie between two pills of one note: [PILL_TIE_GAP] under them, dipping [PILL_TIE_DIP]. */
     const val PILL_TIE_GAP = 4f
@@ -299,10 +325,10 @@ internal object StaffGeometry {
 
     /**
      * Where the pieces of one step stand, in dp from the step's left: the room its sign takes before the first head
-     * ([room], none without a sign), the step's whole [width], each piece's head centre ([heads]), the middle of each
+     * ([signRoom], none without a sign), the step's whole [width], each piece's head centre ([heads]), the middle of each
      * piece's name pill ([pills]) and the middle of each bar line inside the step ([bars]).
      */
-    class StepLayout(val room: Float, val width: Float, val heads: List<Float>, val pills: List<Float>, val bars: List<Float>)
+    class StepLayout(val signRoom: Float, val width: Float, val heads: List<Float>, val pills: List<Float>, val bars: List<Float>)
 
     /**
      * The layout of [mark]: the one place that knows a sign's room stands before the first head, makes that piece's

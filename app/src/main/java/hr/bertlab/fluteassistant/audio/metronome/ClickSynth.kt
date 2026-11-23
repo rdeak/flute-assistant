@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.audio.metronome
 
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.min
 import kotlin.math.sin
@@ -50,7 +51,7 @@ object ClickSynth {
         val start = pcm.size - fade
         for (i in 0 until fade) {
             val x = (i + 1).toDouble() / fade
-            val gain = 0.5 * (1 + kotlin.math.cos(PI * x))
+            val gain = 0.5 * (1 + cos(PI * x))
             pcm[start + i] = (pcm[start + i] * gain).toFloat()
         }
         if (pcm.isNotEmpty()) pcm[pcm.size - 1] = 0f

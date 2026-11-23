@@ -235,7 +235,6 @@ class TabletFitTest {
             asking.copy(
                 roundOver = true,
                 results = List(NotesRound.ROUND_LENGTH) { true },
-                taps = 13,
                 bestStreak = 5,
                 roundMillis = 83_000L,
             ),

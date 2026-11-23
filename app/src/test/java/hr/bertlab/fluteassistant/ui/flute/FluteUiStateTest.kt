@@ -234,11 +234,7 @@ class FluteUiStateTest {
     }
 
     @Test
-    fun `the keys name the notes of the chosen octave, and the lit letter is in it`() {
-        assertEquals(listOf(60, 62, 64, 65, 67, 69, 71), FluteUiState().keyNotes)
-        assertEquals(listOf(84, 86, 88, 89, 91, 93, 95), FluteUiState(octave = 3).keyNotes)
-        assertEquals(listOf(61, null, 63, 66, 68, null, 70), FluteUiState(signWaiting = true).keyNotes)
-        assertEquals(listOf(96, null, null, null, null, null, null), FluteUiState(octave = 4).keyNotes)
+    fun `the lit letter is in the chosen octave`() {
         val c5 = listOf(TuneNote(72, NoteLength.QUARTER))
         assertEquals(0, FluteUiState(tune = c5, playing = Playing(0), octave = 2).litLetter)
         assertNull("c2 plays while the keys show octave one", FluteUiState(tune = c5, playing = Playing(0)).litLetter)

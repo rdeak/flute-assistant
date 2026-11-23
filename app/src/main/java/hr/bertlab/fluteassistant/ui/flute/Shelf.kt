@@ -46,11 +46,11 @@ import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.TabPaddingHeight
 import hr.bertlab.fluteassistant.ui.common.dashedBorder
 import hr.bertlab.fluteassistant.ui.common.fadedUnless
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
-import kotlin.math.roundToInt
 
 /**
  * The picture and name of each of the shelf's six books, in the shelf's order, so that
@@ -85,8 +85,6 @@ fun BookButton(
     modifier: Modifier = Modifier,
 ) {
     val description = stringResource(R.string.flute_book_button, stringResource(sweet.nameRes))
-    // In dp, not sp, as on the shelf: a large font scale cannot push the sweet off the narrow cover.
-    val sweetFont = with(LocalDensity.current) { CornerSweetSize.toSp().value.roundToInt() }
     LittleBook(
         look = CornerBook,
         color = Sun,
@@ -95,7 +93,8 @@ fun BookButton(
         coverModifier = Modifier.semantics { contentDescription = description },
         modifier = modifier.size(StaffGeometry.CORNER_BUTTON.dp, StaffGeometry.BOOK_BUTTON_HEIGHT.dp),
     ) {
-        Emoji(sweet.emoji, fontSize = sweetFont, modifier = Modifier.align(Alignment.Center))
+        // In dp, not sp, as on the shelf: a large font scale cannot push the sweet off the narrow cover.
+        Emoji(sweet.emoji, size = CornerSweetSize, modifier = Modifier.align(Alignment.Center))
     }
 }
 
@@ -113,7 +112,7 @@ private val ShelfGap = 16.dp
  * gaps between them, and the 4 dp over and the 16 dp under that [FluteContent]'s column adds), so
  * it scrolls; above it the rows share whatever height there is.
  */
-val ShelfMinHeight: Dp = BookMinHeight * 3 + ShelfGap * 2 + 20.dp
+val ShelfMinHeight: Dp = BookMinHeight * 3 + ShelfGap * 2 + TabPaddingHeight
 
 /** Between the books of the sideways shelf, the margin the other sideways screens leave around their cards. */
 private val SidewaysShelfGap = SidewaysGeometry.MARGIN.dp
@@ -415,15 +414,13 @@ private fun BookCover(
                 .clearAndSetSemantics { },
         ) {
             // In dp, not sp: the sweet grows with its cover, and a large font scale cannot push it out.
-            val sweetFont = with(LocalDensity.current) {
-                (if (sideways) sidewaysSweetSize(maxWidth, maxHeight) else sweetSize(maxWidth, maxHeight)).toSp().value.roundToInt()
-            }
+            val picture = if (sideways) sidewaysSweetSize(maxWidth, maxHeight) else sweetSize(maxWidth, maxHeight)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
                 modifier = Modifier.fillMaxSize(),
             ) {
-                Emoji(sweet.emoji, fontSize = sweetFont)
+                Emoji(sweet.emoji, size = picture)
                 CoverLabel(book.coverNotes, empty = book.isEmpty)
             }
         }

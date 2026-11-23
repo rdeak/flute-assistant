@@ -21,8 +21,8 @@ import javax.inject.Inject
 
 /**
  * Unidirectional data flow: the screen renders [state] and calls the intent methods below.
- * Engine calls are forwarded synchronously; the last-used settings go to [SettingsStore], so
- * they survive process death.
+ * Engine calls are forwarded synchronously; the last-used settings are kept by [MetronomeSettings],
+ * which stores them, so they survive process death.
  *
  * The ViewModel is a controller, not the owner, of playback: the engine is an app-wide
  * singleton kept alive by [BackgroundPlayback], so the metronome keeps running when the
@@ -35,7 +35,10 @@ class MetronomeViewModel @Inject constructor(
     private val backgroundPlayback: BackgroundPlayback,
 ) : ViewModel() {
 
-    /** Session id of the playback run we started; events from any other run are ignored. */
+    /**
+     * Session id of the playback run we started; events from any other run are ignored. Declared before [_state],
+     * whose first value adopts a session already playing ([initialState]).
+     */
     private var activeSession = MetronomePlayer.NO_SESSION
 
     private val _state = MutableStateFlow(initialState())
@@ -60,10 +63,7 @@ class MetronomeViewModel @Inject constructor(
         // The engine can stop on its own (audio focus lost, headphones unplugged, output failure).
         viewModelScope.launch {
             player.sessionEnded.collect { session ->
-                if (session == activeSession) {
-                    activeSession = MetronomePlayer.NO_SESSION
-                    _state.update { it.copy(isPlaying = false, currentBeat = -1, currentStrength = null) }
-                }
+                if (session == activeSession) showStopped()
             }
         }
         viewModelScope.launch {
@@ -75,13 +75,7 @@ class MetronomeViewModel @Inject constructor(
                 if (waitMillis > 0) delay(waitMillis)
                 // Playback may have stopped while we waited: never light an LED on a stopped metronome.
                 if (event.sessionId != activeSession || !_state.value.isPlaying) return@collect
-                _state.update {
-                    it.copy(
-                        currentBeat = event.click.beatIndex,
-                        currentStrength = event.click.strength,
-                        beatPulse = it.beatPulse + 1,
-                    )
-                }
+                _state.update { it.copy(currentBeat = event.click.beatIndex, beatPulse = it.beatPulse + 1) }
             }
         }
     }
@@ -100,13 +94,18 @@ class MetronomeViewModel @Inject constructor(
         }
         activeSession = session
         backgroundPlayback.start()
-        _state.update { it.copy(isPlaying = true, currentBeat = -1, currentStrength = null) }
+        _state.update { it.copy(isPlaying = true, currentBeat = NO_BEAT) }
     }
 
     private fun stop() {
-        activeSession = MetronomePlayer.NO_SESSION
         player.stop()
-        _state.update { it.copy(isPlaying = false, currentBeat = -1, currentStrength = null) }
+        showStopped()
+    }
+
+    /** The run we started is over, by Stop or by the engine itself: its events no longer count and no beat is lit. */
+    private fun showStopped() {
+        activeSession = MetronomePlayer.NO_SESSION
+        _state.update { it.copy(isPlaying = false, currentBeat = NO_BEAT) }
     }
 
     // ---- Settings --------------------------------------------------------------------------
@@ -132,7 +131,7 @@ class MetronomeViewModel @Inject constructor(
     // No onCleared(): closing the screen must not stop the metronome. Playback ends from the
     // Stop button, the notification, the task being swiped away, or the engine itself.
 
-    companion object {
+    private companion object {
         /** Guards against a bogus audio timestamp freezing the indicator. */
         const val MAX_VISUAL_WAIT_MS = 1_000L
     }

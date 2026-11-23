@@ -79,11 +79,11 @@ fun RoundProgress(
     }
 }
 
-/** One note's place, 28 dp: its star, the yellow dot of the note being asked, or an empty dashed circle. */
+/** One note's place: its star, the yellow dot of the note being asked, or an empty dashed circle. */
 @Composable
 private fun Place(index: Int, results: List<Boolean>, roundOver: Boolean) {
     val colors = FluteTheme.colors
-    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(28.dp)) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(PlaceSize)) {
         when {
             index < results.size -> Emoji(
                 STAR_EMOJI,
@@ -92,16 +92,18 @@ private fun Place(index: Int, results: List<Boolean>, roundOver: Boolean) {
             )
             index == results.size && !roundOver -> Box(
                 Modifier
-                    .size(28.dp)
+                    .size(PlaceSize)
                     .clip(CircleShape)
                     .background(Sun)
                     .border(OutlineWidth, colors.outline, CircleShape),
             )
             else -> Box(
                 Modifier
-                    .size(28.dp)
+                    .size(PlaceSize)
                     .dashedBorder(OutlineWidth / 2, colors.border, CircleShape),
             )
         }
     }
 }
+
+private val PlaceSize = 28.dp

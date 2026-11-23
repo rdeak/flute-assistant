@@ -131,8 +131,10 @@ data class Listening(
      * shows there), not walking a rest (nothing is played there), and not on the ended run's screen.
      */
     val waiting: Boolean
-        get() = !finishing && index != null && !ended &&
-            walk?.phase != Walk.Phase.DONE && walk?.phase != Walk.Phase.REST && walk?.phase != Walk.Phase.CUT
+        get() = !finishing && index != null && !ended && when (walk?.phase) {
+            null, Walk.Phase.SOUNDING, Walk.Phase.SHORT -> true
+            Walk.Phase.DONE, Walk.Phase.REST, Walk.Phase.CUT -> false
+        }
 
     /**
      * The one line under the staff: stop and play it again when a written repeat is held on

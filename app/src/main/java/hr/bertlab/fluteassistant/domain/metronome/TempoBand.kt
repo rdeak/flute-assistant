@@ -18,6 +18,9 @@ enum class TempoBand(val fromBpm: Int, val emoji: String) {
     RABBIT(100, "\uD83D\uDC07"), // rabbit
     CHEETAH(130, "\uD83D\uDC06"); // leopard
 
+    /** Where the band ends: the next band's start, and the ring's end for the last. */
+    val untilBpm: Int get() = entries.getOrNull(ordinal + 1)?.fromBpm ?: MAX_BPM
+
     /** Tempo a tap on the band jumps to: its start, except that a second tap on the rabbit goes on to 120. */
     fun jumpFrom(bpm: Int): Int = if (this == RABBIT && bpm == fromBpm) RABBIT_SECOND_BPM else fromBpm
 
@@ -26,6 +29,9 @@ enum class TempoBand(val fromBpm: Int, val emoji: String) {
         const val MIN_BPM = 40
         const val MAX_BPM = 200
         private const val RABBIT_SECOND_BPM = 120
+
+        /** [bpm] brought onto the ring. */
+        fun clamp(bpm: Int): Int = bpm.coerceIn(MIN_BPM, MAX_BPM)
     }
 }
 
@@ -33,10 +39,9 @@ fun tempoBand(bpm: Int): TempoBand = TempoBand.entries.lastOrNull { bpm >= it.fr
 
 /** Where [bpm] sits along the ring, 0 at the slow end to 1 at the fast end. */
 fun dialFraction(bpm: Int): Float {
-    val clamped = bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM)
+    val clamped = TempoBand.clamp(bpm)
     val band = tempoBand(clamped)
-    val bandEnd = TempoBand.entries.getOrNull(band.ordinal + 1)?.fromBpm ?: TempoBand.MAX_BPM
-    val within = (clamped - band.fromBpm).toFloat() / (bandEnd - band.fromBpm)
+    val within = (clamped - band.fromBpm).toFloat() / (band.untilBpm - band.fromBpm)
     return (band.ordinal + within) / TempoBand.entries.size
 }
 
@@ -44,9 +49,7 @@ fun dialFraction(bpm: Int): Float {
 fun bpmAtDialFraction(fraction: Float): Int {
     val scaled = fraction.coerceIn(0f, 1f) * TempoBand.entries.size
     val band = TempoBand.entries[scaled.toInt().coerceAtMost(TempoBand.entries.size - 1)]
-    val bandEnd = TempoBand.entries.getOrNull(band.ordinal + 1)?.fromBpm ?: TempoBand.MAX_BPM
-    return (band.fromBpm + (scaled - band.ordinal) * (bandEnd - band.fromBpm)).roundToInt()
-        .coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM)
+    return TempoBand.clamp((band.fromBpm + (scaled - band.ordinal) * (band.untilBpm - band.fromBpm)).roundToInt())
 }
 
 /*

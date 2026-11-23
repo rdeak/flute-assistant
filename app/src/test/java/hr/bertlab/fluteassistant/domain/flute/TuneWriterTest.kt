@@ -217,12 +217,12 @@ class TuneWriterTest {
 
     @Test
     fun `nothing to join from refuses the key`() {
-        assertFalse(writer.canJoin)
+        assertFalse(Joins.canJoinAfter(writer.tune))
         assertFalse(writer.join())
         assertFalse(writer.joinWaiting)
         tap(60, at = 0, heldMs = 300)
         writer.breath()
-        assertFalse(writer.canJoin)
+        assertFalse(Joins.canJoinAfter(writer.tune))
         assertFalse(writer.join())
         tap(null, at = 1000, heldMs = 300)
         assertFalse(writer.join())
@@ -247,11 +247,11 @@ class TuneWriterTest {
     }
 
     @Test
-    fun `cancelJoin says whether a join waited, and another book drops it`() {
+    fun `dropWaiting says whether a join waited, and another book drops it`() {
         tap(60, at = 0, heldMs = 300)
         writer.join()
-        assertTrue(writer.cancelJoin())
-        assertFalse(writer.cancelJoin())
+        assertEquals(TuneWriter.Dropped(join = true), writer.dropWaiting())
+        assertEquals(TuneWriter.Dropped(), writer.dropWaiting())
         writer.join()
         writer.open(emptyList())
         assertFalse(writer.joinWaiting)
@@ -343,10 +343,10 @@ class TuneWriterTest {
     }
 
     @Test
-    fun `cancelSign says whether a sign waited, and another book drops it`() {
+    fun `dropWaiting says whether a sign waited, and another book drops it`() {
         writer.sign()
-        assertTrue(writer.cancelSign())
-        assertFalse(writer.cancelSign())
+        assertEquals(TuneWriter.Dropped(sign = true), writer.dropWaiting())
+        assertEquals(TuneWriter.Dropped(), writer.dropWaiting())
         writer.sign()
         writer.open(emptyList())
         assertFalse(writer.signWaiting)

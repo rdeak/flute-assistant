@@ -59,6 +59,7 @@ import hr.bertlab.fluteassistant.ui.common.KeyGap
 import hr.bertlab.fluteassistant.ui.common.KeyHeight
 import hr.bertlab.fluteassistant.ui.common.KeyName
 import hr.bertlab.fluteassistant.ui.common.SharpFlatKey
+import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.TapKey
 import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.chunky
@@ -73,7 +74,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-private val KeyRowGap = 12.dp
+private val KeyRowGap = SidewaysGeometry.KEY_ROW_GAPS.dp
 
 /**
  * The octave pills over the letters (since 2026-11-18): a pill, its shadow, and the room under it that is still its touch
@@ -97,7 +98,7 @@ val FluteKeysMinHeight: Dp = PillsHeight + (KeyHeight + KeyDepth) * 2 + KeyRowGa
 private const val KeysPerRow = 7
 
 /** The breath, rest and erase emoji, in dp so a large font scale cannot push the breath emoji out of a 40 dp key. */
-private const val TOOL_EMOJI_DP = 24f
+private val ToolEmojiSize = 24.dp
 
 /** The ⌒ key's picture: the staff's own slur ([slurPath]), from (2, 3) to (28, 3) dp in a box this size. */
 private val JoinPictureWidth = 30.dp
@@ -113,7 +114,7 @@ private const val EraseRepeatMs = 120L
 /**
  * The flute's keys (since 2026-11-18; spec `2026-11-18-flute-every-octave-design.md`, Revision 3): the four octaves as
  * pills ([OctavePills]: c¹–h¹, c²–h², c³–h³, c⁴), the chosen one ([octave]) yellow; under them the seven letter keys, C to B, each in its
- * letter's colour and named for the note it writes in that octave ([keyNotes]: c¹, d³; its black note while
+ * letter's colour and named for the note it writes in that octave ([FluteNotes.inOctave]: c¹, d³; its black note while
  * [signWaiting]; faded where it writes none: D and A then, and all of octave 4 but c⁴); and under those the tools in
  * columns 1 2, 4 5 and 7: ♯♭ ([SharpFlatKey], [FluteActions.onSign]), ⌒ (down while [joinWaiting], faded unless
  * [joinEnabled]), 💤 (held like a note key, sunk while [restLit]), 😮‍💨, and 🧽 (repeating while held, faded unless
@@ -131,17 +132,16 @@ private const val EraseRepeatMs = 120L
 @Composable
 fun FluteKeys(
     octave: Int,
-    keyNotes: List<Int?>,
+    signWaiting: Boolean,
     litLetter: Int?,
     restLit: Boolean,
     eraseEnabled: Boolean,
+    joinWaiting: Boolean,
+    joinEnabled: Boolean,
     actions: FluteActions,
     modifier: Modifier = Modifier,
     keyHeight: Dp = KeyHeight,
     keyGap: Dp = KeyGap,
-    joinWaiting: Boolean = false,
-    joinEnabled: Boolean = false,
-    signWaiting: Boolean = false,
 ) {
     val groupLabel = stringResource(R.string.flute_keys)
     BoxWithConstraints(modifier = modifier) {
@@ -167,7 +167,7 @@ fun FluteKeys(
                 for (letter in 0 until KeysPerRow) {
                     FluteKey(
                         letter = letter,
-                        note = keyNotes.getOrNull(letter),
+                        note = FluteNotes.inOctave(letter, signWaiting, octave),
                         white = FluteNotes.whiteIn(letter, octave),
                         lit = letter == litLetter,
                         onPress = actions.onKeyPressed,
@@ -272,25 +272,11 @@ private fun RestKey(
     onActivate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val label = stringResource(R.string.flute_rest)
-    val currentOnPress by rememberUpdatedState(onPress)
-    val currentOnRelease by rememberUpdatedState(onRelease)
     ToolKey(
-        label = label,
+        label = stringResource(R.string.flute_rest),
         pressed = lit,
         onActivate = onActivate,
-        modifier = modifier.pointerInput(Unit) {
-            detectTapGestures(
-                onPress = {
-                    currentOnPress()
-                    try {
-                        tryAwaitRelease() // up, or the finger slid off: both let go of the key
-                    } finally {
-                        currentOnRelease() // as does the key leaving the screen (see FluteKey)
-                    }
-                },
-            )
-        },
+        modifier = modifier.heldGesture(Unit, onDown = onPress, onUp = onRelease),
     ) { ToolEmoji(SLEEP_EMOJI) }
 }
 
@@ -315,26 +301,19 @@ private fun JoinKey(waiting: Boolean, enabled: Boolean, onJoin: () -> Unit, modi
 /** The breath key: a plain key with 😮‍💨 that marks a breath as the finger goes down and sinks while it stays. */
 @Composable
 private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
-    val label = stringResource(R.string.flute_breath)
-    val currentOnBreath by rememberUpdatedState(onBreath)
     var pressed by remember { mutableStateOf(false) }
     ToolKey(
-        label = label,
+        label = stringResource(R.string.flute_breath),
         pressed = pressed,
         onActivate = onBreath,
-        modifier = modifier.pointerInput(Unit) {
-            detectTapGestures(
-                onPress = {
-                    pressed = true
-                    currentOnBreath()
-                    try {
-                        tryAwaitRelease()
-                    } finally {
-                        pressed = false
-                    }
-                },
-            )
-        },
+        modifier = modifier.heldGesture(
+            Unit,
+            onDown = {
+                pressed = true
+                onBreath()
+            },
+            onUp = { pressed = false },
+        ),
     ) { ToolEmoji(BREATH_EMOJI) }
 }
 
@@ -386,6 +365,31 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
 }
 
 /**
+ * A key held down: [onDown] as the finger goes down, and [onUp] when it lifts, when it slides off, and when the key
+ * leaves the screen under it. That last one is why the release is in a `finally`: turning the phone takes the key off
+ * the screen and cancels the gesture, with no up to come; the Activity lives on, so nothing else would end the note
+ * (the view model ignores a key that is no longer the one held). The gesture is keyed on [key] alone and reads the
+ * latest callbacks through state, so nothing that changes under a finger restarts it, which would let the key go.
+ */
+@Composable
+private fun Modifier.heldGesture(key: Any?, onDown: () -> Unit, onUp: () -> Unit): Modifier {
+    val currentOnDown by rememberUpdatedState(onDown)
+    val currentOnUp by rememberUpdatedState(onUp)
+    return pointerInput(key) {
+        detectTapGestures(
+            onPress = {
+                currentOnDown()
+                try {
+                    tryAwaitRelease()
+                } finally {
+                    currentOnUp()
+                }
+            },
+        )
+    }
+}
+
+/**
  * A plain (not a note's colour) key showing [content] (an emoji, [ToolEmoji]), named [label] for a screen reader; sunk
  * in a yellow ring while [pressed]; faded, and refusing [onActivate], while [enabled] is false ([ChunkyKey]).
  */
@@ -403,8 +407,7 @@ private fun ToolKey(
 
 /** A tool key's emoji, at the size every tool key shows its own. */
 @Composable
-private fun ToolEmoji(emoji: String) = Emoji(emoji, fontSize = emojiSizeFor(TOOL_EMOJI_DP))
-
+private fun ToolEmoji(emoji: String) = Emoji(emoji, size = ToolEmojiSize)
 
 /**
  * A letter key (since 2026-11-18), 0 = C to 6 = B, in its letter's colour, named for the note it writes ([note]: c¹,
@@ -425,30 +428,13 @@ private fun FluteKey(
     onActivate: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // The gesture block is keyed on the letter alone, so it reads the latest callbacks through state.
-    val currentOnPress by rememberUpdatedState(onPress)
-    val currentOnRelease by rememberUpdatedState(onRelease)
     ChunkyKey(
         label = noteLabel(note ?: white),
         color = noteColor(white),
         down = lit,
         onActivate = { onActivate(letter) },
         enabled = note != null,
-        modifier = modifier.pointerInput(letter) {
-            detectTapGestures(
-                onPress = {
-                    currentOnPress(letter)
-                    try {
-                        tryAwaitRelease() // up, or the finger slid off: both let go of the key
-                    } finally {
-                        // Turning the phone takes the key off the screen and cancels the gesture
-                        // here, with no up to come; the Activity lives on, so nothing else would
-                        // end the note. The ViewModel ignores a key that is no longer the one held.
-                        currentOnRelease(letter)
-                    }
-                },
-            )
-        },
+        modifier = modifier.heldGesture(letter, onDown = { onPress(letter) }, onUp = { onRelease(letter) }),
     ) {
         if (note != null && note != white) {
             // A signed name is longer ("gis¹", "C♯⁴"): it shrinks to fit on one line.

@@ -58,10 +58,3 @@ internal class FrameSummary {
         levelSum = 0.0
     }
 }
-
-/**
- * What the tuner did with one microphone frame; logged per frame when verbose and counted in the summary.
- * [FAINT] is the flute's alone: a clear pitch under [NoteOnsetTracker.MIN_LEVEL], too quiet to be the flute at
- * the phone (the tuner never decides it, so its summary's `faint` is 0).
- */
-enum class FrameDecision { IGNORED, SILENT, LOW_PROBABILITY, FAINT, UNSTEADY, SHOWN }

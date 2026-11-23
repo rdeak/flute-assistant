@@ -169,7 +169,7 @@ music-school convention (c1) and German H and B in Croatian.
 
 ## Build and release
 
-- Android Gradle Plugin 9.4.1 with its built-in Kotlin. The root build raises AGP's bundled Kotlin
+- Android Gradle Plugin 9 (the version is in `gradle/libs.versions.toml`) with its built-in Kotlin. The root build raises AGP's bundled Kotlin
   to the version in the catalog, and the Compose compiler plugin shares that version. Gradle 9.8.2
   is pinned by checksum and the configuration cache is on.
 - Release builds use whole-app R8. A package-scoped optimisation was tried first and crashed at

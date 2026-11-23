@@ -40,6 +40,7 @@ import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.facingRight
+import hr.bertlab.fluteassistant.ui.common.hopOnBeat
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
 
@@ -67,9 +68,9 @@ private val AnimalGap = 6.dp
  */
 private val ColumnSpare = 5.68.dp
 
-/** How much a beat bubble pops (scale) and the animal above it hops (dp) at the flash's peak. */
+/** How much a beat bubble pops (scale) and how far the animal above it hops at the flash's peak. */
 private const val POP = 0.18f
-private const val HOP_DP = 10f
+private val AnimalHop = 10.dp
 
 /**
  * The beats of the bar between a − and a + button. One bubble per beat, the accented ones
@@ -87,41 +88,33 @@ fun BeatIndicator(
     onTimeSignatureChange: (TimeSignature) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val fewer = timeSignature.fewerBeats()
-    val more = timeSignature.moreBeats()
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        BeatStepButton(
-            text = "−",
-            description = stringResource(R.string.fewer_beats),
-            enabled = fewer != null,
-            onClick = { fewer?.let(onTimeSignatureChange) },
-        )
+        FewerBeatsButton(timeSignature, onTimeSignatureChange)
         BeatBubbles(timeSignature, currentBeat, animal, flash, Modifier.weight(1f))
-        BeatStepButton(
-            text = "+",
-            description = stringResource(R.string.more_beats),
-            enabled = more != null,
-            onClick = { more?.let(onTimeSignatureChange) },
-        )
+        MoreBeatsButton(timeSignature, onTimeSignatureChange)
     }
 }
 
-/** A round − or + that steps the bar by a beat; [size] is 52 dp upright, 56 dp under the bubbles sideways. */
+/** The round − that takes a beat off the bar ([fewerBeats]); faded where the bar has no fewer. [size] is 52 dp upright, 56 dp under the bubbles sideways. */
 @Composable
-internal fun BeatStepButton(
-    text: String,
-    description: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    size: Dp = 52.dp,
-) {
+internal fun FewerBeatsButton(timeSignature: TimeSignature, onChange: (TimeSignature) -> Unit, size: Dp = 52.dp) =
+    BeatStepButton("−", stringResource(R.string.fewer_beats), to = timeSignature.fewerBeats(), onChange, size)
+
+/** The round + that adds a beat to the bar ([moreBeats]); faded where the bar has no more. */
+@Composable
+internal fun MoreBeatsButton(timeSignature: TimeSignature, onChange: (TimeSignature) -> Unit, size: Dp = 52.dp) =
+    BeatStepButton("+", stringResource(R.string.more_beats), to = timeSignature.moreBeats(), onChange, size)
+
+/** A round button that steps the bar [to] another one, or is faded when there is none. */
+@Composable
+private fun BeatStepButton(text: String, description: String, to: TimeSignature?, onChange: (TimeSignature) -> Unit, size: Dp) {
     ChunkyButton(
-        onClick = onClick,
-        enabled = enabled,
+        onClick = { to?.let(onChange) },
+        enabled = to != null,
         modifier = Modifier
             .padding(bottom = 4.dp)
             .size(size)
@@ -194,7 +187,7 @@ internal fun BeatBubbles(
                                 modifier = Modifier
                                     .then(if (stableRow) Modifier.wrapContentWidth(unbounded = true) else Modifier)
                                     .facingRight(animal)
-                                    .graphicsLayer { translationY = -HOP_DP * density * flash() },
+                                    .hopOnBeat(flash, AnimalHop),
                             )
                         }
                     }

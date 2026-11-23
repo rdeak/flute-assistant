@@ -45,7 +45,7 @@ class SustainedToneSynthTest {
         synth.noteOn(440.0, 0.5f)
         val s = synth.render(1000)
         assertTrue(abs(s[0]) < 0.01f)
-        val attackSamples = sampleRate * SustainedToneSynth.ATTACK_MS / 1000
+        val attackSamples = sampleRate * FluteTimbre.ATTACK_MS / 1000
         val peakOfAttack = s.take(attackSamples).maxOf { abs(it) }
         val peakOfAll = s.maxOf { abs(it) }
         assertTrue("attack peak $peakOfAttack should be below $peakOfAll", peakOfAttack < peakOfAll)

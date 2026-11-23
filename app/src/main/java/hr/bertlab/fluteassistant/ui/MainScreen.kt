@@ -5,42 +5,26 @@ package hr.bertlab.fluteassistant.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.TextAutoSize
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -49,48 +33,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
-import androidx.compose.ui.unit.sp
-import androidx.core.os.ConfigurationCompat
-import androidx.core.os.LocaleListCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import hr.bertlab.fluteassistant.R
-import hr.bertlab.fluteassistant.ui.common.AppLanguage
-import hr.bertlab.fluteassistant.ui.common.CreditsLogo
-import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.HideSystemBars
 import hr.bertlab.fluteassistant.ui.common.KeepScreenAwake
-import hr.bertlab.fluteassistant.ui.common.LanguageSwitch
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
-import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.SystemBarsFollowTheme
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
-import hr.bertlab.fluteassistant.ui.common.asTextSize
-import hr.bertlab.fluteassistant.ui.common.ThemeSwitch
-import hr.bertlab.fluteassistant.ui.common.hopOnBeat
-import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
 import hr.bertlab.fluteassistant.ui.common.zoomedBy
 import hr.bertlab.fluteassistant.ui.fingers.FingersScreen
 import hr.bertlab.fluteassistant.ui.fingers.FingersViewModel
@@ -103,10 +58,7 @@ import hr.bertlab.fluteassistant.ui.notes.NotesScreen
 import hr.bertlab.fluteassistant.ui.notes.NotesViewModel
 import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
-import hr.bertlab.fluteassistant.ui.theme.InkOnFill
-import hr.bertlab.fluteassistant.ui.theme.Sun
 import hr.bertlab.fluteassistant.ui.theme.ThemeViewModel
-import kotlin.math.roundToInt
 import hr.bertlab.fluteassistant.ui.tuner.TunerScreen
 import hr.bertlab.fluteassistant.ui.tuner.TunerViewModel
 
@@ -160,8 +112,7 @@ fun MainScreen(
     val selectedTab = route.open
     // What the bars open, kept here: the title bar and the rail stand in different places, so a turn
     // between them would close a credits dialog or a language list held by either.
-    var creditsOpen by rememberSaveable { mutableStateOf(false) }
-    var languageOpen by remember { mutableStateOf(false) }
+    val barPanels = rememberBarPanels()
     val metronomeState by metronomeViewModel.state.collectAsStateWithLifecycle()
     val tunerState by tunerViewModel.state.collectAsStateWithLifecycle()
     val notesState by notesViewModel.state.collectAsStateWithLifecycle()
@@ -178,7 +129,8 @@ fun MainScreen(
 
     // One-shot messages (audio unavailable) as a snackbar.
     val snackbarHostState = remember { SnackbarHostState() }
-    val message = metronomeState.userMessage
+    // Derived: the beat changes the metronome's state many times a second, and the message hardly ever.
+    val message by remember { derivedStateOf { metronomeState.userMessage } }
     val messageText = message?.let {
         stringResource(
             when (it) {
@@ -234,10 +186,7 @@ fun MainScreen(
                             tab = selectedTab,
                             dark = dark,
                             onDarkChange = themeViewModel::setDark,
-                            creditsOpen = creditsOpen,
-                            onCreditsOpenChange = { creditsOpen = it },
-                            languageOpen = languageOpen,
-                            onLanguageOpenChange = { languageOpen = it },
+                            panels = barPanels,
                         )
                     },
                     tabBar = {
@@ -254,10 +203,7 @@ fun MainScreen(
                             onSelect = onSelectTab,
                             drumBeating = metronomeState.isPlaying,
                             beatPulse = metronomeState.beatPulse,
-                            creditsOpen = creditsOpen,
-                            onCreditsOpenChange = { creditsOpen = it },
-                            languageOpen = languageOpen,
-                            onLanguageOpenChange = { languageOpen = it },
+                            panels = barPanels,
                         )
                     },
                     tablet = tablet,
@@ -354,218 +300,3 @@ internal fun MainFrame(
 /** The side a camera cutout takes from the tab: it swaps sides between the two sideways directions. */
 private val EndCutout: WindowInsets
     @Composable get() = WindowInsets.displayCutout.only(WindowInsetsSides.End)
-
-/**
- * The in-app language switch, on the top bar or the rail. The current language is read from the
- * resources the words come from (which is what the per-app locale actually changed), so anything
- * that is not Croatian shows as English, the fallback. Choosing hands the tag to the platform's
- * per-app language setting: the system on Android 13+, AppCompat's stored backport below that.
- * Either way the activity is re-created in the new language.
- */
-@Composable
-internal fun AppLanguageSwitch(
-    modifier: Modifier = Modifier,
-    listOffset: Dp = 0.dp,
-    isOpen: Boolean? = null,
-    onOpenChange: ((Boolean) -> Unit)? = null,
-) {
-    // From the resources the words themselves come from, not from `LocalConfiguration`: a turn
-    // hands Compose its configuration through `onConfigurationChanged` and nothing here can say
-    // that this carries AppCompat's locale override below Android 13, so the flag could disagree
-    // with the words. No `remember`: the resources hold one mutable configuration that is updated in
-    // place, so a key on it would keep a stale answer, and picking the language is cheap.
-    val locales = ConfigurationCompat.getLocales(LocalResources.current.configuration)
-    // An empty list is not seen on a phone; English is the fallback anyway.
-    val current = locales[0]?.let(AppLanguage::fromLocale) ?: AppLanguage.ENGLISH
-    LanguageSwitch(
-        current = current,
-        onSelect = { AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(it.tag)) },
-        modifier = modifier,
-        listOffset = listOffset,
-        isOpen = isOpen,
-        onOpenChange = onOpenChange,
-    )
-}
-
-/**
- * The top bar: the app icon, the open tab's name and, at the end, the day/night switch (a moon
- * by day, a sun by night, [dark] and [onDarkChange]) and then the in-app language switch. The
- * credits and the language list are open or shut as [creditsOpen] and [languageOpen] say when the
- * caller passes them with their change callbacks, so a turn to the rail leaves them as they were.
- */
-@Composable
-internal fun TitleBar(
-    tab: AppTab,
-    dark: Boolean,
-    onDarkChange: (Boolean) -> Unit,
-    creditsOpen: Boolean? = null,
-    onCreditsOpenChange: ((Boolean) -> Unit)? = null,
-    languageOpen: Boolean? = null,
-    onLanguageOpenChange: ((Boolean) -> Unit)? = null,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(FluteTheme.colors.page)
-            .statusBarsPadding()
-            .height(72.dp)
-            .padding(horizontal = 20.dp),
-    ) {
-        CreditsLogo(modifier = Modifier.size(48.dp), isOpen = creditsOpen, onOpenChange = onCreditsOpenChange)
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = stringResource(tab.labelRes),
-            style = MaterialTheme.typography.headlineMedium,
-            maxLines = 1,
-            autoSize = TextAutoSize.StepBased(minFontSize = 20.sp, maxFontSize = 32.sp),
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 12.dp)
-                .semantics { heading() },
-        )
-        ThemeSwitch(dark = dark, onDarkChange = onDarkChange)
-        Spacer(Modifier.width(8.dp))
-        AppLanguageSwitch(isOpen = languageOpen, onOpenChange = onLanguageOpenChange)
-    }
-}
-
-/**
- * The bottom bar: one [TabItem] per tab. It draws its own background under the system navigation
- * bar. While the metronome's drum beats ([drumBeating]) the metronome tab's 🥁 hops on every
- * [beatPulse], on every tab, the same hop as the ring's animal.
- *
- * Since 2026-11-17 it holds five tabs, 73 dp each on a 412 dp phone and 62 on a 360 dp one, and its sizes are in dp
- * as the rail's are ([BarLook], [TabLook]). With a floor in sp "Metronome" was cut on a 360 dp phone at normal text
- * and on any phone at a little larger text (`TabBarTest`).
- */
-@Composable
-internal fun TabBar(selected: AppTab, onSelect: (AppTab) -> Unit, drumBeating: Boolean, beatPulse: Long) {
-    val colors = FluteTheme.colors
-    val drumFlash = rememberBeatFlash(beatPulse, drumBeating)
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.card)
-            .drawBehind { drawRect(colors.border, size = Size(size.width, OutlineWidth.toPx())) }
-            .navigationBarsPadding()
-            .selectableGroup()
-            .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 8.dp)
-            .height(66.dp),
-    ) {
-        AppTab.entries.forEach { tab ->
-            TabItem(
-                tab = tab,
-                selected = tab == selected,
-                onSelect = onSelect,
-                drumBeating = drumBeating,
-                drumFlash = drumFlash,
-                look = BarLook,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
-            )
-        }
-    }
-}
-
-/**
- * How a tab looks on the bar or the rail, every size in dp: the [emoji] at the most (a short cell draws it smaller,
- * [TabItem]); the [word] at normal text, the least it shrinks to ([wordFloor]) and the most it grows with the text
- * size, as a share of its size at normal text ([wordGrowth]); the room either side of the word; the open tab's pill.
- * In dp and not sp, so that large text does not grow the emoji out of its cell, and as a floor in sp doubles at the
- * largest text and cut "Metronome".
- */
-@Immutable
-internal data class TabLook(
-    val emoji: Dp,
-    val word: Dp,
-    val wordFloor: Dp,
-    val wordGrowth: Float,
-    val wordPadding: Dp,
-    val shape: Shape,
-)
-
-/** The bottom bar's tabs, in its 66 dp (the rail's two are `SideRail`'s). */
-private val BarLook = TabLook(emoji = 28.dp, word = 14.dp, wordFloor = 9.dp, wordGrowth = 1.3f, wordPadding = 5.dp, shape = RoundedCornerShape(22.dp))
-
-/** A tab's word's line height: relative, as one in sp grows past the cell at large text. */
-private val TabWordLineHeight = 1.25.em
-
-/**
- * One tab, on the bottom bar or the rail: an emoji over a word, the open one a yellow pill with an
- * ink outline. While the drum beats the metronome's 🥁 hops on [drumFlash] and a screen reader hears
- * that tab as "Playing". The bar and the rail each pass their own [look], in dp, which this turns into the word's
- * sizes: there is no default, as a floor in sp cut "Metronome".
- *
- * The tab measures its own cell (since 2026-11-17; the rail used to work the cell's height out by hand from its
- * paddings and guess the lines' heights). The word is measured first and keeps its size; the emoji, drawn at
- * [TabLook.emoji], takes what the word and the outline leave, and is drawn smaller, down to [TAB_EMOJI_FLOOR] of its
- * size, where that is less than it needs: a cut word is worse than a small picture. So the word stands clear of the
- * open tab's outline at any height, text size and number of tabs, with no number to search again. The emoji's size is
- * therefore the most: an emoji's line is about 1.37 times its size on a phone, so the 360 dp rail's cell leaves its
- * 20 dp about 19 and the 411 dp rail's its 24 about 23.5, as they were drawn before.
- */
-@Composable
-internal fun TabItem(
-    tab: AppTab,
-    selected: Boolean,
-    onSelect: (AppTab) -> Unit,
-    drumBeating: Boolean,
-    drumFlash: () -> Float,
-    look: TabLook,
-    modifier: Modifier = Modifier,
-) {
-    val colors = FluteTheme.colors
-    val drumPlaying = stringResource(R.string.tab_metronome_playing)
-    val shape = look.shape
-    val wordSize = (look.word * minOf(LocalDensity.current.fontScale, look.wordGrowth)).asTextSize()
-    Layout(
-        content = {
-            Emoji(
-                tab.emoji,
-                size = look.emoji,
-                modifier = if (tab == AppTab.METRONOME) Modifier.hopOnBeat(drumFlash) else Modifier,
-            )
-            Text(
-                text = stringResource(tab.labelRes),
-                style = MaterialTheme.typography.labelMedium.copy(lineHeight = TabWordLineHeight),
-                color = if (selected) InkOnFill else colors.text,
-                maxLines = 1,
-                autoSize = TextAutoSize.StepBased(minFontSize = look.wordFloor.asTextSize(), maxFontSize = wordSize),
-                modifier = Modifier.padding(horizontal = look.wordPadding),
-            )
-        },
-        modifier = modifier
-            .clip(shape)
-            .background(if (selected) Sun else Color.Transparent)
-            .border(OutlineWidth, if (selected) colors.outline else Color.Transparent, shape)
-            .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(tab) })
-            .semantics {
-                if (tab == AppTab.METRONOME && drumBeating) stateDescription = drumPlaying
-            },
-    ) { (emojiBox, wordBox), constraints ->
-        val emoji = emojiBox.measure(Constraints())
-        // What the cell has between its outlines: all of it, where the cell has no height of its own.
-        val inside = if (constraints.hasBoundedHeight) (constraints.maxHeight - (OutlineWidth * 2).roundToPx()).coerceAtLeast(0) else Constraints.Infinity
-        val wordRoom = if (inside == Constraints.Infinity) inside else (inside - (emoji.height * TAB_EMOJI_FLOOR).roundToInt()).coerceAtLeast(0)
-        val word = wordBox.measure(Constraints(maxWidth = constraints.maxWidth, maxHeight = wordRoom))
-        val scale = if (inside == Constraints.Infinity || emoji.height == 0) 1f else ((inside - word.height).toFloat() / emoji.height).coerceIn(TAB_EMOJI_FLOOR, 1f)
-        val emojiHeight = (emoji.height * scale).roundToInt()
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else maxOf(emoji.width, word.width, constraints.minWidth)
-        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else maxOf(emojiHeight + word.height, constraints.minHeight)
-        layout(width, height) {
-            val top = (height - emojiHeight - word.height) / 2
-            emoji.placeWithLayer((width - emoji.width) / 2, top) {
-                scaleX = scale
-                scaleY = scale
-                transformOrigin = TransformOrigin(0.5f, 0f)
-            }
-            word.place((width - word.width) / 2, top + emojiHeight)
-        }
-    }
-}
-
-/** The least a tab's emoji is drawn at, as a share of its size: 12 dp of the short rail's 20, on a very short window. */
-private const val TAB_EMOJI_FLOOR = 0.6f

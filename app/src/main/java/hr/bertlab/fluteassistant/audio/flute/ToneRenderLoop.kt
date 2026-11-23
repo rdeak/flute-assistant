@@ -11,9 +11,10 @@ import java.util.Queue
  * through an empty one (the route is being rebuilt), so a sustained tone never skips samples:
  * that would be a phase jump, a click. Gives up on an empty write once [running] is false, so
  * a closing thread cannot hang on a stuck route. Returns the block's size when all of it was
- * written, 0 when it gave up, or the error.
+ * written, 0 when it gave up, or the error. Inline: the render thread calls it for every block,
+ * and must not allocate there.
  */
-internal fun writeFully(block: FloatArray, running: () -> Boolean, write: (FloatArray, Int, Int) -> Int): Int {
+internal inline fun writeFully(block: FloatArray, running: () -> Boolean, write: (FloatArray, Int, Int) -> Int): Int {
     var offset = 0
     while (offset < block.size) {
         val written = write(block, offset, block.size - offset)
@@ -55,7 +56,7 @@ internal class ToneRenderLoop(
     val block = FloatArray(blockFrames)
 
     /** After close, at most this many blocks are rendered to let a sounding note release. */
-    private val releaseBlocks = (sampleRate.toLong() * SustainedToneSynth.RELEASE_MS * 2 / 1000 / blockFrames).toInt() + 2
+    private val releaseBlocks = (sampleRate.toLong() * FluteTimbre.RELEASE_MS * 2 / 1000 / blockFrames).toInt() + 2
     private var released = 0
 
     /** Then this many silent blocks: the track buffer still holds the end of the fade, and pause + flush would drop it. */

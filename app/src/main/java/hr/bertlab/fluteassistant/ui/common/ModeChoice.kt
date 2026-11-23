@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
@@ -76,6 +78,43 @@ fun <T> ModeChoice(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * [ModeChoice] on a phone on its side: the same choices stacked in the page's column, each a [SidewaysPlainButton]
+ * [height] tall with [gap] between them, the chosen one yellow. Each tab gives its own sizes (the tuner's are tall
+ * and [big], the notes tab's low, and both are lower on a short phone).
+ */
+@Composable
+fun <T> SidewaysModeChoice(
+    entries: List<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    groupLabel: String,
+    emojiOf: (T) -> String,
+    labelResOf: (T) -> Int,
+    height: Dp,
+    gap: Dp,
+    modifier: Modifier = Modifier,
+    big: Boolean = false,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(gap),
+        modifier = modifier
+            .selectableGroup()
+            .semantics { contentDescription = groupLabel },
+    ) {
+        entries.forEach { entry ->
+            SidewaysPlainButton(
+                emoji = emojiOf(entry).ifEmpty { null },
+                text = stringResource(labelResOf(entry)),
+                onClick = { onSelect(entry) },
+                selected = entry == selected,
+                height = height,
+                big = big,
+            )
         }
     }
 }

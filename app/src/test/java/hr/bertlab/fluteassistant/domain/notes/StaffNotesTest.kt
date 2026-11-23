@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.domain.notes
 
 import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -13,7 +14,7 @@ class StaffNotesTest {
     @Test
     fun `all is the fifteen naturals from c1 to c3`() {
         assertEquals(listOf(60, 62, 64, 65, 67, 69, 71, 72, 74, 76, 77, 79, 81, 83, 84), StaffNotes.ALL)
-        assertEquals(StaffNotes.ALL.size, StaffNotes.POSITIONS)
+        assertEquals(15, StaffNotes.ALL.size)
     }
 
     @Test
@@ -48,6 +49,15 @@ class StaffNotesTest {
         assertEquals(1..13, StaffNotes.visiblePositions(setOf(83)))
         assertEquals(0..14, StaffNotes.visiblePositions(setOf(60, 84)))
         assertEquals(1..11, StaffNotes.visiblePositions(setOf(61, 96))) // foreign notes count for nothing
+    }
+
+    @Test
+    fun `a note of the picker switches in and out, but the last one stays and a foreign one does nothing`() {
+        assertEquals(setOf(60, 62), StaffNotes.toggled(setOf(60), 62))
+        assertEquals(setOf(60), StaffNotes.toggled(setOf(60, 62), 62))
+        val last = setOf(60)
+        assertSame("the last note stays", last, StaffNotes.toggled(last, 60))
+        assertSame("a black note is not offered", last, StaffNotes.toggled(last, 61))
     }
 
     @Test

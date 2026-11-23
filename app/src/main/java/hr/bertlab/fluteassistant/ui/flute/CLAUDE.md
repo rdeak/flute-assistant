@@ -83,7 +83,7 @@ change that part). The songbook is in `SONGBOOK.md`.
   feel: `DESIGN.md`, "The room is not judged".
 - The engine's frames are buffered, never conflated: `NoteOnsetTracker` counts frames.
 - A turn of the phone stops nothing (`../CLAUDE.md`, "Rules"). `FluteKey` and `RestKey` release in a
-  `finally`, so a key held through a turn ends its note. `staffPlace` is created in `FluteContent`'s writing and
+  `finally`, so a key held through a turn ends its note. `staffPlace` is created in `TuneAndKeys` (`FluteContent`'s tab itself, beside its three panels), above its writing and
   running branch, so the staff keeps its scroll through a turn, Play and Stop.
 - Text and emoji on the staff are sized in dp, so they stay in the staff at any text size.
 - The running staff keeps the note before the lit one at its left (`Bars.anchor`) and scrolls on only
@@ -147,7 +147,7 @@ change that part). The songbook is in `SONGBOOK.md`.
   (the user, the same night: "replace 1, 2, 3, 4 labels with c1-h1, c2-h2, c3-h3, and c4"; C4–B4 to C7 in English; a
   screen reader hears "Octave 1"), 40 dp tall with the name at 22 (the user, 2026-11-19: "very hard to read", the
   room taken from the staff's box), the chosen one yellow and down; seven letter keys named for the note they write in that octave (c¹, d³;
-  `FluteNotes.inOctave`, `FluteUiState.keyNotes`); the tools in columns 1 2, 4 5 and 7 (♯♭ ⌒, 💤 😮‍💨, 🧽). A key
+  `FluteNotes.inOctave`, which `FluteKeys` asks for each letter); the tools in columns 1 2, 4 5 and 7 (♯♭ ⌒, 💤 😮‍💨, 🧽). A key
   writes exactly the note on it, and only a pill changes the octave (`TuneWriter.chooseOctave`): it starts at 1, stays
   through Play, Listen to me and the books, and is not stored; the chosen pill again does nothing at all. In octave 4
   the keys read c⁴ to h⁴ and only c⁴ is live: the flute's range ends there. A pill acts as the finger goes down; tapped

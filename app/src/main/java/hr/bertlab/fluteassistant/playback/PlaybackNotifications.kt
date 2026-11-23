@@ -30,20 +30,23 @@ internal class PlaybackNotifications(private val context: Context) {
         )
     }
 
-    fun build(config: MetronomeConfig?): Notification {
-        val openApp = PendingIntent.getActivity(
-            context,
-            REQUEST_OPEN,
-            Intent(context, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE,
-        )
-        val stopIntent = MetronomeService.intent(context, MetronomeService.ACTION_STOP)
-        val stop = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    // The two taps never change, so they are made once: a dial drag rebuilds the notification four times a second.
+    private val openApp = PendingIntent.getActivity(
+        context,
+        REQUEST_OPEN,
+        Intent(context, MainActivity::class.java),
+        PendingIntent.FLAG_IMMUTABLE,
+    )
+    private val stop = MetronomeService.intent(context, MetronomeService.ACTION_STOP).let { stopIntent ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             PendingIntent.getForegroundService(context, REQUEST_STOP, stopIntent, PendingIntent.FLAG_IMMUTABLE)
         } else {
             PendingIntent.getService(context, REQUEST_STOP, stopIntent, PendingIntent.FLAG_IMMUTABLE)
         }
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+    }
+
+    fun build(config: MetronomeConfig?): Notification =
+        NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_metronome)
             .setContentTitle(context.getString(R.string.notification_playing_title))
             .setContentText(config?.summary(context.resources).orEmpty())
@@ -57,7 +60,6 @@ internal class PlaybackNotifications(private val context: Context) {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
-    }
 
     private companion object {
         const val CHANNEL_ID = "playback"

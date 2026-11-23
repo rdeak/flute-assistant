@@ -10,7 +10,6 @@ import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /** A fundamental-frequency estimate. [probability] is 1 - (normalised YIN aperiodicity). */
 data class PitchEstimate(val frequency: Double, val probability: Double)
@@ -42,7 +41,7 @@ data class PitchEstimate(val frequency: Double, val probability: Double)
  */
 class YinPitchDetector(
     private val sampleRate: Int,
-    val bufferSize: Int = 4096,
+    private val bufferSize: Int = DEFAULT_BUFFER_SIZE,
     private val threshold: Double = 0.2,
     minFrequency: Double = 50.0,
     maxFrequency: Double = 3000.0,
@@ -55,6 +54,7 @@ class YinPitchDetector(
     // Scratch buffers reused between calls (not thread-safe; one detector per thread).
     private val difference = DoubleArray(halfSize)
     private val cmnd = DoubleArray(halfSize)
+    private val refineLocal = DoubleArray(2 * REFINE_WINDOW + 3)
 
     /**
      * @param buffer exactly [bufferSize] mono samples in [-1, 1], the oldest first.
@@ -62,7 +62,7 @@ class YinPitchDetector(
      */
     fun detect(buffer: FloatArray): PitchEstimate? {
         require(buffer.size == bufferSize) { "expected $bufferSize samples, got ${buffer.size}" }
-        if (rms(buffer) < silenceRms) return null
+        if (FrameLevels.rms(buffer, 0, buffer.size) < silenceRms) return null
 
         // Steps 1 + 2: difference function d(tau) over the search range, and one lag past it (step 4).
         for (tau in 1..tauMax + 1) difference[tau] = differenceAt(buffer, tau)
@@ -101,12 +101,6 @@ class YinPitchDetector(
         return PitchEstimate(frequency = sampleRate / period, probability = probability)
     }
 
-    private fun rms(buffer: FloatArray): Double {
-        var energy = 0.0
-        for (v in buffer) energy += v.toDouble() * v
-        return sqrt(energy / buffer.size)
-    }
-
     /**
      * The squared difference between a stretch of [halfSize] samples and the same stretch [tau]
      * later, the later one ending on the buffer's last sample: the newest sound, which the
@@ -130,11 +124,10 @@ class YinPitchDetector(
         var estimate = initialPeriod
         var k = 2
         val maxLag = halfSize - 1
-        val window = 3
-        val local = DoubleArray(2 * window + 3)
-        while (k * estimate + window + 1 <= maxLag) {
+        val local = refineLocal
+        while (k * estimate + REFINE_WINDOW + 1 <= maxLag) {
             val center = (k * estimate).roundToInt()
-            val lo = center - window - 1
+            val lo = center - REFINE_WINDOW - 1
             for (i in local.indices) local[i] = differenceAt(buffer, lo + i)
 
             var best = 1
@@ -162,6 +155,12 @@ class YinPitchDetector(
     }
 
     companion object {
+        /** Samples the detector reads at once: 85 ms at 48 kHz. */
+        const val DEFAULT_BUFFER_SIZE = 4096
+
+        /** Lags searched on either side of a multiple of the period when refining it. */
+        private const val REFINE_WINDOW = 3
+
         /**
          * RMS below which a frame is silence: about -60 dBFS, above microphone hiss and a
          * quiet room but well under a softly played note. Checked on a real phone; the
@@ -175,7 +174,7 @@ class YinPitchDetector(
          * 2026-11-14, as the lowest pitch searched: see step 4 of [detect]), and it gates on
          * [QUIET_ROOM_RMS].
          */
-        fun forFlute(sampleRate: Int, bufferSize: Int = 4096): YinPitchDetector = YinPitchDetector(
+        fun forFlute(sampleRate: Int, bufferSize: Int = DEFAULT_BUFFER_SIZE): YinPitchDetector = YinPitchDetector(
             sampleRate = sampleRate,
             bufferSize = bufferSize,
             minFrequency = NoteMath.midiToFrequency(FluteRange.LOWEST_MIDI - 1),

@@ -18,7 +18,7 @@ import kotlin.math.abs
  * Pure Kotlin: the Android-specific [AudioTrackMetronomePlayer] only moves blocks into an
  * AudioTrack and turns the returned [ClickEvent]s into UI events.
  */
-class MetronomeRenderer(val sampleRate: Int) {
+class MetronomeRenderer(sampleRate: Int) {
 
     private class Voice(val samples: FloatArray, val gain: Float, val startFrame: Long) {
         var cursor = 0
@@ -34,23 +34,16 @@ class MetronomeRenderer(val sampleRate: Int) {
     private var framePosition = 0L
     private var lastConfig: MetronomeConfig? = null
 
-    /** Rewinds to the start of bar 1 and silences anything still sounding. */
-    fun reset() {
-        scheduler.reset()
-        framePosition = 0L
-        lastConfig = null
-        voices.clear()
-    }
-
     /**
-     * Fills all of [out] with the next block of audio.
+     * Fills all of [out] with the next block of audio. The audio thread calls this for every block and
+     * a click starts in very few of them, so a block with no click allocates nothing.
      * @return the clicks that start inside this block, in order.
      */
     fun render(out: FloatArray, config: MetronomeConfig): List<ClickEvent> {
         out.fill(0f)
         val blockStart = framePosition
         val blockEnd = blockStart + out.size
-        val started = ArrayList<ClickEvent>(2)
+        var started: ArrayList<ClickEvent>? = null
 
         // A pure tempo change moves the upcoming click instead of waiting the old interval out.
         val previous = lastConfig
@@ -65,25 +58,25 @@ class MetronomeRenderer(val sampleRate: Int) {
             val click = scheduler.next(config)
             if (click.frame >= blockStart) {
                 voices += Voice(samplesFor(click.strength), gainFor(click.strength), click.frame)
-                started += click
+                started = (started ?: ArrayList(2)).also { it += click }
             }
         }
 
         // Mix the active voices.
-        val iterator = voices.iterator()
-        while (iterator.hasNext()) {
-            val voice = iterator.next()
+        var v = 0
+        while (v < voices.size) {
+            val voice = voices[v]
             var outIndex = if (voice.cursor == 0) (voice.startFrame - blockStart).toInt() else 0
             while (outIndex < out.size && !voice.finished) {
                 out[outIndex++] += voice.samples[voice.cursor++] * voice.gain
             }
-            if (voice.finished) iterator.remove()
+            if (voice.finished) voices.removeAt(v) else v++
         }
 
         for (i in out.indices) out[i] = SoftLimiter.limit(out[i] * OUTPUT_GAIN)
 
         framePosition = blockEnd
-        return started
+        return started ?: emptyList()
     }
 
     private fun samplesFor(strength: BeatStrength): FloatArray = when (strength) {

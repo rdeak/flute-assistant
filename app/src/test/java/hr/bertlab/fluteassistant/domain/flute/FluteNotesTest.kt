@@ -7,6 +7,7 @@ import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The flute's own notes: every semitone from C4 to C7 (since 2026-11-18), a black note on its letter's place, and what a key writes. */
@@ -14,8 +15,8 @@ class FluteNotesTest {
 
     @Test
     fun `the flute has every semitone from c4 to c7, the tuner's range`() {
-        assertEquals((60..96).toList(), FluteNotes.ALL)
-        assertEquals(FluteRange.midiRange.toList(), FluteNotes.ALL)
+        assertEquals(60..96, FluteRange.midiRange)
+        assertTrue((60..96).all { FluteNotes.positionOf(it) >= 0 })
     }
 
     @Test

@@ -14,15 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -31,8 +28,8 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import hr.bertlab.fluteassistant.ui.common.FINGERING_ASPECT_RATIO
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
+import hr.bertlab.fluteassistant.ui.common.SidewaysModeChoice
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
-import hr.bertlab.fluteassistant.ui.common.SidewaysPlainButton
 import hr.bertlab.fluteassistant.ui.common.Stage
 import hr.bertlab.fluteassistant.ui.common.labelRes
 
@@ -83,9 +80,9 @@ private val NarrowWordsHeight = 124.dp
 /** The words over the fingering beside the window: one value, as an arrangement built while the tab draws is never equal to the last. */
 private val WordsArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
 
-/** Mode buttons: 92 tall with 13 between on the 915 x 411 phone, 80 with 9 between on a short one. */
-private val ModeHeight = 92.dp
-private val ModeHeightShort = 80.dp
+/** Mode buttons: 92 tall (the big look) with 13 between on the 915 x 411 phone, 80 with 9 between on a short one. */
+internal val ModeHeight = 92.dp
+internal val ModeHeightShort = 80.dp
 private val ModeGap = 13.dp
 private val ModeGapShort = 9.dp
 
@@ -106,22 +103,17 @@ internal fun TunerSideways(state: TunerUiState, actions: TunerActions, modifier:
         SidewaysPage(
             column = {
                 // The column's one child, so the pair stays low.
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(if (short) ModeGapShort else ModeGap),
-                    modifier = Modifier
-                        .selectableGroup()
-                        .semantics { contentDescription = groupLabel },
-                ) {
-                    TunerMode.entries.forEach { entry ->
-                        SidewaysPlainButton(
-                            emoji = entry.emoji,
-                            text = stringResource(entry.labelRes()),
-                            onClick = { actions.onModeChange(entry) },
-                            selected = entry == state.mode,
-                            height = if (short) ModeHeightShort else ModeHeight,
-                        )
-                    }
-                }
+                SidewaysModeChoice(
+                    entries = TunerMode.entries,
+                    selected = state.mode,
+                    onSelect = actions.onModeChange,
+                    groupLabel = groupLabel,
+                    emojiOf = { it.emoji },
+                    labelResOf = { it.labelRes() },
+                    height = if (short) ModeHeightShort else ModeHeight,
+                    gap = if (short) ModeGapShort else ModeGap,
+                    big = !short,
+                )
             },
         ) { card ->
             Stage(modifier = card, verticalArrangement = Arrangement.Center) {
@@ -151,7 +143,7 @@ private fun TunerBeside(state: TunerUiState, scale: Float, actions: TunerActions
             modifier = Modifier.weight(1f),
         ) {
             TunerWords(state.line, wide = true, onOpenGuide = actions.onOpenGuide)
-            TunerFingering(state.homeMidi, state.fingeringLit, Modifier.testTag("fingering"))
+            TunerFingering(state.homeMidi, state.fingeringLit, Modifier.testTag(FINGERING_TAG))
         }
     }
 }
@@ -177,7 +169,7 @@ private fun TunerUnder(state: TunerUiState, scale: Float, innerWidth: Float, act
             WindowBetweenArrows(state, windowScale, NarrowArrowSize, NarrowArrowGap, actions)
             TunerWords(state.line, wide = false, onOpenGuide = actions.onOpenGuide, modifier = Modifier.weight(1f))
         }
-        TunerFingering(state.homeMidi, state.fingeringLit, Modifier.testTag("fingering").widthIn(max = UnderFingeringWidth))
+        TunerFingering(state.homeMidi, state.fingeringLit, Modifier.testTag(FINGERING_TAG).widthIn(max = UnderFingeringWidth))
     }
 }
 

@@ -1,19 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+   Backup and device-transfer rules from API 31 on (backup_rules.xml is read below it).
+   Nothing is left out: all the app stores is its settings, the flute's books and the sticker
+   book, none of it secret or tied to one phone, and a child's tunes should survive a new phone.
+   The debug build has its own copy, which keeps the recorded sessions out.
 -->
 <data-extraction-rules>
-    <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
-    </cloud-backup>
-    <!--
-    <device-transfer>
-        <include .../>
-        <exclude .../>
-    </device-transfer>
-    -->
+    <cloud-backup />
 </data-extraction-rules>

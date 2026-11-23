@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.ui.common
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -12,7 +11,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -29,40 +27,24 @@ import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 
 /**
  * A note in its letter's colour ([noteColor]): a round [chunky] bubble with the name and its
- * raised octave figure ([noteText]). With [midi] null it is the dashed, empty bubble that
- * shows [placeholder] instead ("…" while the tuner listens, 👆 before the first flute key).
+ * raised octave figure ([noteText]).
  */
 @Composable
 fun NoteBubble(
-    midi: Int?,
+    midi: Int,
     size: Dp,
     fontSize: TextUnit,
     modifier: Modifier = Modifier,
-    placeholder: String = "",
     depth: Dp = 6.dp,
 ) {
-    val colors = FluteTheme.colors
     val style = MaterialTheme.typography.displayLarge.copy(fontSize = fontSize, lineHeight = fontSize, letterSpacing = 0.sp)
-    if (midi == null) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = modifier
-                .size(size)
-                .clip(CircleShape)
-                .background(colors.track)
-                .dashedBorder(4.dp, colors.border, CircleShape),
-        ) {
-            Text(placeholder, style = style.copy(fontSize = fontSize * 0.8f), color = colors.mutedText, textAlign = TextAlign.Center)
-        }
-    } else {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = modifier
-                .size(size)
-                .chunky(CircleShape, noteColor(midi), colors.outline, depth),
-        ) {
-            Text(noteText(midi), style = style, color = InkOnFill, textAlign = TextAlign.Center, maxLines = 1)
-        }
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier
+            .size(size)
+            .chunky(CircleShape, noteColor(midi), FluteTheme.colors.outline, depth),
+    ) {
+        Text(noteText(midi), style = style, color = InkOnFill, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 

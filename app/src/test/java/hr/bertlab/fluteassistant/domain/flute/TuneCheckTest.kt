@@ -290,11 +290,11 @@ class TuneCheckTest {
     }
 
     @Test
-    fun `the star a step would earn is faint after a wrong note`() {
+    fun `the star a step earns is faint after a wrong note`() {
+        assertEquals(StepMark.FIRST_TRY, TuneCheck(listOf(q(67))).earn())
         val check = TuneCheck(listOf(q(67)))
-        assertEquals(StepMark.FIRST_TRY, check.star)
         check.judge(60, fresh = true)
-        assertEquals(StepMark.RETRY, check.star)
+        assertEquals(StepMark.RETRY, check.earn())
     }
 
     // ---- A tie, or a slur to the same letter in another octave, is one step (2026-11-16) ----

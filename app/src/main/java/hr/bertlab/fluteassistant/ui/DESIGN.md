@@ -99,7 +99,7 @@ letter, its top level with the letter's top, 1 sp after it (`noteText`, matched 
   does `Modifier.fitOrScroll` make it scroll (a fixed-height column, so weights still work). The
   notes tab scrolls a little on such phones rather than shrink the staff's places, and the flute
   scrolls below its own `FitsHeight` as before (its speed panel, like the metronome tab, only
-  below `MetronomeMinHeight`).
+  below the least height `MetronomeStageColumn` keeps).
 - The credits (`ui/common/Credits.kt`, the user's call on 2026-11-05): a long press on the app icon
   (`CreditsLogo`, in the top bar or at the top of the rail) opens a `Dialog` with the version, the
   website's address (`credits_website_url`, flute-assistant.bertlab.hr), the copyright and the
@@ -244,7 +244,7 @@ the tuner and the flute's Your turn must read from arm's length and need no tap 
   never disposed and made once (checked by putting `tab()` in two branches, which fails it). The real run is still
   worth a look after a change to the frame: a turn during Play with no `flute.stop reason=leave` in
   `adb logcat -s FA.Flute`. For the same reason the credits' and the language list's open state is held in
-  `MainScreen` (`creditsOpen`, `languageOpen`) and passed to whichever bar shows: the logo and the flag move
+  `MainScreen` (one `BarPanels`: `creditsOpen`, `languageOpen`) and passed to whichever bar shows: the logo and the flag move
   between the top bar and the rail, and state kept inside them would be lost.
 - **Tests.** `SidewaysHost(width, height, fontScale, sideways)` (androidTest) forces a window size and
   `LocalSideways`; it takes the rail off the width, so a test with `SideRail` beside a tab forces its own full

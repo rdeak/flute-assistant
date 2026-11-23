@@ -65,6 +65,7 @@ android {
         }
     }
     compileOptions {
+        // With AGP's built-in Kotlin, Kotlin's jvmTarget follows targetCompatibility.
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -104,17 +105,6 @@ android {
             test.systemProperty("fa.sweep", providers.gradleProperty("sweep").getOrElse(""))
             if (session.isNotEmpty()) test.outputs.upToDateWhen { false }
         }
-    }
-}
-
-// With AGP's built-in Kotlin, jvmTarget defaults to compileOptions.targetCompatibility.
-kotlin {
-    compilerOptions {
-        // Opt in to APIs we use deliberately (ModalBottomSheet, SegmentedButton, etc.).
-        freeCompilerArgs.addAll(
-            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-            "-opt-in=androidx.compose.foundation.layout.ExperimentalLayoutApi",
-        )
     }
 }
 

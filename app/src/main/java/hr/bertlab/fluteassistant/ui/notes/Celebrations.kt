@@ -13,12 +13,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.ui.common.Emoji
+import hr.bertlab.fluteassistant.ui.common.SPARKLES_EMOJI
 
 /**
  * The small celebration over the staff when the streak reaches [MAX_FLAMES], and again at every fifth
@@ -37,13 +37,11 @@ internal fun StreakBurst(streak: Int, modifier: Modifier = Modifier) {
         progress.snapTo(0f)
         progress.animateTo(1f, tween(BURST_MS, easing = LinearOutSlowInEasing))
     }
-    // Pictures, so in dp: at a larger text size they keep their size, as the flames do.
-    val fontSize = with(LocalDensity.current) { BURST_EMOJI_SIZE.dp.toSp().value.toInt() }
     Box(modifier.clearAndSetSemantics { testTag = BURST_TAG }) {
         BURST_PIECES.forEach { piece ->
             Emoji(
                 emoji = piece.emoji,
-                fontSize = fontSize,
+                size = BurstEmojiSize, // pictures, so in dp: at a larger text size they keep their size, as the flames do
                 modifier = Modifier
                     .align(BiasAlignment(horizontalBias = piece.bias, verticalBias = 0f))
                     .graphicsLayer {
@@ -81,9 +79,8 @@ private const val BURST_MS = 1000
 private val BURST_RISE = 120.dp
 
 /** The size of a piece, in dp (about 28 sp at the usual text size). */
-private const val BURST_EMOJI_SIZE = 28
+private val BurstEmojiSize = 28.dp
 
 private const val BURST_TAG = "streak_burst"
 
-private const val SPARKLES_EMOJI = "✨" // sparkles
 private const val PARTY_EMOJI = "🎉" // party popper

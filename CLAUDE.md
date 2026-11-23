@@ -92,7 +92,7 @@ rules moved out of the ViewModels):
 
 - `domain/` holds the rules as plain Kotlin with no Android import, a package per feature: `flute`
   (the tune, `TuneWriter`, `ListenRun`, bars, the songbook), `listen` (what the microphone's frames
-  become: `NoteOnsetTracker`, `HearingTracker`, the thresholds in `ListenRules`), `metronome`
+  become: `NoteOnsetTracker`, the tuner's `ReadingTracker`, `HearingTracker`, the thresholds in `ListenRules`), `metronome`
   (`MetronomeConfig`, `TempoBand`), `notes` (`NotesRound`, phrases, the sticker book), `tuner`
   (`NoteMath`, fingerings), `fingers` (`FingerChart`, `FingerPick`: the Fingers tab's notes and keys) and
   `settings` (`SettingsStore`, the one storage interface, and
