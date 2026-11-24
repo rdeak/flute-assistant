@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
@@ -44,10 +41,8 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.ui.theme.ActionGo
@@ -63,7 +58,7 @@ val OutlineWidth = 3.dp
 internal val PressDepth = 3.dp
 
 /** Opacity of something that cannot be pressed right now. */
-const val DISABLED_ALPHA = 0.45f
+private const val DISABLED_ALPHA = 0.45f
 
 /**
  * Fades this to [DISABLED_ALPHA] unless [enabled], with the [chunky] shadow [depth] below it. A faded
@@ -136,9 +131,9 @@ fun ChunkyButton(
     val colors = FluteTheme.colors
     val contentColor = if (color == colors.raised || color == colors.card || color == Color.Transparent) colors.text else InkOnFill
     val gesture = when {
-        selected != null -> Modifier.selectable(selected, source, null, enabled, role, onClick)
-        checked != null -> Modifier.toggleable(checked, source, null, enabled, role) { onClick() }
-        else -> Modifier.clickable(source, null, enabled, null, role, onClick)
+        selected != null -> Modifier.selectable(selected, source, indication = null, enabled, role, onClick)
+        checked != null -> Modifier.toggleable(checked, source, indication = null, enabled, role) { onClick() }
+        else -> Modifier.clickable(source, indication = null, enabled, onClickLabel = null, role, onClick)
     }
     Box(
         contentAlignment = Alignment.Center,
@@ -178,7 +173,7 @@ fun BigActionButton(
         onClick = onClick,
         color = color,
         shape = shape,
-        depth = 8.dp,
+        depth = BIG_ACTION_DEPTH.dp,
         enabled = enabled,
         modifier = modifier
             .fillMaxWidth()
@@ -212,83 +207,10 @@ fun BigActionButton(
     }
 }
 
-/** The height of a [BigActionButton] upright; the round summary counts it in the room it needs, and its tests check it. */
-internal val BigActionHeight = 84.dp
-
-/** The room either side of an upright tab's column, and the room round it: every tab's, so the tabs line up. */
-val TabSide = 20.dp
-val TabPadding = PaddingValues(start = TabSide, end = TabSide, top = 4.dp, bottom = 16.dp)
-
-/** A [Stage]'s own padding inside its card, unless it asks for another. */
-val StagePadding = 16.dp
-
 /**
- * The rounded white (navy in dark mode) card each tab draws its main content on, with a
- * thin border: it is not pressable, so it has no ink outline or shadow.
+ * The height of a [BigActionButton] upright and its shadow's depth; the round summary counts the height in the room
+ * it needs, and its tests check it, and the sideways geometry counts both under the flute's keys.
  */
-@Composable
-fun Stage(
-    modifier: Modifier = Modifier,
-    verticalArrangement: Arrangement.Vertical = Arrangement.SpaceBetween,
-    padding: Dp = StagePadding,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    val colors = FluteTheme.colors
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = verticalArrangement,
-        modifier = modifier
-            .clip(StageShape)
-            .background(colors.card)
-            .border(OutlineWidth, colors.border, StageShape)
-            .padding(padding),
-        content = content,
-    )
-}
-
-val StageShape = RoundedCornerShape(32.dp)
-
-/**
- * An emoji used as an icon. Decorative: the words next to it, or the content description of
- * the control it sits in, carry the meaning.
- */
-@Composable
-fun Emoji(emoji: String, fontSize: Int, modifier: Modifier = Modifier) = EmojiText(emoji, fontSize.sp, modifier)
-
-/**
- * [Emoji] at a [size] in dp, exactly: a picture that large text must not grow out of its room. The size is not cut to
- * a whole number of sp on the way, as the callers' own conversions are (19.67 dp was drawn at 19).
- */
-@Composable
-fun Emoji(emoji: String, size: Dp, modifier: Modifier = Modifier) = EmojiText(emoji, size.asTextSize(), modifier)
-
-@Composable
-private fun EmojiText(emoji: String, font: TextUnit, modifier: Modifier) {
-    Text(
-        text = emoji,
-        style = MaterialTheme.typography.titleLarge.copy(fontSize = font, lineHeight = font * 1.2f),
-        modifier = modifier.clearAndSetSemantics { },
-    )
-}
-
-/** The star a note earns, in the notes game's round and under a step of the flute's "Your turn". */
-const val STAR_EMOJI = "⭐" // star
-
-/** The speaker on whatever plays a note when tapped: the notes game's Hear and Sound, the tuning guide's "tap the note". */
-const val SPEAKER_EMOJI = "🔊" // speaker, loud
-
-/** A star for a note that took more than one try: still earned, but faint. */
-const val RETRY_STAR_ALPHA = 0.35f
-
-/**
- * The signs a step of the flute's "Your turn" earns in the star's place when the right note was played off (since
- * 2026-11-14, the user's pick "2C" and the hourglass): too high (and the arrow beside a note sounding high), too low,
- * let go before it was long enough. Drawn as the star is.
- */
-const val HIGH_EMOJI = "⬇️" // down arrow: a little lower
-const val LOW_EMOJI = "⬆️" // up arrow: a little higher
-const val SHORT_EMOJI = "⏳" // hourglass: hold it longer
-
-/** The sign of a note held past its written length (since 2026-11-16, the user's pick "3A"), drawn as the others. */
-const val LONG_EMOJI = "✋" // raised hand: let go sooner
-const val TONGUED_EMOJI = "✂️" // scissors: a joined note started with the tongue (since 2026-11-16)
+internal const val BIG_ACTION_HEIGHT = 84f
+internal const val BIG_ACTION_DEPTH = 8f
+internal val BigActionHeight = BIG_ACTION_HEIGHT.dp

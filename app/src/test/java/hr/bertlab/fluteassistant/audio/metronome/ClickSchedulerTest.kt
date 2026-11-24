@@ -94,15 +94,4 @@ class ClickSchedulerTest {
         val expected = 137.0 * sampleRate * 60.0 / 137.0 // = 60 seconds of audio
         assertTrue("frame ${e.last().frame} vs $expected", abs(e.last().frame - expected) <= 1.0)
     }
-
-    @Test
-    fun `reset restarts from a given frame`() {
-        val scheduler = ClickScheduler(sampleRate)
-        repeat(3) { scheduler.next(base) }
-        scheduler.reset(startFrame = 1_000)
-        val e = scheduler.next(base)
-        assertEquals(1_000L, e.frame)
-        assertEquals(0, e.beatIndex)
-        assertEquals(0L, e.barIndex)
-    }
 }

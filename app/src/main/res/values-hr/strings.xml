@@ -172,6 +172,8 @@
     <string name="flute_rest">Stanka</string>
     <string name="flute_join">Spoji sa sljedećom notom</string>
     <string name="flute_sign">Povisilica ili snizilica za sljedeću notu</string>
+    <!-- An octave pill (2026-11-18), for a screen reader, with its octave's figure; the pill shows its notes (c1-h1) -->
+    <string name="flute_octave">Oktava %1$s</string>
     <string name="flute_breath">Udahni</string>
     <string name="flute_breath_here">Ovdje udahni</string>
     <string name="flute_time_signature">Mjera %1$d/%2$d</string>

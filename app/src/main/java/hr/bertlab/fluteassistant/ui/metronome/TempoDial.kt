@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -84,18 +83,16 @@ private const val BAND_GAP = 2.4f
  * hears the band as the ring's state); while playing, the knob's animal hops with
  * [flash] (read in the layer phase only) on every beat.
  *
- * Tapping the number swaps it for a [TempoWheel] in the same spot while [editing] is true;
- * the caller owns that flag so it can also close the wheel on a tap anywhere else, using
- * the wheel's position reported through [onWheelPositioned].
+ * Tapping the number swaps it for a [TempoWheel] in the same spot while [wheel] is open
+ * ([TempoWheelState.editing]); the caller owns that state so it can also close the wheel on a tap
+ * anywhere else ([closesTempoWheel]), which the wheel's position, reported into it here, makes possible.
  * Exposes slider semantics so assistive technology can adjust the tempo too.
  */
 @Composable
 fun TempoDial(
     bpm: Int,
     onBpmChange: (Int) -> Unit,
-    editing: Boolean,
-    onEditingChange: (Boolean) -> Unit,
-    onWheelPositioned: (LayoutCoordinates) -> Unit,
+    wheel: TempoWheelState,
     flash: () -> Float,
     modifier: Modifier = Modifier,
 ) {
@@ -171,15 +168,15 @@ fun TempoDial(
             }
         }
 
-        if (editing) {
+        if (wheel.editing) {
             TempoWheel(
                 bpm = bpm,
                 onBpmChange = onBpmChange,
-                onClose = { onEditingChange(false) },
-                modifier = Modifier.onGloballyPositioned(onWheelPositioned),
+                onClose = { wheel.editing = false },
+                modifier = Modifier.onGloballyPositioned { wheel.wheelCoordinates = it },
             )
         } else {
-            TempoNumber(bpm = bpm, scale = side / DESIGN_SIZE.dp, onClick = { onEditingChange(true) })
+            TempoNumber(bpm = bpm, scale = side / DESIGN_SIZE.dp, onClick = { wheel.editing = true })
         }
 
         val knob = side * KNOB_SIZE

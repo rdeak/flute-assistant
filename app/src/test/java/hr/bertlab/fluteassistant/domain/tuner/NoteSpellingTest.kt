@@ -38,13 +38,6 @@ class NoteSpellingTest {
         assertEquals(listOf(1, null, 3, 6, 8, null, 10), (0..6).map(NoteSpelling::blackOf)) // C♯ E♭ F♯ G♯ B♭; D and A have none
     }
 
-    @Test
-    fun `a white note's black note is on its letter, in its octave`() {
-        assertEquals(listOf(61, null, 63, 66, 68, null, 70), listOf(60, 62, 64, 65, 67, 69, 71).map(NoteSpelling::signedOf))
-        assertEquals(85, NoteSpelling.signedOf(84)) // any octave: the flute's range is the flute's rule
-        assertNull("a black note has none", NoteSpelling.signedOf(61))
-    }
-
     /** The staff's places (c1 = 0, the bottom line e1 = 2), at any height: the Fingers tab's chart goes up to c4. */
     @Test
     fun `a note stands on its letter's place`() {

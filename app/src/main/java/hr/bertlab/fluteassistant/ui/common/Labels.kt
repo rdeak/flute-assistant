@@ -94,7 +94,7 @@ fun noteLabel(midi: Int): String = noteLabel(LocalResources.current, midi)
  * A note's name with no octave, in the user's language: "C♯" and "B", or "Cis" and "H" (the Fingers tab's keys,
  * since 2026-11-17). [pitchClass] is taken modulo 12.
  */
-fun noteName(resources: Resources, pitchClass: Int): String = resources.getStringArray(R.array.note_names)[Math.floorMod(pitchClass, 12)]
+fun noteName(resources: Resources, pitchClass: Int): String = resources.getStringArray(R.array.note_names)[NoteSpelling.pitchClassOf(pitchClass)]
 
 @Composable
 @ReadOnlyComposable
@@ -107,7 +107,7 @@ fun noteName(pitchClass: Int): String = noteName(LocalResources.current, pitchCl
  */
 fun noteLabelParts(resources: Resources, midi: Int): Pair<String, String> {
     val name = noteName(resources, midi)
-    val octave = Math.floorDiv(midi, 12) - 1 // scientific: C4 = 60
+    val octave = midi.floorDiv(12) - 1 // scientific: C4 = 60
     if (!resources.getBoolean(R.bool.note_octaves_helmholtz)) return name to octave.toString()
     return when {
         octave >= 4 -> name.lowercase() to (octave - 3).toString()

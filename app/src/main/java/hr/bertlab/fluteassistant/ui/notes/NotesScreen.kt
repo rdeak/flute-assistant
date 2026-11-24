@@ -4,9 +4,6 @@
 package hr.bertlab.fluteassistant.ui.notes
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -64,11 +60,14 @@ import hr.bertlab.fluteassistant.ui.common.NoteBubble
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.SPEAKER_EMOJI
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.TabGap
 import hr.bertlab.fluteassistant.ui.common.TabPadding
 import hr.bertlab.fluteassistant.ui.common.asTextSize
+import hr.bertlab.fluteassistant.ui.common.bounce
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
 import hr.bertlab.fluteassistant.ui.common.labelRes
 import hr.bertlab.fluteassistant.ui.common.noteColor
+import hr.bertlab.fluteassistant.ui.common.rememberBounce
 import hr.bertlab.fluteassistant.ui.common.tintOf
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 
@@ -122,6 +121,9 @@ class NotesActions(
     val onPhraseShown: () -> Unit = {},
 )
 
+/** Which of the tab's three screens is up. The picker is opened over either of the others and wins. */
+internal enum class NotesView { QUESTION, PICKER, SUMMARY }
+
 /**
  * The whole game, top to bottom: the two game pills, then, while a note is asked for, the feedback line ([FeedbackLine],
  * under the pills since 2026-11-18: it stood under the staff), then one hero row (the streak's flames,
@@ -153,11 +155,18 @@ fun NotesContent(
         if (!choosingNotes) actions.onPhraseShown()
     }
 
+    // Which of the three screens is up, said once for both layouts: the picker wins over the summary.
+    val view = when {
+        choosingNotes -> NotesView.PICKER
+        state.roundOver -> NotesView.SUMMARY
+        else -> NotesView.QUESTION
+    }
+
     // A phone on its side has its own layout ([NotesSideways]): the same screens, arranged for the width.
     if (LocalSideways.current) {
         NotesSideways(
             state = state,
-            choosingNotes = choosingNotes,
+            view = view,
             onChoose = { choosingNotes = true },
             onChosen = { choosingNotes = false },
             actions = actions,
@@ -178,16 +187,16 @@ fun NotesContent(
                 .fitOrScroll(fits = maxHeight >= NotesMinHeight, minHeight = NotesMinHeight)
                 .padding(TabPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(TabGap),
         ) {
             GamePills(game = state.game, onSetGame = actions.onSetGame)
             // What to do, right under the game pills and over the buttons, while a note is asked for (since 2026-11-18, the
             // user: "move ... below buttons find and hear"; it stood under the staff): every tab keeps one order, the words
             // first, the buttons under them, the content last. The picker and the summary have no such line.
-            if (!choosingNotes && !state.roundOver) FeedbackLine(state = state, placing = placing)
+            if (view == NotesView.QUESTION) FeedbackLine(state = state, placing = placing)
             HeroRow(
                 state = state,
-                choosingNotes = choosingNotes,
+                view = view,
                 placing = placing,
                 onChoose = { choosingNotes = true },
                 onHearAgain = actions.onHearAgain,
@@ -197,8 +206,8 @@ fun NotesContent(
                     .fillMaxWidth()
                     .weight(1f),
             ) {
-                when {
-                    choosingNotes -> PracticeNotePicker(
+                when (view) {
+                    NotesView.PICKER -> PracticeNotePicker(
                         selected = state.practiceNotes,
                         onToggle = actions.onTogglePracticeNote,
                         progress = state.progress,
@@ -209,14 +218,14 @@ fun NotesContent(
                             .fillMaxWidth()
                             .weight(1f),
                     )
-                    state.roundOver -> RoundSummary(
+                    NotesView.SUMMARY -> RoundSummary(
                         state = state,
                         onPlayAgain = actions.onPlayAgain,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
                     )
-                    else -> Question(
+                    NotesView.QUESTION -> Question(
                         state = state,
                         placing = placing,
                         onPlacingChange = { placing = it },
@@ -266,22 +275,22 @@ private val HeadlineFloor = 11.sp
 @Composable
 private fun HeroRow(
     state: NotesRound,
-    choosingNotes: Boolean,
+    view: NotesView,
     placing: Int?,
     onChoose: () -> Unit,
     onHearAgain: () -> Unit,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (choosingNotes) Arrangement.Center else Arrangement.SpaceBetween,
+        horizontalArrangement = if (view == NotesView.PICKER) Arrangement.Center else Arrangement.SpaceBetween,
         modifier = Modifier
             .fillMaxWidth()
             .height(HeroRowHeight),
     ) {
-        when {
-            choosingNotes -> {
+        when (view) {
+            NotesView.PICKER -> {
                 // The backpack is a picture, in dp like the Pick button's; the title is the row's words.
-                Emoji(BACKPACK_EMOJI, fontSize = with(LocalDensity.current) { 32.dp.toSp().value.toInt() })
+                Emoji(BACKPACK_EMOJI, size = 32.dp)
                 Text(
                     text = stringResource(R.string.choose_notes_title),
                     style = MaterialTheme.typography.headlineMedium.copy(fontSize = 30.sp),
@@ -290,7 +299,7 @@ private fun HeroRow(
                     modifier = Modifier.padding(start = 10.dp),
                 )
             }
-            state.roundOver -> {
+            NotesView.SUMMARY -> {
                 Text(
                     text = stringResource(headlineFor(state.score)),
                     style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
@@ -300,13 +309,9 @@ private fun HeroRow(
                 )
                 PickButton(state.practiceNotes, state.progress, onChoose)
             }
-            else -> {
+            NotesView.QUESTION -> {
                 StreakFlames(state.streak)
-                if (state.hearing) {
-                    HearAgainBubble(size = 68.dp, fontSize = 34, enabled = placing == null, onClick = onHearAgain)
-                } else {
-                    NoteBubble(midi = state.currentMidi, size = 68.dp, fontSize = 36.sp)
-                }
+                QuestionBubble(state, placing, onHearAgain, size = 68.dp, speaker = 34.dp, noteFont = 36.sp)
                 PickButton(state.practiceNotes, state.progress, onChoose)
             }
         }
@@ -332,13 +337,12 @@ private fun GamePills(game: NotesGame, onSetGame: (NotesGame) -> Unit) {
 /**
  * Hear's stand-in for the note in the hero row (and the sideways panel): a round raised button with a speaker, which plays
  * the phrase again (it would give the answer away to show the note). A [size] dp circle with a
- * [fontSize] dp speaker, both pictures that keep their size at large text. [enabled] is false while
+ * [speaker], both pictures that keep their size at large text. [enabled] is false while
  * a finger is placing a note, as that is answering and not asking to hear.
  */
 @Composable
-internal fun HearAgainBubble(size: Dp, fontSize: Int, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun HearAgainBubble(size: Dp, speaker: Dp, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val description = stringResource(R.string.hear_again)
-    val speaker = with(LocalDensity.current) { fontSize.dp.toSp().value.toInt() }
     ChunkyButton(
         onClick = onClick,
         enabled = enabled,
@@ -349,9 +353,13 @@ internal fun HearAgainBubble(size: Dp, fontSize: Int, enabled: Boolean, onClick:
             .size(size)
             .semantics { contentDescription = description },
     ) {
-        Emoji(SPEAKER_EMOJI, fontSize = speaker)
+        Emoji(SPEAKER_EMOJI, size = speaker)
     }
 }
+
+/** Flames shown at most, for the streak on the game screen. */
+internal const val MAX_FLAMES = 5
+private const val FLAME_EMOJI = "🔥" // fire
 
 @Composable
 internal fun StreakFlames(streak: Int, modifier: Modifier = Modifier) {
@@ -391,7 +399,6 @@ internal fun StreakFlames(streak: Int, modifier: Modifier = Modifier) {
 private fun PickButton(practiceNotes: Set<Int>, progress: NoteProgress, onChoose: () -> Unit) {
     val description = stringResource(R.string.choose_notes)
     val wordStyle = MaterialTheme.typography.titleMedium
-    val backpack = with(LocalDensity.current) { 20.dp.toSp().value.toInt() }
     val wordFloor = PickWordFloor.asTextSize()
     ChunkyButton(
         onClick = onChoose,
@@ -407,7 +414,7 @@ private fun PickButton(practiceNotes: Set<Int>, progress: NoteProgress, onChoose
             modifier = Modifier.padding(horizontal = 6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Emoji(BACKPACK_EMOJI, fontSize = backpack, modifier = Modifier.testTag("pick_backpack"))
+                Emoji(BACKPACK_EMOJI, size = 20.dp, modifier = Modifier.testTag("pick_backpack"))
                 Text(
                     stringResource(R.string.pick_notes),
                     style = wordStyle,
@@ -478,8 +485,19 @@ private fun ColumnScope.Question(
     DisposableEffect(Unit) {
         onDispose { onPlacingChange(null) }
     }
-    // The burst is drawn over the staff in the same box and takes no touch, so the slide goes through to the staff.
-    Box(Modifier.fillMaxWidth().weight(1f)) {
+    StaffWithBurst(state, placing, onPlacingChange, onNoteTapped, Modifier.fillMaxWidth().weight(1f))
+}
+
+/** The staff with the streak's burst over it: the burst is drawn in the same box and takes no touch, so the slide goes through to the staff. */
+@Composable
+internal fun StaffWithBurst(
+    state: NotesRound,
+    placing: Int?,
+    onPlacingChange: (Int?) -> Unit,
+    onNoteTapped: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(modifier) {
         NoteStaff(
             state = state,
             placing = placing,
@@ -488,6 +506,19 @@ private fun ColumnScope.Question(
             modifier = Modifier.fillMaxSize(),
         )
         StreakBurst(state.streak, Modifier.matchParentSize())
+    }
+}
+
+/**
+ * The question itself, [size] across: the note to find in its letter's colour, or in Hear the speaker that plays the
+ * phrase again, which waits while a finger is [placing] a note (that is answering, not asking to hear).
+ */
+@Composable
+internal fun QuestionBubble(state: NotesRound, placing: Int?, onHearAgain: () -> Unit, size: Dp, speaker: Dp, noteFont: TextUnit) {
+    if (state.hearing) {
+        HearAgainBubble(size = size, speaker = speaker, enabled = placing == null, onClick = onHearAgain)
+    } else {
+        NoteBubble(midi = state.currentMidi, size = size, fontSize = noteFont)
     }
 }
 
@@ -516,21 +547,17 @@ internal fun FeedbackLine(
     height: Dp = FeedbackLineHeight,
     style: TextStyle = MaterialTheme.typography.headlineMedium,
 ) {
-    val scale = remember { Animatable(1f) }
-    LaunchedEffect(state.solved) {
-        if (state.solved) {
-            scale.snapTo(1.3f)
-            scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
-        }
-    }
-    val feedback = when {
-        state.solved -> stringResource(R.string.notes_correct)
-        state.phrasePlaying -> stringResource(R.string.notes_listening)
-        placing != null -> stringResource(R.string.notes_placing)
-        state.wrongTaps.isNotEmpty() -> stringResource(R.string.notes_wrong)
-        state.hearing -> stringResource(R.string.hear_prompt)
-        else -> stringResource(R.string.notes_placing)
-    }
+    val scale = rememberBounce(on = state.solved)
+    val feedback = stringResource(
+        when {
+            state.solved -> R.string.notes_correct
+            state.phrasePlaying -> R.string.notes_listening
+            placing != null -> R.string.notes_placing
+            state.wrongTaps.isNotEmpty() -> R.string.notes_wrong
+            state.hearing -> R.string.hear_prompt
+            else -> R.string.notes_placing
+        },
+    )
     Text(
         text = feedback,
         style = style,
@@ -542,10 +569,7 @@ internal fun FeedbackLine(
             .height(height)
             // Two lines sit in the middle of their box, as one line would at the top of it.
             .then(if (maxLines > 1) Modifier.wrapContentHeight(Alignment.CenterVertically) else Modifier)
-            .graphicsLayer {
-                scaleX = scale.value
-                scaleY = scale.value
-            },
+            .bounce(scale),
     )
 }
 

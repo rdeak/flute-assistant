@@ -4,6 +4,8 @@
 package hr.bertlab.fluteassistant.domain.flute
 
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
+import kotlin.math.floor
 
 /**
  * What a note earned in "Your turn": a star for the first try, a faint star when a wrong note was heard for it first
@@ -98,39 +100,40 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
      */
     fun judge(heard: Int, fresh: Boolean, begun: Boolean = false, lockHz: Double? = null, sameAsLast: Boolean = false): Verdict {
         forgiven = emptyList()
-        var current = index ?: return Verdict.IGNORED
-        var expected = noteAt(current)
+        val current = index ?: return Verdict.IGNORED
+        val expected = noteAt(current)
         val last = previous
         // The note just judged started again at its own pitch ([ListenRun]'s to say): its tail, unless a repeat is waited on.
-        if (sameAsLast && last != null && !sameLetter(expected, last)) return Verdict.IGNORED
+        if (sameAsLast && last != null && !samePitchClass(expected, last)) return Verdict.IGNORED
+        val right = isNote(heard, lockHz, expected)
         // The note just judged going on: its letter, or its letter blown high unless that is the letter waited on.
-        val tail = last != null && (sameLetter(heard, last) || (isNote(heard, lockHz, last) && !sameLetter(heard, expected)))
-        if (tail && !((fresh || begun) && isNote(heard, lockHz, expected))) {
-            return Verdict.IGNORED
+        val tail = last != null && (samePitchClass(heard, last) || (isNote(heard, lockHz, last) && !samePitchClass(heard, expected)))
+        if (tail && !((fresh || begun) && right)) return Verdict.IGNORED
+        if (right) return if (stumbled) Verdict.RETRY else Verdict.RIGHT
+        if (begun) return Verdict.IGNORED
+        if (last != null && samePitchClass(expected, last) && forgiveRepeats(current, last, heard, lockHz)) return Verdict.RIGHT
+        stumbled = true
+        return Verdict.WRONG
+    }
+
+    /**
+     * The step waited on ([from]) repeats the note just judged ([last]) and [heard] is not it: when [heard] is the note
+     * written after the repeats, they were not heard and are forgiven (each earns [StepMark.RETRY], [forgiven] names
+     * them) and the check moves to that note, which is then right (true). Otherwise nothing changes (false).
+     */
+    private fun forgiveRepeats(from: Int, last: Int, heard: Int, lockHz: Double?): Boolean {
+        val repeats = mutableListOf<Int>()
+        var after: Int? = from
+        while (after != null && samePitchClass(noteAt(after), last)) {
+            repeats += after
+            after = nextNoteFrom(after + 1)
         }
-        // Repeats of the note just judged that were not heard before the note after them: forgiven.
-        if (!isNote(heard, lockHz, expected) && last != null && sameLetter(expected, last) && !begun) {
-            val repeats = mutableListOf<Int>()
-            var after: Int? = current
-            while (after != null && sameLetter(noteAt(after), last)) {
-                repeats += after
-                after = nextNoteFrom(after + 1)
-            }
-            if (after != null && isNote(heard, lockHz, noteAt(after))) {
-                for (repeat in repeats) mark(repeat, StepMark.RETRY)
-                forgiven = repeats
-                stumbled = false
-                current = after
-                expected = noteAt(current)
-                index = current
-            }
-        }
-        if (!isNote(heard, lockHz, expected)) {
-            if (begun) return Verdict.IGNORED
-            stumbled = true
-            return Verdict.WRONG
-        }
-        return if (stumbled) Verdict.RETRY else Verdict.RIGHT
+        if (after == null || !isNote(heard, lockHz, noteAt(after))) return false
+        for (repeat in repeats) mark(repeat, StepMark.RETRY)
+        forgiven = repeats
+        stumbled = false
+        index = after
+        return true
     }
 
     /**
@@ -162,7 +165,7 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
     }
 
     /** The star the step waited on would earn now: [StepMark.RETRY] after a stumble, else [StepMark.FIRST_TRY]. */
-    val star: StepMark get() = if (stumbled) StepMark.RETRY else StepMark.FIRST_TRY
+    private val star: StepMark get() = if (stumbled) StepMark.RETRY else StepMark.FIRST_TRY
 
     /**
      * The step at [index], already earned, is marked [mark] instead ([ListenRun] reads a note on after its mark: held
@@ -183,7 +186,7 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
         stumbled = true
     }
 
-    private fun noteAt(index: Int): Int = (tune[index] as TuneNote).midi
+    private fun noteAt(index: Int): Int = tune.midiAt(index)
 
     /** The next note from [start] that is waited on: a note joined to its own letter before it is heard with that one. */
     private fun nextNoteFrom(start: Int): Int? =
@@ -195,8 +198,8 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
      * octave (the right fingering blown high). With no pitch known, the letter alone.
      */
     fun isNote(heard: Int, lockHz: Double?, written: Int): Boolean =
-        sameLetter(heard, written) ||
-            (highCents > 0 && lockHz != null && sameLetter(heard, written + 1) && centsFrom(lockHz, written) in 0.0..highCents)
+        samePitchClass(heard, written) ||
+            (highCents > 0 && lockHz != null && samePitchClass(heard, written + 1) && centsFrom(lockHz, written) in 0.0..highCents)
 
     companion object {
         /**
@@ -206,13 +209,16 @@ class TuneCheck(private val tune: List<TuneItem>, private val highCents: Double 
          */
         const val HIGH_CENTS = 75.0
 
-        /** Whether two MIDI notes are the same letter, in any octave. */
-        fun sameLetter(a: Int, b: Int): Boolean = Math.floorMod(a, 12) == Math.floorMod(b, 12)
+        /**
+         * Whether two MIDI notes are the same note in any octave, the same pitch class: C♯ is not C. The comments here
+         * and in [ListenRun] call that a note's letter.
+         */
+        fun samePitchClass(a: Int, b: Int): Boolean = NoteSpelling.pitchClassOf(a) == NoteSpelling.pitchClassOf(b)
 
         /** Cents from the written note [written] to [hz] in the octave nearest to it, in (-600, 600]: sharp is positive. */
         fun centsFrom(hz: Double, written: Int): Double {
             val cents = NoteMath.centsBetween(hz, written)
-            val near = cents - 1200.0 * Math.floor((cents + 600.0) / 1200.0) // in [-600, 600)
+            val near = cents - 1200.0 * floor((cents + 600.0) / 1200.0) // in [-600, 600)
             return if (near == -600.0) 600.0 else near
         }
     }

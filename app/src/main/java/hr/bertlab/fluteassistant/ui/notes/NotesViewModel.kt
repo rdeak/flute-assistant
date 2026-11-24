@@ -47,9 +47,6 @@ class NotesViewModel internal constructor(
     constructor(settings: SettingsStore, tonePlayer: ReferenceTonePlayer, clock: MonotonicClock, logger: Logger) :
         this(settings, tonePlayer, clock, logger, Random.Default)
 
-    private val _state: MutableStateFlow<NotesRound>
-    val state: StateFlow<NotesRound>
-
     /**
      * The wait after a found note: Find's green second, after which the next note comes, and Hear's
      * placed note, whose tone is released when it has played out. A phrase starting cancels it, so the
@@ -70,13 +67,16 @@ class NotesViewModel internal constructor(
      */
     private var tonePending = false
 
-    init {
-        val notes = StaffNotes.sanitize(settings.loadPracticeNotes())
-        _state = MutableStateFlow(
-            open(notes, settings.loadNotesGame(), settings.loadNoteSound(), settings.loadNoteProgress(), previous = null),
-        )
-        state = _state.asStateFlow()
-    }
+    private val _state = MutableStateFlow(
+        open(
+            StaffNotes.sanitize(settings.loadPracticeNotes()),
+            settings.loadNotesGame(),
+            settings.loadNoteSound(),
+            settings.loadNoteProgress(),
+            previous = null,
+        ),
+    )
+    val state: StateFlow<NotesRound> = _state.asStateFlow()
 
     /**
      * The child tapped the place of [midi] on the staff ([NotesRound.tapped]; ignored while the last
@@ -88,40 +88,47 @@ class NotesViewModel internal constructor(
         val after = before.tapped(midi, clock.nowMillis())
         if (after === before) return
         _state.value = after
-        if (after.progress != before.progress) {
-            // Find and Hear both come through here, so they feed one book. A known note no longer
-            // changes, so `notes.known` is logged the one time a note reaches NoteProgress.KNOWN_AT.
-            settings.saveNoteProgress(after.progress)
-            val asked = before.currentMidi
-            if (after.progress.isKnown(asked) && !before.progress.isKnown(asked)) logger.i(LogTags.NOTES, "notes.known", "midi" to asked)
-        }
+        saveProgress(before, after)
         if (midi != before.currentMidi) return // a miss: its cross is all there is
         when {
+            // Find: the note sounds through the green second, and then the next note comes.
             !before.hearing -> {
                 if (before.soundOn) soundNote(midi, FEEDBACK_MS)
-                feedbackJob?.cancel()
-                feedbackJob = viewModelScope.launch {
-                    delay(FEEDBACK_MS.toLong())
-                    if (tonePending) releasePlayer() // the data has played out; release the track
-                    advance()
-                }
+                afterNote(FEEDBACK_MS, then = ::advance)
             }
             after.solved -> playPhrase(lead = false) // the phrase's last note: its playback is the feedback
+            // Hear, a note placed: it sounds, and the next column is live meanwhile.
             else -> if (before.soundOn) {
                 soundNote(midi, NOTE_MS)
-                // Release the track when the note has played out, as Find does; the next column is live meanwhile.
-                feedbackJob?.cancel()
-                feedbackJob = viewModelScope.launch {
-                    delay(NOTE_MS.toLong())
-                    if (tonePending) releasePlayer()
-                }
+                afterNote(NOTE_MS)
             }
         }
+    }
+
+    /**
+     * Find and Hear both come through here, so they feed one book. A known note no longer changes, so `notes.known`
+     * is logged the one time a note reaches NoteProgress.KNOWN_AT.
+     */
+    private fun saveProgress(before: NotesRound, after: NotesRound) {
+        if (after.progress == before.progress) return
+        settings.saveNoteProgress(after.progress)
+        val asked = before.currentMidi
+        if (after.progress.isKnown(asked) && !before.progress.isKnown(asked)) logger.i(LogTags.NOTES, "notes.known", "midi" to asked)
     }
 
     private fun soundNote(midi: Int, durationMs: Int) {
         tonePlayer.play(NoteMath.midiToFrequency(midi), durationMs, TONE_VOLUME)
         tonePending = true
+    }
+
+    /** When a note of [millis] has played out, its track is released (the data is done), and [then] runs. */
+    private fun afterNote(millis: Int, then: () -> Unit = {}) {
+        feedbackJob?.cancel()
+        feedbackJob = viewModelScope.launch {
+            delay(millis.toLong())
+            if (tonePending) releasePlayer()
+            then()
+        }
     }
 
     /**
@@ -146,8 +153,7 @@ class NotesViewModel internal constructor(
             if (lead) delay(LEAD_MS.toLong())
             for ((index, midi) in shown.phrase.withIndex()) {
                 _state.update { it.copy(sounding = index) }
-                tonePlayer.play(NoteMath.midiToFrequency(midi), NOTE_MS, TONE_VOLUME)
-                tonePending = true
+                soundNote(midi, NOTE_MS)
                 delay(NOTE_MS.toLong())
                 _state.update { it.copy(sounding = null) }
                 delay(GAP_MS.toLong())
@@ -195,7 +201,7 @@ class NotesViewModel internal constructor(
     }
 
     /**
-     * Throws the round away: score, streak, taps and any feedback in progress go, the chosen
+     * Throws the round away: score, streak and any feedback in progress go, the chosen
      * notes and the game stay, and a new note or phrase is drawn. Called when the child leaves
      * the tab, so coming back always starts from zero, and by Again on the summary; the new round
      * does not open with the note just answered.
@@ -203,15 +209,14 @@ class NotesViewModel internal constructor(
     fun resetRound() = startRound(_state.value.practiceNotes, _state.value.game)
 
     /**
-     * Adds or removes [midi] from the notes asked, saved at once; the last note stays. Any
+     * Adds or removes [midi] from the notes asked ([StaffNotes.toggled]: the last note stays), saved at once. Any
      * change starts a fresh round from the new set, so the score always belongs to one set
      * of notes.
      */
     fun togglePracticeNote(midi: Int) {
-        if (midi !in StaffNotes.ALL) return
         val current = _state.value
-        val notes = if (midi in current.practiceNotes) current.practiceNotes - midi else current.practiceNotes + midi
-        if (notes.isEmpty()) return
+        val notes = StaffNotes.toggled(current.practiceNotes, midi)
+        if (notes == current.practiceNotes) return
         settings.savePracticeNotes(notes)
         startRound(notes, current.game)
     }
@@ -228,9 +233,7 @@ class NotesViewModel internal constructor(
 
     /** A fresh round of [game] over [notes], not opening with what is on screen; any feedback or playback in progress is cut. */
     private fun startRound(notes: Set<Int>, game: NotesGame) {
-        feedbackJob?.cancel()
-        playbackJob?.cancel()
-        if (tonePending) releasePlayer()
+        cutSound()
         val previous = _state.value
         _state.value = open(notes, game, previous.soundOn, previous.progress, previous)
     }
@@ -286,11 +289,14 @@ class NotesViewModel internal constructor(
         tonePending = false
     }
 
-    override fun onCleared() {
+    /** Cuts any feedback or playback in progress and silences the note this game started. */
+    private fun cutSound() {
         feedbackJob?.cancel()
         playbackJob?.cancel()
         if (tonePending) releasePlayer()
     }
+
+    override fun onCleared() = cutSound()
 
     companion object {
         /** How long the right place stays green and the note sounds before the next note. */

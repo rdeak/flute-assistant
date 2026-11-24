@@ -6,14 +6,12 @@ package hr.bertlab.fluteassistant.ui.common
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.R
-import kotlin.math.roundToInt
 
 /**
  * One round button beside the flag that turns the app's colours from day to night and back: a
@@ -29,7 +27,6 @@ fun ThemeSwitch(
     onDarkChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val font = with(LocalDensity.current) { ThemeIconSize.toSp().value.roundToInt() }
     val label = stringResource(R.string.theme_dark)
     ChunkyButton(
         onClick = { onDarkChange(!dark) },
@@ -39,7 +36,7 @@ fun ThemeSwitch(
             .size(48.dp)
             .semantics { contentDescription = label },
     ) {
-        Emoji(if (dark) SUN else MOON, fontSize = font)
+        Emoji(if (dark) SUN else MOON, size = ThemeIconSize)
     }
 }
 

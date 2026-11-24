@@ -3,15 +3,16 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
+import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
 /**
  * The key under a finger: the note it wrote and sounds ([midi]), or null for the rest key, where its note or rest sits
- * in the tune ([index]; null at the cap, where a press sounds but is not added), and the white key itself ([key]; since
- * 2026-11-17 the ♯♭ key makes a white key write its black note, so the two can differ: E's key writes E♭).
+ * in the tune ([index]; null at the cap, where a press sounds but is not added), and the letter key itself ([key], 0 = C
+ * to 6 = B, since 2026-11-18; by default the note's own letter, E's for an E♭). The key stays the same when the octave
+ * pills rename it under the finger.
  */
-data class Held(val midi: Int?, val index: Int?, val key: Int? = midi) {
+data class Held(val midi: Int?, val index: Int?, val key: Int? = midi?.let(NoteSpelling::letterOf)) {
     /** Whether the key is the rest key. */
     val isRest: Boolean get() = midi == null
 }
@@ -32,19 +33,25 @@ data class Held(val midi: Int?, val index: Int?, val key: Int? = midi) {
  * The ⌒ key (since 2026-11-16, [join]) joins the next note pressed to the last one, a slur, or a
  * tie when it is the same note ([TuneNote.joined], [Joins]): one tap per pair, nothing left switched
  * on. A key held counts, its note being the last step. While a join waits, a second tap, the rest
- * key, a breath, another book and [cancelJoin] drop it, and [erase] drops it first and erases
+ * key, a breath, another book and [dropWaiting] drop it, and [erase] drops it first and erases
  * nothing. A join ends the window in which a key let go of goes on with its note, as a breath does,
  * so the same key again after it is a tie of two notes.
  *
- * A hold is counted at [WRITING_PULSE], the ring's fastest, whatever the speed knob says (since 2026-11-17, the user:
- * "set max tempo 200 just when child type notes and want to set duration, is just for note duration"): a whole note
- * takes 1.05 s of holding at any speed. The knob sets how fast Play plays and how long Listen to me asks a note to last.
+ * A hold is counted at [WRITING_PULSE], 130 a minute, whatever the speed knob says (since 2026-11-17, the user:
+ * "set max tempo 200 just when child type notes and want to set duration, is just for note duration"; 130 since
+ * 2026-11-23): a whole note takes 1.6 s of holding at any speed. The knob sets how fast Play plays and how long Listen
+ * to me asks a note to last.
  *
  * The ♯♭ key (since 2026-11-17, [sign]) makes the next note key pressed write its letter's black note
- * ([FluteNotes.signed], [writes]): one tap per note, as the join. While it waits D, A and C6 write nothing (a press of
+ * ([FluteNotes.inOctave], [writes]): one tap per note, as the join. While it waits D and A write nothing (a press of
  * one changes nothing, not even a held key); a note key spends it, the rest key and a breath leave it, a second tap,
- * [erase], another book and [cancelSign] drop it. A key held is known by its white key ([Held.key]), so a key let go of
+ * [erase], another book and [dropWaiting] drop it. A key held is known by its letter ([Held.key]), so a key let go of
  * and pressed again goes on with the note it wrote, signed or not.
+ *
+ * The keys are seven letters, and the four octaves are pills over them (since 2026-11-18, [chooseOctave]): a letter
+ * writes its note in the chosen octave ([octave], [FluteNotes.inOctave]), which stays until another pill is tapped. A
+ * key is its letter, so a key held when the octave changes keeps its note; a pill ends the rejoin window and drops no
+ * waiting join or sign. In octave 4 only c⁴ writes.
  *
  * Pure Kotlin and clock-free: the view model passes the time of every press and release, and does the sounding, the
  * growing over time, the saving and the logging.
@@ -66,8 +73,9 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     var signWaiting: Boolean = false
         private set
 
-    /** Whether the ⌒ key has a note to join the next one to ([Joins.canJoinAfter]). */
-    val canJoin: Boolean get() = Joins.canJoinAfter(tune)
+    /** The octave the letter keys write in, 1 to 4 ([chooseOctave], since 2026-11-18). Kept until another is chosen, through another book too. */
+    var octave: Int = 1
+        private set
 
     /**
      * A hold that ended: the key ([midi], null for the rest), how long it was held, the length that made, whether it is
@@ -100,51 +108,57 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     private var pressedAt = 0L
     private var letGo: LetGo? = null
 
-    /** The note a press of the white key [key] writes now: [key], or its black note while the sign waits (null: none). */
-    fun writes(key: Int): Int? = FluteNotes.written(key, signWaiting)
+    /** The note a press of the letter key [key] writes now: its own in the chosen octave, or its black note while the sign waits (null: none). */
+    fun writes(key: Int): Int? = FluteNotes.inOctave(key, signWaiting, octave)
 
     /**
-     * Whether a press of the white key [key] at [now] would be taken: a key that writes a note now ([writes]), or the
+     * Whether a press of the letter key [key] at [now] would be taken: a key that writes a note now ([writes]), or the
      * key let go of a moment ago, whose hold a press goes on with even when it writes nothing now (D held, ♯♭ tapped,
      * the touch screen splitting the hold; the final review of 2026-11-17).
      */
     fun takes(key: Int, now: Long): Boolean = rejoinable(key, now) != null || writes(key) != null
 
     /**
-     * The white key [key] (null: the rest key) went down at [now]. Null, and nothing changes, for a note key that is not
+     * The letter key [key] (null: the rest key) went down at [now]. Null, and nothing changes, for a note key that is not
      * taken ([takes]).
      */
     fun press(key: Int?, now: Long): Press? {
-        val again = rejoinable(key, now) // asked before a held key is ended: a press over a held key is a new note
-        val midi = when {
-            key == null -> null
-            again != null -> again.key.midi // the same hold going on, signed or not
-            else -> writes(key) ?: return null
-        }
+        // Asked before a held key is ended: a press over a held key is a new note.
+        rejoinable(key, now)?.let { return goOn(it, now) }
+        val midi = if (key == null) null else writes(key) ?: return null
         val ended = release(now)
         letGo = null
+        // The rest key cancels a waiting join (a slur does not run over a rest); a note key spends it, and a waiting
+        // sign, on the note it adds.
         val joined = joinWaiting && midi != null
-        // The rest key cancels a waiting join (a slur does not run over a rest); a note key spends it on the note it adds,
-        // and a key that bounces (the same hold going on, below) keeps it for the next note.
         val dropped = Dropped(join = joinWaiting && midi == null)
-        if (midi == null || again == null) joinWaiting = false
-        if (midi != null && again == null) signWaiting = false
-        if (again == null) {
-            pressedAt = now
-            val atCap = tune.size >= Tune.MAX_NOTES
-            held = Held(midi, index = tune.size.takeUnless { atCap }, key = key)
-            if (!atCap) tune = tune + if (midi == null) TuneRest(NoteLength.EIGHTH) else TuneNote(midi, NoteLength.EIGHTH, joined)
-            return Press(ended, rejoinGapMs = null, elapsedMs = 0, dropped)
-        }
-        // A touch screen can report one hold as several (its palm rejection cancelling a flat finger
-        // and starting it over, or a bounce): within the window the gap counts as held. Longer ago
-        // (only the rest key gets here) the pause was not silence the child asked for.
+        joinWaiting = false
+        if (midi != null) signWaiting = false
+        pressedAt = now
+        val atCap = tune.size >= Tune.MAX_NOTES
+        held = Held(midi, index = tune.size.takeUnless { atCap }, key = key)
+        if (!atCap) tune = tune + if (midi == null) TuneRest(NoteLength.EIGHTH) else TuneNote(midi, NoteLength.EIGHTH, joined)
+        return Press(ended, rejoinGapMs = null, elapsedMs = 0, dropped)
+    }
+
+    /**
+     * The key let go of ([again]) is down again at [now], and its hold goes on, signed or not. A touch screen can report
+     * one hold as several (its palm rejection cancelling a flat finger and starting it over, or a bounce): within the
+     * window the gap counts as held. Longer ago (only the rest key gets here) the pause was not silence the child asked
+     * for. No key is held here ([rejoinable]), so none ends. A waiting join and sign stay for the next note, but the
+     * rest key cancels the join, as it does on a new press.
+     */
+    private fun goOn(again: LetGo, now: Long): Press {
+        letGo = null
+        val rest = again.key.midi == null
+        val dropped = Dropped(join = joinWaiting && rest)
+        if (rest) joinWaiting = false
         val gap = now - again.at
         val elapsed = if (gap <= HOLD_REJOIN_MS) now - again.pressedAt else Tune.durationMs(again.length, WRITING_PULSE)
         pressedAt = now - elapsed
         held = again.key
         grow(Tune.lengthOf(elapsed, WRITING_PULSE))
-        return Press(ended, rejoinGapMs = gap, elapsedMs = elapsed, dropped)
+        return Press(ended = null, rejoinGapMs = gap, elapsedMs = elapsed, dropped)
     }
 
     /** The held key's note or rest reached [length]; nothing changes at the cap, where it was not added. */
@@ -179,11 +193,11 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     }
 
     /**
-     * A tap of the ⌒ key: while a join waits it is cancelled (false); with nothing to join from ([canJoin]) nothing
-     * changes (false); else the next note pressed will be joined to the last one (true), and the rejoin window ends.
+     * A tap of the ⌒ key: while a join waits it is cancelled (false); with nothing to join from ([Joins.canJoinAfter])
+     * nothing changes (false); else the next note pressed will be joined to the last one (true), and the rejoin window ends.
      */
     fun join(): Boolean {
-        if (joinWaiting || !canJoin) {
+        if (joinWaiting || !Joins.canJoinAfter(tune)) {
             joinWaiting = false
             return false
         }
@@ -193,7 +207,7 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     }
 
     /** Drops a waiting join; says whether one waited. */
-    fun cancelJoin(): Boolean = joinWaiting.also { joinWaiting = false }
+    private fun cancelJoin(): Boolean = joinWaiting.also { joinWaiting = false }
 
     /**
      * A tap of the ♯♭ key: the next note key pressed writes its letter's black note (true), or a second tap drops it
@@ -206,7 +220,20 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     }
 
     /** Drops a waiting sign; says whether one waited. */
-    fun cancelSign(): Boolean = signWaiting.also { signWaiting = false }
+    private fun cancelSign(): Boolean = signWaiting.also { signWaiting = false }
+
+    /**
+     * A tap of an octave pill: the letter keys write in [octave] from now on (true); the chosen one again, or one the
+     * pills do not have, changes nothing at all (false). It never ends a held key, which is known by its letter
+     * ([Held.key]), drops no waiting join or sign, and ends the rejoin window, as the sign does: the same key again
+     * writes its new note.
+     */
+    fun chooseOctave(octave: Int): Boolean {
+        if (octave == this.octave || octave !in FluteNotes.OCTAVES) return false
+        this.octave = octave
+        forget()
+        return true
+    }
 
     /**
      * Marks a breath, unless the tune is at the cap or its last step is one already, and drops a waiting join (a breath
@@ -241,9 +268,8 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     /** Another book's [tune] takes this one's place. */
     fun open(tune: List<TuneItem>) {
         this.tune = tune
-        letGo = null
-        joinWaiting = false
-        signWaiting = false
+        forget()
+        dropWaiting()
     }
 
     /** The hold a press of the key [key] at [now] goes on with: see the class comment; null for a new note or rest. */
@@ -256,12 +282,17 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
 
     companion object {
         /**
-         * The pace a held key is counted at: 200 quarter notes a minute ([TempoBand.MAX_BPM], the ring's fastest), in
-         * quarter notes whatever the time signature, so a quarter is 300 ms of holding and a whole note 1.05 s. Writing
-         * only: it is shown nowhere and never reaches the metronome. The line between an eighth and a quarter is at 225 ms,
-         * near an ordinary tap; `flute.note`'s `heldMs` shows where a child's taps fall, and the number changes only from that.
+         * The pace a held key is counted at, in quarter notes a minute whatever the time signature: 130 since
+         * 2026-11-23 (the user: "reduce speed of adding notes to 130, just adding notes, not metronome"; 200, the ring's
+         * fastest, from 2026-11-17), so a quarter is about 460 ms of holding and a whole note 1.6 s. Writing only: it is
+         * shown nowhere and never reaches the metronome. The line between an eighth and a quarter is at 347 ms;
+         * `flute.note`'s `heldMs` shows where a child's taps fall, and the number changes only at the user's word or
+         * from that.
          */
-        val WRITING_PULSE: Pulse = Pulse(TempoBand.MAX_BPM, TimeSignature.FOUR_FOUR)
+        const val WRITING_BPM: Int = 130
+
+        /** [WRITING_BPM] as the pulse [Tune.lengthOf] and [Tune.growAtMs] count a hold in. */
+        val WRITING_PULSE: Pulse = Pulse(WRITING_BPM, TimeSignature.FOUR_FOUR)
 
         /** How long a key a screen reader activates is held for: one beat of the writing pace, a quarter note or rest. */
         val TAP_MS: Long = Tune.durationMs(NoteLength.QUARTER, WRITING_PULSE)

@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class MetronomeSettings(private val store: SettingsStore) {
 
     private val _config = MutableStateFlow(
-        store.loadMetronomeConfig().let { it.copy(bpm = it.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM)) },
+        store.loadMetronomeConfig().let { it.copy(bpm = TempoBand.clamp(it.bpm)) },
     )
     val config: StateFlow<MetronomeConfig> = _config.asStateFlow()
 

@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.di
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,8 +26,7 @@ object SessionModule {
 
     @Provides
     @Singleton
-    fun provideLogger(@ApplicationContext context: Context): Logger =
-        AndroidLogger(debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
+    fun provideLogger(@ApplicationContext context: Context): Logger = AndroidLogger(context)
 
     @Provides
     fun provideAudioTap(): AudioTap = AudioTap.None

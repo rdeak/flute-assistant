@@ -104,7 +104,7 @@ class TuneTest {
     fun `decode drops what it cannot read, rounds odd lengths and ignores a pause field`() {
         assertEquals(
             listOf(TuneNote(60, QUARTER), TuneNote(72, HALF), TuneNote(74, HALF)),
-            Tune.decode("60:2,x:1,85:2,67,72:4:150, ,74:3,76:0,77:-2", legacyBpm = 120),
+            Tune.decode("60:2,x:1,97:2,67,72:4:150, ,74:3,76:0,77:-2", legacyBpm = 120),
         )
     }
 
@@ -128,7 +128,7 @@ class TuneTest {
         assertEquals(
             listOf(TuneBreath, TuneNote(60, QUARTER), TuneBreath, TuneRest(HALF), TuneBreath),
             Tune.sanitize(
-                listOf(TuneBreath, TuneNote(60, QUARTER), TuneBreath, TuneNote(96, QUARTER), TuneBreath, TuneRest(HALF), TuneBreath, TuneBreath),
+                listOf(TuneBreath, TuneNote(60, QUARTER), TuneBreath, TuneNote(97, QUARTER), TuneBreath, TuneRest(HALF), TuneBreath, TuneBreath),
             ),
         )
         assertEquals(200, Tune.sanitize(List(250) { if (it % 2 == 0) TuneRest(QUARTER) else TuneBreath }).size)
@@ -137,7 +137,12 @@ class TuneTest {
     @Test
     fun `sanitize keeps offered notes and caps`() {
         assertEquals(200, Tune.sanitize(List(250) { TuneNote(60, QUARTER) }).size)
-        assertEquals(listOf(TuneNote(62, HALF)), Tune.sanitize(listOf(TuneNote(96, QUARTER), TuneNote(62, HALF))))
+        assertEquals(listOf(TuneNote(62, HALF)), Tune.sanitize(listOf(TuneNote(97, QUARTER), TuneNote(62, HALF))))
+    }
+
+    @Test
+    fun `sanitize keeps every note to c7 and drops one above`() {
+        assertEquals(listOf(TuneNote(96, QUARTER), TuneNote(85, QUARTER)), Tune.sanitize(listOf(TuneNote(96, QUARTER), TuneNote(97, QUARTER), TuneNote(59, QUARTER), TuneNote(85, QUARTER))))
     }
 
     // ---- Joined notes (2026-11-16, the ⌒ key): a third field on the note joined to the one before ----
@@ -163,8 +168,8 @@ class TuneTest {
     // ---- Black notes (2026-11-16): stored as their MIDI number, kept when they are the flute's ----
 
     @Test
-    fun `black notes are kept and notes outside c4 to c6 dropped`() {
-        val tune = Tune.decode("66:2,85:2,59:2,70:4", 60)
+    fun `black notes are kept and notes outside c4 to c7 dropped`() {
+        val tune = Tune.decode("66:2,97:2,59:2,70:4", 60)
         assertEquals(listOf(TuneNote(66, QUARTER), TuneNote(70, HALF)), tune)
         assertEquals("66:2,70:4", Tune.encode(tune))
     }

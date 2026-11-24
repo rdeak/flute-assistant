@@ -119,7 +119,6 @@ class NotesSidewaysTest {
     private fun over(score: Int, bestStreak: Int = 5) = asking(60).copy(
         roundOver = true,
         results = List(score) { true } + List(NotesRound.ROUND_LENGTH - score) { false },
-        taps = 13,
         bestStreak = bestStreak,
         roundMillis = 83_000L,
     )
@@ -437,7 +436,7 @@ class NotesSidewaysTest {
 
     @Test
     fun the_places_fill_as_the_round_goes() {
-        show(asking(60).copy(results = listOf(true, false, true), taps = 4))
+        show(asking(60).copy(results = listOf(true, false, true)))
         compose.onNodeWithContentDescription("Round progress, 3 of 10 notes").assertIsDisplayed()
         assertNear("the places' height", 168.dp, height(compose.onNodeWithContentDescription("Round progress, 3 of 10 notes")))
     }
@@ -703,7 +702,7 @@ class NotesSidewaysTest {
 
     @Test
     fun fits_every_phone() {
-        show(asking(60).copy(streak = 3, results = listOf(true, true, true), taps = 3))
+        show(asking(60).copy(streak = 3, results = listOf(true, true, true)))
         listOf(Phone(915, 411), Phone(800, 360), Phone(640, 360)).forEach { each ->
             on(each)
             val question = "$each, the question"
@@ -756,10 +755,10 @@ class NotesSidewaysTest {
             compose.runOnIdle { state.value = asking(60) }
             compose.waitForIdle()
             val bubble = bounds(word("C4"))
-            compose.runOnIdle { state.value = asking(60).copy(streak = 3, results = listOf(true, true, true), taps = 3) }
+            compose.runOnIdle { state.value = asking(60).copy(streak = 3, results = listOf(true, true, true)) }
             compose.waitForIdle()
             assertEquals("$each: the bubble moved with the streak", bubble, bounds(word("C4")))
-            compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 4) }
+            compose.runOnIdle { state.value = state.value.copy(wrongTaps = setOf(62), lastWrongTap = 62) }
             compose.waitForIdle()
             word("🙈 Try again").assertIsDisplayed()
             assertEquals("$each: the bubble moved with the line", bubble, bounds(word("C4")))
@@ -887,10 +886,10 @@ class NotesSidewaysTest {
             }
             pills.forEach { assertWholeWords(each, it) }
             // Wrong and right are states; the line that speaks while a finger is down is reached by one.
-            compose.runOnIdle { state.value = asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62, taps = 1) }
+            compose.runOnIdle { state.value = asking(60).copy(wrongTaps = setOf(62), lastWrongTap = 62) }
             compose.waitForIdle()
             assertInThePanel(wrong)
-            compose.runOnIdle { state.value = asking(60).copy(solved = true, results = listOf(true), taps = 1, streak = 1) }
+            compose.runOnIdle { state.value = asking(60).copy(solved = true, results = listOf(true), streak = 1) }
             compose.waitForIdle()
             assertInThePanel(correct)
             compose.runOnIdle { state.value = asking(60) }

@@ -81,7 +81,7 @@ object ListenPath {
         run: ListenRun.Rules = ListenRun.Rules(),
     ): Run {
         val hop = AudioRecordTunerEngine.HOP_SIZE
-        val listen = ListenRun(tune, pulse, rules, floor, run)
+        val listen = ListenRun(ListenRun.Setup(tune, pulse, rules, floor, run))
         val steps = mutableListOf<Step>()
         val heard = mutableListOf<Heard>()
         for ((i, pitch) in frames.frames.withIndex()) {

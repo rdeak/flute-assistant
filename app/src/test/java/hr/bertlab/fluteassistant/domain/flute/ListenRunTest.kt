@@ -32,7 +32,7 @@ import org.junit.Test
 class ListenRunTest {
 
     /** The rule of before 2026-11-11, pitch only: every note is long enough at its onset. */
-    private fun pitchOnly(tune: List<TuneItem>) = ListenRun(tune, Pulse(60), run = ListenRun.Rules.PITCH_ONLY)
+    private fun pitchOnly(tune: List<TuneItem>) = ListenRun(ListenRun.Setup(tune, Pulse(60), run = ListenRun.Rules.PITCH_ONLY))
 
     /**
      * The walk's workings at half a beat's slack, whose numbers are round: at 60 a minute in 4/4 a quarter note lasts
@@ -46,7 +46,7 @@ class ListenRunTest {
     /** The rule until 2026-11-14: a note let go too early is waited on until it is played long enough. */
     private val waits = halfBeatSlack.copy(shortMovesOn = false)
     private fun timed(vararg tune: TuneItem, pulse: Pulse = Pulse(60), run: ListenRun.Rules = halfBeatSlack) =
-        ListenRun(tune.toList(), pulse, run = run)
+        ListenRun(ListenRun.Setup(tune.toList(), pulse, run = run))
 
     /**
      * Frames after the onset frame by which a note begun with [begin] has sounded [ms]: by its onset
@@ -163,7 +163,7 @@ class ListenRunTest {
         val first = pitchOnly(listOf(q(60)))
         first.onFrame(PitchFrame(null, 0.0, level = 0.2f))
         assertEquals(0.2f, first.floor)
-        assertEquals(0.2f, ListenRun(listOf(q(60)), Pulse(60), floor = first.floor).floor)
+        assertEquals(0.2f, ListenRun(ListenRun.Setup(listOf(q(60)), Pulse(60), floor = first.floor)).floor)
     }
 
     /**
@@ -183,7 +183,7 @@ class ListenRunTest {
         assertEquals(0, run.listening.index)
         assertEquals(TunerAdvice.COME_CLOSER, run.listening.advice)
 
-        val before = ListenRun(listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER)), Pulse(60), NoteOnsetTracker.Rules(minLevel = 0f), run = ListenRun.Rules.PITCH_ONLY)
+        val before = ListenRun(ListenRun.Setup(listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER)), Pulse(60), NoteOnsetTracker.Rules(minLevel = 0f), run = ListenRun.Rules.PITCH_ONLY))
         repeat(HearingTracker.UNCLEAR_FRAMES) { before.onFrame(faint) }
         assertEquals(WrongNote(0, 64), before.listening.wrong)
     }
@@ -215,7 +215,7 @@ class ListenRunTest {
     @Test
     fun `the slack is three quarters of a beat, so a half note at 60 a minute is long enough at 1250 ms`() {
         // The user's pick of 2026-11-13 from the sessions of 2026-11-12: the child stopped half notes at 1.2 to 1.7 s.
-        val run = ListenRun(listOf(h(60), q(62), q(64)), Pulse(60))
+        val run = ListenRun(ListenRun.Setup(listOf(h(60), q(62), q(64)), Pulse(60)))
         run.begin(60)
         repeat(after(1250.0) - 1) { assertFalse(run.onFrame(pitched(60)).advanced) }
         val half = run.onFrame(pitched(60))
@@ -231,7 +231,7 @@ class ListenRunTest {
 
     @Test
     fun `a whole note at 60 a minute still needs the longest hold, not more`() {
-        val run = ListenRun(listOf(TuneNote(60, WHOLE), q(62)), Pulse(60))
+        val run = ListenRun(ListenRun.Setup(listOf(TuneNote(60, WHOLE), q(62)), Pulse(60)))
         run.begin(60)
         repeat(after(3000.0) - 1) { assertFalse(run.onFrame(pitched(60)).advanced) }
         assertEquals(3000L, run.onFrame(pitched(60)).held?.needMs)
@@ -768,7 +768,7 @@ class ListenRunTest {
     @Test
     fun `with a longer gap rule a note stopped while strong is still no fade`() {
         // The tracker's gap frames are walked before the cut; they are silence, not the note's end.
-        val run = ListenRun(listOf(h(60), q(62)), Pulse(60), NoteOnsetTracker.Rules(onsetGapFrames = 4), run = waits)
+        val run = ListenRun(ListenRun.Setup(listOf(h(60), q(62)), Pulse(60), NoteOnsetTracker.Rules(onsetGapFrames = 4), run = waits))
         run.begin(60)
         run.hold(60, 15)
         repeat(4) { run.onFrame(silent) }
@@ -1066,7 +1066,7 @@ class ListenRunTest {
     @Test
     fun `pitch only, any note is long enough the moment it is heard`() {
         // No slack to run out of however long a note is written: the rule of before 2026-11-11.
-        val run = ListenRun(listOf(TuneNote(60, WHOLE), q(62)), Pulse(40), run = ListenRun.Rules.PITCH_ONLY)
+        val run = ListenRun(ListenRun.Setup(listOf(TuneNote(60, WHOLE), q(62)), Pulse(40), run = ListenRun.Rules.PITCH_ONLY))
         assertTrue(run.begin(60).advanced)
         assertEquals(mapOf(0 to StepMark.FIRST_TRY), run.marks)
     }
@@ -1695,7 +1695,7 @@ class ListenRunTest {
         wrong.begin(62)
         wrong.hold(62, after(800.0))
         assertEquals(StepMark.RETRY, wrong.marks[1])
-        val off = ListenRun(listOf(q(60), j(62)), Pulse(60), run = halfBeatSlack.copy(slurCheck = false))
+        val off = ListenRun(ListenRun.Setup(listOf(q(60), j(62)), Pulse(60), run = halfBeatSlack.copy(slurCheck = false)))
         off.begin(60)
         off.hold(60, after(800.0))
         off.tongueTo(60, 62)
@@ -1887,7 +1887,7 @@ class ListenRunTest {
 
     @Test
     fun `with the rule off the second note is never heard`() {
-        val run = ListenRun(listOf(q(67), j(66)), Pulse(60), rules = NoteOnsetTracker.Rules(stepFromSounding = false), run = halfBeatSlack)
+        val run = ListenRun(ListenRun.Setup(listOf(q(67), j(66)), Pulse(60), rules = NoteOnsetTracker.Rules(stepFromSounding = false), run = halfBeatSlack))
         run.play(67, 40.0)
         run.play(66, 40.0)
         assertNull(run.marks[1])

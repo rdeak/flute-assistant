@@ -7,7 +7,7 @@ import kotlin.math.PI
 
 /**
  * A flute voice ([FluteTimbre]) that does not know its length in advance: [noteOn] fades the
- * note in over [ATTACK_MS] and holds it, [noteOff] fades it out over [RELEASE_MS], and a
+ * note in over [FluteTimbre.ATTACK_MS] and holds it, [noteOff] fades it out over [FluteTimbre.RELEASE_MS], and a
  * [noteOn] while a note sounds fades the old note down over [RETRIGGER_MS] before the new
  * attack, so nothing clicks; [glide] moves a sounding note to another pitch with no fade and no
  * attack (a joined note in Play, since 2026-11-16). The oscillator is phase-continuous across every change.
@@ -28,8 +28,8 @@ class SustainedToneSynth(private val sampleRate: Int) {
     private var pendingFrequencyHz = 0.0
     private var pendingAmplitude = 0f
 
-    private val attackStep = 1.0 / samplesFor(ATTACK_MS)
-    private val releaseStep = 1.0 / samplesFor(RELEASE_MS)
+    private val attackStep = 1.0 / samplesFor(FluteTimbre.ATTACK_MS)
+    private val releaseStep = 1.0 / samplesFor(FluteTimbre.RELEASE_MS)
     private val retriggerStep = 1.0 / samplesFor(RETRIGGER_MS)
 
     init {
@@ -118,8 +118,6 @@ class SustainedToneSynth(private val sampleRate: Int) {
     private fun samplesFor(ms: Int): Int = (sampleRate.toLong() * ms / 1000).toInt().coerceAtLeast(1)
 
     companion object {
-        const val ATTACK_MS = 30
-        const val RELEASE_MS = 120
         const val RETRIGGER_MS = 10
 
         /** Below this a releasing note is quiet enough to restart the attack in place of a retrigger fade. */

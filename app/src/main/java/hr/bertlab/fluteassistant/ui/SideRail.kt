@@ -39,8 +39,8 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
  * frame's numbers do. The yellow tab says which is open, so there is no title; a screen reader
  * hears the open tab's word as a selected tab. The background runs under a camera cutout on the
  * rail's side, and the width below is what is left clear of it. The credits and the language list
- * are open or shut as [creditsOpen] and [languageOpen] say when the caller passes them with their
- * change callbacks, so a turn from the title bar leaves them as they were.
+ * are open or shut as [panels] says: the caller that also shows the title bar hands both the same
+ * one, so a turn from the title bar leaves them as they were.
  */
 @Composable
 internal fun SideRail(
@@ -49,10 +49,7 @@ internal fun SideRail(
     drumBeating: Boolean,
     beatPulse: Long,
     modifier: Modifier = Modifier,
-    creditsOpen: Boolean? = null,
-    onCreditsOpenChange: ((Boolean) -> Unit)? = null,
-    languageOpen: Boolean? = null,
-    onLanguageOpenChange: ((Boolean) -> Unit)? = null,
+    panels: BarPanels = rememberBarPanels(),
 ) {
     val colors = FluteTheme.colors
     val drumFlash = rememberBeatFlash(beatPulse, drumBeating)
@@ -81,7 +78,7 @@ internal fun SideRail(
                 .width(railWidth)
                 .padding(start = RailPadding, end = RailPadding + OutlineWidth, top = 10.dp, bottom = 12.dp),
         ) {
-            CreditsLogo(modifier = Modifier.size(iconSize), isOpen = creditsOpen, onOpenChange = onCreditsOpenChange)
+            CreditsLogo(isOpen = panels.creditsOpen, onOpenChange = { panels.creditsOpen = it }, modifier = Modifier.size(iconSize))
             Column(
                 verticalArrangement = Arrangement.spacedBy(3.dp),
                 modifier = Modifier
@@ -105,10 +102,10 @@ internal fun SideRail(
             }
             // Beside the rail, as above the flag the list would cover the tabs.
             AppLanguageSwitch(
+                isOpen = panels.languageOpen,
+                onOpenChange = { panels.languageOpen = it },
                 modifier = Modifier.size(iconSize),
                 listOffset = railWidth - flagStart + SidewaysGeometry.MARGIN.dp,
-                isOpen = languageOpen,
-                onOpenChange = onLanguageOpenChange,
             )
         }
     }
@@ -116,6 +113,8 @@ internal fun SideRail(
 
 /** The room either side of the rail's contents. */
 private val RailPadding = 6.dp
+
+private val RailTabShape = RoundedCornerShape(20.dp)
 
 /**
  * The rail's tabs, on the taller rail and on the short one (`TabLook`, every size in dp).
@@ -128,6 +127,5 @@ private val RailPadding = 6.dp
  *   with which five tabs' words stay inside their cells at the largest text (searched on 2026-11-17 with
  *   `SideRailTest`; with four tabs it was 1.3 on both).
  */
-private val RailTabShape = RoundedCornerShape(20.dp)
 private val RailLook = TabLook(emoji = 24.dp, word = 12.dp, wordFloor = 7.dp, wordGrowth = 1.1f, wordPadding = 3.dp, shape = RailTabShape)
 private val RailLookShort = TabLook(emoji = 20.dp, word = 11.dp, wordFloor = 7.dp, wordGrowth = 1.0f, wordPadding = 3.dp, shape = RailTabShape)

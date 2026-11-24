@@ -29,12 +29,12 @@ class FluteUiStateTest {
     fun `lit note and index follow playback first, then the held key`() {
         val tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(67, NoteLength.QUARTER))
         val playing = FluteUiState(tune = tune, held = Held(72, index = 1), playing = Playing(0))
-        assertEquals(60, playing.litMidi)
+        assertEquals("C's key", 0, playing.litLetter)
         assertEquals(0, playing.litIndex)
         val held = FluteUiState(tune = tune, held = Held(72, index = 1))
-        assertEquals(72, held.litMidi)
+        assertEquals("the held key, by its letter", 0, held.litLetter)
         assertEquals(1, held.litIndex)
-        assertNull(FluteUiState().litMidi)
+        assertNull(FluteUiState().litLetter)
         assertNull(FluteUiState().litIndex)
     }
 
@@ -51,10 +51,10 @@ class FluteUiStateTest {
         assertFalse(FluteUiState(tune = tune).restLit)
         assertTrue(FluteUiState(tune = tune, held = Held(midi = null, index = 1)).restLit)
         assertTrue(FluteUiState(tune = tune, playing = Playing(1)).restLit)
-        assertNull(FluteUiState(tune = tune, playing = Playing(1)).litMidi)
+        assertNull(FluteUiState(tune = tune, playing = Playing(1)).litLetter)
         assertEquals(1, FluteUiState(tune = tune, playing = Playing(1)).litIndex)
         assertFalse(FluteUiState(tune = tune, playing = Playing(0)).restLit)
-        assertEquals(60, FluteUiState(tune = tune, playing = Playing(0)).litMidi)
+        assertEquals(0, FluteUiState(tune = tune, playing = Playing(0)).litLetter)
     }
 
     @Test
@@ -231,5 +231,16 @@ class FluteUiStateTest {
         assertTrue(FluteUiState(tune = lamb, playing = Playing(0)).isBusy)
         assertFalse(FluteUiState(tune = lamb, listening = Listening(index = 0)).isBusy)
         assertTrue(FluteUiState(tune = lamb, listening = Listening(index = 0, heardNow = 67)).isBusy)
+    }
+
+    @Test
+    fun `the lit letter is in the chosen octave`() {
+        val c5 = listOf(TuneNote(72, NoteLength.QUARTER))
+        assertEquals(0, FluteUiState(tune = c5, playing = Playing(0), octave = 2).litLetter)
+        assertNull("c2 plays while the keys show octave one", FluteUiState(tune = c5, playing = Playing(0)).litLetter)
+        assertEquals("E's key for an E flat", 2, FluteUiState(tune = listOf(TuneNote(63, NoteLength.QUARTER)), playing = Playing(0)).litLetter)
+        // A held key is its letter, whatever the pills say now.
+        assertEquals(0, FluteUiState(tune = listOf(TuneNote(60, NoteLength.EIGHTH)), held = Held(60, index = 0), octave = 2).litLetter)
+        assertNull(FluteUiState().litLetter)
     }
 }

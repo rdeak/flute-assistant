@@ -201,7 +201,7 @@ class FluteSidewaysTest {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
-            listOf("C6", "Sharp or flat for the next note", "B5", "C5", "B4", "C4", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
+            listOf("C4", "B4", "Sharp or flat for the next note", "Join to the next note", "Rest", "Breathe", "Erase the last note").forEach { name ->
                 assertInside(name, key(name).assertIsDisplayed(), shadow = 5.dp)
                 assertNearBySize("$each: $name's width", each.keyWidth.dp, width(key(name)))
                 assertNear("$each: $name's height", each.keyHeight.dp, height(key(name)))
@@ -216,17 +216,25 @@ class FluteSidewaysTest {
         }
     }
 
-    /** The ♯♭ key (2026-11-17) stands beside C6 on its side too, over D5. */
+    /** The octave pills over two key rows on its side too (2026-11-18): the letters, then the tools, as tall as the height allows. */
     @Test
-    fun the_sign_key_stands_beside_c6_on_its_side() {
+    fun the_pills_and_two_key_rows_stand_in_the_keys_column() {
         show(FluteUiState(tune = twoNotes))
         PHONES.forEach { each ->
             on(each)
-            val c6 = bounds(key("C6"))
-            val d5 = bounds(key("D5"))
+            val pill = bounds(key("Octave 4"))
+            val last = bounds(key("Octave 7"))
+            val c = bounds(key("C4"))
+            val b = bounds(key("B4"))
             val sign = bounds(key("Sharp or flat for the next note"))
-            assertNear("$each: ♯♭ in C6's row", c6.top, sign.top)
-            assertNear("$each: ♯♭ over D5", d5.left, sign.left)
+            assertInside("$each: the first pill", key("Octave 4"))
+            assertTrue("$each: the pills ($pill) over the letters ($c)", pill.bottom <= c.top + 1.dp)
+            assertNear("$each: the pills start with the keys", c.left, pill.left, tolerance = 1f)
+            assertNear("$each: the pills end with the keys", b.right, last.right, tolerance = 1f)
+            assertTrue("$each: the tools ($sign) under the letters ($c)", sign.top >= c.bottom)
+            assertNear("$each: ♯♭ under C", c.left, sign.left, tolerance = 1f)
+            assertTrue("$each: a key is at least 58 dp tall, was ${c.bottom - c.top}", c.bottom - c.top >= 58.dp - SLACK)
+            assertTrue("$each: Play under the keys", bounds(word("Play")).top >= bounds(key("Erase the last note")).bottom)
         }
     }
 
@@ -237,12 +245,12 @@ class FluteSidewaysTest {
         PHONES.forEach { each ->
             on(each)
             val staff = bounds(staff())
-            val c6 = bounds(key("C6"))
-            val b5 = bounds(key("B5"))
-            assertNearBySize("$each: the keys' width", each.keysWidth.dp, b5.right - c6.left)
-            assertNear("$each: the keys end at the margin", each.contentWidth.dp - 8.dp, b5.right)
+            val first = bounds(key("C4"))
+            val last = bounds(key("B4"))
+            assertNearBySize("$each: the keys' width", each.keysWidth.dp, last.right - first.left)
+            assertNear("$each: the keys end at the margin", each.contentWidth.dp - 8.dp, last.right)
             // The card's inside ends the card's padding before the keys' margin.
-            assertNear("$each: the staff ends at the card's padding", c6.left - 8.dp - 16.dp, staff.right)
+            assertNear("$each: the staff ends at the card's padding", first.left - 8.dp - 16.dp, staff.right)
             assertNear("$each: the staff's height", TuneStaffHeight, staff.bottom - staff.top, tolerance = 3f)
             assertNear("$each: the staff's middle", (each.height / 2).dp, (staff.top + staff.bottom) / 2)
             assertNear("$each: the knob keeps its corner", 24.dp, bounds(knob()).left)
@@ -250,18 +258,16 @@ class FluteSidewaysTest {
         }
     }
 
-    /** The key gap has three uses, which must agree, or the tools stop standing over the keys below them. */
+    /** The key gap has three uses, which must agree, or the tools stop standing under the letters above them. */
     @Test
-    fun the_tools_stand_over_the_last_three_keys() {
+    fun the_tools_stand_under_the_letters_column_by_column() {
         show(FluteUiState(tune = twoNotes))
+        val columns = listOf("C4" to "Sharp or flat for the next note", "D4" to "Join to the next note", "F4" to "Rest", "G4" to "Breathe")
         PHONES.forEach { each ->
             on(each)
-            assertNear("$each: the join over F5", bounds(key("F5")).left, bounds(key("Join to the next note")).left, tolerance = 1f)
-            assertNear("$each: the rest over G5", bounds(key("G5")).left, bounds(key("Rest")).left, tolerance = 1f)
-            assertNear("$each: the breath over A5", bounds(key("A5")).left, bounds(key("Breathe")).left, tolerance = 1f)
-            assertNear("$each: the sponge over B5", bounds(key("B5")).right, bounds(key("Erase the last note")).right, tolerance = 1f)
-            assertNear("$each: C6 over C5", bounds(key("C5")).left, bounds(key("C6")).left, tolerance = 1f)
-            assertNear("$each: the gap", each.keyGap.dp, bounds(key("D5")).left - bounds(key("C5")).right)
+            for ((letter, tool) in columns) assertNear("$each: $tool under $letter", bounds(key(letter)).left, bounds(key(tool)).left, tolerance = 1f)
+            assertNear("$each: the sponge under B4", bounds(key("B4")).right, bounds(key("Erase the last note")).right, tolerance = 1f)
+            assertNear("$each: the gap", each.keyGap.dp, bounds(key("D4")).left - bounds(key("C4")).right)
         }
     }
 
@@ -324,6 +330,18 @@ class FluteSidewaysTest {
         val stop = bounds(word("Stop"))
         assertNear("the right edge", listen.right, stop.right)
         assertNear("the bottom", listen.bottom, stop.bottom)
+    }
+
+    /** A tune up to c⁴ (2026-11-18) needs 320 dp of staff: on a phone 360 dp tall it is drawn a little smaller and fits its card. */
+    @Test
+    fun a_tune_up_to_c4_fits_its_card_on_every_phone() {
+        show(FluteUiState(tune = listOf(TuneNote(72, NoteLength.QUARTER), TuneNote(96, NoteLength.QUARTER))))
+        PHONES.forEach { each ->
+            on(each)
+            assertInside("$each: the staff", staff())
+            val scale = SidewaysGeometry.restingStaffScale(each.height.toFloat(), StaffGeometry.TOTAL_HEIGHT + StaffGeometry.HIGH_ROOM)
+            assertNear("$each: the staff's height", tuneStaffHeight(scale, StaffGeometry.HIGH_ROOM), height(staff()), tolerance = 3f)
+        }
     }
 
     @Test
@@ -496,10 +514,10 @@ class FluteSidewaysTest {
     fun a_key_held_during_a_turn_is_released() {
         show(FluteUiState(tune = twoNotes))
         key("G4").performTouchInput { down(center) }
-        assertEquals(listOf(67), pressed)
+        assertEquals(listOf(4), pressed)
         assertTrue(released.isEmpty())
         flip()
-        assertEquals(listOf(67), released)
+        assertEquals(listOf(4), released)
     }
 
     @Test
@@ -517,10 +535,10 @@ class FluteSidewaysTest {
         sideways = false
         show(FluteUiState(tune = twoNotes))
         key("G4").performTouchInput { down(center) }
-        assertEquals(listOf(67), pressed)
+        assertEquals(listOf(4), pressed)
         assertTrue(released.isEmpty())
         flip()
-        assertEquals(listOf(67), released)
+        assertEquals(listOf(4), released)
     }
 
     @Test
@@ -545,10 +563,10 @@ class FluteSidewaysTest {
         needsDevice()
         show(FluteUiState(tune = twoNotes))
         key("G4").performTouchInput { down(center) }
-        assertEquals(listOf(67), pressed)
+        assertEquals(listOf(4), pressed)
         assertTrue(released.isEmpty())
         cancelTheGestures()
-        assertEquals(listOf(67), released)
+        assertEquals(listOf(4), released)
     }
 
     @Test
@@ -568,9 +586,9 @@ class FluteSidewaysTest {
         show(FluteUiState())
         val hint = bounds(word(HINT).assertIsDisplayed())
         assertWholeWords(HINT)
-        // Inside the card, whose edge is the keys' margin away from C6.
-        assertTrue("the hint ends at ${hint.right}, the keys start at ${bounds(key("C6")).left}", hint.right <= bounds(key("C6")).left - 8.dp)
-        assertNear("the card", 228.dp, bounds(key("C6")).left - 16.dp)
+        // Inside the card, whose edge is the keys' margin away from the first key.
+        assertTrue("the hint ends at ${hint.right}, the keys start at ${bounds(key("C4")).left}", hint.right <= bounds(key("C4")).left - 8.dp)
+        assertNear("the card", 228.dp, bounds(key("C4")).left - 16.dp)
         word("Play").assertIsDisplayed().assertIsNotEnabled()
         word("Listen to me").assertIsDisplayed().assertIsNotEnabled()
         key("Erase the last note").assertIsNotEnabled()
@@ -586,7 +604,7 @@ class FluteSidewaysTest {
         show(FluteUiState(), Locale("hr"), fontScale = 1.5f)
         word(HINT_HR).assertIsDisplayed()
         assertWholeWords(HINT_HR)
-        assertTrue("the hint runs into the keys", bounds(word(HINT_HR)).right <= bounds(key("c3")).left - 8.dp)
+        assertTrue("the hint runs into the keys", bounds(word(HINT_HR)).right <= bounds(key("c1")).left - 8.dp)
     }
 
     @Test
@@ -595,7 +613,7 @@ class FluteSidewaysTest {
         show(FluteUiState(), fontScale = 1.5f)
         word(HINT).assertIsDisplayed()
         assertWholeWords(HINT)
-        assertTrue("the hint runs into the keys", bounds(word(HINT)).right <= bounds(key("C6")).left - 8.dp)
+        assertTrue("the hint runs into the keys", bounds(word(HINT)).right <= bounds(key("C4")).left - 8.dp)
     }
 
     /** Review Focus 3: the words shrink in the narrow buttons rather than being cut. */
@@ -627,18 +645,19 @@ class FluteSidewaysTest {
     // ---- Writing below the least height ----
 
     /**
-     * Under 329 dp (the margins, the keys at their least, a gap and Play) the keys' column scrolls
+     * Under 305 dp (329 with three rows, until 2026-11-18: the margins, the pills and the keys at their least, a gap and Play) the keys' column scrolls
      * rather than let the key rows run past it onto Play: the top row would stand above the page's
      * margin and the bottom one on Play. Both phones here are shorter than any the layout was drawn for.
      */
     @Test
-    fun below_329_dp_tall_the_keys_scroll_and_stay_clear_of_play() {
-        phone = Phone(640, 320)
+    fun below_305_dp_tall_the_keys_scroll_and_stay_clear_of_play() {
+        phone = Phone(640, 287)
         show(FluteUiState(tune = twoNotes))
-        listOf(Phone(640, 320), Phone(640, 300)).forEach { each ->
+        listOf(Phone(640, 287), Phone(640, 270)).forEach { each ->
             on(each)
-            val top = bounds(key("C6"))
-            val bottom = bounds(key("C4"))
+            key("Octave 4").performScrollTo() // the column back at its top: the phone before scrolled it to Play
+            val top = bounds(key("Octave 4"))
+            val bottom = bounds(key("Sharp or flat for the next note"))
             val play = bounds(word("Play"))
             assertTrue("$each: the top key starts at ${top.top}, inside the page's 8 dp margin", top.top >= 8.dp - SLACK)
             assertTrue("$each: the lowest keys and their shadow end at ${bottom.bottom + 5.dp}, Play starts at ${play.top}", bottom.bottom + 5.dp <= play.top + SLACK)
@@ -650,11 +669,12 @@ class FluteSidewaysTest {
 
     /** A little over the least height the keys and Play need, the column fits and does not scroll. */
     @Test
-    fun just_over_329_dp_tall_nothing_needs_to_scroll() {
-        phone = Phone(640, 340)
+    fun just_over_305_dp_tall_nothing_needs_to_scroll() {
+        phone = Phone(640, 307)
         show(FluteUiState(tune = twoNotes))
         assertInside("Play", word("Play").assertIsDisplayed(), shadow = 8.dp)
-        assertInside("the top key", key("C6"), shadow = 5.dp)
+        assertInside("the first pill", key("Octave 4"))
+        assertInside("the last tool", key("Erase the last note"), shadow = 5.dp)
     }
 
     // ---- The staff keeps its place ----

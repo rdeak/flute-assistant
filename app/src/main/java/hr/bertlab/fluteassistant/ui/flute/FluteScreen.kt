@@ -3,24 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
-import hr.bertlab.fluteassistant.ui.common.KeyGap
-import hr.bertlab.fluteassistant.ui.common.KeyHeight
-import hr.bertlab.fluteassistant.ui.common.TabPadding
-import hr.bertlab.fluteassistant.ui.common.noteText
-import hr.bertlab.fluteassistant.ui.common.FingeringDiagram
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.platform.LocalResources
-import androidx.compose.foundation.layout.heightIn
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -42,12 +26,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleStartEffect
 import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.flute.Pace
@@ -55,17 +39,28 @@ import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.metronome.tempoBand
 import hr.bertlab.fluteassistant.ui.common.AdviceLine
 import hr.bertlab.fluteassistant.ui.common.AppIcons
+import hr.bertlab.fluteassistant.ui.common.BIG_ACTION_DEPTH
 import hr.bertlab.fluteassistant.ui.common.BigActionButton
+import hr.bertlab.fluteassistant.ui.common.BigActionHeight
+import hr.bertlab.fluteassistant.ui.common.FingeringDiagram
+import hr.bertlab.fluteassistant.ui.common.KeyGap
+import hr.bertlab.fluteassistant.ui.common.KeyHeight
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.LocalTabZoom
 import hr.bertlab.fluteassistant.ui.common.MicrophonePermissionCard
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.Stage
+import hr.bertlab.fluteassistant.ui.common.StagePadding
+import hr.bertlab.fluteassistant.ui.common.TabGap
+import hr.bertlab.fluteassistant.ui.common.TabPadding
+import hr.bertlab.fluteassistant.ui.common.TabPaddingHeight
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import hr.bertlab.fluteassistant.ui.common.fitOrScroll
+import hr.bertlab.fluteassistant.ui.common.noteText
 import hr.bertlab.fluteassistant.ui.common.rememberBeatFlash
-import hr.bertlab.fluteassistant.ui.metronome.MetronomeMinHeight
+import hr.bertlab.fluteassistant.ui.common.rememberMicrophonePermission
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeStage
+import hr.bertlab.fluteassistant.ui.metronome.MetronomeStageColumn
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
 import hr.bertlab.fluteassistant.ui.metronome.closesTempoWheel
 import hr.bertlab.fluteassistant.ui.metronome.rememberTempoWheelState
@@ -92,20 +87,12 @@ fun FluteScreen(
     metronome: MetronomeUiState,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val activity = LocalActivity.current
-    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        // After a no, the phone says whether it would show its question again; when it would not, only its settings are left.
-        val canAskAgain = activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.RECORD_AUDIO) } ?: true
-        viewModel.onMicResult(granted, canAskAgain)
-    }
-    fun micGranted() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-        PackageManager.PERMISSION_GRANTED
+    val mic = rememberMicrophonePermission(viewModel::onMicResult)
     LifecycleStartEffect(Unit) {
         viewModel.enterTab()
         onStopOrDispose { viewModel.leaveTab() }
     }
-    val actions = remember(viewModel, micLauncher, context) {
+    val actions = remember(viewModel, mic) {
         FluteActions(
             onKeyPressed = viewModel::onKeyPressed,
             onKeyReleased = viewModel::onKeyReleased,
@@ -116,11 +103,10 @@ fun FluteScreen(
             onBreath = viewModel::onBreath,
             onJoin = viewModel::onJoin,
             onSign = viewModel::onSign,
+            onOctave = viewModel::onOctave,
             onEraseLast = viewModel::eraseLast,
             onTogglePlayback = viewModel::togglePlayback,
-            onYourTurn = {
-                if (micGranted()) viewModel.startListening() else micLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            },
+            onYourTurn = { if (mic.isGranted()) viewModel.startListening() else mic.request() },
             onStop = viewModel::stopRun,
             onBpmChange = viewModel::setBpm,
             onTimeSignatureChange = viewModel::setTimeSignature,
@@ -128,12 +114,8 @@ fun FluteScreen(
             onSpeedDone = viewModel::closeSpeed,
             onShelfOpen = viewModel::openShelf,
             onBookChosen = viewModel::openBook,
-            onRequestMic = { micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
-            onOpenSettings = {
-                context.startActivity(
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null)),
-                )
-            },
+            onRequestMic = mic.request,
+            onOpenSettings = mic.openSettings,
             onMicDismiss = viewModel::dismissMic,
         )
     }
@@ -157,6 +139,8 @@ class FluteActions(
     val onJoin: () -> Unit = {},
     /** The ♯♭ key: the next note key pressed writes its letter's sharp or flat (since 2026-11-17). */
     val onSign: () -> Unit = {},
+    /** An octave pill, 1 to 4: the letter keys write in that octave (since 2026-11-18). */
+    val onOctave: (Int) -> Unit = {},
     val onEraseLast: () -> Unit = {},
     /** Play. */
     val onTogglePlayback: () -> Unit = {},
@@ -179,20 +163,21 @@ class FluteActions(
     val onMicDismiss: () -> Unit = {},
 )
 
-private val PlayRowHeight = 84.dp
-private val PlayShadow = 8.dp
+/** The Play row's shadow, under the buttons. */
+private val PlayShadow = BIG_ACTION_DEPTH.dp
 
 /**
  * Everything below this height cannot hold the keys: the column's own padding (4 dp over, 16 under),
  * the stage (the staff with the names under it, in the stage's 16 dp padding, which holds its
- * border), three key rows and the Play row with its shadow, and the two gaps between them. It is
- * 642 dp, what the column measures; until 2026-11-10 it counted 22 dp more, so a phone that leaves
+ * border), the octave pills and two key rows and the Play row with its shadow, and the two gaps between them. It is
+ * 618 dp since 2026-11-19, what the column measures (642 with three key rows until 2026-11-18), and what a tab has over it goes
+ * to the staff's box first, up to the 63 dp c⁴ needs. Until 2026-11-10 it counted 22 dp more, so a phone that leaves
  * the tab between the two (a Galaxy A55 with three navigation buttons: 652) was laid out as one too
  * short, its spare height under the Play row and Stop far over Play's place. (628 from 2026-11-16, when
  * the black keys scrolled in rows of their own, until 2026-11-17.)
  */
-private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
-    14.dp + FluteKeysMinHeight + 14.dp + PlayRowHeight + PlayShadow
+private val FitsHeight = TabPaddingHeight + (StagePadding * 2 + TuneStaffHeight) +
+    TabGap + FluteKeysMinHeight + TabGap + BigActionHeight + PlayShadow
 
 /**
  * The whole flute tab, top to bottom: a stage with the child's tune on a staff ([TuneStaff]: the
@@ -202,9 +187,9 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  * in the last "Your turn", and over the staff's top left the [SpeedKnob], the
  * metronome's animal for the tempo in [metronome], where printed music writes the tempo, and under
  * the clef, beside the names, the [BookButton], the sweet of the open book ([FluteUiState.openBook]),
- * whose tap is [FluteActions.onShelfOpen]; then the octave rows of [FluteKeys], with the rest, the breath and
- * the erase key ([FluteActions.onEraseLast], faded while the tune is empty) at the end of the top row, apart
- * from c3, taking the height left, and the Play row: two big buttons sharing its width, each stacking its icon over its
+ * whose tap is [FluteActions.onShelfOpen]; then [FluteKeys]: the octave pills, the seven letter keys and the tools'
+ * row with the erase key ([FluteActions.onEraseLast], faded while the tune is empty) at its end, taking the height
+ * left, and the Play row: two big buttons sharing its width, each stacking its icon over its
  * word, "Play" (green, [FluteActions.onTogglePlayback], faded while the tune is empty) and "Your turn" (blue,
  * [FluteActions.onYourTurn], faded while the tune holds no note). On an ordinary phone held
  * upright nothing scrolls; when the height is short of [FitsHeight] the keys keep their minimum
@@ -212,7 +197,8 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  *
  * While the tune runs ([FluteUiState.isRunning]: Play, or Your turn with the microphone open, or a
  * Your turn that ended with its speed line, the microphone closed, until Stop) the
- * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]), so it
+ * keys and the sponge go away and the staff is drawn a third bigger ([RunningStaffScale]; a tune above c³ a little
+ * less, [StaffGeometry.runningScale], with only the room its highest note needs), so it
  * reads from a music stand at arm's length, with the knob's animal walking the staff at the knob's
  * height ([StaffAnimal]: over the playing step, hopping on to each beat's place on each click, or
  * waiting over the step the child is to play), the knob itself empty and inert, and the book button faded and inert,
@@ -227,7 +213,7 @@ private val FitsHeight = 20.dp + (32.dp + TuneStaffHeight) +
  * through [FluteActions.onTimeSignatureChange] and [FluteActions.onBpmChange]) and one big green OK. OK ([FluteActions.onSpeedDone])
  * is the way back, as on the notes tab's picker; the choice survives rotation. The panel
  * lays out as the metronome tab does, shrinking its ring to a short screen and scrolling only
- * below [MetronomeMinHeight].
+ * below the metronome's own least height ([MetronomeStageColumn]).
  *
  * A tap on the book button ([FluteActions.onShelfOpen]) swaps the stage, the keys and the Play row, in place,
  * for the [TuneShelf]: the six books ([FluteUiState.shelf]), the open one's cover yellow. One tap
@@ -250,298 +236,301 @@ fun FluteContent(
     actions: FluteActions,
     modifier: Modifier = Modifier,
 ) {
+    // Kept here, above the four screens and the turn, so a panel stays open when the phone turns.
     var choosingSpeed by rememberSaveable { mutableStateOf(false) }
     var choosingBook by rememberSaveable { mutableStateOf(false) }
-    val sideways = LocalSideways.current
-    val zoom = LocalTabZoom.current
-    val zoomed = zoom > 1f
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        if (state.micDenied) {
-            // The phone said no to the microphone: the tuner's card, with its quiet "Not now" as the way back.
-            BackHandler(onBack = actions.onMicDismiss)
-            if (sideways) {
-                // The card is a page of its own there, with the margins of one: it gets the whole tab.
-                MicrophonePermissionCard(
-                    onRequestPermission = actions.onRequestMic,
-                    onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
-                    onDismiss = actions.onMicDismiss,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(TabPadding),
-                ) {
-                    MicrophonePermissionCard(
-                        onRequestPermission = actions.onRequestMic,
-                        onOpenSettings = actions.onOpenSettings.takeIf { state.micBlocked },
-                        onDismiss = actions.onMicDismiss,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    )
-                }
-            }
-        } else if (choosingSpeed) {
-            val wheel = rememberTempoWheelState()
-            val closePanel = {
-                choosingSpeed = false
-                actions.onSpeedDone()
-            }
-            // Back is OK; an open wheel closes first (the later handler is asked first).
-            BackHandler(onBack = closePanel)
-            BackHandler(enabled = wheel.editing) { wheel.editing = false }
-            if (sideways) {
-                FluteSpeedSideways(
-                    metronome = metronome,
-                    wheel = wheel,
-                    onBpmChange = actions.onBpmChange,
-                    onTimeSignatureChange = actions.onTimeSignatureChange,
-                    onDone = closePanel,
-                    modifier = Modifier.closesTempoWheel(wheel),
-                )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fitOrScroll(fits = maxHeight >= MetronomeMinHeight, minHeight = MetronomeMinHeight)
-                        .closesTempoWheel(wheel)
-                        .padding(TabPadding),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    MetronomeStage(
-                        state = metronome,
-                        wheel = wheel,
-                        onBpmChange = actions.onBpmChange,
-                        onTimeSignatureChange = actions.onTimeSignatureChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    )
-                    BigActionButton(
-                        icon = AppIcons.Done,
-                        text = stringResource(R.string.speed_done),
-                        color = ActionGo,
-                        onClick = closePanel,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
-            }
-        } else if (choosingBook) {
-            val chooseBook = { index: Int ->
-                choosingBook = false
-                actions.onBookChosen(index)
-            }
-            // Back is a tap on the open book: the shelf closes and nothing changes.
-            BackHandler { chooseBook(state.openBook) }
-            if (sideways) {
-                // One row of six in the whole window less the margins: nothing scrolls, and there is no column.
-                TuneShelf(
-                    books = state.shelf,
-                    openBook = state.openBook,
-                    onChoose = chooseBook,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(SidewaysGeometry.MARGIN.dp),
-                )
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fitOrScroll(fits = maxHeight >= ShelfMinHeight, minHeight = ShelfMinHeight)
-                        .padding(TabPadding),
-                ) {
-                    TuneShelf(
-                        books = state.shelf,
-                        openBook = state.openBook,
-                        onChoose = chooseBook,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                    )
-                }
-            }
+        when {
+            state.micDenied -> MicrophoneCard(state.micBlocked, actions)
+            choosingSpeed -> SpeedPanel(
+                metronome = metronome,
+                actions = actions,
+                tabHeight = maxHeight,
+                onDone = {
+                    choosingSpeed = false
+                    actions.onSpeedDone()
+                },
+            )
+            choosingBook -> ShelfPanel(
+                state = state,
+                tabHeight = maxHeight,
+                onChoose = { index ->
+                    choosingBook = false
+                    actions.onBookChosen(index)
+                },
+            )
+            else -> TuneAndKeys(
+                state = state,
+                metronome = metronome,
+                actions = actions,
+                tabHeight = maxHeight,
+                onSpeed = {
+                    actions.onSpeedOpen()
+                    choosingSpeed = true
+                },
+                onShelf = {
+                    actions.onShelfOpen()
+                    choosingBook = true
+                },
+            )
+        }
+    }
+}
+
+/** The phone said no to the microphone: the tuner's card in the tab's place, with its quiet "Not now" as the way back. */
+@Composable
+private fun MicrophoneCard(blocked: Boolean, actions: FluteActions) {
+    BackHandler(onBack = actions.onMicDismiss)
+    MicrophonePermissionCard(
+        onRequestPermission = actions.onRequestMic,
+        onOpenSettings = actions.onOpenSettings.takeIf { blocked },
+        onDismiss = actions.onMicDismiss,
+        // On its side the card is a page of its own, with the margins of one: it gets the whole tab.
+        modifier = if (LocalSideways.current) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(TabPadding),
+    )
+}
+
+/** The metronome's own stage in the tab's place, with one big OK ([onDone]) as the way back. */
+@Composable
+private fun SpeedPanel(metronome: MetronomeUiState, actions: FluteActions, tabHeight: Dp, onDone: () -> Unit) {
+    val wheel = rememberTempoWheelState()
+    // Back is OK; an open wheel closes first (the later handler is asked first).
+    BackHandler(onBack = onDone)
+    BackHandler(enabled = wheel.editing) { wheel.editing = false }
+    if (LocalSideways.current) {
+        FluteSpeedSideways(
+            metronome = metronome,
+            wheel = wheel,
+            onBpmChange = actions.onBpmChange,
+            onTimeSignatureChange = actions.onTimeSignatureChange,
+            onDone = onDone,
+            modifier = Modifier.closesTempoWheel(wheel),
+        )
+    } else {
+        MetronomeStageColumn(metronome, wheel, tabHeight, actions.onBpmChange, actions.onTimeSignatureChange) {
+            BigActionButton(
+                icon = AppIcons.Done,
+                text = stringResource(R.string.speed_done),
+                color = ActionGo,
+                onClick = onDone,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+    }
+}
+
+/** The six books in the tab's place; a tap on one ([onChoose]) is the way back, the open one changing nothing. */
+@Composable
+private fun ShelfPanel(state: FluteUiState, tabHeight: Dp, onChoose: (Int) -> Unit) {
+    // Back is a tap on the open book: the shelf closes and nothing changes.
+    BackHandler { onChoose(state.openBook) }
+    TuneShelf(
+        books = state.shelf,
+        openBook = state.openBook,
+        onChoose = onChoose,
+        modifier = if (LocalSideways.current) {
+            // One row of six in the whole window less the margins: nothing scrolls, and there is no column.
+            Modifier.fillMaxSize().padding(SidewaysGeometry.MARGIN.dp)
         } else {
-            val fits = maxHeight >= FitsHeight
-            val uprightKeyHeight = if (zoomed) TabletGeometry.uprightKeyHeight((maxHeight - FitsHeight).value).dp else KeyHeight
-            val running = state.isRunning
-            // "Play B4", until the first note of a "Your turn" is judged; the note carries its raised octave, as its pill does.
-            // Or, once a run ended at another animal's speed than the knob's, that one line until Stop (2026-11-14).
-            val prompt = state.promptMidi?.let { playPrompt(it) } ?: state.pace?.let { speedLine(it) }
-            // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
-            BackHandler(enabled = running, onBack = actions.onStop)
-            // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
-            // out in places of their own, and a staff made anew at each swap would scroll in from its start.
-            val staffPlace = rememberLazyListState()
-            val staffScale = when {
-                !running -> if (sideways && zoomed) TabletGeometry.sidewaysStaffScale(zoom) else 1f
-                sideways -> SidewaysGeometry.runningStaffScale(maxHeight.value, StaffGeometry.TOTAL_HEIGHT)
-                else -> RunningStaffScale
+            Modifier.fitOrScroll(fits = tabHeight >= ShelfMinHeight, minHeight = ShelfMinHeight).padding(TabPadding)
+        },
+    )
+}
+
+/**
+ * The tab itself: the tune on its staff, and under it the keys and the Play row while the child writes, or the
+ * listening room and one wide Stop while the tune runs. [onSpeed] and [onShelf] are the knob's and the book
+ * button's taps.
+ */
+@Composable
+private fun TuneAndKeys(
+    state: FluteUiState,
+    metronome: MetronomeUiState,
+    actions: FluteActions,
+    tabHeight: Dp,
+    onSpeed: () -> Unit,
+    onShelf: () -> Unit,
+) {
+    val sideways = LocalSideways.current
+    val zoom = LocalTabZoom.current
+    val fits = tabHeight >= FitsHeight
+    // What the tab's height has over its least goes to the staff's box first, up to the room c⁴ needs (since
+    // 2026-11-18), then to the keys: on a zoomed tab into their height, else round them.
+    val spare = (tabHeight - FitsHeight).value
+    val uprightStaffBox = StaffGeometry.uprightBox(spare)
+    val staffSpare = uprightStaffBox - StaffGeometry.TOTAL_HEIGHT
+    val uprightKeyHeight = if (zoom > 1f) TabletGeometry.uprightKeyHeight(spare - staffSpare).dp else KeyHeight
+    val running = state.isRunning
+    // Back is Stop while the tune runs; while the child writes it is the phone's, and leaves the app.
+    BackHandler(enabled = running, onBack = actions.onStop)
+    // The staff's place stays here, above the shapes: a phone on its side lays Play and a run
+    // out in places of their own, and a staff made anew at each swap would scroll in from its start.
+    val staffPlace = rememberLazyListState()
+    // The room a tune that goes above c³ needs over the staff (since 2026-11-18), worked out once per tune: while
+    // listening the state changes on every microphone frame.
+    val needed = remember(state.tune) { StaffGeometry.roomOver(state.tune) }
+    val staff = StaffGeometry.fit(running, sideways, zoom, tabHeight.value, needed, uprightStaffBox)
+    // The walking animal's hop: it hops only on the staff, so only while the tune runs.
+    val flash = rememberBeatFlash(state.beatPulse, running)
+    val animal = if (running) {
+        state.animalIndex?.let {
+            StaffAnimal(it, tempoBand(metronome.config.bpm).emoji, flash, waiting = state.waiting, halfBeat = state.animalHalfBeat)
+        }
+    } else {
+        null
+    }
+    // The pieces both shapes show, so upright and sideways can only differ in where they stand.
+    val tune: @Composable (Modifier) -> Unit = { tuneModifier ->
+        Box(tuneModifier.fillMaxWidth()) {
+            TuneStaff(
+                tune = state.tune,
+                litIndex = state.litIndex,
+                heldIndex = state.heldIndex,
+                timeSignature = metronome.config.timeSignature,
+                marks = state.marks,
+                animal = animal,
+                listening = state.listening,
+                scale = staff.scale,
+                listState = staffPlace,
+                joinWaiting = state.joinWaiting,
+                room = staff.room,
+            )
+            SpeedKnob(
+                bpm = metronome.config.bpm,
+                running = running,
+                onClick = onSpeed,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(y = StaffGeometry.knobTop(staff.scale, staff.room).dp),
+            )
+            BookButton(
+                sweet = Sweet.entries[state.openBook],
+                running = running,
+                onClick = onShelf,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .offset(y = StaffGeometry.bookButtonTop(staff.scale, staff.room).dp),
+            )
+        }
+    }
+    val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, keyHeight, keyGap ->
+        FluteKeys(
+            octave = state.octave,
+            signWaiting = state.signWaiting,
+            litLetter = state.litLetter,
+            restLit = state.restLit,
+            eraseEnabled = !state.isEmpty,
+            joinWaiting = state.joinWaiting,
+            joinEnabled = state.canJoin,
+            actions = actions,
+            modifier = keysModifier,
+            keyHeight = keyHeight,
+            keyGap = keyGap,
+        )
+    }
+    val playRow: @Composable (Modifier) -> Unit = { rowModifier ->
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = rowModifier
+                .fillMaxWidth()
+                .padding(bottom = PlayShadow),
+        ) {
+            BigActionButton(
+                icon = AppIcons.Play,
+                text = stringResource(R.string.flute_play),
+                color = ActionGo,
+                onClick = actions.onTogglePlayback,
+                enabled = !state.isEmpty,
+                stacked = true,
+                modifier = Modifier.weight(1f),
+            )
+            BigActionButton(
+                icon = AppIcons.Microphone,
+                text = stringResource(R.string.flute_your_turn),
+                color = ActionListen,
+                onClick = actions.onYourTurn,
+                enabled = state.canListen,
+                stacked = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+    // The one line while the tune runs: "Play B4" until the first note of a "Your turn" is judged (the note carries its
+    // raised octave, as its pill does), or, once a run ended at another animal's speed than the knob's, that one line
+    // until Stop (2026-11-14); else the advice.
+    val prompt = state.promptMidi?.let { playPrompt(it) } ?: state.pace?.let { speedLine(it) }
+    val line: @Composable (Boolean) -> Unit = { wrap ->
+        if (prompt != null) AdviceLine(prompt, wrap = wrap) else AdviceLine(state.advice, wrap = wrap)
+    }
+    if (sideways) {
+        if (running) {
+            FluteRunningSideways(tune = tune, line = { line(true) }, onStop = actions.onStop)
+        } else {
+            FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
+        }
+        return
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(if (fits) Modifier else Modifier.verticalScroll(rememberScrollState()))
+            .padding(TabPadding),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(TabGap),
+    ) {
+        Stage(modifier = Modifier.fillMaxWidth()) {
+            tune(Modifier)
+        }
+        if (running) {
+            // The keys' room: the listening room in it, and one wide Stop where Play was.
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(if (fits) Modifier.weight(1f) else Modifier.heightIn(min = AdviceLineHeight)),
+            ) {
+                ListenRoom(state.fingeringMidi) { line(false) }
             }
-            // The walking animal's hop: it hops only on the staff, so only while the tune runs.
-            val flash = rememberBeatFlash(state.beatPulse, running)
-            val animal = if (running) {
-                state.animalIndex?.let {
-                    StaffAnimal(it, tempoBand(metronome.config.bpm).emoji, flash, waiting = state.waiting, halfBeat = state.animalHalfBeat)
-                }
-            } else {
-                null
-            }
-            // The pieces both shapes show, so upright and sideways can only differ in where they stand.
-            val tune: @Composable (Modifier) -> Unit = { tuneModifier ->
-                Box(tuneModifier.fillMaxWidth()) {
-                    TuneStaff(
-                        tune = state.tune,
-                        litIndex = state.litIndex,
-                        heldIndex = state.heldIndex,
-                        timeSignature = metronome.config.timeSignature,
-                        marks = state.marks,
-                        animal = animal,
-                        listening = state.listening,
-                        scale = staffScale,
-                        listState = staffPlace,
-                        joinWaiting = state.joinWaiting,
-                    )
-                    SpeedKnob(
-                        bpm = metronome.config.bpm,
-                        running = running,
-                        onClick = {
-                            actions.onSpeedOpen()
-                            choosingSpeed = true
-                        },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(y = StaffGeometry.knobTop(staffScale).dp),
-                    )
-                    BookButton(
-                        sweet = Sweet.entries[state.openBook],
-                        running = running,
-                        onClick = {
-                            actions.onShelfOpen()
-                            choosingBook = true
-                        },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(y = StaffGeometry.bookButtonTop(staffScale).dp),
-                    )
-                }
-            }
-            val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, keyHeight, keyGap ->
-                FluteKeys(
-                    litMidi = state.litMidi,
-                    restLit = state.restLit,
-                    eraseEnabled = !state.isEmpty,
-                    actions = actions,
-                    joinWaiting = state.joinWaiting,
-                    joinEnabled = state.canJoin,
-                    signWaiting = state.signWaiting,
-                    modifier = keysModifier,
-                    keyHeight = keyHeight,
-                    keyGap = keyGap,
-                )
-            }
-            val playRow: @Composable (Modifier) -> Unit = { rowModifier ->
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = rowModifier
-                        .fillMaxWidth()
-                        .padding(bottom = PlayShadow),
-                ) {
-                    BigActionButton(
-                        icon = AppIcons.Play,
-                        text = stringResource(R.string.flute_play),
-                        color = ActionGo,
-                        onClick = actions.onTogglePlayback,
-                        enabled = !state.isEmpty,
-                        stacked = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    BigActionButton(
-                        icon = AppIcons.Microphone,
-                        text = stringResource(R.string.flute_your_turn),
-                        color = ActionListen,
-                        onClick = actions.onYourTurn,
-                        enabled = state.canListen,
-                        stacked = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-            if (sideways) {
-                if (running) {
-                    FluteRunningSideways(
-                        tune = tune,
-                        advice = state.advice,
-                        onStop = actions.onStop,
-                        prompt = prompt,
-                    )
-                } else {
-                    FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(if (fits) Modifier else Modifier.verticalScroll(rememberScrollState()))
-                        .padding(TabPadding),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                ) {
-                    Stage(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        tune(Modifier)
-                    }
-                    if (running) {
-                        // The keys' room: the listening room in it, and one wide Stop where Play was.
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .then(if (fits) Modifier.weight(1f) else Modifier.heightIn(min = AdviceLineHeight)),
-                        ) {
-                            ListenRoom(state, prompt)
-                        }
-                        BigActionButton(
-                            icon = AppIcons.Stop,
-                            text = stringResource(R.string.stop),
-                            color = ActionStop,
-                            onClick = actions.onStop,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = PlayShadow),
-                        )
-                    } else {
-                        keys(
-                            Modifier
-                                .fillMaxWidth()
-                                .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
-                            uprightKeyHeight,
-                            KeyGap,
-                        )
-                        playRow(Modifier)
-                    }
-                }
-            }
+            BigActionButton(
+                icon = AppIcons.Stop,
+                text = stringResource(R.string.stop),
+                color = ActionStop,
+                onClick = actions.onStop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = PlayShadow),
+            )
+        } else {
+            keys(
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (fits) Modifier.weight(1f) else Modifier.height(FluteKeysMinHeight)),
+                uprightKeyHeight,
+                KeyGap,
+            )
+            playRow(Modifier)
         }
     }
 }
 
 /**
  * The room under the stage while the tune runs, where the keys were (the user's "3C" of 2026-11-10, picked from
- * drawn options). While things go right it holds one line and nothing else: [prompt], "Play B4", from the start
- * of a "Your turn" until its first note is judged, and the advice when there is some. After a wrong note it shows
+ * drawn options). While things go right it holds one line and nothing else: "Play B4", from the start
+ * of a "Your turn" until its first note is judged, and the advice when there is some ([line], which the caller
+ * builds once for both layouts). After a wrong note it shows
  * how the note that was wanted is fingered ([FluteUiState.fingeringMidi], the tuner's own diagram) over "Check
  * your fingers", until the right note is played: the heard note under the step says what came out, this says
  * what to do. Playing the tune back shows nothing here, as before. A phone on its side has the line alone, in
  * its column ([FluteRunningSideways]): the column is too narrow for the diagram.
  */
 @Composable
-private fun ListenRoom(state: FluteUiState, prompt: AnnotatedString?) {
+private fun ListenRoom(fingeringMidi: Int?, line: @Composable () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(ListenRoomGap)) {
-        state.fingeringMidi?.let { midi ->
+        fingeringMidi?.let { midi ->
             FingeringDiagram(midi, Modifier.fillMaxWidth())
         }
-        if (prompt != null) AdviceLine(prompt) else AdviceLine(state.advice)
+        line()
     }
 }
 

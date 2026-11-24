@@ -9,3 +9,9 @@ package hr.bertlab.fluteassistant.audio
  * buttons do that.
  */
 const val TONE_VOLUME = 0.8f
+
+/** The peak of a tone at full volume: a comfortable level, about where the metronome's clicks sit. */
+internal const val TONE_PEAK = 0.6f
+
+/** The peak a tone is rendered at for a [volume] in 0..1. */
+internal fun toneAmplitude(volume: Float): Float = TONE_PEAK * volume.coerceIn(0f, 1f)

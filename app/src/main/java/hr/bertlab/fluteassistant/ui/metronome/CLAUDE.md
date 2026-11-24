@@ -1,6 +1,6 @@
 How the metronome's audio path and player contract works, with the reasons behind it, is in `../../audio/metronome/CLAUDE.md`; read it before changing anything here.
 
-The tab's stage (the beat bubbles over the tempo ring) is `MetronomeStage`, shared with the flute tab's speed panel (2026-11-03): its caller owns the `TempoWheelState` and puts `closesTempoWheel` on its column, and `MetronomeMinHeight` is the height below which the metronome tab and the flute's speed panel scroll; `ui/common/BeatFlash.kt` (`rememberBeatFlash`, `hopOnBeat`) is the one hop shared by the ring's knob, the flute's walking animal and the bottom bar's 🥁.
+The tab's stage (the beat bubbles over the tempo ring) is `MetronomeStage`, shared with the flute tab's speed panel (2026-11-03): its caller owns the `TempoWheelState` and its Back handler; upright both tabs show it through `MetronomeStageColumn` (since 2026-11-23: the stage over one big button, with `closesTempoWheel` on the column and the least height, `MetronomeMinHeight`, below which the metronome tab and the flute's speed panel scroll), and `TempoDial` takes the wheel's state itself; `ui/common/BeatFlash.kt` (`rememberBeatFlash`, `hopOnBeat`) is the one hop shared by the ring's knob, the flute's walking animal and the bottom bar's 🥁.
 
 ## The tab on screen
 
@@ -46,8 +46,8 @@ takes over while it plays.
   play starts, since a start from elsewhere (the drum in the rail) is not a touch on Play and Stop would
   bring the ring back with the wheel still open.
 - **Why `BeatBubbles` has `stableRow`.** It is `internal` now, with `maxUnit`, `gapFew`, `gapMany`,
-  `animalFont`, `animalHeight` and `stableRow` (defaults are upright's), and `BeatStepButton` takes a
-  `size`. Both sideways layouts pass `stableRow = true`, because the sounding column is as wide as the animal
+  `animalFont`, `animalHeight` and `stableRow` (defaults are upright's), and the − and + (`FewerBeatsButton`,
+  `MoreBeatsButton`) take a `size`. Both sideways layouts pass `stableRow = true`, because the sounding column is as wide as the animal
   when the animal is wider than its bubble: at 640 x 360 with six beats playing (56 dp bubbles, a 58 sp animal
   of about 68 dp) the whole row reflowed on every beat. With the flag the animal's box is the bubble's width and
   the emoji overflows into the gap; upright's animal fits its bubble, so it does not ask for it. The row divides

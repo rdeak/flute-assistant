@@ -26,8 +26,7 @@ c1 to g1) live there too. `NotesViewModel` (Activity-scoped; spec:
 plays the note through the tuner's `ReferenceTonePlayer` at `TONE_VOLUME` and after
 `FEEDBACK_MS` (1200) draws the next note (never the same twice in a row unless only one is
 chosen) or ends the round; a wrong tap joins `wrongTaps`, becomes `lastWrongTap` (the cross that
-gets the arrow) and zeroes the streak. `taps` counts
-every tap so `accuracyPercent` (right taps over all taps) differs from `score`; `roundMillis`
+gets the arrow) and zeroes the streak. `roundMillis`
 is the time from the round's first tap to the tenth note found (`MonotonicClock`, so tests use
 `FakeClock`), shown in the summary only as one of the metronome's animals (`NotesRound.speed`,
 the time per note: cheetah up to 2 s, rabbit 3.5 s, duck 6 s, turtle 10 s, then the snail), as the
@@ -295,7 +294,7 @@ screen, a path across rounds, auto-unlocking notes, daily streaks, mixing Find a
   watched it fill; the trophy says it to a screen reader ("Right first time: 8 of 10", `summary_stars`, on the
   trophy's box). Gone with the tiles: `SummaryStars`, `SummaryTiles`, the rules `aimStars`, `speed` and
   `accuracyPercent` and the words `summary_streak`, `summary_aim`, `summary_speed`, `aim_description`,
-  `speed_description` (git keeps them). `NotesRound.taps` is still counted and nothing reads it; `bestStreak` and
+  `speed_description` (git keeps them). `NotesRound.taps`, which nothing read, went on 2026-11-23; `bestStreak` and
   `roundMillis` still go to the `notes.round` log line. Do not bring a tile back without the user.
 - **The summary's keys** (`SummaryKeys`, `RoundSummary.kt`) are the notes asked this round (`askedThisRound`), plain
   `NoteKey`s in staff order, and they are the reward, so they are large: up to 62 x 70 (1.4 times the picker's 44 x
@@ -306,7 +305,7 @@ screen, a path across rounds, auto-unlocking notes, daily streaks, mixing Find a
   first draft showed every chosen note, and with fifteen chosen three rows do not fit under the pills at any trophy
   size; the notes asked are what the round earned anyway. A key that grew this round (`grewThisRound`) hops, the
   trophy's own hop, with ✨ over its top-left corner; one that became known gets its star the same way. The block is
-  one accessible node: "Your notes", then the names of the notes that grew. It keeps `KEY_OVERHANG` (10 dp) of room
+  one accessible node: "Your notes", then the names of the notes that grew. It keeps `NoteKeyOverhang` (10 dp) of room
   above the first row for the star and sparkle, outside its own bounds.
 - **The colour rises.** A round remembers the progress it began with (`NotesRound.startProgress`, set by `open`), and
   each summary key starts as full as its note was then and moves to where the round took it, 400 ms after it appears

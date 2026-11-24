@@ -33,7 +33,7 @@ internal object TabletGeometry {
     /** The logical width an upright tab keeps: about a big phone's, with room to spare for its keys. */
     private const val UPRIGHT_WIDTH = 560f
 
-    /** The logical height an upright tab keeps: the flute's `FitsHeight` (664) and a little more, so nothing scrolls. */
+    /** The logical height an upright tab keeps: more than the flute's `FitsHeight`, the tallest a tab needs, so nothing scrolls. */
     private const val UPRIGHT_HEIGHT = 690f
 
     /** The logical width a sideways tab keeps: the 915 dp phone's content (823), which the layouts were drawn for. */
@@ -48,8 +48,8 @@ internal object TabletGeometry {
     /** Upright, the most a key is before the zoom, from a phone's [KEY_HEIGHT] (`KeyLook.kt`): a zoomed one is about 104 dp on a 10-inch tablet. */
     private const val KEY_HEIGHT_MAX = 72f
 
-    /** The flute's three key rows, which share what the height spares. */
-    private const val KEY_ROWS = 3
+    /** The flute's two key rows (three until 2026-11-18), which share what the height spares. */
+    private const val KEY_ROWS = SidewaysGeometry.KEY_ROWS
 
     /**
      * The keys' column on a zoomed tab, sideways, against a phone's [PHONE_KEYS]: with
@@ -57,7 +57,7 @@ internal object TabletGeometry {
      * against about 10.
      */
     private const val SIDEWAYS_KEYS = 336f
-    private const val PHONE_KEYS = 372f
+    private const val PHONE_KEYS = SidewaysGeometry.KEYS
 
     /** The resting staff on a zoomed tab, sideways: 1.3 times a phone's at 10 inches, 1.02 at 8. */
     private const val SIDEWAYS_STAFF_SCALE = 0.91f
@@ -90,6 +90,6 @@ internal object TabletGeometry {
     /** The resting staff at this [zoom]: [SIDEWAYS_STAFF_SCALE], but a barely zoomed window keeps a phone's real size. */
     fun sidewaysStaffScale(zoom: Float): Float = maxOf(SIDEWAYS_STAFF_SCALE, 1f / zoom)
 
-    /** An upright key on a zoomed tab: a third of what the height [spare]s, as there are three rows. */
+    /** An upright key on a zoomed tab: half of what the height [spare]s, as there are two rows. */
     fun uprightKeyHeight(spare: Float): Float = (KEY_HEIGHT + spare / KEY_ROWS).coerceIn(KEY_HEIGHT, KEY_HEIGHT_MAX)
 }

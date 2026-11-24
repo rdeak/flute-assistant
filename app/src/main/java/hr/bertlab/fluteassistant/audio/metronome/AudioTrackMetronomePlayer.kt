@@ -7,9 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.media.AudioAttributes
 import android.media.AudioFocusRequest
-import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTimestamp
 import android.media.AudioTrack
@@ -19,6 +17,8 @@ import android.os.Looper
 import android.os.Process
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import hr.bertlab.fluteassistant.audio.LowLatencyStream
+import hr.bertlab.fluteassistant.audio.mediaPlaybackAttributes
 import hr.bertlab.fluteassistant.core.log.LogTags
 import hr.bertlab.fluteassistant.core.log.Logger
 import hr.bertlab.fluteassistant.domain.metronome.MetronomeConfig
@@ -31,32 +31,30 @@ import kotlinx.coroutines.flow.update
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.max
 
 /**
  * Low-latency metronome built on a streaming [AudioTrack].
  *
  * Design:
  * - A dedicated high-priority thread renders small PCM blocks with [MetronomeRenderer] and
- *   writes them with blocking writes, so timing is governed by the audio clock, not by
- *   handlers or timers. Click positions are sample-accurate.
- * - The track runs at the device's native output rate with float PCM and
- *   PERFORMANCE_MODE_LOW_LATENCY (API 26+) to get the fast mixer path where available.
- * - USAGE_MEDIA attributes let the OS route output to wired or Bluetooth headphones and
- *   respect the media volume stream. Audio focus is requested so other media pauses, and
+ *   writes them with blocking writes, every block in full ([renderWhile]), so timing is
+ *   governed by the audio clock, not by handlers or timers. Click positions are sample-accurate.
+ * - The track is a [LowLatencyStream]: the device's native output rate, float PCM and the fast
+ *   mixer path where available, with media attributes. Audio focus is requested so other media pauses, and
  *   playback stops when focus is lost or when headphones are unplugged
  *   (ACTION_AUDIO_BECOMING_NOISY), so a click never suddenly blasts from the speaker.
  * - Each queued click is published as a [BeatEvent] whose audible time is derived from
  *   [AudioTrack.getTimestamp], so the visual flash lines up with what the ear hears.
  *
  * Threading: settings reach the audio thread through an [AtomicReference]; [stop] never
- * blocks the caller (the thread winds down on its own and a successor joins it before
- * opening a new track, so only one AudioTrack exists at a time). [sessionEnded] reports every
+ * blocks the caller: the thread winds down on its own after its current block, so a start
+ * straight after a stop overlaps the old track for that block. [sessionEnded] reports every
  * end of playback, including stops the engine initiates itself.
  *
  * Logs under [LogTags.METRONOME]: `metronome.start` / `metronome.stop` per session, why a
  * session ended on its own (`metronome.focus_lost`, `metronome.noisy`, `metronome.ended`),
- * the track's geometry and underrun count, and every failure as `metronome.error`.
+ * the track's geometry, its underrun count and how many writes it took less than all of, and
+ * every failure as `metronome.error`.
  */
 @Singleton
 class AudioTrackMetronomePlayer @Inject constructor(
@@ -84,7 +82,8 @@ class AudioTrackMetronomePlayer @Inject constructor(
 
     private val config = AtomicReference(MetronomeConfig())
 
-    // The fields below are guarded by synchronized(this).
+    // The fields below are guarded by synchronized(this). A thread is held here only while it is
+    // meant to run: stop() and the thread's own exit both clear it.
     private var thread: RenderThread? = null
     private var sessionCounter = 0L
     private var focusRequest: AudioFocusRequest? = null
@@ -111,13 +110,8 @@ class AudioTrackMetronomePlayer @Inject constructor(
 
     @Synchronized
     override fun start(config: MetronomeConfig): Long {
-        this.config.set(config)
-        thread?.let {
-            if (it.running) {
-                _playback.update { state -> state?.copy(config = config) }
-                return it.sessionId
-            }
-        }
+        update(config)
+        thread?.let { return it.sessionId }
 
         if (!requestAudioFocus()) {
             logger.w(LogTags.METRONOME, "metronome.error", "reason" to "focus_refused")
@@ -130,7 +124,7 @@ class AudioTrackMetronomePlayer @Inject constructor(
             LogTags.METRONOME, "metronome.start",
             "session" to session, "bpm" to config.bpm, "signature" to config.timeSignature,
         )
-        thread = RenderThread(session, predecessor = thread).also { it.start() }
+        thread = RenderThread(session).also { it.start() }
         _playback.value = PlaybackState(session, config)
         return session
     }
@@ -145,10 +139,7 @@ class AudioTrackMetronomePlayer @Inject constructor(
         val current = thread ?: return
         logger.i(LogTags.METRONOME, "metronome.stop", "session" to current.sessionId)
         current.running = false // the thread exits after its current block; no join on the caller
-        thread = null
-        releaseSystemResources()
-        _playback.value = null
-        _sessionEnded.tryEmit(current.sessionId)
+        endSession(current.sessionId)
     }
 
     /** Called by a render thread when it finishes for any reason. */
@@ -156,17 +147,21 @@ class AudioTrackMetronomePlayer @Inject constructor(
     private fun onThreadExited(exited: RenderThread) {
         if (thread === exited) {
             logger.i(LogTags.METRONOME, "metronome.ended", "session" to exited.sessionId)
-            thread = null
-            releaseSystemResources()
-            _playback.value = null
-            _sessionEnded.tryEmit(exited.sessionId)
+            endSession(exited.sessionId)
         }
+    }
+
+    private fun endSession(sessionId: Long) {
+        thread = null
+        releaseSystemResources()
+        _playback.value = null
+        _sessionEnded.tryEmit(sessionId)
     }
 
     private fun requestAudioFocus(): Boolean {
         val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(playbackAttributes())
+                .setAudioAttributes(mediaPlaybackAttributes())
                 .setOnAudioFocusChangeListener(focusListener, mainHandler)
                 .build()
             focusRequest = request
@@ -203,86 +198,62 @@ class AudioTrackMetronomePlayer @Inject constructor(
         noisyReceiverRegistered = true
     }
 
-    private fun playbackAttributes(): AudioAttributes = AudioAttributes.Builder()
-        .setUsage(AudioAttributes.USAGE_MEDIA)
-        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-        .build()
-
-    private inner class RenderThread(
-        val sessionId: Long,
-        private val predecessor: RenderThread?,
-    ) : Thread("MetronomeAudio-$sessionId") {
+    private inner class RenderThread(val sessionId: Long) : Thread("MetronomeAudio-$sessionId") {
 
         @Volatile
         var running = true
 
         override fun run() {
-            // Only one AudioTrack at a time: wait for a previous session to release its track.
-            predecessor?.join(PREDECESSOR_JOIN_MS)
             Process.setThreadPriority(Process.THREAD_PRIORITY_URGENT_AUDIO)
 
-            var track: AudioTrack? = null
+            var stream: LowLatencyStream? = null
+            var shortWrites = 0 // writes the track took less than all of; each is retried
             try {
-                val sampleRate = AudioTrack.getNativeOutputSampleRate(AudioManager.STREAM_MUSIC)
-                    .takeIf { it > 0 } ?: DEFAULT_SAMPLE_RATE
-                val minBufferBytes = AudioTrack.getMinBufferSize(
-                    sampleRate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_FLOAT,
-                ).takeIf { it > 0 } ?: (sampleRate / 10 * BYTES_PER_FRAME)
-                val minBufferFrames = minBufferBytes / BYTES_PER_FRAME
-                // Small blocks keep tempo changes responsive; a 2x buffer guards against underruns.
-                val blockFrames = (minBufferFrames / 2).coerceIn(128, 1024)
-                val bufferBytes = max(minBufferBytes * 2, blockFrames * 4 * BYTES_PER_FRAME)
-                val bufferFrames = bufferBytes / BYTES_PER_FRAME
-
-                track = buildTrack(sampleRate, bufferBytes) // may throw on unsupported formats
-                if (track.state != AudioTrack.STATE_INITIALIZED) {
-                    logger.w(LogTags.METRONOME, "metronome.error", "reason" to "track_uninitialised", "rate" to sampleRate)
+                stream = LowLatencyStream.open() // may throw on unsupported formats
+                val track = stream.track
+                if (!stream.isInitialised) {
+                    logger.w(LogTags.METRONOME, "metronome.error", "reason" to "track_uninitialised", "rate" to stream.sampleRate)
                     return
                 }
                 logger.d(
                     LogTags.METRONOME, "metronome.track_open",
-                    "session" to sessionId, "rate" to sampleRate, "blockFrames" to blockFrames, "bufferFrames" to bufferFrames,
+                    "session" to sessionId, "rate" to stream.sampleRate,
+                    "blockFrames" to stream.blockFrames, "bufferFrames" to stream.bufferFrames,
                 )
 
-                val renderer = MetronomeRenderer(sampleRate) // synthesises its clicks now, not on the first beat
-                val block = FloatArray(blockFrames)
+                val renderer = MetronomeRenderer(stream.sampleRate) // synthesises its clicks now, not on the first beat
                 val timestamp = AudioTimestamp()
 
                 track.play()
-                while (running) {
-                    val events = renderer.render(block, config.get())
-                    val written = track.write(block, 0, block.size, AudioTrack.WRITE_BLOCKING)
-                    if (written < 0) {
-                        logger.w(LogTags.METRONOME, "metronome.error", "reason" to "write_failed", "code" to written)
-                        break
-                    }
-                    if (written == 0) {
-                        sleep(1) // nothing accepted (route being rebuilt): avoid a hot spin
-                        continue
-                    }
-                    if (events.isNotEmpty()) publish(events, track, timestamp, sampleRate, bufferFrames)
-                }
+                val ended = renderer.renderWhile(
+                    running = { running },
+                    block = FloatArray(stream.blockFrames),
+                    config = { config.get() },
+                    write = { block, offset, count ->
+                        track.write(block, offset, count, AudioTrack.WRITE_BLOCKING).also { if (it in 0 until count) shortWrites++ }
+                    },
+                    onClicks = { publish(it, stream, timestamp) },
+                )
+                if (ended < 0) logger.w(LogTags.METRONOME, "metronome.error", "reason" to "write_failed", "code" to ended)
             } catch (e: RuntimeException) {
                 // UnsupportedOperationException / IllegalArgumentException from the builder,
                 // IllegalStateException from play(): report and stop instead of killing the process.
                 logger.w(LogTags.METRONOME, "metronome.error", "reason" to "exception", "message" to e.message, error = e)
             } finally {
-                track?.let { t ->
-                    logger.d(LogTags.METRONOME, "metronome.track_closed", "session" to sessionId, "underruns" to t.underrunCount)
-                    runCatching { t.pause(); t.flush(); t.stop() }
-                    t.release()
+                stream?.let {
+                    logger.d(
+                        LogTags.METRONOME, "metronome.track_closed",
+                        "session" to sessionId, "underruns" to it.track.underrunCount, "shortWrites" to shortWrites,
+                    )
+                    it.close()
                 }
                 onThreadExited(this)
             }
         }
 
-        private fun publish(
-            events: List<ClickEvent>,
-            track: AudioTrack,
-            ts: AudioTimestamp,
-            sampleRate: Int,
-            bufferFrames: Int,
-        ) {
+        private fun publish(events: List<ClickEvent>, stream: LowLatencyStream, ts: AudioTimestamp) {
+            val track = stream.track
+            val sampleRate = stream.sampleRate
             val now = System.nanoTime()
             val hasTimestamp = track.getTimestamp(ts)
             for (event in events) {
@@ -293,35 +264,14 @@ class AudioTrackMetronomePlayer @Inject constructor(
                     // Before the first timestamp is available: head position plus a rough
                     // output-latency allowance (half the track buffer).
                     val head = track.playbackHeadPosition.toLong() and 0xFFFFFFFFL
-                    now + (event.frame - head + bufferFrames / 2) * NANOS_PER_SECOND / sampleRate
+                    now + (event.frame - head + stream.bufferFrames / 2) * NANOS_PER_SECOND / sampleRate
                 }
                 _beatEvents.tryEmit(BeatEvent(event, audibleAt, sessionId))
             }
         }
-
-        private fun buildTrack(sampleRate: Int, bufferBytes: Int): AudioTrack {
-            val builder = AudioTrack.Builder()
-                .setAudioAttributes(playbackAttributes())
-                .setAudioFormat(
-                    AudioFormat.Builder()
-                        .setEncoding(AudioFormat.ENCODING_PCM_FLOAT)
-                        .setSampleRate(sampleRate)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build(),
-                )
-                .setTransferMode(AudioTrack.MODE_STREAM)
-                .setBufferSizeInBytes(bufferBytes)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-            }
-            return builder.build()
-        }
     }
 
     private companion object {
-        const val DEFAULT_SAMPLE_RATE = 48_000
-        const val BYTES_PER_FRAME = 4 // mono float
         const val NANOS_PER_SECOND = 1_000_000_000L
-        const val PREDECESSOR_JOIN_MS = 1_000L
     }
 }

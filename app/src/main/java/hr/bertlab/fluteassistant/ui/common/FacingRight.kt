@@ -5,6 +5,7 @@ package hr.bertlab.fluteassistant.ui.common
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import java.io.File
 
 /**
@@ -26,7 +27,7 @@ internal enum class EmojiSet { SAMSUNG, OTHER }
  * there the snail is left as drawn (seen on a Galaxy A55, One UI, 2026-11-04).
  */
 internal fun mirrorsToFaceRight(emoji: String, set: EmojiSet): Boolean =
-    !(set == EmojiSet.SAMSUNG && emoji == SNAIL)
+    !(set == EmojiSet.SAMSUNG && emoji == TempoBand.SNAIL.emoji)
 
 /** Samsung phones put their own emoji font ahead of Google's in the system font fallback. */
 private val deviceEmojiSet: EmojiSet by lazy {
@@ -34,4 +35,3 @@ private val deviceEmojiSet: EmojiSet by lazy {
 }
 
 private const val SAMSUNG_EMOJI_FONT = "/system/fonts/SamsungColorEmoji.ttf"
-private const val SNAIL = "🐌" // TempoBand.SNAIL

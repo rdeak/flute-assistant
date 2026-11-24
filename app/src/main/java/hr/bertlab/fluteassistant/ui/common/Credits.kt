@@ -14,10 +14,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,19 +36,13 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
  * The app icon of the top bar, which opens the credits on a long press. Nothing on screen says it
  * can: the credits are for grown-ups and for forks, which NOTICE asks to keep them, not a control
  * for a child, so a tap does nothing and the icon looks as it always did. A screen reader is
- * offered the long press as an action. Whether they are open is kept here, unless the caller
- * passes [isOpen] and [onOpenChange] together and keeps it: the top bar and the side rail are
- * different places on the screen, so a turn between them would otherwise close the credits.
+ * offered the long press as an action. The caller keeps whether they are open ([isOpen],
+ * [onOpenChange]): the top bar and the side rail are different places on the screen, so a turn
+ * between them would otherwise close the credits.
  */
 @Composable
-fun CreditsLogo(
-    modifier: Modifier = Modifier,
-    isOpen: Boolean? = null,
-    onOpenChange: ((Boolean) -> Unit)? = null,
-) {
-    var ownOpen by rememberSaveable { mutableStateOf(false) }
-    val open = isOpen ?: ownOpen
-    val setOpen by rememberUpdatedState(onOpenChange ?: { ownOpen = it })
+fun CreditsLogo(isOpen: Boolean, onOpenChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val setOpen by rememberUpdatedState(onOpenChange) // the gesture below is never restarted
     val openLabel = stringResource(R.string.credits_open)
     AppLogo(
         contentDescription = stringResource(R.string.app_name),
@@ -63,7 +55,7 @@ fun CreditsLogo(
                 }
             },
     )
-    if (open) Credits(onClose = { setOpen(false) })
+    if (isOpen) Credits(onClose = { setOpen(false) })
 }
 
 /**

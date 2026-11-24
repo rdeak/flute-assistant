@@ -114,7 +114,6 @@ class MetronomeViewModelTest {
         player.events.tryEmit(beat(0, BeatStrength.STRONG))
         advanceUntilIdle()
         assertEquals(0, vm.state.value.currentBeat)
-        assertEquals(BeatStrength.STRONG, vm.state.value.currentStrength)
         val pulseAfterFirst = vm.state.value.beatPulse
 
         player.events.tryEmit(beat(1, BeatStrength.WEAK))

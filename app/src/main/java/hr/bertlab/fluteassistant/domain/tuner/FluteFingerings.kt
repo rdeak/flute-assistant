@@ -80,7 +80,7 @@ object FluteFingerings {
         84 to setOf(L1, E_FLAT),                                      // c3
         85 to setOf(E_FLAT),                                          // cis3
         86 to setOf(THUMB, L2, L3, E_FLAT),                           // d3
-        87 to setOf(THUMB, L1, L2, L3, G_SHARP, R1, R2, R3, E_FLAT),  // dis3
+        87 to setOf(THUMB, L1, L2, L3, G_SHARP, R1, R2, R3, E_FLAT),  // es3
         88 to setOf(THUMB, L1, L2, R1, R2, E_FLAT),                   // e3
         89 to setOf(THUMB, L1, L3, R1, E_FLAT),                       // f3
         90 to setOf(THUMB, L1, L3, R3, E_FLAT),                       // fis3

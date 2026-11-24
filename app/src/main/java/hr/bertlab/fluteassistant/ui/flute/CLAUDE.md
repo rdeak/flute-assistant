@@ -6,8 +6,8 @@ change that part). The songbook is in `SONGBOOK.md`.
 
 ## Where things are
 
-- `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `FluteNotes` (the flute's 25 notes,
-  C4 to C6, and the black note each white key writes under the ♯♭ key), `Tune` (lengths, the
+- `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `FluteNotes` (the flute's 37 notes,
+  C4 to C7 since 2026-11-18, and the note a letter key writes in the chosen octave, `inOctave`), `Tune` (lengths, the
   stored string, `playSteps` for Play), `TuneWriter` (a key held makes a note: growth at the writing pace, the rejoin
   window, the cap, breath, the join, the sign, erase; which key drops a waiting join or sign is its rule too, it says what
   it dropped, `TuneWriter.Dropped`, and the view model only shows and logs that), `Bars` (how the staff writes bars, ties and
@@ -23,8 +23,8 @@ change that part). The songbook is in `SONGBOOK.md`.
   step's heads, pills and bar lines stand is `StaffGeometry.layout`, the one place that knows a sign's room), its signs
   from `ui/common/StaffSigns.kt`; `FluteKeys` builds its keys from `ui/common/KeyLook.kt`'s `ChunkyKey` (shared with the
   Fingers tab since 2026-11-17); the ♯♭ key is that file's `SharpFlatKey`, drawn with the staff's own signs
-  (`SharpFlatPicture`), and the ⌒ key its `TapKey`. Which black note a key writes is `NoteSpelling.signedOf`,
-  kept to the flute's range by `FluteNotes.signed`.
+  (`SharpFlatPicture`), and the ⌒ key its `TapKey`. Which black note a letter writes is `NoteSpelling.blackOf`, in
+  the chosen octave (`FluteNotes.inOctave`).
 - `audio/flute/`: the tone (`SustainedToneSynth`, `AudioTrackFluteTonePlayer`).
 
 ## Rules
@@ -38,12 +38,14 @@ change that part). The songbook is in `SONGBOOK.md`.
   gives the owner the opened book's, and the metronome follows by itself.
 - The old single tune is migrated by the `open_book` key being missing, never by the books being
   empty: a child who wipes all six must not get the old tune back (`SONGBOOK.md`).
-- A note's length comes only from how long its key is held, counted at `TuneWriter.WRITING_PULSE`: 200 quarter
-  notes a minute whatever the speed knob and the time signature say (the user, 2026-11-17: "set max tempo 200 just
-  when child type notes and want to set duration, is just for note duration, do not make changes on tempo in metronom
-  or flute view during the play / listen"). A quarter is 300 ms of holding, a whole note 1.05 s. It is shown nowhere
-  and never written to `MetronomeSettings`; the knob sets Play and Listen to me only. The eighth/quarter line is at
-  225 ms, near a tap: change the number only from a phone test (`flute.note`'s `heldMs`). The time between presses is
+- A note's length comes only from how long its key is held, counted at `TuneWriter.WRITING_PULSE`
+  (`WRITING_BPM`): 130 quarter notes a minute whatever the speed knob and the time signature say (the user,
+  2026-11-17: "set max tempo 200 just when child type notes and want to set duration, is just for note duration, do
+  not make changes on tempo in metronom or flute view during the play / listen"; 2026-11-23: "reduce speed of adding
+  notes to 130, just adding notes, not metronome"). A quarter is about 460 ms of holding, a whole note 1.6 s. It is
+  shown nowhere and never written to `MetronomeSettings`; the knob sets Play and Listen to me only. The
+  eighth/quarter line is at 347 ms: change the number only at the user's word or from a phone test (`flute.note`'s
+  `heldMs`). The time between presses is
   never recorded. No record button, clear-all or length control (root CLAUDE.md, "Turned down").
 - "Your turn" is opt-in and score-free, no number, marks not saved. The child decides when each
   note starts; the metronome decides how long it lasts: a note counts once it has sounded its
@@ -83,7 +85,7 @@ change that part). The songbook is in `SONGBOOK.md`.
   feel: `DESIGN.md`, "The room is not judged".
 - The engine's frames are buffered, never conflated: `NoteOnsetTracker` counts frames.
 - A turn of the phone stops nothing (`../CLAUDE.md`, "Rules"). `FluteKey` and `RestKey` release in a
-  `finally`, so a key held through a turn ends its note. `staffPlace` is created in `FluteContent`'s writing and
+  `finally`, so a key held through a turn ends its note. `staffPlace` is created in `TuneAndKeys` (`FluteContent`'s tab itself, beside its three panels), above its writing and
   running branch, so the staff keeps its scroll through a turn, Play and Stop.
 - Text and emoji on the staff are sized in dp, so they stay in the staff at any text size.
 - The running staff keeps the note before the lit one at its left (`Bars.anchor`) and scrolls on only
@@ -124,22 +126,46 @@ change that part). The songbook is in `SONGBOOK.md`.
   (sweeps of `slurStopDrop`; `slurCheck` turns it off).
 - Sharps and flats (the user, 2026-11-16, the notes; 2026-11-17, the key: "reduce notes to fundemental and add #
   button that allow to create all notes we have now"; spec `docs/superpowers/specs/2026-11-17-flute-calmer-design.md`,
-  `DESIGN.md`, "Sharps and flats"): the flute's notes are C4 to C6 in every semitone (`FluteNotes`, 25); the notes
-  game keeps `StaffNotes`, the white notes, on purpose. The keys are the fifteen white ones in three rows, as before
-  2026-11-16, and nothing scrolls; the ♯♭ key stands beside C6 (C6, ♯♭, an empty column, ⌒ 💤 😮‍💨 🧽). A tap on it
-  makes the next note key write its letter's black note in the app's one spelling (`FluteNotes.signed`: C♯ E♭ F♯ G♯
-  B♭), one tap per note, as ⌒: while it waits the keys show those names, D, A and C6 are faded and write nothing,
-  and the key is down in its ring. A note key spends it; 💤 and 😮‍💨 leave it; a second tap, 🧽 (with a waiting join,
-  both, erasing nothing), Play, Listen to me, the book, the speed panel and leaving the tab drop it; never saved. A key
-  always reports its white key, and its gesture is keyed on that alone: the face changes under the finger when a
-  press spends the sign, and a finger already on D when ♯♭ is tapped holds its note on (`Held.key`; the writer goes
-  on with a bounce by the key, signed or not). Do not key a key's gesture on its face or faded state. The scrolling
-  piano rows of 2026-11-16 are gone (`DESIGN.md`, "Sharps and flats", for what they were and why they went).
+  `DESIGN.md`, "Sharps and flats"): every semitone of the flute's range (`FluteNotes`: C4 to C7, 37, since 2026-11-18;
+  C4 to C6 before); the notes game keeps `StaffNotes`, the white notes, on purpose. The ♯♭ key stands first in the
+  tools' row, under C. A tap on it makes the next letter key write its black note in the app's one spelling
+  (`NoteSpelling.blackOf`: C♯ E♭ F♯ G♯ B♭), in the chosen octave, one tap per note, as ⌒: while it waits the keys show
+  those names (cis¹, C♯4), D and A are faded and write nothing, and the key is down in its ring. A letter spends it; 💤
+  and 😮‍💨 leave it; a second tap, 🧽 (with a waiting join, both, erasing nothing), Play, Listen to me, the book, the
+  speed panel and leaving the tab drop it; an octave pill leaves it; never saved. A key always reports its letter, and
+  its gesture is keyed on that alone: the name changes under the finger when a press spends the sign and when a pill
+  is tapped, and a finger already on D when ♯♭ is tapped holds its note on (`Held.key`; the writer goes on with a
+  bounce by the key, signed or not). Do not key a key's gesture on its name, its note or its faded state. The
+  scrolling piano rows of 2026-11-16 and the three octave rows are gone (`DESIGN.md`, "Sharps and flats", "Octaves").
   The staff: a black note on its letter's place with its ♯ or ♭, and a ♮ on a
   white note whose place carried a ♯ or ♭ earlier in the bar (`Bars`); a signed step is `ACCIDENTAL_ROOM` (10 dp)
   wider. Listen to me keeps exact semitones; a semitone slurred on a flute off its pitch is a step, read from the
   note heard sounding (`NoteOnsetTracker.Rules.stepFromSounding`); F fingered for F♯ on a flute 60 cents sharp reads
   as F♯ played low, ⬆️ (pitch alone cannot tell them apart): a known limit, pinned in `ListenRunTest` and left.
+- Octaves (the user, 2026-11-18: "support all octave covered by fingers", and after two tests with a child and an
+  adult "go with b approach (with numbers 1, 2, 3, 4) and show d1, d2, d3, d4 depending which octave is selected";
+  spec `docs/superpowers/specs/2026-11-18-flute-every-octave-design.md`, Revision 3; `DESIGN.md`, "Octaves"): the
+  flute writes c¹ to c⁴. The keys, top to bottom: four octave pills, each naming its notes, c¹–h¹ c²–h² c³–h³ c⁴
+  (the user, the same night: "replace 1, 2, 3, 4 labels with c1-h1, c2-h2, c3-h3, and c4"; C4–B4 to C7 in English; a
+  screen reader hears "Octave 1"), 40 dp tall with the name at 22 (the user, 2026-11-19: "very hard to read", the
+  room taken from the staff's box), the chosen one yellow and down; seven letter keys named for the note they write in that octave (c¹, d³;
+  `FluteNotes.inOctave`, which `FluteKeys` asks for each letter); the tools in columns 1 2, 4 5 and 7 (♯♭ ⌒, 💤 😮‍💨, 🧽). A key
+  writes exactly the note on it, and only a pill changes the octave (`TuneWriter.chooseOctave`): it starts at 1, stays
+  through Play, Listen to me and the books, and is not stored; the chosen pill again does nothing at all. In octave 4
+  the keys read c⁴ to h⁴ and only c⁴ is live: the flute's range ends there. A pill acts as the finger goes down; tapped
+  while a key is held it leaves that note sounding (a key is its letter), ends the rejoin window as ♯♭ does, and drops
+  no waiting ♯♭ or ⌒. Play lights a letter key only while the pills show the playing note's octave
+  (`FluteUiState.litLetter`). Do not hide the octave figure, work the octave out for the child (the "nearest note" and
+  the ⬇ ⬆ of the first build), or split the notes over rows that move (the high-notes key of the second): both were
+  tested and failed. The staff: every released number in `StaffGeometry` stands; a tune above c³ needs room over the
+  box (`roomOver`, 9 dp a step, 63 at c⁴) and is drawn that much lower (`TuneStaff`'s `atStaff`). Upright, while the
+  child writes, the box is the released 257 dp and what the tab's height has over its least (618), up to 63
+  (`FluteScreen`: 292 on an A55, 320 from 681 dp); it never changes, so the keys never move, and a tune is drawn at
+  full size unless its highest note needs more room than the box has (`restingScale`). While the tune runs it has only
+  the room its highest note needs and is no taller than before (`runningScale`), so a tune up to c³ runs exactly as
+  before, upright; where the running staff is drawn smaller the animal walks higher (`animalY`, the user's "b,
+  higher"), never over more than 4 dp of the top note's head. On its side the card's height sets the scale
+  (`SidewaysGeometry.restingStaffScale`), and the keys' column has the pills and two rows of keys.
 - A finished run played at another animal's speed than the knob's says so in one line, "🐢 Slower
   than the 🐇", the child's animal first (`Pace`, rules `paceMinPairs` 6 and `paceOff` 15%); its
   screen stays as the run ended, the microphone closed, until Stop. No other summary.
@@ -155,6 +181,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 | Key presses, the rejoin window, the rest key, Play | the same paragraph, from "`FluteViewModel` (Activity-scoped" |
 | The keys; the speed knob and its panel | "The keys", "The speed knob and its panel" |
 | Sharps and flats: the ♯♭ key, the signs on the staff | "Sharps and flats" |
+| The octave pills, the letter keys, the range to c⁴, the staff's box and room, the running animal's line | "Octaves" |
 | Your turn: the listening rules, the length rule and the walk, the loudness floor, the heard-note bubble, the advice, the room under the stage | "Your turn" |
 | The ⌒ key, slurs and ties on the staff and in Play, ✂️ | "Legato" |
 | The running staff, the walking animal, the marks row | "While the tune runs" |

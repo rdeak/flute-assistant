@@ -37,6 +37,13 @@ class HearingTracker {
     val levelMean: Double
         get() = if (levels.isEmpty()) 0.0 else levels.sumOf { it.toDouble() } / levels.size
 
+    /**
+     * The mean level that decided [hearing] when it last changed: the window's while sound is unclear, and the ended
+     * run's once it is [Hearing.CLEAR] again. For the log line a caller writes when the hearing changes.
+     */
+    var decidingMean = 0.0
+        private set
+
     /** Folds one frame in and returns the resulting [hearing]. */
     fun onFrame(level: Float, decision: FrameDecision): Hearing {
         when {
@@ -46,9 +53,15 @@ class HearingTracker {
                 gap = 0
                 levels.addLast(level)
                 if (levels.size > UNCLEAR_FRAMES) levels.removeFirst()
-                if (levels.size == UNCLEAR_FRAMES) hearing = judge(levelMean)
+                if (levels.size == UNCLEAR_FRAMES) {
+                    decidingMean = levelMean
+                    hearing = judge(decidingMean)
+                }
             }
-            levels.isNotEmpty() && ++gap >= (if (hearing == Hearing.CLEAR) UNCLEAR_GAP_FRAMES else ADVICE_HOLD_FRAMES) -> reset()
+            levels.isNotEmpty() -> {
+                val allowed = if (hearing == Hearing.CLEAR) UNCLEAR_GAP_FRAMES else ADVICE_HOLD_FRAMES
+                if (++gap >= allowed) reset()
+            }
         }
         return hearing
     }
@@ -62,6 +75,7 @@ class HearingTracker {
 
     /** Ends the run: back to [Hearing.CLEAR] with an empty window. */
     fun reset() {
+        decidingMean = levelMean
         levels.clear()
         gap = 0
         hearing = Hearing.CLEAR
@@ -69,7 +83,7 @@ class HearingTracker {
 
     companion object {
         /**
-         * The level (0..1, as in [hr.bertlab.fluteassistant.domain.listen.PitchFrame.level]) from
+         * The level (0..1, as in [PitchFrame.level]) from
          * which a frame counts as sound rather than room noise: about -45 dBFS. A starting value
          * to be confirmed from `levelMean` in `tuner.summary` on a real phone.
          */

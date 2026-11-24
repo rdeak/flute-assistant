@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.tuner
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -119,7 +120,7 @@ private fun TuningGuideUpright(card: GuideCard, onCard: (GuideCard) -> Unit, onC
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .testTag("guide_stage"),
+                .testTag(GUIDE_STAGE_TAG),
         ) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 // The words take at most 60% of the card's inside, so the picture keeps the rest.
@@ -188,13 +189,13 @@ private fun TuningGuideSideways(card: GuideCard, onCard: (GuideCard) -> Unit, on
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     val pair = Modifier
                         .weight(1f)
-                        .height(if (short) 80.dp else 92.dp)
-                    StepIcon(AppIcons.ChevronLeft, R.string.tune_guide_back, card.previous, onCard, pair, RoundedCornerShape(26.dp))
+                        .height(if (short) ModeHeightShort else ModeHeight)
+                    StepIcon(AppIcons.ChevronLeft, R.string.tune_guide_back, card.previous, onCard, pair, PairShape)
                     if (card.next == null) {
                         // No room for "U redu" in half the column: the tick alone, named OK for a screen reader.
                         ChunkyButton(
                             onClick = { onClose(GuideExit.OK) },
-                            shape = RoundedCornerShape(26.dp),
+                            shape = PairShape,
                             color = ActionGo,
                             depth = 5.dp,
                             modifier = pair,
@@ -202,12 +203,12 @@ private fun TuningGuideSideways(card: GuideCard, onCard: (GuideCard) -> Unit, on
                             Icon(AppIcons.Done, contentDescription = stringResource(R.string.tune_guide_done), tint = OnAction, modifier = Modifier.size(30.dp))
                         }
                     } else {
-                        StepIcon(AppIcons.ChevronRight, R.string.tune_guide_next, card.next, onCard, pair, RoundedCornerShape(26.dp))
+                        StepIcon(AppIcons.ChevronRight, R.string.tune_guide_next, card.next, onCard, pair, PairShape)
                     }
                 }
             },
         ) { cardModifier ->
-            Stage(padding = GuideStagePadding, modifier = cardModifier.testTag("guide_stage")) {
+            Stage(padding = GuideStagePadding, modifier = cardModifier.testTag(GUIDE_STAGE_TAG)) {
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val pictureWidth = maxWidth * if (maxWidth >= WIDE_CARD) 0.5f else 0.4f
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxSize()) {
@@ -304,12 +305,15 @@ private fun Dots(card: GuideCard) {
 @Composable
 private fun StepIcon(
     icon: ImageVector,
-    description: Int,
+    @StringRes description: Int,
     to: GuideCard?,
     onCard: (GuideCard) -> Unit,
     modifier: Modifier,
     shape: Shape = CircleShape,
 ) = StepButton(icon, stringResource(description), enabled = to != null, onClick = { to?.let(onCard) }, modifier, shape, iconSize = 32.dp)
+
+/** The corners of the sideways ‹ and ›, and of the ✓ in ›'s place on the last card. */
+private val PairShape = RoundedCornerShape(26.dp)
 
 private val HeadingHeight = 69.dp
 private val GuideStagePadding = 20.dp

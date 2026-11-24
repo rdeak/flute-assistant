@@ -34,9 +34,7 @@ policy. The policy's address is the Play Console field, which only changes after
 
 ## Commands
 
-Everything goes through the wrapper (Gradle 9.8.2, sha256-pinned in
-`gradle-wrapper.properties`; the daemon runs on JDK 25 via the foojay toolchain). The
-configuration cache is on.
+Everything goes through the wrapper. The configuration cache is on.
 
 ```sh
 ./gradlew testDebugUnitTest                               # every JVM test: the rules, the view models and the screens (about 25 s)
@@ -90,15 +88,10 @@ theme and debug/release files.
 Three layers, each a top-level package under `hr.bertlab.fluteassistant` (since 2026-11-10, when the
 rules moved out of the ViewModels):
 
-- `domain/` holds the rules as plain Kotlin with no Android import, a package per feature: `flute`
-  (the tune, `TuneWriter`, `ListenRun`, bars, the songbook), `listen` (what the microphone's frames
-  become: `NoteOnsetTracker`, `HearingTracker`, the thresholds in `ListenRules`), `metronome`
-  (`MetronomeConfig`, `TempoBand`), `notes` (`NotesRound`, phrases, the sticker book), `tuner`
-  (`NoteMath`, fingerings), `fingers` (`FingerChart`, `FingerPick`: the Fingers tab's notes and keys) and
-  `settings` (`SettingsStore`, the one storage interface, and
-  `MetronomeSettings`, the one owner of the metronome's tempo and beat, which the metronome tab and
-  the flute both read and change there and nowhere else). A rule goes here and is tested here, on
-  the JVM, with no dispatcher.
+- `domain/` holds the rules as plain Kotlin with no Android import, a package per feature.
+  `settings/SettingsStore` is the one storage interface, and `settings/MetronomeSettings` the one
+  owner of the metronome's tempo and beat, which the metronome tab and the flute both read and change
+  there and nowhere else. A rule goes here and is tested here, on the JVM, with no dispatcher.
 - `audio/`, `data/` and `playback/` implement the interfaces the rules and the screens use: the
   engines and players, the SharedPreferences store, the foreground service. `di/AppModule` binds
   them; the logger and the session recorder differ by build type (`SessionModule`).
@@ -110,11 +103,8 @@ A tab does not import another tab's `ui` package and is never handed another tab
 two tabs share has one owner below them. The one import that stands is the flute showing the
 metronome's own stage (a composable and its state) as its speed panel.
 
-Each folder's CLAUDE.md loads when you work there and holds what must not be broken: `ui/` (the
-frame, the look and the structure every tab shares), `audio/metronome/` (metronome audio path,
-player contract), `ui/metronome/` (that tab), `playback/` (background playback), `ui/tuner/` (tuner
-path), `ui/notes/` (note reading game: Find and Hear, and the sticker book), `ui/flute/` (digital
-flute) and `ui/fingers/` (the fingering chart). The matching `audio/` and `domain/` folders point there. For `ui/`, `ui/flute/` and
+Each folder's CLAUDE.md loads when you work there and holds what must not be broken; a short one in
+`audio/` or `domain/` points to its tab's. For `ui/`, `ui/flute/` and
 `ui/notes/` the long text (how it works, the reasons, who decided what) is `DESIGN.md` beside the
 CLAUDE.md, and the songbook's is `ui/flute/SONGBOOK.md`: these are not loaded by themselves, so
 read the part the CLAUDE.md names before you change that part.
@@ -147,23 +137,17 @@ tab's CLAUDE.md; these rules hold on all of them:
   `docs/superpowers/specs/2026-11-05-landscape-design.md`, `ui/DESIGN.md`): its width goes to size and
   air, not to more things, and the turned-down list below holds there too. A tablet's room goes the
   same way (2026-11-06, `ui/DESIGN.md`, "Tablets"): the tab grows, and nothing is added.
-- Added at the user's request (2026-11-07): a day/night switch in the top bar before the flag, a moon or a
-  sun with no words (`ui/DESIGN.md`). It is part of the frame like the flag, not a control on a tab.
-- Added at the user's request (2026-11-14): the tuner's four picture cards on tuning the flute (`ui/tuner/CLAUDE.md`,
-  "How to tune"). Since 2026-11-18 (the calmer Tune view, the user's ask: "drop buttons hear how from view completly")
-  they open from the tuner's line when it names a fix on the flute, and a tap on the window plays the note: the 🔧 How?
-  and 🔊 Hear buttons are gone, and the tuner has one line of words.
-- Added at the user's request (2026-11-16): the flute's ⌒ join key, a slur between two notes, one tap per
-  pair, left of 💤 in the top key row (`ui/flute/CLAUDE.md`, "Legato").
-- Added at the user's request (2026-11-16, reshaped 2026-11-17): the flute's ♯♭ key beside C6, which makes
-  the next note key write its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭, both octaves), one tap per note; the
-  keys stay the fifteen white ones in three rows (`ui/flute/CLAUDE.md`, "Sharps and flats").
-- Added at the user's request (2026-11-17, a teacher's ask): the fifth tab, Fingers 🖐️, last in the row: the chosen
-  note in every octave, each on its staff with the flute drawn as the player sees it, and seven letter keys and ♯♭ to
-  choose it. Nothing else on it (`ui/fingers/CLAUDE.md`; spec `docs/superpowers/specs/2026-11-17-fingers-tab-design.md`).
-  The same flute replaced the fingering strip in the tuner and Listen to me. Since 2026-11-18 a tap on a row's flute
-  opens that note in the tuner's Tune mode (the user's ask; no new control, the picture is the button), and the
-  phone's Back there returns to the Fingers tab.
+- Added at the user's request, each told in full, with what must not change, in the file named: a day/night
+  switch in the top bar before the flag, a moon or a sun with no words, part of the frame like the flag and not a
+  control on a tab (2026-11-07, `ui/DESIGN.md`); the tuner's four picture cards on tuning the flute, opened from its
+  one line of words, with no 🔧 How? or 🔊 Hear button (2026-11-14, calmer since 2026-11-18, `ui/tuner/CLAUDE.md`);
+  on the flute (`ui/flute/CLAUDE.md`) the ⌒ join key (2026-11-16, "Legato"), the ♯♭ key (2026-11-17, "Sharps and
+  flats") and c¹ to c⁴ as four octave pills over seven letter keys named for the chosen octave (2026-11-18,
+  "Octaves"): a key writes exactly the note on it and only a pill changes the octave; do not hide the octave figure,
+  work the octave out for the child (the nearest note and ⬇ ⬆) or move the notes over rows (a high-notes key): both
+  were withdrawn after a child and an adult could not find the octave; and the fifth tab, Fingers 🖐️, last in the
+  row, nothing else on it, whose flutes open their note in the tuner's Tune mode (2026-11-17, a teacher's ask,
+  `ui/fingers/CLAUDE.md`).
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's
   buttons set loudness), a visible About or credits entry (2026-11-05: the credits stay behind a long
   press on the logo), words in the language list and, on the flute, a record button, a clear-all, a tempo control other than
@@ -174,10 +158,7 @@ tab's CLAUDE.md; these rules hold on all of them:
   any view, badge or switch that only explains a control: when a screen is too much, take things out.
 - Tap tempo, subdivisions, the beep and bell click sounds, the volume setting, presets (with their
   Room database) and the A4 reference are gone from the code since 2026-11-09, at the user's
-  decision: no screen could reach them. The metronome clicks one woodblock on every beat at a fixed
-  gain (`MetronomeRenderer.OUTPUT_GAIN`), `NoteMath` measures against 440 Hz and the reference tone
-  plays at a fixed `TONE_VOLUME` (`audio/ToneVolume.kt`, every tone the app plays). `MetronomeSettings` still brings a stored
-  tempo onto the ring's 40 to 200. Git keeps the old code (the preset sheet is in commit `6a20374`).
+  decision: no screen could reach them. Git keeps the old code (the preset sheet is in commit `6a20374`).
 
 ## Logging and observability
 

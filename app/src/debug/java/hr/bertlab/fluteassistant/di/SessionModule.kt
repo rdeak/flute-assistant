@@ -4,7 +4,6 @@
 package hr.bertlab.fluteassistant.di
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.os.Build
 import androidx.core.content.pm.PackageInfoCompat
 import dagger.Module
@@ -43,20 +42,17 @@ object SessionModule {
             sdk = Build.VERSION.SDK_INT,
         )
         // The recorder logs through the plain logger: the recording one would hand its lines back to it.
-        return FileSessionRecorder(root, facts, androidLogger(context))
+        return FileSessionRecorder(root, facts, AndroidLogger(context))
     }
 
     @Provides
     @Singleton
     fun provideLogger(@ApplicationContext context: Context, recorder: FileSessionRecorder): Logger =
-        RecordingLogger(androidLogger(context), recorder)
+        RecordingLogger(AndroidLogger(context), recorder)
 
     @Provides
     fun provideAudioTap(recorder: FileSessionRecorder): AudioTap = recorder
 
     @Provides
     fun provideListenRecorder(recorder: FileSessionRecorder): ListenRecorder = recorder
-
-    private fun androidLogger(context: Context) =
-        AndroidLogger(debuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
 }

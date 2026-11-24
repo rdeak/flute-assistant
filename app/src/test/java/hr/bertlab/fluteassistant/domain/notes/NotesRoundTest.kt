@@ -14,14 +14,21 @@ import kotlin.random.Random
 
 class NotesRoundTest {
 
-    private fun state(results: List<Boolean>, taps: Int) =
-        NotesRound(practiceNotes = setOf(60), currentMidi = 60, results = results, taps = taps)
+    private fun state(results: List<Boolean>) =
+        NotesRound(practiceNotes = setOf(60), currentMidi = 60, results = results)
 
     @Test
     fun `score counts first-tap answers`() {
-        val s = state(results = listOf(true, false, true), taps = 5)
+        val s = state(results = listOf(true, false, true))
         assertEquals(3, s.answered)
         assertEquals(2, s.score)
+    }
+
+    @Test
+    fun `a round is perfect when every note was found on the first tap`() {
+        assertTrue(state(results = List(NotesRound.ROUND_LENGTH) { true }).perfect)
+        assertFalse(state(results = List(NotesRound.ROUND_LENGTH) { it != 3 }).perfect)
+        assertFalse("not before the round is full", state(results = listOf(true, true)).perfect)
     }
 
     /**
@@ -53,7 +60,6 @@ class NotesRoundTest {
         assertEquals(listOf(true), after.results)
         assertEquals(1, after.streak)
         assertEquals(1, after.bestStreak)
-        assertEquals(1, after.taps)
         assertEquals(1, after.progress.countOf(60))
         assertEquals(setOf(60), after.grewThisRound)
         assertEquals(setOf(60), after.askedThisRound)
@@ -76,7 +82,6 @@ class NotesRoundTest {
         assertEquals("found, but not on the first tap", listOf(false), found.results)
         assertEquals(1, found.progress.countOf(60))
         assertTrue(found.grewThisRound.isEmpty())
-        assertEquals(3, found.taps)
     }
 
     @Test

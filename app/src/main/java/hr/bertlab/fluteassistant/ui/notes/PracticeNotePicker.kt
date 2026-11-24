@@ -3,13 +3,8 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
-import hr.bertlab.fluteassistant.ui.common.asTextSize
-import kotlinx.coroutines.delay
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +25,8 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +37,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -48,6 +44,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -59,8 +56,10 @@ import hr.bertlab.fluteassistant.ui.common.BigActionButton
 import hr.bertlab.fluteassistant.ui.common.ChunkyButton
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.SPARKLES_EMOJI
 import hr.bertlab.fluteassistant.ui.common.SPEAKER_EMOJI
 import hr.bertlab.fluteassistant.ui.common.STAR_EMOJI
+import hr.bertlab.fluteassistant.ui.common.asTextSize
 import hr.bertlab.fluteassistant.ui.common.chunky
 import hr.bertlab.fluteassistant.ui.common.dashedBorder
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -71,6 +70,7 @@ import hr.bertlab.fluteassistant.ui.theme.ActionGo
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Go
 import hr.bertlab.fluteassistant.ui.theme.InkOnFill
+import kotlinx.coroutines.delay
 
 /**
  * The game's notes in rows by octave, highest on top as on the staff and the flute: c3
@@ -126,8 +126,8 @@ internal fun NoteRows(
     onToggle: (Int) -> Unit,
     progress: NoteProgress,
     modifier: Modifier = Modifier,
-    keyWidth: Dp = 44.dp,
-    keyHeight: Dp = 50.dp,
+    keyWidth: Dp = NoteKeyWidth,
+    keyHeight: Dp = NoteKeyHeight,
     gap: Dp = 4.dp,
 ) {
     val colors = FluteTheme.colors
@@ -138,7 +138,7 @@ internal fun NoteRows(
         modifier = modifier.semantics { contentDescription = groupLabel },
     ) {
         OCTAVE_ROWS.forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.height(keyHeight + 4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.height(keyHeight + NoteKeyDepth)) {
                 row.forEach { midi ->
                     if (midi in selected) {
                         NoteKey(
@@ -187,8 +187,8 @@ internal fun NoteKey(
     midi: Int,
     progress: NoteProgress,
     modifier: Modifier = Modifier,
-    width: Dp = 44.dp,
-    height: Dp = 50.dp,
+    width: Dp = NoteKeyWidth,
+    height: Dp = NoteKeyHeight,
     grew: Boolean = false,
     scale: Float = 1f,
     from: NoteProgress? = null,
@@ -210,7 +210,7 @@ internal fun NoteKey(
         else -> null
     }
     // The star and the sparkle are pictures, in dp, so large text does not grow them past the room kept over a key.
-    val corner = with(LocalDensity.current) { (CornerEmoji * scale).toSp().value.toInt() }
+    val corner = CornerEmoji * scale
     val labelSize = LabelSize * scale
     // Under the name. The key itself clips to its shape, so the fill needs no clip of its own, and its outline is drawn over it.
     val inside: @Composable BoxScope.() -> Unit = {
@@ -240,21 +240,22 @@ internal fun NoteKey(
                 checked = true,
                 shape = shape,
                 color = tint,
+                depth = NoteKeyDepth,
                 modifier = Modifier.fillMaxSize(),
                 content = inside,
             )
         } else {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize().chunky(shape, tint, colors.outline, KeyDepth),
+                modifier = Modifier.fillMaxSize().chunky(shape, tint, colors.outline, NoteKeyDepth),
                 content = inside,
             )
         }
         if (known) {
-            Emoji(STAR_EMOJI, fontSize = corner, modifier = Modifier.align(Alignment.TopEnd).offset(x = 9.dp, y = (-10).dp))
+            Emoji(STAR_EMOJI, size = corner, modifier = Modifier.align(Alignment.TopEnd).offset(x = 9.dp, y = -NoteKeyOverhang))
         }
         if (grew) {
-            Emoji(SPARKLES_EMOJI, fontSize = corner, modifier = Modifier.align(Alignment.TopStart).offset(x = (-9).dp, y = (-10).dp))
+            Emoji(SPARKLES_EMOJI, size = corner, modifier = Modifier.align(Alignment.TopStart).offset(x = (-9).dp, y = -NoteKeyOverhang))
         }
     }
 }
@@ -312,8 +313,17 @@ private fun ClippedToGround(share: Float, onFill: Boolean, content: @Composable 
 /** The colour of a key's name on [ground]: ink on a bright one, [text] (the theme's) on a dark one. */
 private fun labelOn(ground: Color, text: Color): Color = if (ground.luminance() > LIGHT_GROUND) InkOnFill else text
 
-/** The shadow under a key: what [ChunkyButton] has by default, for the plain key to match. */
-private val KeyDepth = 4.dp
+/** The smallest a word gets in the sideways page's 100 dp column (Pick, Sound): under the app's `WordFloor`, as the column is narrow. */
+internal val ColumnWordFloor = 9.dp
+
+/**
+ * A note's key as the picker draws it: 44 x 50, the shadow under it, and how far a learned key's star and a grown
+ * key's sparkle hang over its top. The summary draws the same key larger and counts with these.
+ */
+internal val NoteKeyWidth = 44.dp
+internal val NoteKeyHeight = 50.dp
+internal val NoteKeyDepth = 4.dp
+internal val NoteKeyOverhang = 10.dp
 
 /** A ground lighter than this takes ink; a darker one the theme's own text colour. */
 private const val LIGHT_GROUND = 0.2f
@@ -388,7 +398,7 @@ internal fun SoundTile(soundOn: Boolean, onToggleSound: () -> Unit, modifier: Mo
     val colors = FluteTheme.colors
     val shape = RoundedCornerShape(28.dp)
     // In dp: a floor in sp doubles with the text, and at the largest size "Sound" then has no room beside the speaker in the 100 dp column.
-    val wordFloor = 9.dp.asTextSize()
+    val wordFloor = ColumnWordFloor.asTextSize()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
@@ -439,4 +449,3 @@ private fun SoundSwitch(soundOn: Boolean, size: DpSize, knob: Dp, inset: Dp) {
 }
 
 private const val MUTED_EMOJI = "🔇" // speaker, muted
-private const val SPARKLES_EMOJI = "✨" // sparkles, a note that moved up

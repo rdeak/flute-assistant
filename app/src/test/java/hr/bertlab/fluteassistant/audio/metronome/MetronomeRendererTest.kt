@@ -77,17 +77,4 @@ class MetronomeRendererTest {
         assertEquals(0.72f, audio.take(24_000).maxOf { abs(it) }, 0.001f)
         assertEquals(0.504f, audio.drop(24_000).maxOf { abs(it) }, 0.001f)
     }
-
-    @Test
-    fun `reset starts the pattern again from the accent`() {
-        val renderer = MetronomeRenderer(sampleRate)
-        val buffer = FloatArray(block)
-        val config = MetronomeConfig(bpm = 240)
-        repeat(50) { renderer.render(buffer, config) } // ~0.53 s -> a few beats in
-        renderer.reset()
-        val first = renderer.render(buffer, config).first()
-        assertEquals(0L, first.frame)
-        assertEquals(BeatStrength.STRONG, first.strength)
-        assertEquals(0, first.beatIndex)
-    }
 }

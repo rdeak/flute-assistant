@@ -34,13 +34,6 @@ class ClickScheduler(private val sampleRate: Int) {
     // Where the last emitted click sat: the next one is a beat after it.
     private var lastEventPosition = Double.NaN
 
-    fun reset(startFrame: Long = 0L) {
-        position = startFrame.toDouble()
-        beatIndex = 0
-        barIndex = 0L
-        lastEventPosition = Double.NaN
-    }
-
     /** Frame at which the next click (the one [next] will return) is due. */
     val nextFrame: Long get() = position.roundToLong()
 

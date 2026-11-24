@@ -12,6 +12,10 @@ import kotlin.math.sin
  * tuner's reference tone and the flute tab's sustained tone so both sound the same. Pure Kotlin.
  */
 object FluteTimbre {
+    /** How long a note fades in and out, so it neither clicks nor stops dead: the same for both tones. */
+    const val ATTACK_MS = 30
+    const val RELEASE_MS = 120
+
     private val HARMONICS = doubleArrayOf(1.0, 0.3, 0.1)
 
     /** Peak of one cycle of the harmonic sum, so the output can be scaled to peak exactly at an amplitude. */

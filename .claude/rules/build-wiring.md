@@ -15,7 +15,7 @@ paths:
 
 # Build wiring (AGP 9)
 
-AGP 9.4.1 uses built-in Kotlin: there is no `kotlin-android` plugin and no kapt. The root
+AGP 9 (9.5.1 in `gradle/libs.versions.toml`) uses built-in Kotlin: there is no `kotlin-android` plugin and no kapt. The root
 `build.gradle.kts` puts the Kotlin Gradle plugin on the buildscript classpath to raise AGP's
 bundled Kotlin to the catalog's `kotlin` version, and the Compose compiler plugin shares that
 same version ref; keep the two equal. KSP is the standalone 2.3.x line and runs for Hilt alone
@@ -58,7 +58,7 @@ first run (2026-11-10, every tab, re-creations, the service, a finished activity
 `AppLocalesMetadataHolderService` with `autoStoreLocales`. The choice is stored by the platform
 (system on 13+, AppCompat below), not by `SettingsStore`.
 
-`MainActivity` declares `android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"` so
+`MainActivity` declares `android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"` so
 a turn of the phone does not re-create it and a running tune, Your turn, the tuner or the metronome go on
 (`TurningThePhoneTest` reads the flags). The locale must stay out of the list: the language switch relies
 on the re-creation.

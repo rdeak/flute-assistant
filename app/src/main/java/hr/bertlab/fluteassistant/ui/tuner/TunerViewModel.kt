@@ -18,11 +18,11 @@ import hr.bertlab.fluteassistant.domain.listen.Hearing
 import hr.bertlab.fluteassistant.domain.listen.HearingTracker
 import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
+import hr.bertlab.fluteassistant.domain.listen.ReadingTracker
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.settings.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.FluteRange
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
-import hr.bertlab.fluteassistant.domain.tuner.NoteReading
 import hr.bertlab.fluteassistant.domain.tuner.TunerMode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -33,22 +33,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import kotlin.math.abs
-import kotlin.math.log2
 
 /**
- * Smooths raw [PitchFrame]s into a stable [TunerUiState]:
- * - shows a reading only once a few consecutive frames agree (a held note, not room noise),
- * - keeps a short median window so a single mis-detected frame does not flick the needle,
- * - ignores low-confidence frames,
- * - holds the last reading for a few silent or unsteady frames so the display does not blink
- *   between notes; a wandering pitch expires the reading after [ListenRules.HOLD_FRAMES] like silence does,
- *   and only a steady note resets that count,
- * - keeps the identified note (the ring of [TunerMode.IDENTIFY]) through a drift just past the
- *   halfway point to a neighbouring note until it has lasted [ListenRules.SWITCH_FRAMES],
- * - tells the screen when sound keeps coming without ever becoming a note ([Hearing], judged
- *   by [HearingTracker]), so it can say what to change,
- * - keeps a fix on the flute on the line a while after the sound stops ([FixHold]).
+ * The tuner's wiring: feeds the microphone's [PitchFrame]s to the rules and mirrors what they say into a stable
+ * [TunerUiState].
+ * - [ReadingTracker] smooths the frames into the reading and the identified note.
+ * - [HearingTracker] tells when sound keeps coming without ever becoming a note ([Hearing]), so the screen can say
+ *   what to change.
+ * - [FixHold] keeps a fix on the flute on the line a while after the sound stops.
  *
  * It also writes the tuner's structured log under [LogTags.TUNER]: what became of every frame
  * ([FrameDecision], verbose), a `tuner.summary` every [ListenRules.SUMMARY_FRAMES] frames, `tuner.reading`
@@ -70,11 +62,7 @@ class TunerViewModel @Inject constructor(
 
     private var listenJob: Job? = null
     private var playJob: Job? = null
-    private val recentFrequencies = ArrayDeque<Double>()
-    /** Frames in a row without a steady note (silent, uncertain or unsteady); [ListenRules.HOLD_FRAMES] of them clear the reading. */
-    private var silentFrames = 0
-    /** Shown frames in a row whose note is not the identified one but still within reach of it; see [identify]. */
-    private var driftFrames = 0
+    private val readings = ReadingTracker()
     private val hearingTracker = HearingTracker()
     private val fixHold = FixHold()
     private val summary = FrameSummary()
@@ -115,6 +103,7 @@ class TunerViewModel @Inject constructor(
             } catch (e: Exception) {
                 logger.w(LogTags.TUNER, "tuner.error", "message" to e.message, error = e)
                 clearHearing()
+                readings.reset()
                 _state.update { it.copy(isListening = false, reading = null, micFailed = true) }
             }
         }
@@ -124,8 +113,7 @@ class TunerViewModel @Inject constructor(
         stopTone()
         listenJob?.cancel()
         listenJob = null
-        recentFrequencies.clear()
-        silentFrames = 0
+        readings.reset()
         clearHearing()
         _state.update { it.copy(isListening = false, reading = null) }
         if (summary.frames > 0) logSummary() // the last partial second, before the child left
@@ -154,14 +142,13 @@ class TunerViewModel @Inject constructor(
             REFERENCE_TONE_MS,
             TONE_VOLUME,
         )
-        recentFrequencies.clear()
+        readings.reset()
         clearHearing()
         _state.update { it.copy(isPlayingReference = true, reading = null) }
         playJob = viewModelScope.launch {
             delay(REFERENCE_TONE_MS.toLong())
             tonePlayer.stop() // the data has played out; release the track rather than leave it registered as playing
-            recentFrequencies.clear()
-            silentFrames = 0
+            readings.reset()
             clearHearing()
             _state.update { it.copy(isPlayingReference = false) }
         }
@@ -224,66 +211,18 @@ class TunerViewModel @Inject constructor(
                 "f" to frame.frequency, "p" to frame.probability, "level" to frame.level, "decision" to decision,
             )
         }
-        val runMean = hearingTracker.levelMean // read before onFrame, which empties the window when the run ends
-        val hearing = hearingTracker.onFrame(frame.level, decision)
-        updateHearing(hearing, if (hearing == Hearing.CLEAR) runMean else hearingTracker.levelMean)
+        updateHearing(hearingTracker.onFrame(frame.level, decision), hearingTracker.decidingMean)
         holdFix()
         summary.add(frame, decision)
         if (summary.frames >= ListenRules.SUMMARY_FRAMES) logSummary()
         logReadingIfChanged()
     }
 
-    /** Folds one frame into the state and says what became of it. */
+    /** Folds one frame into the state and says what became of it; none is read while the reference tone sounds. */
     private fun process(frame: PitchFrame): FrameDecision {
         if (_state.value.isPlayingReference) return FrameDecision.IGNORED
-        val frequency = frame.frequency ?: return onUnpitchedFrame(FrameDecision.SILENT)
-        if (frame.probability < ListenRules.MIN_PROBABILITY) return onUnpitchedFrame(FrameDecision.LOW_PROBABILITY)
-
-        recentFrequencies.addLast(frequency)
-        while (recentFrequencies.size > ListenRules.SMOOTHING_WINDOW) recentFrequencies.removeFirst()
-        if (!isSteady()) {
-            // Counts towards the hold like silence: a wandering pitch must not keep the last reading up for as long as it lasts.
-            silentFrames++
-            if (silentFrames >= ListenRules.HOLD_FRAMES) _state.update { it.copy(reading = null) }
-            return FrameDecision.UNSTEADY
-        }
-        silentFrames = 0
-        val median = recentFrequencies.sorted()[recentFrequencies.size / 2]
-        val previous = _state.value
-        val reading = NoteMath.frequencyToNote(median)
-        val identified = identify(previous, reading)
-        _state.update { it.copy(reading = reading, identifiedMidi = identified) }
-        return FrameDecision.SHOWN
-    }
-
-    /**
-     * The identified note once [reading] is shown. The first note after silence is taken at
-     * once, and so is a clearly different note (further than [ListenRules.NEAR_CENTS]
-     * from the identified one, such as a clean step to the next note). A sound that has only
-     * drifted past the halfway point to a neighbour switches the ring after [ListenRules.SWITCH_FRAMES]
-     * shown frames there in a row; one frame back on the identified note starts the count again.
-     */
-    private fun identify(previous: TunerUiState, reading: NoteReading): Int {
-        val current = previous.identifiedMidi.takeIf { previous.reading != null }
-        if (current == null || reading.midi == current) {
-            driftFrames = 0
-            return reading.midi
-        }
-        val reach = abs(NoteMath.centsBetween(reading.frequency, current))
-        if (reach > ListenRules.NEAR_CENTS || ++driftFrames >= ListenRules.SWITCH_FRAMES) {
-            driftFrames = 0
-            return reading.midi
-        }
-        return current
-    }
-
-    /** Silence or a frame too uncertain to trust: hold the reading for a while, then clear it. */
-    private fun onUnpitchedFrame(decision: FrameDecision): FrameDecision {
-        silentFrames++
-        if (silentFrames >= ListenRules.HOLD_FRAMES) {
-            recentFrequencies.clear()
-            _state.update { it.copy(reading = null) }
-        }
+        val decision = readings.onFrame(frame)
+        _state.update { it.copy(reading = readings.reading, identifiedMidi = readings.identifiedMidi) }
         return decision
     }
 
@@ -299,9 +238,8 @@ class TunerViewModel @Inject constructor(
 
     /** Ends any unclear-sound run and drops a held fix, for when the listening starts afresh or the microphone is not the child's. */
     private fun clearHearing() {
-        val runMean = hearingTracker.levelMean
         hearingTracker.reset()
-        updateHearing(Hearing.CLEAR, runMean)
+        updateHearing(Hearing.CLEAR, hearingTracker.decidingMean)
         dropHeldFix()
     }
 
@@ -338,17 +276,6 @@ class TunerViewModel @Inject constructor(
             LogTags.TUNER, "tuner.reading",
             "midi" to midi, "cents" to s.reading?.cents, "f" to s.reading?.frequency, "target" to s.targetMidi, "mode" to s.mode,
         )
-    }
-
-    /**
-     * True once the last [ListenRules.LOCK_FRAMES] frames agree within [ListenRules.LOCK_CENTS]: a held note, as
-     * opposed to a syllable, a bump or a voice gliding past, whose pitch moves or stops within
-     * that time. Until then the previous reading stays rather than jumping to the stray sound.
-     */
-    private fun isSteady(): Boolean {
-        if (recentFrequencies.size < ListenRules.LOCK_FRAMES) return false
-        val last = recentFrequencies.takeLast(ListenRules.LOCK_FRAMES)
-        return 1200.0 * log2(last.max() / last.min()) <= ListenRules.LOCK_CENTS
     }
 
     override fun onCleared() {

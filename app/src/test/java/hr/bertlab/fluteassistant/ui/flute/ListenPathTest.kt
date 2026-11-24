@@ -41,6 +41,16 @@ class ListenPathTest {
     }
 
     @Test
+    fun `three h3 notes two octaves up are heard and marked as the same notes below`() {
+        // Since 2026-11-18 the flute writes up to c4 (C7): the detector listens to C7 and above (FluteRange, plus one).
+        val high = listOf(TuneNote(95, NoteLength.QUARTER), TuneNote(95, NoteLength.QUARTER), TuneNote(95, NoteLength.HALF))
+        val samples = FluteSound.sound(gapsMs = 50, cents = 2400.0) // B4 two octaves up, B6
+        val run = ListenPath.run(FluteSound.render(samples), rate, high, Pulse(60), run = ListenRun.Rules.PITCH_ONLY)
+        assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)
+        assertEquals(3, run.heard.size)
+    }
+
+    @Test
     fun `the quickest tongue, 40 ms, is still heard in a lively room`() {
         val run = listen(FluteSound.sound(gapsMs = 40, roomDb = -6.0, rt60 = 0.6, floorDb = -42.0))
         assertEquals(run.heard.toString(), mapOf(0 to StepMark.FIRST_TRY, 1 to StepMark.FIRST_TRY, 2 to StepMark.FIRST_TRY), run.marks)

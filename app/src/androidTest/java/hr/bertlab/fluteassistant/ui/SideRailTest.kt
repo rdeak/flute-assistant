@@ -360,8 +360,7 @@ class SideRailTest {
     // ---- A turn between the two bars ----
 
     private var sideways by mutableStateOf(true)
-    private var creditsOpen by mutableStateOf(false)
-    private var languageOpen by mutableStateOf(false)
+    private val panels = BarPanels()
 
     /**
      * What `MainScreen` does with the bars: the rail beside the tab when the phone is on its side,
@@ -379,10 +378,7 @@ class SideRailTest {
                                 onSelect = { selected = it },
                                 drumBeating = false,
                                 beatPulse = 0L,
-                                creditsOpen = creditsOpen,
-                                onCreditsOpenChange = { creditsOpen = it },
-                                languageOpen = languageOpen,
-                                onLanguageOpenChange = { languageOpen = it },
+                                panels = panels,
                             )
                         }
                     } else {
@@ -390,10 +386,7 @@ class SideRailTest {
                             tab = selected,
                             dark = false,
                             onDarkChange = {},
-                            creditsOpen = creditsOpen,
-                            onCreditsOpenChange = { creditsOpen = it },
-                            languageOpen = languageOpen,
-                            onLanguageOpenChange = { languageOpen = it },
+                            panels = panels,
                         )
                     }
                 }

@@ -80,9 +80,10 @@ class TabletGeometryTest {
     }
 
     @Test
-    fun `upright keys take a third of what the height spares, from 58 to 72`() {
+    fun `upright keys take half of what the height spares, two rows, from 58 to 72`() {
         assertEquals(72f, uprightKeyHeight(81f), 0.01f)
-        assertEquals(66.67f, uprightKeyHeight(26f), 0.01f)
+        assertEquals(71f, uprightKeyHeight(26f), 0.01f)
+        assertEquals(64f, uprightKeyHeight(12f), 0.01f)
         assertEquals(58f, uprightKeyHeight(0f), 0.01f)
         assertEquals(58f, uprightKeyHeight(-10f), 0.01f)
     }

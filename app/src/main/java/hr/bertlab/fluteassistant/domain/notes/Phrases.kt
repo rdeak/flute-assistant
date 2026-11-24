@@ -41,12 +41,15 @@ object Phrases {
      * [random] picks, so a seed always gives the same phrase.
      */
     fun draw(notes: Set<Int>, length: Int, random: Random, avoidFirst: Int? = null): List<Int> {
-        val first = pick((notes - setOfNotNull(avoidFirst)).ifEmpty { notes }, random)
+        val first = anyBut(notes, avoidFirst, random)
         return buildList {
             add(first)
             while (size < length) add(next(notes, last(), random))
         }
     }
+
+    /** A random note from [notes], not [avoid] unless it is the only one. */
+    fun anyBut(notes: Set<Int>, avoid: Int?, random: Random): Int = pick((notes - setOfNotNull(avoid)).ifEmpty { notes }, random)
 
     private fun next(notes: Set<Int>, previous: Int, random: Random): Int {
         val here = StaffNotes.positionOf(previous)

@@ -210,8 +210,10 @@
     <string name="flute_rest">Rest</string>
     <!-- The join key (⌒): the next note pressed is joined to the last one, a slur or a tie -->
     <string name="flute_join">Join to the next note</string>
-    <!-- The ♯♭ key beside C6 (2026-11-17): the next note key pressed writes its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭) -->
+    <!-- The ♯♭ key (2026-11-17; first in the tools' row since 2026-11-18): the next note key pressed writes its letter's sharp or flat (C♯ E♭ F♯ G♯ B♭) -->
     <string name="flute_sign">Sharp or flat for the next note</string>
+    <!-- An octave pill (2026-11-18), for a screen reader, with its octave's figure; the pill shows its notes (c1-h1) -->
+    <string name="flute_octave">Octave %1$s</string>
     <!-- The breath key (😮‍💨): a sign for the player to breathe, no sound and no time -->
     <string name="flute_breath">Breathe</string>
     <!-- Accessibility name of a breath sign on the staff -->

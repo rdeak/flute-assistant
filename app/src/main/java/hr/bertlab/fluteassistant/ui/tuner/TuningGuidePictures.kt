@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.tuner
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,9 +35,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -71,7 +72,7 @@ import kotlin.math.sin
  */
 
 /** Which way the arrow over the head joint points: in towards the body, or out. */
-enum class JointArrow { PUSH_IN, PULL_OUT }
+internal enum class JointArrow { PUSH_IN, PULL_OUT }
 
 /** The picture of [card], scaled to fill [modifier]'s size without changing its shape; silent to a screen reader. */
 @Composable
@@ -96,7 +97,7 @@ internal fun GuidePicture(card: GuideCard, modifier: Modifier = Modifier) {
                     GuideCard.WARM_UP -> WarmUpPicture()
                     GuideCard.HEAD_JOINT -> HeadJointPicture()
                     GuideCard.EACH_NOTE -> EachNotePicture()
-                    GuideCard.ONE_NOTE_OFF -> FluteSide(Modifier.width(300.dp), headColor = Sun, rollRing = true)
+                    GuideCard.ONE_NOTE_OFF -> FluteSide(Modifier.width(FluteWidth), headColor = Sun, rollRing = true)
                 }
             }
         }
@@ -108,7 +109,7 @@ internal fun GuidePicture(card: GuideCard, modifier: Modifier = Modifier) {
 private fun WarmUpPicture() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Emoji(THERMOMETER_EMOJI, fontSize = 56)
-        FluteSide(Modifier.width(300.dp), breath = true)
+        FluteSide(Modifier.width(FluteWidth), breath = true)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             listOf(60, 62, 64).forEach { midi -> LongNote(noteColor(midi)) }
         }
@@ -131,7 +132,7 @@ private fun HeadJointPicture() {
 
 /** One of card 2's flutes: its head joint moved as [arrow] says, and the move's [label] under it. */
 @Composable
-private fun JointMove(arrow: JointArrow, label: Int) {
+private fun JointMove(arrow: JointArrow, @StringRes label: Int) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         val gap = if (arrow == JointArrow.PULL_OUT) PULLED_GAP else 0f
         FluteSide(Modifier.width(fluteWidth(gap)), jointGap = gap, arrow = arrow)
@@ -214,8 +215,7 @@ internal fun NoteRing(midi: Int, filled: Boolean) {
             val stroke = 4.dp.toPx()
             val radius = size.minDimension / 2f - stroke / 2f
             if (filled) {
-                drawCircle(color, radius)
-                drawCircle(color, radius, style = Stroke(stroke))
+                drawCircle(color, radius + stroke / 2f) // the disc out to where the empty ring's line ends
             } else {
                 drawCircle(colors.card, radius)
                 drawCircle(color, radius, style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f * density, 6f * density))))
@@ -267,15 +267,15 @@ internal fun FluteSide(
         if (breath) grid.breath()
         if (rollRing) grid.ringBack(colors.mutedText)
 
-        grid.box(8f, FLUTE_Y - TUBE / 2f, HEAD_END - 8f, TUBE, 6f, head)
-        grid.box(2f, FLUTE_Y - 14f, 12f, 28f, 5f, MetalShade)
-        grid.box(44f, FLUTE_Y - 17f, 38f, 34f, 14f, head)
-        drawOval(InkOnFill, grid.at(63f - 9f, FLUTE_Y - 6f), Size(18f * unit, 12f * unit))
+        grid.box(8f, FLUTE_Y - TUBE / 2f, HEAD_END - 8f, TUBE, 6f, head) // the head joint's tube
+        grid.box(2f, FLUTE_Y - 14f, 12f, 28f, 5f, MetalShade) // the crown at its end
+        grid.box(44f, FLUTE_Y - 17f, 38f, 34f, 14f, head) // the lip plate
+        drawOval(InkOnFill, grid.at(RING_X - 9f, FLUTE_Y - 6f), Size(18f * unit, 12f * unit)) // the hole
         val bodyStart = HEAD_END + jointGap
-        grid.box(bodyStart, FLUTE_Y - TUBE / 2f, BODY_END - HEAD_END, TUBE, 4f, Metal)
-        grid.box(bodyStart - 6f, FLUTE_Y - TUBE / 2f - 3f, 12f, TUBE + 6f, 3f, MetalShade)
+        grid.box(bodyStart, FLUTE_Y - TUBE / 2f, BODY_END - HEAD_END, TUBE, 4f, Metal) // the body
+        grid.box(bodyStart - 6f, FLUTE_Y - TUBE / 2f - 3f, 12f, TUBE + 6f, 3f, MetalShade) // the socket's band
         BODY_KEYS.forEach { grid.key(it + jointGap, 7f) }
-        grid.box(BODY_END + jointGap, FLUTE_Y - TUBE / 2f, 46f, TUBE, 5f, Metal)
+        grid.box(BODY_END + jointGap, FLUTE_Y - TUBE / 2f, 46f, TUBE, 5f, Metal) // the foot
         grid.key(314f + jointGap, 6f)
 
         when (arrow) {
@@ -330,15 +330,23 @@ private class Grid(private val scope: DrawScope, private val unit: Float) {
     }
 
     /** The ring's half behind the tube: dotted, from the top left round to the bottom. */
-    fun ringBack(color: Color) = with(scope) {
+    fun ringBack(color: Color) = ringArc(
+        color,
+        startAngle = 90f,
+        sweepAngle = 270f - RING_BACK_START,
+        Stroke(5f * unit, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.1f, 12f * unit))),
+    )
+
+    /** A stretch of the roll ring's oval, by the canvas's angles (clockwise from the right). */
+    private fun ringArc(color: Color, startAngle: Float, sweepAngle: Float, style: Stroke) = with(scope) {
         drawArc(
             color = color,
-            startAngle = 90f,
-            sweepAngle = 270f - RING_BACK_START,
+            startAngle = startAngle,
+            sweepAngle = sweepAngle,
             useCenter = false,
             topLeft = at(RING_X - RING_RX, FLUTE_Y - RING_RY),
             size = Size(2 * RING_RX * unit, 2 * RING_RY * unit),
-            style = Stroke(5f * unit, cap = StrokeCap.Round, pathEffect = PathEffect.dashPathEffect(floatArrayOf(0.1f, 12f * unit))),
+            style = style,
         )
     }
 
@@ -350,15 +358,8 @@ private class Grid(private val scope: DrawScope, private val unit: Float) {
     fun ringFront(color: Color) = with(scope) {
         val cased = color.luminance() > 0.5f
         // Angles are counted as on paper (anticlockwise from the right, y up); the canvas counts clockwise.
-        fun arc(stroke: Float, arcColor: Color) = drawArc(
-            color = arcColor,
-            startAngle = -RING_HEAD_BASE,
-            sweepAngle = RING_HEAD_BASE + 90f,
-            useCenter = false,
-            topLeft = at(RING_X - RING_RX, FLUTE_Y - RING_RY),
-            size = Size(2 * RING_RX * unit, 2 * RING_RY * unit),
-            style = Stroke(stroke * unit, cap = StrokeCap.Round),
-        )
+        fun arc(stroke: Float, arcColor: Color) =
+            ringArc(arcColor, startAngle = -RING_HEAD_BASE, sweepAngle = RING_HEAD_BASE + 90f, Stroke(stroke * unit, cap = StrokeCap.Round))
         if (cased) arc(7f + 2 * CASING, InkOnFill)
         arc(7f, color)
         val base = ringPoint(RING_HEAD_BASE)
@@ -383,6 +384,9 @@ private class Grid(private val scope: DrawScope, private val unit: Float) {
         return Offset(RING_X + RING_RX * cos(t).toFloat(), FLUTE_Y - RING_RY * sin(t).toFloat())
     }
 }
+
+/** The flute alone on a card (warming up, the roll ring), at the picture's full size. */
+private val FluteWidth = 300.dp
 
 private val HeadJointFluteWidth = 250.dp
 

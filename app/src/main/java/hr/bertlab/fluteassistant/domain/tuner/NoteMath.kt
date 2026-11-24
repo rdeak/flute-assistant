@@ -21,6 +21,7 @@ data class NoteReading(
 object NoteMath {
     /** A4 in Hz. */
     private const val A4_HZ = 440.0
+    private const val A4_MIDI = 69
 
     fun frequencyToNote(frequency: Double): NoteReading {
         require(frequency > 0.0) { "frequency must be positive" }
@@ -30,9 +31,9 @@ object NoteMath {
     }
 
     /** Where [frequency] lies as a MIDI number with its fraction: 69.5 is halfway from A4 to B♭4. */
-    fun exactMidi(frequency: Double): Double = 69.0 + 12.0 * log2(frequency / A4_HZ)
+    fun exactMidi(frequency: Double): Double = A4_MIDI + 12.0 * log2(frequency / A4_HZ)
 
-    fun midiToFrequency(midi: Int): Double = A4_HZ * 2.0.pow((midi - 69) / 12.0)
+    fun midiToFrequency(midi: Int): Double = A4_HZ * 2.0.pow((midi - A4_MIDI) / 12.0)
 
     /**
      * Signed distance in cents from the note [targetMidi] to [frequency]: positive when sharp,

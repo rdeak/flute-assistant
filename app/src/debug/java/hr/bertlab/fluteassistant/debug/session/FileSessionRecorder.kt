@@ -71,28 +71,26 @@ class FileSessionRecorder(
         val s = Session(dir, log, csv)
         session = s
         val at = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT).format(Date(now()))
-        line(
+        note(
             s, "session.start", "at" to at, "app" to facts.app, "code" to facts.code, "device" to facts.device,
             "sdk" to facts.sdk, "floor" to setup.floor?.let { level(it) },
         )
         // The rules the run runs under, the tracker's and then its own: what is written down is what ran.
         val rules = setup.rules.fields() + setup.run.fields()
-        line(s, "session.rules", *rules.toTypedArray())
-        line(s, "session.pulse", "bpm" to setup.pulse.bpm, "time" to setup.pulse.timeSignature.label)
+        note(s, "session.rules", *rules.toTypedArray())
+        note(s, "session.pulse", "bpm" to setup.pulse.bpm, "time" to setup.pulse.timeSignature.label)
         setup.tune.forEachIndexed { index, item ->
             when (item) {
                 is TuneNote -> {
                     // A note joined to the one before says so (since 2026-11-16); older lines have no such field.
                     val joined = if (item.joined) arrayOf("joined" to true) else emptyArray()
-                    line(s, "session.tune", "index" to index, "note" to item.midi, "length" to item.length, *joined)
+                    note(s, "session.tune", "index" to index, "note" to item.midi, "length" to item.length, *joined)
                 }
-                is TuneRest -> line(s, "session.tune", "index" to index, "rest" to item.length)
-                TuneBreath -> line(s, "session.tune", "index" to index, "breath" to true)
+                is TuneRest -> note(s, "session.tune", "index" to index, "rest" to item.length)
+                TuneBreath -> note(s, "session.tune", "index" to index, "breath" to true)
             }
         }
-        csv.write(HEADER)
-        csv.newLine()
-        csv.flush()
+        csv.writeLine(HEADER)
         logger.i(LogTags.FLUTE, "session.open", "path" to dir.path)
     }
 
@@ -101,12 +99,12 @@ class FileSessionRecorder(
         if (s.wav != null) {
             // The microphone opened again inside one run (nothing in the app does this today): the
             // audio keeps going at the first opening's rate, so the rows still line up with it.
-            line(s, "session.reopened", "frame" to s.rows, "rate" to sampleRate, "source" to source)
+            note(s, "session.reopened", "frame" to s.rows, "rate" to sampleRate, "source" to source)
             return@guarded
         }
         s.rate = sampleRate
         s.wav = WavWriter(File(s.dir, AUDIO), sampleRate)
-        line(
+        note(
             s, "session.audio", "rate" to sampleRate, "source" to source,
             "window" to AudioRecordTunerEngine.WINDOW_SIZE, "hop" to AudioRecordTunerEngine.HOP_SIZE,
         )
@@ -135,9 +133,7 @@ class FileSessionRecorder(
             frame.pitch?.name.orEmpty(),
             frame.changed?.let { "${it.index}:${it.mark.name}" }.orEmpty(),
         )
-        s.csv.write(cells.joinToString(","))
-        s.csv.newLine()
-        s.csv.flush()
+        s.csv.writeLine(cells.joinToString(","))
     }
 
     override fun line(tag: String, level: Char, line: String) = guarded {
@@ -145,9 +141,7 @@ class FileSessionRecorder(
         val event = line.substringBefore(' ')
         val rest = line.substringAfter(' ', missingDelimiterValue = "")
         val stamp = "$event frame=${s.rows} tag=$tag level=$level"
-        s.log.write(if (rest.isEmpty()) stamp else "$stamp $rest")
-        s.log.newLine()
-        s.log.flush()
+        s.log.writeLine(if (rest.isEmpty()) stamp else "$stamp $rest")
     }
 
     override fun end(marks: Map<Int, StepMark>) = guarded {
@@ -159,7 +153,7 @@ class FileSessionRecorder(
         session = null
         try {
             val spelled = marks.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value.name}" }
-            line(s, "session.end", "frames" to s.rows, "marks" to spelled)
+            note(s, "session.end", "frames" to s.rows, "marks" to spelled)
         } finally {
             closeFiles(s)
         }
@@ -179,10 +173,15 @@ class FileSessionRecorder(
         failure?.let { throw it }
     }
 
-    private fun line(s: Session, event: String, vararg fields: Pair<String, Any?>) {
-        s.log.write(LogLine.format(event, *fields))
-        s.log.newLine()
-        s.log.flush()
+    /** One line of the recorder's own in the session's log, in the app's log format. */
+    private fun note(s: Session, event: String, vararg fields: Pair<String, Any?>) =
+        s.log.writeLine(LogLine.format(event, *fields))
+
+    /** Every line is flushed as it is written, so a session cut short by a crash keeps what it had. */
+    private fun BufferedWriter.writeLine(text: String) {
+        write(text)
+        newLine()
+        flush()
     }
 
     private fun newFolder(): File {

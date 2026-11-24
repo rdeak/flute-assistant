@@ -27,7 +27,8 @@ import javax.inject.Singleton
 
 /**
  * Everything both build types bind the same way: the audio engines, the settings and the
- * background playback. The logger and the session recorder differ by build type and are in
+ * background playback. The engines and the store are app-wide singletons, which each class says
+ * itself (`@Singleton`). The logger and the session recorder differ by build type and are in
  * `SessionModule` (`src/debug` and `src/release`).
  */
 @Module
@@ -35,23 +36,18 @@ import javax.inject.Singleton
 abstract class AppModule {
 
     @Binds
-    @Singleton
     abstract fun bindMetronomePlayer(impl: AudioTrackMetronomePlayer): MetronomePlayer
 
     @Binds
-    @Singleton
     abstract fun bindTunerEngine(impl: AudioRecordTunerEngine): TunerEngine
 
     @Binds
-    @Singleton
     abstract fun bindReferenceTonePlayer(impl: AudioTrackReferenceTonePlayer): ReferenceTonePlayer
 
     @Binds
-    @Singleton
     abstract fun bindFluteTonePlayer(impl: AudioTrackFluteTonePlayer): FluteTonePlayer
 
     @Binds
-    @Singleton
     abstract fun bindSettingsStore(impl: SharedPreferencesSettingsStore): SettingsStore
 
     @Binds

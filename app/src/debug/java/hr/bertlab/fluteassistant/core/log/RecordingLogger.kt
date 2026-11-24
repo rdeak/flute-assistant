@@ -22,21 +22,24 @@ class RecordingLogger(private val inner: Logger, private val sink: LogSink) : Lo
 
     override fun d(tag: String, event: String, vararg fields: Pair<String, Any?>) {
         inner.d(tag, event, *fields)
-        sink.line(tag, 'd', LogLine.format(event, *fields))
+        record(tag, 'd', event, fields)
     }
 
     override fun i(tag: String, event: String, vararg fields: Pair<String, Any?>) {
         inner.i(tag, event, *fields)
-        sink.line(tag, 'i', LogLine.format(event, *fields))
+        record(tag, 'i', event, fields)
     }
 
     override fun w(tag: String, event: String, vararg fields: Pair<String, Any?>, error: Throwable?) {
         inner.w(tag, event, *fields, error = error)
-        sink.line(tag, 'w', LogLine.format(event, *fields))
+        record(tag, 'w', event, fields)
     }
 
     override fun e(tag: String, event: String, vararg fields: Pair<String, Any?>, error: Throwable?) {
         inner.e(tag, event, *fields, error = error)
-        sink.line(tag, 'e', LogLine.format(event, *fields))
+        record(tag, 'e', event, fields)
     }
+
+    private fun record(tag: String, level: Char, event: String, fields: Array<out Pair<String, Any?>>) =
+        sink.line(tag, level, LogLine.format(event, *fields))
 }

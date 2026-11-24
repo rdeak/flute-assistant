@@ -129,7 +129,6 @@ class NotesViewModelTest {
         assertEquals(setOf(wrong), vm.state.value.wrongTaps)
         assertEquals(wrong, vm.state.value.lastWrongTap)
         assertEquals(0, vm.state.value.streak)
-        assertEquals(2, vm.state.value.taps)
         assertEquals(asked, vm.current)
         assertFalse(vm.state.value.solved)
         assertEquals(1, tonePlayer.played.size) // nothing new sounded
@@ -151,7 +150,6 @@ class NotesViewModelTest {
         vm.onNoteTapped(vm.current)
         vm.onNoteTapped(vm.current)
         vm.onNoteTapped(vm.otherNote())
-        assertEquals(1, vm.state.value.taps)
         assertEquals(1, vm.state.value.results.size)
         assertTrue(vm.state.value.wrongTaps.isEmpty())
     }
@@ -173,7 +171,6 @@ class NotesViewModelTest {
         val fresh = vm.state.value
         assertFalse(fresh.roundOver)
         assertTrue(fresh.results.isEmpty())
-        assertEquals(0, fresh.taps)
         assertEquals(0, fresh.streak)
         assertEquals(0, fresh.bestStreak)
         assertTrue(fresh.currentMidi in fresh.practiceNotes)
@@ -287,7 +284,6 @@ class NotesViewModelTest {
         val fresh = vm.state.value
         assertTrue(84 in fresh.practiceNotes)
         assertTrue(fresh.results.isEmpty())
-        assertEquals(0, fresh.taps)
         assertEquals(0, fresh.streak)
         assertEquals(0, fresh.bestStreak)
         assertTrue(fresh.wrongTaps.isEmpty())

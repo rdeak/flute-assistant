@@ -139,7 +139,7 @@ class NoteOnsetTracker(
     var sounding: Int? = null
         private set
 
-    private val recent = ArrayDeque<Double>()
+    private val window = SmoothingWindow(rules.smoothing)
     /** Frames in a row that did not count and were quiet enough; [ONSET_GAP_FRAMES] of them end the sounding note. */
     private var gap = 0
     /** Frames in a row that did not count, at any level; [ListenRules.HOLD_FRAMES] of them end the sounding note too. */
@@ -179,12 +179,17 @@ class NoteOnsetTracker(
      * note going on: what came before was the old note's. [leadOf] reads [Result.leadFrames] from it.
      */
     private val runFrames = ArrayDeque<Double?>()
-    /** Frames since a stop was heard inside the sounding note, or -1 when none is pending. */
-    private var stopAge = -1
-    /** The quietest stretch of the stop pending, which the tone must rise [RESTART_RISE] over. */
-    private var stopFloor = 0f
-    /** The note's recent level when the stop pending was first heard: how deep it fell is this less [stopFloor]. */
-    private var stopRecent = 0f
+    /**
+     * A stop heard inside the sounding note and still pending: the note's [recent] level when it was first heard, its
+     * quietest stretch so far ([floor], which the tone must rise [RESTART_RISE] over; how deep it fell is [recent] less
+     * this), and the frames since it was last heard ([age]).
+     */
+    private class Stop(val recent: Float, var floor: Float) {
+        var age = 0
+    }
+
+    /** The stop pending inside the sounding note; null when none is. */
+    private var stop: Stop? = null
 
     fun onFrame(frame: PitchFrame): Result {
         noticeStop(frame)
@@ -198,40 +203,43 @@ class NoteOnsetTracker(
         recentLevels.addLast(frame.level)
         while (recentLevels.size > rules.recentFrames) recentLevels.removeFirst()
         if (sounding != null) framesSinceOnset++
-        if (stopAge == 0) runFrames.clear() else runFrames.addLast(frequency) // a stop's frame is the old note's
+        if (stop?.age == 0) runFrames.clear() else runFrames.addLast(frequency) // a stop's frame is the old note's
         while (runFrames.size > RUN_FRAMES) runFrames.removeFirst()
-        recent.addLast(frequency)
-        while (recent.size > rules.smoothing) recent.removeFirst()
-        if (!isSteady()) return Result(FrameDecision.UNSTEADY, onset = null).also { ageStop() }
-        val median = recent.sorted()[recent.size / 2]
+        window.add(frequency)
+        if (!window.isSteady(rules.lockFrames, rules.lockCents)) return Result(FrameDecision.UNSTEADY, onset = null).also { ageStop() }
+        val median = window.median()
         val before = sounding
-        val identified = identify(NoteMath.frequencyToNote(median).midi, median)
+        val identified = identify(median)
         // The tone is back after a stop: the note started again, whatever pitch locked.
-        val restarted = stopAge in 1..rules.restartFrames && frame.minLevel >= stopFloor + rules.restartRise
+        val restart = stop?.takeIf { it.age in 1..rules.restartFrames && frame.minLevel >= it.floor + rules.restartRise }
         val onset = when {
-            identified != before && !drifted -> Onset(identified, fresh = before == null || restarted)
-            identified == before && restarted -> Onset(identified, fresh = true)
+            identified != before && !drifted -> Onset(identified, fresh = before == null || restart != null)
+            identified == before && restart != null -> Onset(identified, fresh = true)
             else -> null
         }
-        val lead = if (onset != null) leadOf(median) else 0
-        if (onset != null) {
-            // The new note's loudness is its own; the frames that locked it are its first.
-            levelSum = frame.level.toDouble()
-            levelCount = 1
-            recentLevels.clear()
-            recentLevels.addLast(frame.level)
-            framesSinceOnset = 0
-            stopAge = -1
-        } else if (stopAge < 0) {
-            // Shown as the sounding note going on (no stop waits to be a restart): this frame and all before it are
-            // that note's, however near the pitch of a note stepped to after them (a sharp b, then a slur to c).
-            runFrames.clear()
-        }
         sounding = identified
-        ageStop()
+        if (onset == null) {
+            // Shown as the sounding note going on (unless a stop waits to be a restart): this frame and all before it
+            // are that note's, however near the pitch of a note stepped to after them (a sharp b, then a slur to c).
+            if (stop == null) runFrames.clear()
+            ageStop()
+            return Result(FrameDecision.SHOWN, onset = null)
+        }
+        val lead = leadOf(median)
         // Under the quieter side: a joined note softer than the one before must not turn a breath's dip into a tongue's.
-        val stopDrop = if (onset != null && restarted) minOf(stopRecent, frame.minLevel) - stopFloor else null
-        return Result(FrameDecision.SHOWN, onset, lead, lockHz = median.takeIf { onset != null }, stopDrop = stopDrop)
+        val stopDrop = restart?.let { minOf(it.recent, frame.minLevel) - it.floor }
+        beginNote(frame.level)
+        return Result(FrameDecision.SHOWN, onset, lead, lockHz = median, stopDrop = stopDrop)
+    }
+
+    /** A note began on a frame at [level]: its loudness is its own, the frames that locked it are its first, and no stop is pending in it. */
+    private fun beginNote(level: Float) {
+        levelSum = level.toDouble()
+        levelCount = 1
+        recentLevels.clear()
+        recentLevels.addLast(level)
+        framesSinceOnset = 0
+        stop = null
     }
 
     /**
@@ -256,7 +264,7 @@ class NoteOnsetTracker(
     fun reset() {
         sounding = null
         soundingHz = null
-        recent.clear()
+        window.clear()
         gap = 0
         unheard = 0
         driftFrames = 0
@@ -266,7 +274,7 @@ class NoteOnsetTracker(
         recentLevels.clear()
         framesSinceOnset = 0
         runFrames.clear()
-        stopAge = -1
+        stop = null
     }
 
     /**
@@ -278,15 +286,19 @@ class NoteOnsetTracker(
         if (sounding == null || framesSinceOnset < rules.attackFrames || recentLevels.isEmpty()) return
         val recentMean = recentLevels.sum() / recentLevels.size
         if (frame.minLevel < recentMean - rules.stopDrop) {
-            if (stopAge < 0) stopRecent = recentMean
-            stopFloor = if (stopAge < 0) frame.minLevel else minOf(stopFloor, frame.minLevel)
-            stopAge = 0
+            val pending = stop
+            if (pending == null) {
+                stop = Stop(recent = recentMean, floor = frame.minLevel)
+            } else {
+                pending.floor = minOf(pending.floor, frame.minLevel)
+                pending.age = 0
+            }
         }
     }
 
     /** A frame has passed since the stop; past [RESTART_FRAMES] it was the end of the note, not a stop in it. */
     private fun ageStop() {
-        if (stopAge >= 0 && ++stopAge > rules.restartFrames) stopAge = -1
+        stop?.let { if (++it.age > rules.restartFrames) stop = null }
     }
 
     /**
@@ -306,27 +318,23 @@ class NoteOnsetTracker(
         val quiet = note == null || levelCount == 0 ||
             level < (levelSum / levelCount) * rules.gapLevelRatio ||
             floor?.let { level <= it + rules.floorMargin } == true
-        if ((quiet && ++gap >= rules.onsetGapFrames) || ++unheard >= rules.holdFrames) reset()
+        if (quiet) gap++
+        unheard++
+        if ((quiet && gap >= rules.onsetGapFrames) || unheard >= rules.holdFrames) reset()
         ageStop()
         return Result(decision, onset = null)
     }
 
-    /** True once the last [ListenRules.LOCK_FRAMES] frames agree within [ListenRules.LOCK_CENTS]. */
-    private fun isSteady(): Boolean {
-        if (recent.size < rules.lockFrames) return false
-        val last = recent.takeLast(rules.lockFrames)
-        return NoteMath.centsApart(last.max(), last.min()) <= rules.lockCents
-    }
-
     /**
-     * The note [heard] (the median's nearest note) becomes the sounding note at once when nothing
+     * The note heard (the [median]'s nearest note) becomes the sounding note at once when nothing
      * was sounding, when it is the sounding note, or when it is a clear step away: further than
      * [ListenRules.NEAR_CENTS] from the sounding note's written pitch or, with [Rules.stepFromSounding],
      * from where it was sounding ([soundingHz]: a slurred semitone on a flute off pitch); a drift that has
      * only passed the halfway point to a neighbour waits for [ListenRules.SWITCH_FRAMES] shown
      * frames in a row, one frame back on the sounding note starting the count again.
      */
-    private fun identify(heard: Int, median: Double): Int {
+    private fun identify(median: Double): Int {
+        val heard = NoteMath.frequencyToNote(median).midi
         val current = sounding
         drifted = false
         if (current != null && heard != current && !isClearStep(median, current)) {

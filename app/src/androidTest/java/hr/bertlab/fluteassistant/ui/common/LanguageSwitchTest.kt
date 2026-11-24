@@ -6,6 +6,8 @@ package hr.bertlab.fluteassistant.ui.common
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -41,7 +43,8 @@ class LanguageSwitchTest {
     private fun show(current: AppLanguage, locale: Locale = Locale.ENGLISH) {
         compose.setContent {
             LocaleProvider(locale) {
-                LanguageSwitch(current = current, onSelect = { chosen = it })
+                var open by remember { mutableStateOf(false) }
+                LanguageSwitch(current = current, onSelect = { chosen = it }, isOpen = open, onOpenChange = { open = it })
             }
         }
     }
@@ -63,7 +66,7 @@ class LanguageSwitchTest {
             DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(fontScale)) {
                 LocaleProvider(Locale.ENGLISH) {
                     Column {
-                        LanguageSwitch(current = AppLanguage.ENGLISH, onSelect = {})
+                        LanguageSwitch(current = AppLanguage.ENGLISH, onSelect = {}, isOpen = false, onOpenChange = {})
                         FlagChoice(AppLanguage.CROATIAN, selected = false, onClick = {})
                     }
                 }

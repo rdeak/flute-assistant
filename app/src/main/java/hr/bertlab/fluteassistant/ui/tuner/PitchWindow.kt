@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import hr.bertlab.fluteassistant.ui.common.AppIcons
 import hr.bertlab.fluteassistant.ui.common.Emoji
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
+import hr.bertlab.fluteassistant.ui.common.SPARKLES_EMOJI
+import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
 import hr.bertlab.fluteassistant.ui.common.dashedBorder
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.noteText
@@ -66,8 +68,8 @@ private const val RANGE_CENTS = 50f
 private const val OUT_OF_TUNE_SHARE = 0.37f
 
 // The canvas's drawing at full size, in dp; on a short screen all of it shrinks together.
-private const val WINDOW_WIDTH = 132f
-private const val WINDOW_HEIGHT = 300f
+private const val WINDOW_WIDTH = SidewaysGeometry.PITCH_WINDOW_WIDTH
+private const val WINDOW_HEIGHT = SidewaysGeometry.PITCH_WINDOW_HEIGHT
 private const val RING = 132f
 private const val BUBBLE = 112f
 private const val HOME_BUBBLE = 120f
@@ -80,6 +82,16 @@ private const val ARROW = 30f
 /** How far the arrow sits from the bubble's centre, towards the ring. */
 private const val ARROW_LEAD = 20f
 private const val BADGE = 40f
+/** The in-tune badge's centre from the bubble's: right of it and up, on its rim; and the tick in it. */
+private const val BADGE_RIGHT = 50f
+private const val BADGE_UP = 52f
+private const val BADGE_TICK = 20f
+/** The two sparkles of a note in tune: the bigger up left, the smaller down right, this far from the bubble's centre each way. */
+private const val BIG_SPARKLE = 26
+private const val SMALL_SPARKLE = 22
+private const val SPARKLE_OUT = 58f
+/** The room between the bubble and the arrow beside it. */
+private const val ARROW_GAP = 4
 
 private val RingWidth = 5.dp
 
@@ -166,16 +178,16 @@ fun PitchWindow(
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .offset { IntOffset(sized(50f).roundToPx(), (bubbleY() - sized(52f).toPx()).toInt()) }
+                        .offset { IntOffset(sized(BADGE_RIGHT).roundToPx(), (bubbleY() - sized(BADGE_UP).toPx()).toInt()) }
                         .size(sized(BADGE))
                         .clip(CircleShape)
                         .background(InTuneGreen)
                         .border(OutlineWidth, Color.White, CircleShape),
                 ) {
-                    Icon(AppIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(sized(20f)))
+                    Icon(AppIcons.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(sized(BADGE_TICK)))
                 }
-                Emoji(SPARKLES, fontSize = (26 * scale).toInt(), modifier = Modifier.offset(sized(-58f), sized(-58f)))
-                Emoji(SPARKLES, fontSize = (22 * scale).toInt(), modifier = Modifier.offset(sized(58f), sized(58f)))
+                Emoji(SPARKLES_EMOJI, fontSize = (BIG_SPARKLE * scale).toInt(), modifier = Modifier.offset(sized(-SPARKLE_OUT), sized(-SPARKLE_OUT)))
+                Emoji(SPARKLES_EMOJI, fontSize = (SMALL_SPARKLE * scale).toInt(), modifier = Modifier.offset(sized(SPARKLE_OUT), sized(SPARKLE_OUT)))
             } else {
                 val high = cents > 0
                 Icon(
@@ -186,7 +198,7 @@ fun PitchWindow(
                         .offset {
                             val lead = sized(ARROW_LEAD).toPx()
                             IntOffset(
-                                sized(BUBBLE / 2 + 4 + ARROW / 2).roundToPx(),
+                                sized(BUBBLE / 2 + ARROW_GAP + ARROW / 2).roundToPx(),
                                 (bubbleY() + if (high) lead else -lead).toInt(),
                             )
                         }
@@ -294,5 +306,3 @@ private fun travel(cents: Float): Float {
     val share = OUT_OF_TUNE_SHARE + (magnitude - inTuneCents) / (RANGE_CENTS - inTuneCents) * (1f - OUT_OF_TUNE_SHARE)
     return if (cents < 0) -share else share
 }
-
-private const val SPARKLES = "✨" // sparkles

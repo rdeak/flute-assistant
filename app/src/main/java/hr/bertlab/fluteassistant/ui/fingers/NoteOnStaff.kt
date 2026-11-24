@@ -29,8 +29,8 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 internal fun NoteOnStaff(midi: Int, modifier: Modifier = Modifier) {
     val colors = FluteTheme.colors
     Canvas(modifier) {
-        val gap = (size.height - 15.dp.toPx()) / 10.5f
-        val bottom = 8.dp.toPx() + 9.5f * gap
+        val gap = (size.height - StaffMargins.toPx()) / STAFF_GAPS
+        val bottom = StaffTopMargin.toPx() + BOTTOM_LINE_GAPS * gap
         val line = 1.5.dp.toPx()
         // `StaffNotes`' places, two to a line gap, counted up from the bottom line.
         fun yOf(place: Int) = bottom - (place - StaffNotes.LINE_POSITIONS.first()) * gap / 2
@@ -39,13 +39,13 @@ internal fun NoteOnStaff(midi: Int, modifier: Modifier = Modifier) {
         drawStaffClef(gap, yOf(StaffNotes.G_LINE), x = 2.dp.toPx(), color = colors.mutedText, strokeUnits = CLEF_STROKE)
 
         val place = NoteSpelling.placeOf(midi)
-        val x = size.width - 17.dp.toPx()
+        val x = size.width - NoteFromEnd.toPx()
         val y = yOf(place)
-        val ledgerHalf = 9.dp.toPx()
+        val ledgerHalf = LedgerHalf.toPx()
         StaffNotes.ledgerLinesFor(place).forEach { drawLine(colors.text, Offset(x - ledgerHalf, yOf(it)), Offset(x + ledgerHalf, yOf(it)), line) }
-        val head = Size(gap * 0.72f * 2, gap * 0.54f * 2)
+        val head = Size(gap * HEAD_RX * 2, gap * HEAD_RY * 2)
         val topLeft = Offset(x - head.width / 2, y - head.height / 2)
-        rotate(-18f, pivot = Offset(x, y)) {
+        rotate(HEAD_TILT, pivot = Offset(x, y)) {
             drawOval(noteColor(midi), topLeft, head)
             drawOval(colors.outline, topLeft, head, style = Stroke(2.dp.toPx()))
         }
@@ -53,7 +53,7 @@ internal fun NoteOnStaff(midi: Int, modifier: Modifier = Modifier) {
             // drawSign draws in the flute staff's units, whose line gap is 18: one unit here is this staff's gap over that.
             val unit = gap / SIGN_LINE_GAP
             scale(unit, pivot = Offset.Zero) {
-                drawSign(sign, cx = (x - 15.dp.toPx()) / unit, y = y / unit, color = colors.text)
+                drawSign(sign, cx = (x - SignBeforeNote.toPx()) / unit, y = y / unit, color = colors.text)
             }
         }
     }
@@ -61,3 +61,17 @@ internal fun NoteOnStaff(midi: Int, modifier: Modifier = Modifier) {
 
 /** Thicker than the clef's default 0.13 of a unit: this clef is small. */
 private const val CLEF_STROKE = 0.2f
+
+/** The staff in its box: 15 dp of margin in all, 8 of it over the top, and 10.5 line gaps of height, the bottom line 9.5 down. */
+private val StaffMargins = 15.dp
+private val StaffTopMargin = 8.dp
+private const val STAFF_GAPS = 10.5f
+private const val BOTTOM_LINE_GAPS = 9.5f
+
+/** The note: its head's radii in line gaps and its tilt, how far it stands from the staff's end, its ledger lines' half width and its sign before it. */
+private const val HEAD_RX = 0.72f
+private const val HEAD_RY = 0.54f
+private const val HEAD_TILT = -18f
+private val NoteFromEnd = 17.dp
+private val LedgerHalf = 9.dp
+private val SignBeforeNote = 15.dp

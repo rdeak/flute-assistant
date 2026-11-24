@@ -70,7 +70,7 @@ internal val KeyGap: Dp = KEY_GAP.dp
 private val KeyCorner = 21.dp
 
 /** A key's rounded shape. */
-internal val KeyShape: Shape = RoundedCornerShape(KeyCorner)
+private val KeyShape: Shape = RoundedCornerShape(KeyCorner)
 
 /** The ring's line, how far its middle runs outside the key's outline, and how much lower the whole ring sits, as a sunk key does. */
 private val RingLine = 5.dp
@@ -81,7 +81,7 @@ private val RingDrop = 3.dp
 internal val KeyRingReach: Dp = RingGap - RingDrop + RingLine / 2
 
 /** The yellow ring around a pressed key, a little outside its outline. */
-internal fun DrawScope.drawKeyRing() {
+private fun DrawScope.drawKeyRing() {
     val gap = RingGap.toPx()
     drawRoundRect(
         color = Sun,
@@ -94,7 +94,7 @@ internal fun DrawScope.drawKeyRing() {
 
 /** The ♯♭ key's picture: the staff's own sharp and flat side by side ([drawSign]), 28 x 26 dp at [scale] 1. */
 @Composable
-internal fun SharpFlatPicture(color: Color, scale: Float, modifier: Modifier = Modifier) {
+private fun SharpFlatPicture(color: Color, scale: Float, modifier: Modifier = Modifier) {
     Canvas(modifier.size((SHARP_FLAT_WIDTH * scale).dp, (SHARP_FLAT_HEIGHT * scale).dp)) {
         scale(scale * density, pivot = Offset.Zero) {
             drawSign(Accidental.SHARP, cx = 7f, y = 13f, color = color)

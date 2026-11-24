@@ -55,20 +55,22 @@ class AudioRecordTunerEngine @Inject constructor(
         }
 
         val sampleRate = pickSampleRate()
-        val record = openRecorder(sampleRate)
         val detector = YinPitchDetector.forFlute(sampleRate, bufferSize = WINDOW_SIZE)
         val window = FloatArray(WINDOW_SIZE)
         val chunk = FloatArray(HOP_SIZE)
         var frames = 0
-        logger.i(
-            LogTags.TUNER, "mic.open",
-            "source" to sourceName(record.audioSource), "unprocessedSupported" to unprocessedSupported(),
-            "rate" to record.sampleRate, "bufferFrames" to record.bufferSizeInFrames,
-            "window" to WINDOW_SIZE, "hop" to HOP_SIZE,
-        )
-        tap.opened(record.sampleRate, sourceName(record.audioSource))
 
+        // Nothing between the open and the try that releases it: whatever fails after this, the microphone is given back.
+        val record = openRecorder(sampleRate)
         try {
+            val source = sourceName(record.audioSource)
+            logger.i(
+                LogTags.TUNER, "mic.open",
+                "source" to source, "unprocessedSupported" to unprocessedSupported(),
+                "rate" to record.sampleRate, "bufferFrames" to record.bufferSizeInFrames,
+                "window" to WINDOW_SIZE, "hop" to HOP_SIZE,
+            )
+            tap.opened(record.sampleRate, source)
             record.startRecording()
             check(record.recordingState == AudioRecord.RECORDSTATE_RECORDING) { "Microphone is busy" }
             while (currentCoroutineContext().isActive) {
@@ -102,12 +104,12 @@ class AudioRecordTunerEngine @Inject constructor(
             tap.closed()
             logger.i(LogTags.TUNER, "mic.close", "frames" to frames)
         }
-    }.flowOn(Dispatchers.IO) // blocking reads belong on IO; each collector decides whether to conflate or buffer
+    }.flowOn(Dispatchers.IO) // blocking reads belong on IO, which buffers the frames for the collector
 
     private fun pickSampleRate(): Int =
         PREFERRED_SAMPLE_RATES.firstOrNull { rate ->
             AudioRecord.getMinBufferSize(rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT) > 0
-        } ?: 44_100
+        } ?: PREFERRED_SAMPLE_RATES.last()
 
     // Permission is verified at the top of pitchFrames() before this is reached.
     @SuppressLint("MissingPermission")
@@ -124,7 +126,7 @@ class AudioRecordTunerEngine @Inject constructor(
                     .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
                     .build(),
             )
-            .setBufferSizeInBytes(max(minBytes, WINDOW_SIZE * 4 * 2))
+            .setBufferSizeInBytes(max(minBytes, WINDOW_SIZE * Float.SIZE_BYTES * 2))
             .build()
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             record.release()
@@ -149,7 +151,7 @@ class AudioRecordTunerEngine @Inject constructor(
 
     companion object {
         /** Samples the detector sees at once; public so the replay of a recorded session frames audio the same way. */
-        const val WINDOW_SIZE = 4096
+        const val WINDOW_SIZE = YinPitchDetector.DEFAULT_BUFFER_SIZE
         /** Samples read, and the window advanced, per frame: about 43 ms at 48 kHz. */
         const val HOP_SIZE = PitchFrame.HOP_SAMPLES
         private val PREFERRED_SAMPLE_RATES = intArrayOf(48_000, 44_100)

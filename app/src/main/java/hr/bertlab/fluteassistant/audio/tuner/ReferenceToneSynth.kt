@@ -12,9 +12,6 @@ import kotlin.math.min
  * out so it neither clicks nor stops dead. Pure Kotlin.
  */
 object ReferenceToneSynth {
-    private const val ATTACK_MS = 30
-    private const val RELEASE_MS = 120
-
     /** [durationMs] of mono float PCM at [sampleRate], peaking at [amplitude] (0..1). */
     fun render(frequencyHz: Double, sampleRate: Int, durationMs: Int, amplitude: Float): FloatArray {
         require(frequencyHz > 0.0) { "frequency must be positive" }
@@ -22,8 +19,8 @@ object ReferenceToneSynth {
         val count = (sampleRate.toLong() * durationMs / 1000).toInt()
         val out = FloatArray(count)
         if (count == 0 || amplitude <= 0f) return out
-        val attack = (sampleRate * ATTACK_MS / 1000).coerceAtLeast(1)
-        val release = (sampleRate * RELEASE_MS / 1000).coerceAtLeast(1)
+        val attack = (sampleRate * FluteTimbre.ATTACK_MS / 1000).coerceAtLeast(1)
+        val release = (sampleRate * FluteTimbre.RELEASE_MS / 1000).coerceAtLeast(1)
         val gain = amplitude / FluteTimbre.cyclePeak
         for (i in 0 until count) {
             val envelope = min(1.0, min(i.toDouble() / attack, (count - 1 - i).toDouble() / release))

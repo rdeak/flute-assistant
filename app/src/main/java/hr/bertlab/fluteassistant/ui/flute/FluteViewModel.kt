@@ -29,7 +29,6 @@ import hr.bertlab.fluteassistant.domain.listen.ListenRules
 import hr.bertlab.fluteassistant.domain.listen.PitchFrame
 import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
-import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.settings.MetronomeSettings
 import hr.bertlab.fluteassistant.domain.settings.SettingsStore
 import hr.bertlab.fluteassistant.domain.tuner.NoteMath
@@ -86,7 +85,8 @@ import javax.inject.Inject
  * second tap cancelled one or there was nothing to join from), `flute.join_cancel` (reason: rest, breath, erase,
  * play, listen, book, speed or leave: a waiting join dropped), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its
  * second tap dropped it, since 2026-11-17), `flute.sign_cancel` (reason: erase, play, listen, book, speed or leave: a waiting sign
- * dropped), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
+ * dropped), `flute.octave` (octave: 1 to 4, when an octave pill changed the octave the keys write in, since
+ * 2026-11-18), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
  * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left),
  * `flute.speed_open` and `flute.speed_done` (bpm, time), `flute.shelf_open` (book: the open
  * one's index), `flute.book_open` (from, to, notes: the steps in the book opened, bpm and time:
@@ -155,12 +155,13 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * A finger went down on the white key [key]: sound the note it writes at once and add it to the tune, or go on with its
-     * note ([TuneWriter]). While the ♯♭ key waits it writes its letter's black note, and D, A and C6 do nothing but go
-     * on with a hold the touch screen split ([TuneWriter.takes]). The keys are the white ones only (since 2026-11-17).
+     * A finger went down on the letter key [key] (0 = C to 6 = B, since 2026-11-18): sound the note it writes at once, its
+     * own in the chosen octave, and add it to the tune, or go on with its note ([TuneWriter]). While the ♯♭ key waits it
+     * writes its letter's black note, and D and A do nothing but go on with a hold the touch screen split
+     * ([TuneWriter.takes]); in octave 4 only c⁴ writes.
      */
     fun onKeyPressed(key: Int) {
-        if (key !in StaffNotes.ALL || !writer.takes(key, clock.nowMillis())) return
+        if (!writer.takes(key, clock.nowMillis())) return // a key the keys do not have is not taken either
         stopRunning(reason = "key")
         activationJob?.cancel()
         press(key)
@@ -171,22 +172,13 @@ class FluteViewModel @Inject constructor(
 
     /** The finger lifted off (or slid off) the key [key]; ignored unless that key is the one held. */
     fun onKeyReleased(key: Int) {
-        if (!holdsNote(key)) return
-        tonePlayer.noteOff()
-        ended(writer.release(clock.nowMillis()))
+        if (holdsNote(key)) letGo()
     }
 
     /** A screen reader activated the key [key]: sound the note it writes for one beat of the writing pace and add it, a quarter note. */
     fun onKeyActivated(key: Int) {
         onKeyPressed(key)
-        if (!holdsNote(key)) return
-        activationJob = viewModelScope.launch {
-            delay(TuneWriter.TAP_MS)
-            if (holdsNote(key)) {
-                tonePlayer.noteOff()
-                ended(writer.release(clock.nowMillis(), heldMs = TuneWriter.TAP_MS))
-            }
-        }
+        if (holdsNote(key)) letGoAfterTap { holdsNote(key) }
     }
 
     /** A finger went down on the rest key: silence a held note and add a rest that grows while the key stays down, or go on with its rest. */
@@ -199,24 +191,19 @@ class FluteViewModel @Inject constructor(
 
     /** The finger lifted off (or slid off) the rest key; ignored unless the rest is the one held. */
     fun onRestReleased() {
-        if (writer.held?.isRest != true) return
-        ended(writer.release(clock.nowMillis()))
+        if (holdsRest()) letGo()
     }
 
     /** A screen reader activated the rest key: a rest of one beat of the writing pace, a quarter rest. */
     fun onRestActivated() {
         onRestPressed()
-        activationJob = viewModelScope.launch {
-            delay(TuneWriter.TAP_MS)
-            if (writer.held?.isRest == true) ended(writer.release(clock.nowMillis(), heldMs = TuneWriter.TAP_MS))
-        }
+        letGoAfterTap(::holdsRest)
     }
 
     /** The breath key: ends a held key and marks a breath, unless the last step is one already. */
     fun onBreath() {
         stopRunning(reason = "key")
         endHeld()
-        activationJob?.cancel()
         val breath = writer.breath()
         if (breath.added || breath.dropped.any) written()
         logDropped(breath.dropped, reason = "breath")
@@ -232,7 +219,6 @@ class FluteViewModel @Inject constructor(
         }
         if (_state.value.isEmpty || _state.value.isListening) return
         endHeld()
-        activationJob?.cancel()
         dropWaiting(reason = "play")
         val items = writer.tune
         val pulse = pulse()
@@ -241,8 +227,7 @@ class FluteViewModel @Inject constructor(
             "flute.play",
             "notes" to items.count { it is TuneNote },
             "rests" to items.count { it is TuneRest },
-            "bpm" to pulse.bpm,
-            "time" to pulse.timeSignature.label,
+            *pulse.fields(),
         )
         // Undispatched, so the first note sounds and lights before this call returns.
         playbackJob = viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -285,7 +270,6 @@ class FluteViewModel @Inject constructor(
         val current = _state.value
         if (current.isPlaying || current.isListening || !current.canListen) return
         endHeld()
-        activationJob?.cancel()
         dropWaiting(reason = "listen")
         beginRun()
         listenJob = viewModelScope.launch { listen() }
@@ -343,8 +327,7 @@ class FluteViewModel @Inject constructor(
      */
     fun openSpeed() {
         clearStage(reason = "speed")
-        val pulse = pulse()
-        logger.d(LogTags.FLUTE, "flute.speed_open", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
+        logger.d(LogTags.FLUTE, "flute.speed_open", *pulse().fields())
     }
 
     /** The speed panel's ring: the metronome's tempo, for both tabs ([MetronomeSettings]). */
@@ -355,8 +338,7 @@ class FluteViewModel @Inject constructor(
 
     /** OK on the metronome's ring: the tune is back, its staff in the time signature chosen there (the screen reads the metronome's). */
     fun closeSpeed() {
-        val pulse = pulse()
-        logger.d(LogTags.FLUTE, "flute.speed_done", "bpm" to pulse.bpm, "time" to pulse.timeSignature.label)
+        logger.d(LogTags.FLUTE, "flute.speed_done", *pulse().fields())
     }
 
     /**
@@ -384,8 +366,7 @@ class FluteViewModel @Inject constructor(
             return
         }
         clearStage(reason = "book") // before the tune is read: a held note is part of the book left
-        val config = metronome.config.value
-        val leaving = Book(writer.tune, config.bpm, config.timeSignature)
+        val leaving = bookNow()
         settings.saveBook(open, leaving)
         settings.saveOpenBook(index)
         val target = _state.value.books[index]
@@ -399,7 +380,7 @@ class FluteViewModel @Inject constructor(
             )
         }
         val pulse = if (target.isEmpty) null else {
-            Pulse(target.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM), target.timeSignature)
+            Pulse(TempoBand.clamp(target.bpm), target.timeSignature)
         }
         if (pulse != null) metronome.update { it.withBpm(pulse.bpm).copy(timeSignature = pulse.timeSignature) }
         logger.d(
@@ -408,8 +389,7 @@ class FluteViewModel @Inject constructor(
             "from" to open,
             "to" to index,
             "notes" to target.tune.size,
-            "bpm" to pulse?.bpm,
-            "time" to pulse?.timeSignature?.label,
+            *pulse.fields(),
         )
     }
 
@@ -549,7 +529,7 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * The white key [key] (null: the rest key) went down: the writer adds its step or goes on with the
+     * The letter key [key] (null: the rest key) went down: the writer adds its step or goes on with the
      * one let go of, and it grows from there while the key stays down. A new step is a write to
      * the tune and is saved; a hold that only goes on is not.
      */
@@ -583,9 +563,27 @@ class FluteViewModel @Inject constructor(
      * of before: something other than the finger is acting on the tune. Nothing held: only the latter.
      */
     private fun endHeld() {
-        if (writer.held?.midi != null) tonePlayer.noteOff()
-        ended(writer.release(clock.nowMillis()))
+        activationJob?.cancel()
+        letGo()
         writer.forget()
+    }
+
+    /**
+     * The held key is let go: a sounding note is silenced, and its step takes the length [heldMs] makes, by default
+     * the time since its press. Nothing held: nothing happens.
+     */
+    private fun letGo(heldMs: Long? = null) {
+        if (writer.held?.midi != null) tonePlayer.noteOff()
+        val now = clock.nowMillis()
+        ended(if (heldMs == null) writer.release(now) else writer.release(now, heldMs))
+    }
+
+    /** A screen reader's tap: the key just pressed is let go after one beat of the writing pace, if it is [stillHeld] then. */
+    private fun letGoAfterTap(stillHeld: () -> Boolean) {
+        activationJob = viewModelScope.launch {
+            delay(TuneWriter.TAP_MS)
+            if (stillHeld()) letGo(heldMs = TuneWriter.TAP_MS)
+        }
     }
 
     /** A hold ended ([ended], null when no key was held): its step stops growing, shows the length it made and is saved. */
@@ -611,7 +609,9 @@ class FluteViewModel @Inject constructor(
 
     /** Shows what the writer holds: the tune, the key under a finger, and whether a join or a sign waits. */
     private fun written() {
-        _state.update { it.copy(tune = writer.tune, held = writer.held, joinWaiting = writer.joinWaiting, signWaiting = writer.signWaiting) }
+        _state.update {
+            it.copy(tune = writer.tune, held = writer.held, joinWaiting = writer.joinWaiting, signWaiting = writer.signWaiting, octave = writer.octave)
+        }
     }
 
     /**
@@ -637,6 +637,21 @@ class FluteViewModel @Inject constructor(
         logger.d(LogTags.FLUTE, "flute.sign", "waiting" to waiting)
     }
 
+    /**
+     * An octave pill (since 2026-11-18, spec `2026-11-18-flute-every-octave-design.md`, Revision 3): the letter keys write
+     * in [octave], 1 to 4, until another pill is tapped. The chosen one again does nothing. It never ends a held key,
+     * whose note goes on under its finger, and drops no waiting join or sign.
+     */
+    fun onOctave(octave: Int) {
+        if (!writer.chooseOctave(octave)) return
+        stopRunning(reason = "key")
+        written()
+        logger.d(LogTags.FLUTE, "flute.octave", "octave" to octave)
+    }
+
+    /** Whether the rest key is the one held now. */
+    private fun holdsRest(): Boolean = writer.held?.isRest == true
+
     /** Whether the note key [key] is the one held now. */
     private fun holdsNote(key: Int): Boolean = writer.held?.let { it.midi != null && it.key == key } == true
 
@@ -656,12 +671,11 @@ class FluteViewModel @Inject constructor(
         dropWaiting(reason)
     }
 
-    /** Drops a waiting join and a waiting sign, shown and logged with what dropped them; says whether either waited. */
-    private fun dropWaiting(reason: String): Boolean {
+    /** Drops a waiting join and a waiting sign, shown and logged with what dropped them. */
+    private fun dropWaiting(reason: String) {
         val dropped = writer.dropWaiting()
         if (dropped.any) written()
         logDropped(dropped, reason)
-        return dropped.any
     }
 
     /**
@@ -679,7 +693,7 @@ class FluteViewModel @Inject constructor(
      */
     private fun pulse(): Pulse {
         val config = metronome.config.value
-        return Pulse(config.bpm.coerceIn(TempoBand.MIN_BPM, TempoBand.MAX_BPM), config.timeSignature)
+        return Pulse(TempoBand.clamp(config.bpm), config.timeSignature)
     }
 
     /**
@@ -689,9 +703,17 @@ class FluteViewModel @Inject constructor(
      */
     private fun save() {
         if (_state.value.marks.isNotEmpty()) _state.update { it.copy(marks = emptyMap()) }
-        val config = metronome.config.value
-        settings.saveBook(_state.value.openBook, Book(writer.tune, config.bpm, config.timeSignature))
+        settings.saveBook(_state.value.openBook, bookNow())
     }
+
+    /** The tune as it stands, as a book: with the speed and the beat the metronome has now. */
+    private fun bookNow(): Book {
+        val config = metronome.config.value
+        return Book(writer.tune, config.bpm, config.timeSignature)
+    }
+
+    /** A pulse's two fields of a log line, `none` for both when there is none (an empty book). */
+    private fun Pulse?.fields(): Array<Pair<String, Any?>> = arrayOf("bpm" to this?.bpm, "time" to this?.timeSignature?.label)
 
     override fun onCleared() {
         playbackJob?.cancel()

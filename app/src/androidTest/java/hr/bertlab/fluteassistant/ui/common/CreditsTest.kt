@@ -3,6 +3,10 @@
 
 package hr.bertlab.fluteassistant.ui.common
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsDisplayed
@@ -31,7 +35,8 @@ class CreditsTest {
     private fun show(locale: Locale = Locale.ENGLISH) {
         compose.setContent {
             LocaleProvider(locale) {
-                CreditsLogo()
+                var open by remember { mutableStateOf(false) }
+                CreditsLogo(isOpen = open, onOpenChange = { open = it })
             }
         }
     }

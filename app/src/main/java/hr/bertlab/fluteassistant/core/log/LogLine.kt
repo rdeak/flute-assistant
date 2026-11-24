@@ -54,8 +54,7 @@ object LogLine {
 
     private fun render(value: Any?): String = when (value) {
         null -> "none"
-        is Double -> String.format(Locale.ROOT, "%.2f", value)
-        is Float -> String.format(Locale.ROOT, "%.2f", value)
+        is Double, is Float -> String.format(Locale.ROOT, "%.2f", value)
         is Enum<*> -> value.name
         is String -> if (value.any { it.isWhitespace() }) "\"$value\"" else value
         else -> value.toString()

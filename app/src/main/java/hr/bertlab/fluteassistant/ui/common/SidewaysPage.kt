@@ -106,8 +106,8 @@ fun SidewaysActionButton(
 
 /**
  * A column's quieter button: an emoji over a word on the plain raised colour, as wide as the column.
- * Pass [selected] for one option of a group, yellow when chosen. The 92 tall one has the bigger
- * emoji and word the mockup gives it. The microphone card's "Not now" has no emoji, and a button
+ * Pass [selected] for one option of a group, yellow when chosen. A [big] one has the bigger
+ * emoji and word the mockup gives the tuner's 92 dp modes. The microphone card's "Not now" has no emoji, and a button
  * without one is its word alone, centred. The word shrinks to fit down to 12 dp, a floor in dp as
  * the Pick buttons' are: one in sp doubles at the largest text, and 12 sp cut "👂 Slušaj" there,
  * and a cut word is worse than a small one.
@@ -121,8 +121,8 @@ fun SidewaysPlainButton(
     selected: Boolean? = null,
     enabled: Boolean = true,
     height: Dp = 84.dp,
+    big: Boolean = false,
 ) {
-    val big = height >= 92.dp
     val wordFloor = WordFloor.asTextSize()
     ChunkyButton(
         onClick = onClick,

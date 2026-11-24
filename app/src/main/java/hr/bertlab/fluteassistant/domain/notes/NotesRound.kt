@@ -32,8 +32,6 @@ data class NotesRound(
     /** Notes found on the first tap in a row, right now. */
     val streak: Int = 0,
     val bestStreak: Int = 0,
-    /** Every tap this round, right or wrong (the summary's aim tile read it until 2026-11-10; nothing on screen does now). */
-    val taps: Int = 0,
     /** True once [ROUND_LENGTH] notes are answered and the summary is up. */
     val roundOver: Boolean = false,
     /** Whether a found note is sounded; a toggle beside the note picker, remembered. */
@@ -79,6 +77,9 @@ data class NotesRound(
     /** Notes found on the first tap. */
     val score: Int get() = results.count { it }
 
+    /** Every note of the round found on the first tap: the trophy hops higher and gets its sparkles. */
+    val perfect: Boolean get() = score == ROUND_LENGTH
+
     /**
      * The round after the child tapped the place of [midi] on the staff at [now]. The same round
      * (nothing happened) while the last answer still shows, a phrase plays or the round is over.
@@ -97,7 +98,6 @@ data class NotesRound(
             return copy(
                 wrongTaps = wrongTaps + midi,
                 lastWrongTap = midi,
-                taps = taps + 1,
                 streak = 0,
                 phraseClean = phraseClean && !hearing,
                 progress = if (wrongTaps.isEmpty()) progress.missed(currentMidi) else progress,
@@ -108,7 +108,6 @@ data class NotesRound(
         val newStreak = if (firstTry) streak + 1 else 0
         val newProgress = if (firstTry) progress.found(midi) else progress
         val scored = copy(
-            taps = taps + 1,
             results = results + firstTry,
             streak = newStreak,
             bestStreak = max(bestStreak, newStreak),
@@ -155,7 +154,7 @@ data class NotesRound(
                     phraseClean = true,
                 )
             }
-            else -> cleared.copy(currentMidi = draw(practiceNotes, avoid = currentMidi, random))
+            else -> cleared.copy(currentMidi = Phrases.anyBut(practiceNotes, avoid = currentMidi, random))
         }
     }
 
@@ -179,7 +178,7 @@ data class NotesRound(
             if (game == NotesGame.FIND) {
                 return NotesRound(
                     practiceNotes = notes,
-                    currentMidi = draw(notes, avoid = previous?.currentMidi, random),
+                    currentMidi = Phrases.anyBut(notes, avoid = previous?.currentMidi, random),
                     soundOn = soundOn,
                     phraseId = phraseId,
                     progress = progress,
@@ -198,12 +197,6 @@ data class NotesRound(
                 progress = progress,
                 startProgress = progress,
             )
-        }
-
-        /** A random note from [notes], not [avoid] unless it is the only one. */
-        private fun draw(notes: Set<Int>, avoid: Int?, random: Random): Int {
-            val candidates = (notes - setOfNotNull(avoid)).ifEmpty { notes }.sorted()
-            return candidates[random.nextInt(candidates.size)]
         }
     }
 }

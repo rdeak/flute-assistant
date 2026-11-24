@@ -31,8 +31,8 @@ object Joins {
                 continue
             }
             var end = start
-            while ((tune.getOrNull(end + 1) as? TuneNote)?.joined == true) end++
-            val notes = (start..end).map { (tune[it] as TuneNote).midi }
+            while (goesOn(tune, end)) end++
+            val notes = (start..end).map { tune.midiAt(it) }
             if (notes.zipWithNext().any { (a, b) -> a != b }) arcs += JoinArc(start, end, tie = false)
             for (index in start + 1..end) {
                 if (notes[index - start] == notes[index - start - 1]) arcs += JoinArc(index - 1, index, tie = true)
@@ -41,6 +41,9 @@ object Joins {
         }
         return arcs
     }
+
+    /** Whether the step at [index] goes on into the next one: the next step is a note joined to it. */
+    fun goesOn(tune: List<TuneItem>, index: Int): Boolean = (tune.getOrNull(index + 1) as? TuneNote)?.joined == true
 
     /** Whether the ⌒ key has a note to join the next one to: the last step is a note, and the tune is not at the cap. */
     fun canJoinAfter(tune: List<TuneItem>): Boolean = tune.lastOrNull() is TuneNote && tune.size < Tune.MAX_NOTES
@@ -65,7 +68,7 @@ object Joins {
         var index = head
         var left = halfBeat
         while (heardWithBefore(tune, index + 1)) {
-            val length = tune[index].length?.halfBeats ?: 0
+            val length = tune[index].halfBeats
             if (left < length) break
             left -= length
             index++
@@ -80,6 +83,6 @@ object Joins {
     private fun joinedInLetter(tune: List<TuneItem>, index: Int): Boolean? {
         val note = tune.getOrNull(index) as? TuneNote ?: return null
         val before = tune.getOrNull(index - 1) as? TuneNote ?: return null
-        return if (note.joined) TuneCheck.sameLetter(note.midi, before.midi) else null
+        return if (note.joined) TuneCheck.samePitchClass(note.midi, before.midi) else null
     }
 }
