@@ -66,9 +66,10 @@ data class FluteUiState(
 ) {
     /**
      * Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full, or, with a
-     * step [selected], the step before it is a note ([TuneWriter.canJoin]).
+     * step [selected], the step before it is a note; never while the key [held] is changing the chosen step
+     * ([TuneWriter.canJoin]).
      */
-    val canJoin: Boolean get() = TuneWriter.canJoin(tune, selected)
+    val canJoin: Boolean get() = TuneWriter.canJoin(tune, selected, held)
 
     /** [books] with the open entry's tune replaced by [tune], the tune as the child sees it now. */
     val shelf: List<Book>

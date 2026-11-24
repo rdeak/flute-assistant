@@ -250,5 +250,8 @@ class FluteUiStateTest {
         assertTrue(FluteUiState(tune = tune).canJoin)
         assertFalse(FluteUiState(tune = tune, selected = 1).canJoin)
         assertTrue(FluteUiState(tune = tune, selected = 2).canJoin)
+        // A key held on the chosen step: the next note is written at the end, not after the held one.
+        assertFalse(FluteUiState(tune = tune, selected = 2, held = Held(65, index = 2, replaces = true)).canJoin)
+        assertTrue("a key held at the end joins its note to the next", FluteUiState(tune = tune, held = Held(64, index = 2)).canJoin)
     }
 }

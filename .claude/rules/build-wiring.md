@@ -15,7 +15,7 @@ paths:
 
 # Build wiring (AGP 9)
 
-AGP 9 (9.5.1 in `gradle/libs.versions.toml`) uses built-in Kotlin: there is no `kotlin-android` plugin and no kapt. The root
+AGP 9 (9.5.2 in `gradle/libs.versions.toml`) uses built-in Kotlin: there is no `kotlin-android` plugin and no kapt. The root
 `build.gradle.kts` puts the Kotlin Gradle plugin on the buildscript classpath to raise AGP's
 bundled Kotlin to the catalog's `kotlin` version, and the Compose compiler plugin shares that
 same version ref; keep the two equal. KSP is the standalone 2.3.x line and runs for Hilt alone

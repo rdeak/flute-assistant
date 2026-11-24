@@ -14,8 +14,9 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * The scale of a tab's line of words whose good news bounces in: when [on] turns true ("Perfect!" on the tuner,
- * "That's it!" on the notes tab) it jumps to 1.3 and springs back to 1. Read through [bounce], in the layer phase, so
- * the spring redraws the line and never recomposes it.
+ * "That's it!" on the notes tab) it jumps to 1.3 and springs back to 1; when it turns false the line stands at 1 at
+ * once, wherever its spring had got to, so the words that follow good news are never drawn large. Read through
+ * [bounce], in the layer phase, so the spring redraws the line and never recomposes it.
  */
 @Composable
 fun rememberBounce(on: Boolean): () -> Float {
@@ -24,6 +25,9 @@ fun rememberBounce(on: Boolean): () -> Float {
         if (on) {
             scale.snapTo(1.3f)
             scale.animateTo(1f, spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+        } else {
+            // Good news that ended in the middle of its bounce took the spring with it (this effect's restart).
+            scale.snapTo(1f)
         }
     }
     return { scale.value }

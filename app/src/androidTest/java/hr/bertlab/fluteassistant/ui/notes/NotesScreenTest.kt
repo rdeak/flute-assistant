@@ -183,7 +183,13 @@ class NotesScreenTest {
      * room: the test's own window is the whole emulator, with none of the bars a phone's tab has to share its
      * height with. At [fontScale] and in [locale] when a test asks.
      */
-    private fun showInWindow(size: DpSize, initial: NotesRound, fontScale: Float = 1f, locale: Locale = Locale.ENGLISH) {
+    private fun showInWindow(
+        size: DpSize,
+        initial: NotesRound,
+        fontScale: Float = 1f,
+        locale: Locale = Locale.ENGLISH,
+        actions: NotesActions = NotesActions(),
+    ) {
         state = mutableStateOf(initial)
         window = mutableStateOf(size)
         compose.setContent {
@@ -191,10 +197,37 @@ class NotesScreenTest {
                 DeviceConfigurationOverride.ForcedSize(window.value) then DeviceConfigurationOverride.FontScale(fontScale),
             ) {
                 LocaleProvider(locale) {
-                    NotesContent(state = state.value, actions = NotesActions())
+                    NotesContent(state = state.value, actions = actions)
                 }
             }
         }
+    }
+
+    /**
+     * The staff's places follow its size (a split screen, a window dragged, a foldable): after the window changes
+     * height a touch still answers the place under it. The touch's block lives on through the change, so it must
+     * not keep the height it began with (the review of 2026-11-24: a touch then answered another place, a miss).
+     */
+    @Test
+    fun a_touch_answers_the_place_under_it_after_the_staff_changes_height() {
+        showInWindow(DpSize(411.dp, 800.dp), asking(62), actions = NotesActions(onNoteTapped = { tapped += it }))
+        val staff = compose.onNodeWithContentDescription(staffDescription)
+        fun touch(place: Int) {
+            val top = staff.fetchSemanticsNode().boundsInRoot.top
+            val middle = compose.onNodeWithContentDescription("Staff position $place").fetchSemanticsNode().boundsInRoot.center.y
+            staff.performTouchInput {
+                down(Offset(width / 4f, middle - top))
+                up()
+            }
+        }
+        touch(2) // d4, and the touch's block has begun
+        val tall = staff.fetchSemanticsNode().boundsInRoot.height
+        compose.runOnIdle { window.value = DpSize(411.dp, 640.dp) }
+        compose.waitForIdle()
+        val short = staff.fetchSemanticsNode().boundsInRoot.height
+        assertTrue("the staff should be far shorter now: $tall then $short", short < tall * 0.8f)
+        touch(5) // g4
+        assertEquals(listOf(62, 67), tapped)
     }
 
     private fun layoutOf(word: String): TextLayoutResult {

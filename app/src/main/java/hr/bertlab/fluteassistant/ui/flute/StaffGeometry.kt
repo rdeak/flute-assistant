@@ -102,7 +102,7 @@ internal object StaffGeometry {
 
     /**
      * The staff's box upright while the child writes (since 2026-11-18): [TOTAL_HEIGHT] and what the tab's height has to
-     * [spare] over its least, up to [HIGH_ROOM]: 300 on a Galaxy A55, whose tab has 43 dp to spare, 320 from 63 dp.
+     * [spare] over its least, up to [HIGH_ROOM]: 292 on a Galaxy A55, whose tab has 35 dp to spare, 320 from 63 dp.
      */
     fun uprightBox(spare: Float): Float = TOTAL_HEIGHT + spare.coerceIn(0f, HIGH_ROOM)
 

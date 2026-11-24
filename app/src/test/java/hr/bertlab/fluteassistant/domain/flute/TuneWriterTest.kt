@@ -740,4 +740,47 @@ class TuneWriterTest {
         assertTrue(writer.unselect())
         assertFalse("the note it would join from changed", writer.joinWaiting)
     }
+
+    // The review of 2026-11-24.
+
+    @Test
+    fun `the join key does nothing while a key is held on the chosen step`() {
+        // The join it set outlived the choice, and the next note, written at the end, came out joined to the last
+        // step, even a rest.
+        tap(60, at = 0, heldMs = quarter)
+        tap(62, at = 1000, heldMs = quarter)
+        tap(null, at = 2000, heldMs = quarter) // c d 💤
+        writer.select(1)
+        writer.press(writer.key(64), 3000)
+        assertFalse("faded", TuneWriter.canJoin(writer.tune, writer.selected, writer.held))
+        assertFalse("the next note is written at the end, not after the held one", writer.join())
+        assertFalse(writer.joinWaiting)
+        writer.release(3000 + quarter)
+        tap(65, at = 4000, heldMs = quarter)
+        assertEquals(
+            listOf(TuneNote(60, QUARTER), TuneNote(64, QUARTER), TuneRest(QUARTER), TuneNote(65, QUARTER)),
+            writer.tune,
+        )
+    }
+
+    @Test
+    fun `a key held at the end still joins its note to the next`() {
+        tap(60, at = 0, heldMs = quarter)
+        writer.press(writer.key(62), 1000)
+        assertTrue(TuneWriter.canJoin(writer.tune, writer.selected, writer.held))
+        assertTrue(writer.join())
+        writer.press(writer.key(64), 1000 + quarter)
+        assertEquals(TuneNote(64, EIGHTH, joined = true), writer.tune.last())
+    }
+
+    @Test
+    fun `a key held on the chosen step keeps the choice until it is let go`() {
+        cde()
+        writer.select(1)
+        writer.press(writer.key(65), 3000)
+        assertFalse("nothing while a key is held, as a tap on a step", writer.unselect())
+        assertEquals(1, writer.selected)
+        writer.release(3000 + quarter)
+        assertNull(writer.selected)
+    }
 }

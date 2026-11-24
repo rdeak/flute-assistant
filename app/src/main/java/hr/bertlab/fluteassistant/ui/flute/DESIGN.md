@@ -841,6 +841,9 @@ splitting one hold within `HOLD_REJOIN_MS`, goes on with the step it changed, ch
 drop the second on the next start, and an erase between two breaths takes the second with it); ♯♭, the octave pills
 and ⌒ apply to the replacement, ⌒ joining it to the step before it (`TuneWriter.canJoin`, which the ⌒ key's fade
 follows, and `joinFrom`, where the dashed waiting arc is drawn from), and a replacement made without ⌒ is not joined.
+While a key is held on the chosen step ⌒ is faded and does nothing (`canJoin`'s `held`): the next note is written at
+the end, not after the held one, and a join set then outlived the choice and joined that note to the last step, even
+a rest (the review of 2026-11-24). A key held at the end joins its note to the next, as before.
 Choosing another step, or letting the chosen one go, drops a waiting ⌒ (`flute.join_cancel`, reason select): the note
 it would join from changed. A breath is chosen like a note, its yellow disc behind its face (the final review of the
 build found a breath could not be chosen, and a step turned into a breath stayed chosen with nothing showing it). A note joined
@@ -865,20 +868,24 @@ end" (`TuneMarks`' `LetGoPlace`). A screen reader hears each step as before, "se
 note", `flute_step_change`). Two more of the user's asks the same day, after trying the build: a tap on the stage
 beside the notes lets the chosen step go ("when user tap on white section with metronom and notes, but does not select
 any note it should deselct currently selected note": the writing stage's own tap, `onStageTapped`, which a note, the
-knob, the book and a drag take before it, and which drops a waiting ⌒ as letting go always does), and a tapped note
+knob, the book and a drag take before it, and which drops a waiting ⌒ as letting go always does; nothing while a key
+is held, as a tap on a step, since the review of 2026-11-24, `TuneWriter.unselect`: a second finger on the stage ended
+the choice under the held key, and the staff scrolled to that step and then to the end), and a tapped note
 sounds ("when user tap on note it should play that note also": for its written length at the knob's speed, as Play
 would play it; a rest is silence; `soundStep`). A note key takes the voice from a tapped note with no note off, and the
-rest key, Play, Listen to me and leaving the stage silence it first, so its end never cuts what sounds next and the
-microphone never hears it (`hushTap`; on the listening path this is one call before the run starts, nothing in the
-run). A tap while a key is held sounds nothing. Tests: `TuneWriterTest`, `FluteUiStateTest`, `FluteViewModelTest`,
+rest key, the breath key, the sponge, Play, Listen to me and leaving the stage silence it first, so its end never cuts
+what sounds next and the microphone never hears it (`hushTap`; on the listening path this is one call before the run
+starts, nothing in the run; the breath key and the sponge since the review of 2026-11-24: a note taken out of the tune
+sounded on, a whole note at the knob's slowest for six seconds). A tap while a key is held sounds nothing. Tests: `TuneWriterTest`, `FluteUiStateTest`, `FluteViewModelTest`,
 `FluteScreenTest`.
 
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
 length, added: false at the cap, joined: joined to the note before, since 2026-11-16; replaced: it took the place of the
 step chosen on the staff, since 2026-11-24; per note ended), `flute.select` (index: the step chosen on the staff, `none`
-when it is let go; reason: tap; key or breath, the key that changed it; or play, listen, book, speed or leave when that
-let it go; since 2026-11-24), `flute.join`
+when it is let go; reason: tap; key or breath, the key that changed it (key with an index, after a `flute.rejoin`: the
+touch screen split that key's hold, which goes on with its step chosen again); or play, listen, book, speed or leave
+when that let it go; since 2026-11-24), `flute.join`
 (waiting: true when the ⌒ key set a join, false when its second tap cancelled one or there was nothing to join from;
 since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, select (since 2026-11-24), play, listen, book, speed
 or leave: a waiting join dropped; since 2026-11-16), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its second tap

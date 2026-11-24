@@ -60,7 +60,9 @@ data class Held(val midi: Int?, val index: Int?, val key: Int? = midi?.let(NoteS
  * there, the breath key a breath (which ends the choice at once), and a
  * waiting sign, octave and join apply to it (the join to the step before it, [canJoin]). [erase] removes the chosen step
  * and ends the choice. A note joined to a step that is removed, or that becomes a rest or a breath, is no longer joined.
- * The same step tapped again lets it go; a tap while a key is held changes nothing.
+ * The same step tapped again lets it go; a tap while a key is held changes nothing, on a step or beside them
+ * ([unselect]), and the ⌒ key does nothing while that key is changing the chosen step: the next note is written at the
+ * end, not after the held one.
  *
  * Pure Kotlin and clock-free: the view model passes the time of every press and release, and does the sounding, the
  * growing over time, the saving and the logging.
@@ -226,7 +228,8 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
     /**
      * A tap on the step at [index] of the staff: it is chosen for the keys to change, or let go when it was the chosen
      * one; another step moves the choice there. A step not in the tune, or a tap while a key is held, changes nothing.
-     * Says the chosen step after it. A waiting join and sign stay; the rejoin window ends.
+     * Says the chosen step after it. A waiting sign stays, a waiting join is dropped (the note it would join from is
+     * another now), and the rejoin window ends.
      */
     fun select(index: Int): Int? {
         if (held != null || index !in tune.indices) return selected
@@ -240,8 +243,9 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
      * Lets the chosen step go (a tap on the stage beside the notes, Play, Listen to me, the book, the speed panel, leaving
      * the tab); says whether one was chosen. The rejoin window ends with it, so the rest key does not go on with a rest
      * written in the middle, and a waiting join is dropped, as by [select]: the note it would join from changed.
+     * Nothing while a key is held, as [select]: the key changing the chosen step lets the choice go itself ([release]).
      */
-    fun unselect(): Boolean = (selected != null).also {
+    fun unselect(): Boolean = (held == null && selected != null).also {
         if (it) {
             selected = null
             joinWaiting = false
@@ -264,11 +268,12 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
 
     /**
      * A tap of the ⌒ key: while a join waits it is cancelled (false); with nothing to join from ([canJoin]: the last
-     * step, or the one before the chosen step) nothing changes (false); else the next note pressed will be joined to that
-     * note (true), and the rejoin window ends. Choosing another step drops it ([select]).
+     * step, or the one before the chosen step; never while a key is held on the chosen step) nothing changes (false);
+     * else the next note pressed will be joined to that note (true), and the rejoin window ends. Choosing another step
+     * drops it ([select]).
      */
     fun join(): Boolean {
-        if (joinWaiting || !canJoin(tune, selected)) {
+        if (joinWaiting || !canJoin(tune, selected, held)) {
             joinWaiting = false
             return false
         }
@@ -411,10 +416,16 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
 
         /**
          * Whether the ⌒ key has a note to join the next one to: with no step chosen, the last step is a note and the
-         * tune is not full ([Joins.canJoinAfter]); with one ([selected]), the step before it is a note.
+         * tune is not full ([Joins.canJoinAfter]); with one ([selected]), the step before it is a note. Never while the
+         * key [held] is changing the chosen step ([Held.replaces]): the next note is written at the end, not after the
+         * held one, and a join set then outlived the choice and joined that note to the last step, even a rest (the
+         * review of 2026-11-24).
          */
-        fun canJoin(tune: List<TuneItem>, selected: Int?): Boolean =
-            if (selected == null) Joins.canJoinAfter(tune) else joinFrom(tune, selected) != null
+        fun canJoin(tune: List<TuneItem>, selected: Int?, held: Held? = null): Boolean = when {
+            held?.replaces == true -> false
+            selected == null -> Joins.canJoinAfter(tune)
+            else -> joinFrom(tune, selected) != null
+        }
 
         /**
          * The note a waiting ⌒ joins the next note to: the last step with no step chosen, the step before the chosen one

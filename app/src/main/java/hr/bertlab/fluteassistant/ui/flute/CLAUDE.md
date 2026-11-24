@@ -179,12 +179,14 @@ change that part). The songbook is in `SONGBOOK.md`.
   and a tap on the stage beside the notes lets it go (the user: "when user tap on white section with metronom and notes,
   but does not select any note it should deselct currently selected note"; `onStageTapped`, the stage of the writing
   tab only). A tapped note sounds for its written length at the knob's speed, a rest is silence (the user: "when user tap
-  on note it should play that note also"); a note key takes the voice from it, and the rest key, Play, Listen to me
-  (whose microphone must not hear it) and leaving the stage silence it first (`hushTap`); a tap while a key is held
+  on note it should play that note also"); a note key takes the voice from it, and the rest key, 😮‍💨, 🧽, Play, Listen
+  to me (whose microphone must not hear it) and leaving the stage silence it first (`hushTap`); a tap while a key is held
   sounds nothing; 🧽 removes it
   once ("Erase the chosen note"), never repeating on into the end. Play, Listen to me, the book, the speed panel and
   leaving the tab let it go, through `FluteViewModel.dropWaiting`, the one change on the listening path; never saved;
-  nothing while a key is held or the tune runs. A breath is chosen like a note (a yellow disc behind its face). A note
+  nothing while a key is held or the tune runs: a key held on the chosen step keeps the choice until it is let go (a tap
+  on a step or on the stage does nothing), and ⌒ is faded and does nothing then, the next note being written at the end
+  (`TuneWriter.unselect`, `canJoin`). A breath is chosen like a note (a yellow disc behind its face). A note
   joined to a step removed or turned into a rest or a breath loses its join; two breaths never stand side by side;
   choosing another step drops a waiting ⌒ (its note changed); 💤 pressed again later does not go on with the rest it
   wrote in the middle. While a

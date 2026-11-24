@@ -168,6 +168,9 @@ internal val LocalStaffRoom = compositionLocalOf { 0f }
 /** The walking animal's box, the knob's size, for the tests to find where it stands. */
 internal const val WALKING_ANIMAL_TAG = "staff_animal"
 
+/** A rest's 💤 in its name pill, for the tests to measure. */
+internal const val REST_SLEEP_TAG = "staff_rest_sleep"
+
 /**
  * Draws [block] in the staff's own dp, at rest, with the staff drawn at [scale] and [room] over it: the staff stands
  * that much lower in its box, which is that much taller, so the released numbers hold for everything on it.
@@ -709,7 +712,7 @@ private fun NamePill(item: TuneItem, length: NoteLength, lit: Boolean, modifier:
                     autoSize = TextAutoSize.StepBased(minFontSize = 11.sp, maxFontSize = (17 * s).sp),
                 )
             } else {
-                Emoji(SLEEP_EMOJI, fontSize = (14 * s).roundToInt())
+                Emoji(SLEEP_EMOJI, size = (14 * s).dp, modifier = Modifier.testTag(REST_SLEEP_TAG))
             }
         }
     }

@@ -231,9 +231,11 @@ private fun Modifier.staffTouch(
     val currentOnNoteTapped by rememberUpdatedState(onNoteTapped)
     return pointerInput(visible, enabled) {
         if (!enabled) return@pointerInput
-        val frame = StaffFrame(size.height.toFloat(), visible)
         awaitEachGesture {
             val down = awaitFirstDown()
+            // For each touch: this block lives on while the staff changes height (a split screen, a foldable), and a
+            // frame kept from its start answered another place than the one under the finger.
+            val frame = StaffFrame(size.height.toFloat(), visible)
             var position: Int? = frame.positionAt(down.position.y)
             currentOnPlacingChange(position)
             haptics.performHapticFeedback(HapticFeedbackType.SegmentFrequentTick)

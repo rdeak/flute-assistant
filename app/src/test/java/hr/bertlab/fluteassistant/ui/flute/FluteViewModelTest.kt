@@ -2313,4 +2313,87 @@ class FluteViewModelTest {
         vm.onStepTapped(0)
         assertEquals(on(67), tonePlayer.sounding)
     }
+
+    // The review of 2026-11-24.
+
+    @Test
+    fun `a tap on the stage while a key is held on the chosen step changes nothing`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.onStepTapped(1)
+        val letter = vm.key(67)
+        vm.onKeyPressed(letter)
+        val lines = logger.events("flute.select").size
+        vm.onStageTapped() // a second finger
+        assertEquals("nothing while a key is held", 1, vm.current.selected)
+        assertEquals(lines, logger.events("flute.select").size)
+        clock.now += quarter
+        vm.onKeyReleased(letter)
+        assertNull(vm.current.selected)
+        assertEquals(mapOf("index" to null, "reason" to "key"), logger.events("flute.select").last().fields)
+    }
+
+    @Test
+    fun `the join key is faded and does nothing while a key is held on the chosen step`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.rest(quarter)
+        vm.onStepTapped(1)
+        val letter = vm.key(64)
+        vm.onKeyPressed(letter)
+        assertFalse("the next note is written at the end, not after the held one", vm.current.canJoin)
+        vm.onJoin()
+        assertFalse(vm.current.joinWaiting)
+        assertEquals(false, logger.events("flute.join").single()["waiting"])
+        clock.now += quarter
+        vm.onKeyReleased(letter)
+        vm.tap(65, quarter)
+        assertEquals("not joined over the rest", TuneNote(65, QUARTER), vm.current.tune.last())
+    }
+
+    @Test
+    fun `a split hold on the chosen step logs the step chosen again`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.onStepTapped(1)
+        val letter = vm.key(67)
+        vm.onKeyPressed(letter)
+        clock.now += quarter
+        vm.onKeyReleased(letter)
+        clock.now += 20 // the touch screen reports one hold as two (HOLD_REJOIN_MS)
+        vm.onKeyPressed(letter)
+        assertEquals(1, vm.current.selected)
+        clock.now += quarter
+        vm.onKeyReleased(letter)
+        // Chosen by the tap, let go by the key, chosen again as its hold goes on, let go for good.
+        assertEquals(
+            listOf<Pair<Any?, Any?>>("tap" to 1, "key" to null, "key" to 1, "key" to null),
+            logger.events("flute.select").map { it["reason"] to it["index"] },
+        )
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(67, HALF)), vm.current.tune)
+    }
+
+    @Test
+    fun `the sponge and the breath key silence a tapped note`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.tap(60, hold(WHOLE))
+        vm.tap(62, hold(WHOLE))
+        vm.onStepTapped(0)
+        assertEquals(on(60), tonePlayer.sounding)
+        vm.eraseLast()
+        assertNull("a note taken out of the tune does not sound on", tonePlayer.sounding)
+        assertEquals(listOf(TuneNote(62, WHOLE)), vm.current.tune)
+        vm.onStepTapped(0)
+        assertEquals(on(62), tonePlayer.sounding)
+        vm.onBreath()
+        assertNull("nor one a breath took the place of", tonePlayer.sounding)
+        // Its time running out later cuts nothing that sounds then.
+        vm.onKeyPressed(vm.key(67))
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertEquals(on(67), tonePlayer.sounding)
+    }
 }

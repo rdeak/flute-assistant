@@ -1955,4 +1955,31 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Your tune, 2 notes").performTouchInput { click(Offset(width - 4f, height / 2f)) }
         assertEquals(0, stageTaps)
     }
+
+    /**
+     * A rest's 💤 in its name pill is a picture, sized in dp as everything on the staff: the largest text leaves it
+     * its size, inside the pill (the review of 2026-11-24: it was a size in sp, twice as large at twice the text).
+     */
+    @Test
+    fun a_rests_sleep_emoji_does_not_grow_with_the_text_size() {
+        val fontScale = mutableStateOf(1f)
+        compose.setContent {
+            LocaleProvider(Locale.ENGLISH) {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale = fontScale.value)) {
+                    FluteContent(
+                        state = FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER))),
+                        metronome = MetronomeUiState(),
+                        actions = FluteActions(),
+                    )
+                }
+            }
+        }
+        fun sleep() = compose.onNodeWithTag(REST_SLEEP_TAG, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val normal = sleep()
+        fontScale.value = 2f
+        compose.waitForIdle()
+        val large = sleep()
+        assertEquals("its width", normal.width.value, large.width.value, 0.5f)
+        assertEquals("its height", normal.height.value, large.height.value, 0.5f)
+    }
 }

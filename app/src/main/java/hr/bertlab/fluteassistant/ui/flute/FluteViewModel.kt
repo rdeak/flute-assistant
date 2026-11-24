@@ -82,8 +82,9 @@ import javax.inject.Inject
  * at the cap, joined: joined to the note before; replaced: it took the chosen step's place, since 2026-11-24), `flute.rest`
  * per rest ended (heldMs, length, added, replaced), `flute.rejoin` (midi, none for the rest, gapMs) when a key let go of
  * goes on, `flute.breath` (added: false at the cap or right after a breath; replaced), `flute.select` (index: the step
- * chosen on the staff, none when let go; reason: tap; key or breath, the key that changed it; or play, listen, book,
- * speed or leave when that let it go; since 2026-11-24), `flute.join` (waiting: true when the ⌒ key set a join, false when its
+ * chosen on the staff, none when let go; reason: tap; key or breath, the key that changed it (key with an index: a
+ * split hold went on with its step, chosen again); or play, listen, book, speed or leave when that let it go; since
+ * 2026-11-24), `flute.join` (waiting: true when the ⌒ key set a join, false when its
  * second tap cancelled one or there was nothing to join from), `flute.join_cancel` (reason: rest, breath, erase,
  * select, play, listen, book, speed or leave: a waiting join dropped), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its
  * second tap dropped it, since 2026-11-17), `flute.sign_cancel` (reason: erase, play, listen, book, speed or leave: a waiting sign
@@ -209,9 +210,11 @@ class FluteViewModel @Inject constructor(
 
     /**
      * The breath key: ends a held key and marks a breath, unless the last step is one already; with a step chosen on the
-     * staff the breath takes its place, unless a breath stands beside it.
+     * staff the breath takes its place, unless a breath stands beside it. A tapped note is silenced first, as by the
+     * rest key: the breath may take its place.
      */
     fun onBreath() {
+        hushTap(silence = true)
         stopRunning(reason = "key")
         endHeld()
         val breath = writer.breath()
@@ -408,9 +411,10 @@ class FluteViewModel @Inject constructor(
 
     /**
      * Drops the step chosen on the staff, or else the last step of the tune; ignored while a key is held or the tune is
-     * empty. Stops playback and listening first.
+     * empty. Stops playback and listening first, and silences a tapped note: one taken out of the tune must not sound on.
      */
     fun eraseLast() {
+        hushTap(silence = true)
         stopRunning(reason = "erase")
         val erase = writer.erase()
         if (erase.dropped.any) { // a waiting join or sign went first, and nothing was erased
@@ -560,6 +564,8 @@ class FluteViewModel @Inject constructor(
         } else {
             // The note gone on with, as flute.note names it: E♭ for E's key when the sign wrote it.
             logger.d(LogTags.FLUTE, "flute.rejoin", "midi" to writer.held?.midi, "gapMs" to press.rejoinGapMs)
+            // The hold that changed the chosen step goes on with it chosen again; the release before logged it let go.
+            if (writer.held?.replaces == true) logger.d(LogTags.FLUTE, "flute.select", "index" to writer.selected, "reason" to "key")
         }
         val pulse = TuneWriter.WRITING_PULSE
         growJob = viewModelScope.launch {
@@ -658,7 +664,8 @@ class FluteViewModel @Inject constructor(
     /**
      * The ⌒ key (since 2026-11-16): the next note pressed is joined to the last one, or a second tap cancels the join.
      * It never ends a held key, unlike the breath key: a tap while a key is held joins the held note to the next, so that
-     * note goes on sounding and growing until the next press ends it.
+     * note goes on sounding and growing until the next press ends it. A key held on the chosen step is not joined to
+     * anything: the next note is written at the end ([TuneWriter.canJoin]).
      */
     fun onJoin() {
         stopRunning(reason = "key")
@@ -716,7 +723,8 @@ class FluteViewModel @Inject constructor(
     /**
      * A tap on the stage beside the notes (since 2026-11-24, the user: "when user tap on white section with metronom and
      * notes, but does not select any note it should deselect currently selected note"): the chosen step is let go.
-     * Nothing while the tune runs, or with nothing chosen.
+     * Nothing while the tune runs, while a key is held ([TuneWriter.unselect]: a second finger must not end the choice
+     * under the held key), or with nothing chosen.
      */
     fun onStageTapped() {
         if (_state.value.isRunning) return
@@ -747,9 +755,10 @@ class FluteViewModel @Inject constructor(
     }
 
     /**
-     * Ends a tapped note's sound before something else takes the voice: [silence] fades it out (the rest key, Play, Listen
-     * to me, whose microphone must not hear it, and leaving the stage); without it a note key's own sound takes over with
-     * no note off. Either way its end can no longer cut what sounds next.
+     * Ends a tapped note's sound before something else takes the voice: [silence] fades it out (the rest key, the breath
+     * key and the sponge, which may take the note out of the tune, Play, Listen to me, whose microphone must not hear it,
+     * and leaving the stage); without it a note key's own sound takes over with no note off. Either way its end can no
+     * longer cut what sounds next.
      */
     private fun hushTap(silence: Boolean) {
         val job = tapSoundJob ?: return
