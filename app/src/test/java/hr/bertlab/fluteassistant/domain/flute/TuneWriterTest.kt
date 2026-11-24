@@ -15,10 +15,19 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The writing rules by themselves, no clock and no coroutines: at the writing pace (200 a minute) a quarter note is 300 ms. */
+/** The writing rules by themselves, no clock and no coroutines: at the writing pace (130 a minute) a quarter note is about 462 ms. */
 class TuneWriterTest {
 
     private val writer = TuneWriter()
+
+    /**
+     * How long a key is held to write [length] at the writing pace: the length's own time, halfway between the points
+     * where it grows, so these tests follow [TuneWriter.WRITING_PULSE] and only the pace test pins its numbers.
+     */
+    private fun hold(length: NoteLength): Long = Tune.durationMs(length, TuneWriter.WRITING_PULSE)
+
+    /** A quarter note's hold at the writing pace. */
+    private val quarter = hold(QUARTER)
 
     /**
      * The letter key of the white note [midi] (0 = C to 6 = B), after choosing its octave: since 2026-11-18 the keys are
@@ -43,7 +52,8 @@ class TuneWriterTest {
         assertEquals(Held(60, index = 0), writer.held)
         writer.grow(QUARTER)
         assertEquals(listOf(TuneNote(60, QUARTER)), writer.tune)
-        assertEquals(TuneWriter.Ended(60, heldMs = 600, length = HALF, added = true), writer.release(600))
+        val half = hold(HALF)
+        assertEquals(TuneWriter.Ended(60, heldMs = half, length = HALF, added = true), writer.release(half))
         assertEquals(listOf(TuneNote(60, HALF)), writer.tune)
         assertNull(writer.held)
         assertNull("nothing held: nothing ends", writer.release(2000))
@@ -51,12 +61,15 @@ class TuneWriterTest {
 
     @Test
     fun `a held key grows at the writing pace whatever the metronome says`() {
-        // 2026-11-17, the user: a held key is counted at the ring's fastest, 200 a minute, only to choose a length.
-        assertEquals(300.0, TuneWriter.WRITING_PULSE.quarterMs, 0.0)
-        assertEquals(listOf(225L, 450L, 750L, 1050L), Tune.growAtMs(TuneWriter.WRITING_PULSE))
+        // 2026-11-17, the user: a held key is counted at its own pace, only to choose a length; 130 a minute since
+        // 2026-11-23 ("reduce speed of adding notes to 130, just adding notes, not metronome").
+        assertEquals(130, TuneWriter.WRITING_PULSE.bpm)
+        assertEquals(60_000.0 / 130, TuneWriter.WRITING_PULSE.quarterMs, 1e-9)
+        assertEquals(listOf(347L, 693L, 1154L, 1616L), Tune.growAtMs(TuneWriter.WRITING_PULSE))
+        assertEquals(462L, TuneWriter.TAP_MS)
         val edges = listOf(
-            224L to EIGHTH, 225L to QUARTER, 449L to QUARTER, 450L to HALF,
-            749L to HALF, 750L to DOTTED_HALF, 1049L to DOTTED_HALF, 1050L to WHOLE,
+            346L to EIGHTH, 347L to QUARTER, 692L to QUARTER, 693L to HALF,
+            1153L to HALF, 1154L to DOTTED_HALF, 1615L to DOTTED_HALF, 1616L to WHOLE,
         )
         for ((heldMs, length) in edges) {
             val writer = TuneWriter()
@@ -69,15 +82,15 @@ class TuneWriterTest {
     fun `the rest key writes a rest the same way`() {
         writer.press(null, 0)
         assertEquals(Held(midi = null, index = 0), writer.held)
-        assertEquals(TuneWriter.Ended(null, heldMs = 300, length = QUARTER, added = true), writer.release(300))
+        assertEquals(TuneWriter.Ended(null, heldMs = quarter, length = QUARTER, added = true), writer.release(quarter))
         assertEquals(listOf(TuneRest(QUARTER)), writer.tune)
     }
 
     @Test
     fun `a press over a held key ends that key first`() {
         writer.press(writer.key(60), 0)
-        val press = writer.press(writer.key(62), 300)!!
-        assertEquals(TuneWriter.Ended(60, heldMs = 300, length = QUARTER, added = true), press.ended)
+        val press = writer.press(writer.key(62), quarter)!!
+        assertEquals(TuneWriter.Ended(60, heldMs = quarter, length = QUARTER, added = true), press.ended)
         assertNull(press.rejoinGapMs)
         assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(62, EIGHTH)), writer.tune)
         assertEquals(Held(62, index = 1), writer.held)
@@ -90,7 +103,7 @@ class TuneWriterTest {
         assertEquals(TuneWriter.HOLD_REJOIN_MS, press.rejoinGapMs)
         assertEquals("counted from the first press", 100 + TuneWriter.HOLD_REJOIN_MS, press.elapsedMs)
         assertEquals(Held(60, index = 0), writer.held)
-        writer.release(300)
+        writer.release(quarter)
         assertEquals(listOf(TuneNote(60, QUARTER)), writer.tune)
     }
 
@@ -104,11 +117,11 @@ class TuneWriterTest {
 
     @Test
     fun `the rest key goes on with its rest however long the pause, from the length it has`() {
-        tap(null, at = 0, heldMs = 300) // a quarter rest
+        tap(null, at = 0, heldMs = quarter) // a quarter rest
         val press = writer.press(null, 5_000)!!
-        assertEquals(4_700L, press.rejoinGapMs)
-        assertEquals("the pause is not counted", 300L, press.elapsedMs)
-        writer.release(5_300) // another 300 ms: a half rest in all
+        assertEquals(5_000L - quarter, press.rejoinGapMs)
+        assertEquals("the pause is not counted", quarter, press.elapsedMs)
+        writer.release(5_000 + quarter) // another quarter's hold: a half rest in all
         assertEquals(listOf(TuneRest(HALF)), writer.tune)
     }
 
@@ -136,7 +149,7 @@ class TuneWriterTest {
         full.press(1, 0)
         assertEquals(Held(62, index = null), full.held)
         full.grow(WHOLE)
-        assertEquals(TuneWriter.Ended(62, heldMs = 300, length = QUARTER, added = false), full.release(300))
+        assertEquals(TuneWriter.Ended(62, heldMs = quarter, length = QUARTER, added = false), full.release(quarter))
         assertEquals(Tune.MAX_NOTES, full.tune.size)
         assertFalse(full.breath().added)
     }
@@ -164,41 +177,41 @@ class TuneWriterTest {
 
     @Test
     fun `the join key joins the next note to the last one`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         assertTrue(writer.join())
         assertTrue(writer.joinWaiting)
-        tap(62, at = 1000, heldMs = 300)
+        tap(62, at = 1000, heldMs = quarter)
         assertEquals(TuneNote(62, QUARTER, joined = true), writer.tune[1])
         assertFalse(writer.joinWaiting)
-        tap(64, at = 2000, heldMs = 300)
+        tap(64, at = 2000, heldMs = quarter)
         assertFalse("one tap joins one pair", (writer.tune[2] as TuneNote).joined)
     }
 
     @Test
     fun `a second tap cancels the join`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         assertTrue(writer.join())
         assertFalse(writer.join())
         assertFalse(writer.joinWaiting)
-        tap(62, at = 1000, heldMs = 300)
+        tap(62, at = 1000, heldMs = quarter)
         assertFalse((writer.tune[1] as TuneNote).joined)
     }
 
     @Test
     fun `the rest key cancels a waiting join`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
         assertEquals("the press says it dropped the join", TuneWriter.Dropped(join = true), writer.press(null, 1000)!!.dropped)
-        writer.release(1300)
+        writer.release(1000 + quarter)
         assertFalse(writer.joinWaiting)
         assertEquals("a note key spends a join, it drops nothing", TuneWriter.Dropped(), writer.press(writer.key(62), 2000)!!.dropped)
-        writer.release(2300)
+        writer.release(2000 + quarter)
         assertFalse((writer.tune[2] as TuneNote).joined)
     }
 
     @Test
     fun `the breath cancels a waiting join`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
         assertEquals("the breath says it dropped the join", TuneWriter.Dropped(join = true), writer.breath().dropped)
         assertFalse(writer.joinWaiting)
@@ -206,7 +219,7 @@ class TuneWriterTest {
 
     @Test
     fun `erase while a join waits cancels the join and erases nothing, the next erase erases`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
         assertEquals(TuneWriter.Erase(TuneWriter.Dropped(join = true), erased = false), writer.erase())
         assertEquals(1, writer.tune.size)
@@ -220,11 +233,11 @@ class TuneWriterTest {
         assertFalse(Joins.canJoinAfter(writer.tune))
         assertFalse(writer.join())
         assertFalse(writer.joinWaiting)
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.breath()
         assertFalse(Joins.canJoinAfter(writer.tune))
         assertFalse(writer.join())
-        tap(null, at = 1000, heldMs = 300)
+        tap(null, at = 1000, heldMs = quarter)
         assertFalse(writer.join())
     }
 
@@ -239,16 +252,16 @@ class TuneWriterTest {
 
     @Test
     fun `a join ends the rejoin window, so the same key again is a tie of two notes`() {
-        tap(60, at = 0, heldMs = 400)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
-        writer.press(writer.key(60), 420) // 20 ms after the release: inside HOLD_REJOIN_MS, but the join came between
+        writer.press(writer.key(60), quarter + 20) // 20 ms after the release: inside HOLD_REJOIN_MS, but the join came between
         assertEquals(2, writer.tune.size)
         assertEquals(TuneNote(60, EIGHTH, joined = true), writer.tune[1])
     }
 
     @Test
     fun `dropWaiting says whether a join waited, and another book drops it`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
         assertEquals(TuneWriter.Dropped(join = true), writer.dropWaiting())
         assertEquals(TuneWriter.Dropped(), writer.dropWaiting())
@@ -262,8 +275,8 @@ class TuneWriterTest {
         // The final review of 2026-11-16: a touch screen reporting one hold as two (HOLD_REJOIN_MS) spent the join.
         writer.press(writer.key(60), 0)
         writer.join()
-        writer.release(300)
-        writer.press(writer.key(60), 320) // the same hold going on
+        writer.release(quarter)
+        writer.press(writer.key(60), quarter + 20) // the same hold going on
         assertTrue(writer.joinWaiting)
         writer.press(writer.key(62), 800)
         assertTrue((writer.tune[1] as TuneNote).joined)
@@ -281,7 +294,7 @@ class TuneWriterTest {
         assertEquals(Held(63, index = 0, key = 2), writer.held)
         assertFalse("spent by the note", writer.signWaiting)
         assertEquals(64, writer.writes(writer.key(64)))
-        writer.release(300)
+        writer.release(quarter)
         assertEquals(listOf(TuneNote(63, QUARTER)), writer.tune)
         writer.press(writer.key(64), 1000)
         assertEquals(TuneNote(64, EIGHTH), writer.tune[1])
@@ -310,19 +323,19 @@ class TuneWriterTest {
 
     @Test
     fun `the rest and the breath leave the sign waiting`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.sign()
-        tap(null, at = 1000, heldMs = 300)
+        tap(null, at = 1000, heldMs = quarter)
         assertTrue(writer.signWaiting)
         writer.breath()
         assertTrue(writer.signWaiting)
-        tap(65, at = 2000, heldMs = 300)
+        tap(65, at = 2000, heldMs = quarter)
         assertEquals(TuneNote(66, QUARTER), writer.tune.last())
     }
 
     @Test
     fun `erase drops a waiting sign and a waiting join together and erases nothing`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
         writer.sign()
         assertEquals(TuneWriter.Erase(TuneWriter.Dropped(join = true, sign = true), erased = false), writer.erase())
@@ -335,7 +348,7 @@ class TuneWriterTest {
 
     @Test
     fun `erase drops a waiting sign alone and erases nothing`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.sign()
         assertEquals(TuneWriter.Erase(TuneWriter.Dropped(sign = true), erased = false), writer.erase())
         assertEquals(1, writer.tune.size)
@@ -356,8 +369,8 @@ class TuneWriterTest {
     fun `a bounce on a signed key goes on with the signed note`() {
         writer.sign()
         writer.press(writer.key(64), 0)
-        writer.release(400)
-        val press = writer.press(writer.key(64), 430) // 30 ms after the release: the same hold going on, the key white again
+        writer.release(quarter)
+        val press = writer.press(writer.key(64), quarter + 30) // 30 ms after the release: the same hold going on, the key white again
         assertEquals(30L, press?.rejoinGapMs)
         assertEquals(listOf(TuneNote(63, QUARTER)), writer.tune)
         assertEquals(Held(63, index = 0, key = 2), writer.held)
@@ -368,7 +381,7 @@ class TuneWriterTest {
         writer.press(writer.key(60), 0)
         assertTrue(writer.sign())
         assertEquals(Held(60, index = 0), writer.held)
-        writer.press(writer.key(65), 300)
+        writer.press(writer.key(65), quarter)
         assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(66, EIGHTH)), writer.tune)
     }
 
@@ -382,10 +395,10 @@ class TuneWriterTest {
 
     @Test
     fun `a sign and a join together write a signed joined note`() {
-        tap(60, at = 0, heldMs = 300)
+        tap(60, at = 0, heldMs = quarter)
         writer.join()
         writer.sign()
-        tap(67, at = 1000, heldMs = 300)
+        tap(67, at = 1000, heldMs = quarter)
         assertEquals(TuneNote(68, QUARTER, joined = true), writer.tune[1])
         assertFalse(writer.joinWaiting)
         assertFalse(writer.signWaiting)
@@ -406,10 +419,10 @@ class TuneWriterTest {
         // The final review of 2026-11-17: D held, ♯♭ tapped (D writes nothing now), the screen splits the hold.
         writer.press(writer.key(62), 0)
         writer.sign()
-        writer.release(300)
-        assertTrue("the same hold going on is taken", writer.takes(writer.key(62), 320))
-        assertFalse("a fresh press of D is not", writer.takes(writer.key(62), 500))
-        val press = writer.press(writer.key(62), 320)
+        writer.release(quarter)
+        assertTrue("the same hold going on is taken", writer.takes(writer.key(62), quarter + 20))
+        assertFalse("a fresh press of D is not", writer.takes(writer.key(62), quarter + 200))
+        val press = writer.press(writer.key(62), quarter + 20)
         assertEquals(20L, press?.rejoinGapMs)
         assertEquals(Held(62, index = 0), writer.held)
         assertTrue("the sign still waits for the next note", writer.signWaiting)
@@ -423,9 +436,9 @@ class TuneWriterTest {
         assertEquals(1, writer.octave)
         assertTrue(writer.chooseOctave(2))
         writer.press(0, 0)
-        writer.release(300)
+        writer.release(quarter)
         writer.press(1, 1000)
-        writer.release(1300)
+        writer.release(1000 + quarter)
         assertEquals(listOf(TuneNote(72, QUARTER), TuneNote(74, QUARTER)), writer.tune)
         assertTrue(writer.chooseOctave(1))
         writer.press(6, 2000)
@@ -435,9 +448,9 @@ class TuneWriterTest {
     @Test
     fun `the chosen pill again changes nothing`() {
         writer.press(0, 0)
-        writer.release(300)
+        writer.release(quarter)
         assertFalse(writer.chooseOctave(1))
-        assertEquals("the same hold goes on", 60L, writer.press(0, 360)?.rejoinGapMs)
+        assertEquals("the same hold goes on", 60L, writer.press(0, quarter + 60)?.rejoinGapMs)
         assertFalse(writer.chooseOctave(0))
         assertFalse(writer.chooseOctave(5))
         assertEquals(1, writer.octave)
@@ -446,9 +459,9 @@ class TuneWriterTest {
     @Test
     fun `a pill ends the rejoin window`() {
         writer.press(0, 0)
-        writer.release(300)
+        writer.release(quarter)
         writer.chooseOctave(2)
-        assertNull("a new note, not the hold going on", writer.press(0, 360)?.rejoinGapMs)
+        assertNull("a new note, not the hold going on", writer.press(0, quarter + 60)?.rejoinGapMs)
         assertEquals(listOf(60, 72), writer.tune.map { (it as TuneNote).midi })
     }
 
@@ -461,7 +474,7 @@ class TuneWriterTest {
         assertEquals(Held(60, index = 0), writer.held)
         assertTrue(writer.joinWaiting)
         assertTrue(writer.signWaiting)
-        assertEquals(60, writer.release(300)?.midi)
+        assertEquals(60, writer.release(quarter)?.midi)
     }
 
     @Test
@@ -469,8 +482,8 @@ class TuneWriterTest {
         // The pill's twin of the ♯♭ rule: C held, pill 2 tapped, the screen splits the hold.
         writer.press(0, 0)
         writer.chooseOctave(2)
-        writer.release(300)
-        assertEquals(20L, writer.press(0, 320)?.rejoinGapMs)
+        writer.release(quarter)
+        assertEquals(20L, writer.press(0, quarter + 20)?.rejoinGapMs)
         assertEquals(Held(60, index = 0), writer.held)
         assertEquals(listOf(TuneNote(60, QUARTER)), writer.tune)
     }

@@ -35,13 +35,14 @@ snapped to the writing pace (below; the metronome tab's tempo until 2026-11-17):
 a half, a dotted half and a whole
 note (`NoteLength.ofBeats`, split halfway: ¾, 1½, 2½, 3½ beats; longer stays a whole note).
 Lengths are kept in beats, so the tempo applies only at playback and changing it later keeps
-the rhythm. A hold is counted at the writing pace, `TuneWriter.WRITING_PULSE`: 200 quarter notes a minute whatever
-the speed knob and the time signature say, so a quarter is 300 ms of holding and a whole note 1.05 s (since 2026-11-17,
-the user: "set max tempo 200 just when child type notes and want to set duration, is just for note duration, do not
-make changes on tempo in metronom or flute view during the play / listen"; before, a hold was counted in the
-metronome's tempo, so a whole note took 3.5 s with the knob on 60). It is shown nowhere and never reaches the
-metronome; the eighth/quarter line at 225 ms lies near a tap, so `flute.note`'s `heldMs` from a phone test with the
-child is what may move it. Play counts in the metronome's `Pulse` (`domain/flute/Tune.kt`: its bpm and time
+the rhythm. A hold is counted at the writing pace, `TuneWriter.WRITING_PULSE` (`WRITING_BPM`): 130 quarter notes a
+minute whatever the speed knob and the time signature say, so a quarter is about 460 ms of holding and a whole note
+1.6 s (since 2026-11-17, the user: "set max tempo 200 just when child type notes and want to set duration, is just for
+note duration, do not make changes on tempo in metronom or flute view during the play / listen"; before, a hold was
+counted in the metronome's tempo, so a whole note took 3.5 s with the knob on 60; on 2026-11-23 the user slowed it
+from 200 to 130: "reduce speed of adding notes to 130, just adding notes, not metronome"). It is shown nowhere and
+never reaches the metronome; the eighth/quarter line is at 347 ms (225 ms at 200), and `flute.note`'s `heldMs` from
+a phone test with the child shows where taps fall. Play counts in the metronome's `Pulse` (`domain/flute/Tune.kt`: its bpm and time
 signature, read at Play): one click is one beat of the signature's note value,
 so in 6/8 a click is an eighth note and a quarter lasts two clicks (since 2026-11-02, at the
 user's request, so a flute bar lasts as long as the metronome's; the hold dots that counted those

@@ -3,7 +3,6 @@
 
 package hr.bertlab.fluteassistant.domain.flute
 
-import hr.bertlab.fluteassistant.domain.metronome.TempoBand
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
@@ -38,9 +37,10 @@ data class Held(val midi: Int?, val index: Int?, val key: Int? = midi?.let(NoteS
  * nothing. A join ends the window in which a key let go of goes on with its note, as a breath does,
  * so the same key again after it is a tie of two notes.
  *
- * A hold is counted at [WRITING_PULSE], the ring's fastest, whatever the speed knob says (since 2026-11-17, the user:
- * "set max tempo 200 just when child type notes and want to set duration, is just for note duration"): a whole note
- * takes 1.05 s of holding at any speed. The knob sets how fast Play plays and how long Listen to me asks a note to last.
+ * A hold is counted at [WRITING_PULSE], 130 a minute, whatever the speed knob says (since 2026-11-17, the user:
+ * "set max tempo 200 just when child type notes and want to set duration, is just for note duration"; 130 since
+ * 2026-11-23): a whole note takes 1.6 s of holding at any speed. The knob sets how fast Play plays and how long Listen
+ * to me asks a note to last.
  *
  * The ♯♭ key (since 2026-11-17, [sign]) makes the next note key pressed write its letter's black note
  * ([FluteNotes.inOctave], [writes]): one tap per note, as the join. While it waits D and A write nothing (a press of
@@ -282,12 +282,17 @@ class TuneWriter(tune: List<TuneItem> = emptyList()) {
 
     companion object {
         /**
-         * The pace a held key is counted at: 200 quarter notes a minute ([TempoBand.MAX_BPM], the ring's fastest), in
-         * quarter notes whatever the time signature, so a quarter is 300 ms of holding and a whole note 1.05 s. Writing
-         * only: it is shown nowhere and never reaches the metronome. The line between an eighth and a quarter is at 225 ms,
-         * near an ordinary tap; `flute.note`'s `heldMs` shows where a child's taps fall, and the number changes only from that.
+         * The pace a held key is counted at, in quarter notes a minute whatever the time signature: 130 since
+         * 2026-11-23 (the user: "reduce speed of adding notes to 130, just adding notes, not metronome"; 200, the ring's
+         * fastest, from 2026-11-17), so a quarter is about 460 ms of holding and a whole note 1.6 s. Writing only: it is
+         * shown nowhere and never reaches the metronome. The line between an eighth and a quarter is at 347 ms;
+         * `flute.note`'s `heldMs` shows where a child's taps fall, and the number changes only at the user's word or
+         * from that.
          */
-        val WRITING_PULSE: Pulse = Pulse(TempoBand.MAX_BPM, TimeSignature.FOUR_FOUR)
+        const val WRITING_BPM: Int = 130
+
+        /** [WRITING_BPM] as the pulse [Tune.lengthOf] and [Tune.growAtMs] count a hold in. */
+        val WRITING_PULSE: Pulse = Pulse(WRITING_BPM, TimeSignature.FOUR_FOUR)
 
         /** How long a key a screen reader activates is held for: one beat of the writing pace, a quarter note or rest. */
         val TAP_MS: Long = Tune.durationMs(NoteLength.QUARTER, WRITING_PULSE)

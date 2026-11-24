@@ -38,12 +38,14 @@ change that part). The songbook is in `SONGBOOK.md`.
   gives the owner the opened book's, and the metronome follows by itself.
 - The old single tune is migrated by the `open_book` key being missing, never by the books being
   empty: a child who wipes all six must not get the old tune back (`SONGBOOK.md`).
-- A note's length comes only from how long its key is held, counted at `TuneWriter.WRITING_PULSE`: 200 quarter
-  notes a minute whatever the speed knob and the time signature say (the user, 2026-11-17: "set max tempo 200 just
-  when child type notes and want to set duration, is just for note duration, do not make changes on tempo in metronom
-  or flute view during the play / listen"). A quarter is 300 ms of holding, a whole note 1.05 s. It is shown nowhere
-  and never written to `MetronomeSettings`; the knob sets Play and Listen to me only. The eighth/quarter line is at
-  225 ms, near a tap: change the number only from a phone test (`flute.note`'s `heldMs`). The time between presses is
+- A note's length comes only from how long its key is held, counted at `TuneWriter.WRITING_PULSE`
+  (`WRITING_BPM`): 130 quarter notes a minute whatever the speed knob and the time signature say (the user,
+  2026-11-17: "set max tempo 200 just when child type notes and want to set duration, is just for note duration, do
+  not make changes on tempo in metronom or flute view during the play / listen"; 2026-11-23: "reduce speed of adding
+  notes to 130, just adding notes, not metronome"). A quarter is about 460 ms of holding, a whole note 1.6 s. It is
+  shown nowhere and never written to `MetronomeSettings`; the knob sets Play and Listen to me only. The
+  eighth/quarter line is at 347 ms: change the number only at the user's word or from a phone test (`flute.note`'s
+  `heldMs`). The time between presses is
   never recorded. No record button, clear-all or length control (root CLAUDE.md, "Turned down").
 - "Your turn" is opt-in and score-free, no number, marks not saved. The child decides when each
   note starts; the metronome decides how long it lasts: a note counts once it has sounded its
