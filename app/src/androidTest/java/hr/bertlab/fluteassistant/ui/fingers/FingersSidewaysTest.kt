@@ -6,8 +6,10 @@ package hr.bertlab.fluteassistant.ui.fingers
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -16,6 +18,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -46,6 +49,16 @@ class FingersSidewaysTest {
     private var pick by mutableStateOf(FingerPick())
     private val tuned = mutableListOf<Int>()
 
+    /** On its side the whole row is the button too (the user, 2026-11-24): its pill at the left end, and its staff. */
+    @Test
+    fun a_tap_anywhere_on_a_row_asks_for_its_note_in_the_tuner() {
+        show(FingerPick(7)) // G: its rows G4, G5, G6
+        val rows = compose.onAllNodesWithTag("fingers_row")
+        rows[1].assertHasClickAction().performTouchInput { click(Offset(8.dp.toPx(), height / 2f)) }
+        rows[2].performTouchInput { click(Offset(70.dp.toPx(), height / 2f)) }
+        compose.runOnIdle { assertEquals(listOf(79, 91), tuned) }
+    }
+
     /** On its side too a tap on a row's flute asks for that note in the tuner (the user, 2026-11-18). */
     @Test
     fun a_tap_on_a_flute_asks_for_its_note_in_the_tuner() {
@@ -71,7 +84,9 @@ class FingersSidewaysTest {
         compose.waitForIdle()
     }
 
-    private fun bounds(description: String) = compose.onNodeWithContentDescription(description).getUnclippedBoundsInRoot()
+    /** The chart itself, not its row: the whole row is a button since 2026-11-24 and merges its parts. */
+    private fun bounds(description: String) =
+        compose.onNodeWithContentDescription(description, useUnmergedTree = true).getUnclippedBoundsInRoot()
     private fun card() = compose.onNodeWithTag("fingers_card").getUnclippedBoundsInRoot()
 
 
@@ -156,7 +171,7 @@ class FingersSidewaysTest {
         show(FingerPick())
         listOf(Phone(800, 360), Phone(915, 411)).forEach { each ->
             on(each)
-            val pill = compose.onAllNodesWithTag("fingers_pill")[0].getUnclippedBoundsInRoot()
+            val pill = compose.onAllNodesWithTag("fingers_pill", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
             val flute = bounds("Fingering for C4")
             val left = pill.left - card().left
             val right = card().right - flute.right
@@ -167,8 +182,8 @@ class FingersSidewaysTest {
     @Test
     fun the_hands_are_not_named_on_its_side() {
         show(FingerPick())
-        compose.onNodeWithText("Left hand").assertDoesNotExist()
-        compose.onNodeWithText("Right hand").assertDoesNotExist()
+        compose.onNodeWithText("Left hand", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText("Right hand", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test
@@ -185,7 +200,7 @@ class FingersSidewaysTest {
     fun croatian_at_the_largest_text_fits() {
         show(FingerPick(8), locale = Locale("hr"), fontScale = 2f)
         listOf("gis1", "gis2", "gis3").forEach { name ->
-            assertWhole(name, compose.onNodeWithText(name), 2f)
+            assertWhole(name, compose.onNodeWithText(name, useUnmergedTree = true), 2f)
             assertTrue("$name's flute is inside the card", bounds("Hvat za $name").isInside(card()))
         }
     }

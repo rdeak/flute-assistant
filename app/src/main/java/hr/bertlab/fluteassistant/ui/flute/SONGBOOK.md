@@ -83,8 +83,8 @@ knob says how fast, the book under it says which tune. It replaced a round white
 day (white then because it was "not chosen"; the user's "same book" overrode that). It stands at
 the staff's bottom left, under the clef, beside the names row, at
 `StaffGeometry.bookButtonTop`: centred on the names' pills (`NAMES_TOP + PILL_HEIGHT / 2`), in the
-column left of `NOTES_CLIP` (57 dp) that is empty from under the clef (`CLEF_BOTTOM`, 167 dp, the
-hook's lowest control point, a bound the stroke never passes) down to the bottom of the marks row
+column left of `NOTES_CLIP` (57 dp) that is empty from under the clef (`CLEF_BOTTOM`, 166.9 dp since 2026-11-24, the
+music font's clef's foot; 167 for the drawn clef's hook before) down to the bottom of the marks row
 (`TOTAL_HEIGHT`, 257 dp), so nothing moves and nothing is covered (`StaffGeometryTest` checks it at
 both scales). At `RunningStaffScale` the cell grows and the button does not; only its position
 follows the scaled geometry. It shows on an empty tune too, and while the tune runs it stays, faded

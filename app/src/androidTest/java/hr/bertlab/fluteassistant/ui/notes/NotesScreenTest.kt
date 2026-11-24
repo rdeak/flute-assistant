@@ -71,6 +71,9 @@ import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
 import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
+import hr.bertlab.fluteassistant.ui.common.isNear
+import hr.bertlab.fluteassistant.ui.theme.DarkFluteColors
+import hr.bertlab.fluteassistant.ui.theme.LightFluteColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -641,6 +644,12 @@ class NotesScreenTest {
 
         val width = image.width
 
+        /** The pixels at [column] of the width, from [near] to [far] pitches over the middle of [position]'s place. */
+        fun columnAbove(column: Float, position: Int, near: Float, far: Float): List<Color> {
+            val x = (image.width * column).toInt()
+            return (middleOf(position, -far).toInt()..middleOf(position, -near).toInt()).map { image[x, it] }
+        }
+
         /** Whether any pixel with x in [xs], from [top] to [bottom] pitches from the staff's top, is [match]. */
         fun anyIn(xs: IntRange, top: Float, bottom: Float, match: (Color) -> Boolean): Boolean =
             (((top * pitch).toInt())..((bottom * pitch).toInt())).any { y -> xs.any { x -> match(image[x, y]) } }
@@ -673,7 +682,8 @@ class NotesScreenTest {
      * What a child sees of the note still to find (the first child test, 2026-11-09: "why first one is marked and
      * second is not"): E F G A with the E given is a pale yellow capsule in the second column, from the staff's top
      * place to its bottom one, with a ❓ in it, and fainter ones, no fill and a pale ❓, for the notes after it. The spot
-     * sampled is the white half of the B line's place, clear of the line, the ❓ and every head.
+     * sampled is the white half of the D line's place (8), clear of the line, the ❓ and every head; in the given note's
+     * column it is the F line's place (10), over the clef, which lies under the first column (Hear's notes pass over it).
      */
     @Test
     fun the_note_to_find_has_a_slot_and_later_notes_fainter_ones() {
@@ -684,7 +694,7 @@ class NotesScreenTest {
         assertFalse("the staff there is plain: $bare", isYellowish(bare))
 
         assertTrue("inside the slot of the note to find: ${staff.at(0.42f, 8, 0.3f)}", isYellowish(staff.at(0.42f, 8, 0.3f)))
-        assertEquals("the given note's column, away from its head, is the plain staff", bare, staff.at(0.26f, 8, 0.3f))
+        assertEquals("the given note's column, away from its head and the clef, is the plain staff", bare, staff.at(0.26f, 10, 0.3f))
         assertEquals("inside a later slot there is no fill", bare, staff.at(0.74f, 8, 0.3f))
 
         // From the staff's top place to its bottom one, and no further: the margins above and below stay plain.
@@ -866,7 +876,7 @@ class NotesScreenTest {
         assertEquals("blue inside the near edge: $near, the far edge $far", far.blue, near.blue, 0.03f)
         assertTrue("the slot has its pale yellow there: $far", isYellowish(far))
 
-        assertTrue("the halo still shows round the F: ${staff.at(0.26f, 3, dy = -0.5f)}", isYellowish(staff.at(0.26f, 3, dy = -0.5f)))
+        assertTrue("the halo still shows round the F, over its head", staff.columnAbove(0.26f, 3, 0.5f, 0.7f).any(::isYellowish))
     }
 
     /**
@@ -915,6 +925,71 @@ class NotesScreenTest {
         compose.runOnIdle { state.value = done.copy(sounding = null) }
         compose.waitForIdle()
         assertFalse("the halo goes out with the sound: ${halo()}", isYellowish(halo()))
+    }
+
+    /**
+     * A found note is the music font's filled head (since 2026-11-24, the user's pick B): its letter's colour with an ink
+     * edge, which keeps a yellow E in sight on the yellow bands and halo, by day and at night.
+     */
+    @Test
+    fun a_found_note_is_its_letters_colour_with_an_ink_edge() = assertFoundNoteLook(dark = false)
+
+    @Test
+    fun a_found_note_is_its_letters_colour_with_an_ink_edge_at_night() = assertFoundNoteLook(dark = true)
+
+    private fun assertFoundNoteLook(dark: Boolean) {
+        needsDevice()
+        show(asking(64).copy(solved = true), dark = dark)
+        val outline = if (dark) DarkFluteColors.outline else LightFluteColors.outline
+        val staff = staffPixels(staffDescription)
+        assertTrue("dark $dark: the head is E's colour", staff.at(0.5f, 2).isNear(NoteLetterColors[2], 0.08f))
+        assertTrue("dark $dark: an ink edge over the head", staff.columnAbove(0.5f, 2, 0.3f, 0.65f).any { it.isNear(outline, 0.08f) })
+    }
+
+    /**
+     * A yellow E sounding on its yellow halo (the plan's first review focus): up the column from its middle, E's colour,
+     * then the ink edge, then the halo's yellow, so the head stays apart from the halo, by day and at night. Hear's
+     * given E with the phrase playing and the E sounding.
+     */
+    @Test
+    fun a_sounding_yellow_e_keeps_its_ink_edge_on_the_halo() = assertYellowOnHalo(dark = false)
+
+    @Test
+    fun a_sounding_yellow_e_keeps_its_ink_edge_on_the_halo_at_night() = assertYellowOnHalo(dark = true)
+
+    private fun assertYellowOnHalo(dark: Boolean) {
+        needsDevice()
+        show(asking(65).copy(game = NotesGame.HEAR, phrase = listOf(64, 65), placed = 1, sounding = 0, phrasePlaying = true), dark = dark)
+        val outline = if (dark) DarkFluteColors.outline else LightFluteColors.outline
+        val staff = staffPixels()
+        val column = phraseColumns(2)[0]
+        assertTrue("dark $dark: the head is E's colour", staff.at(column, 2).isNear(NoteLetterColors[2], 0.08f))
+        assertTrue("dark $dark: an ink edge over the head", staff.columnAbove(column, 2, 0.3f, 0.65f).any { it.isNear(outline, 0.08f) })
+        assertTrue("dark $dark: the halo's yellow over the edge", staff.columnAbove(column, 2, 0.55f, 0.75f).any(::isYellowish))
+    }
+
+    /**
+     * The clef is the music font's, faint (since 2026-11-24): somewhere left of the first column it is the muted ink at
+     * 0.3 over the bare staff, and nowhere there, off the lines, is it the muted ink at full strength.
+     */
+    @Test
+    fun the_clef_is_drawn_faint() {
+        needsDevice()
+        show(asking(67))
+        val staff = staffPixels(staffDescription)
+        val muted = LightFluteColors.mutedText
+        val bare = staff.at(0.9f, 8, 0.3f)
+        val faint = Color(
+            bare.red * 0.7f + muted.red * 0.3f, bare.green * 0.7f + muted.green * 0.3f, bare.blue * 0.7f + muted.blue * 0.3f,
+        )
+        val lines = StaffNotes.LINE_POSITIONS.map { staff.middleOf(it) }
+        val pixels = (0 until (staff.width * 0.25f).toInt()).flatMap { x ->
+            (staff.middleOf(10).toInt()..staff.middleOf(0).toInt())
+                .filter { y -> lines.none { abs(it - y) < 0.12f * staff.pitch } }
+                .map { y -> staff[x, y] }
+        }
+        assertTrue("the clef's faint ink is there", pixels.count { it.isNear(faint, 0.03f) } > 20)
+        assertTrue("nothing there is the muted ink at full strength", pixels.none { it.isNear(muted, 0.1f) })
     }
 
     /**

@@ -20,10 +20,14 @@ change that part). The songbook is in `SONGBOOK.md`.
   `FluteUiState` has one part per way the tab can be: `held`, `playing`, `listening`.
 - `FluteContent(state, metronome, actions)` builds the tune, the keys and the Play row once, and
   `FluteSideways.kt` only says where they stand. `TuneStaff` draws from `StaffGeometry` (plain dp; where a
-  step's heads, pills and bar lines stand is `StaffGeometry.layout`, the one place that knows a sign's room), its signs
-  from `ui/common/StaffSigns.kt`; `FluteKeys` builds its keys from `ui/common/KeyLook.kt`'s `ChunkyKey` (shared with the
-  Fingers tab since 2026-11-17); the ♯♭ key is that file's `SharpFlatKey`, drawn with the staff's own signs
-  (`SharpFlatPicture`), and the ⌒ key its `TapKey`. Which black note a letter writes is `NoteSpelling.blackOf`, in
+  step's heads, pills and bar lines stand is `StaffGeometry.layout`, the one place that knows a sign's room). Since
+  2026-11-24 every symbol on it (clef, heads, flag, dot, rests, ♯ ♭ ♮, the breath comma) is the music font's
+  (`ui/common/MusicSymbols`, the Fingers tab's too; spec `2026-11-24-flute-staff-music-symbols-design.md`): ink as a book
+  prints it, the letter's colour only in the heads (the user's pick A2), each at a share of the em in `StaffGeometry`
+  (`HEAD_SHARE` and the rest) that keeps today's room, so the animal, slurs, rings, knob and book keep their numbers;
+  the ♯♭ key keeps `ui/common/StaffSigns.kt`'s drawn signs. `FluteKeys` builds its keys from `ui/common/KeyLook.kt`'s `ChunkyKey` (shared with the
+  Fingers tab since 2026-11-17); the ♯♭ key is that file's `SharpFlatKey`, drawn with `StaffSigns.kt`'s signs
+  (`SharpFlatPicture`; the staff's own were these until 2026-11-24), and the ⌒ key its `TapKey`. Which black note a letter writes is `NoteSpelling.blackOf`, in
   the chosen octave (`FluteNotes.inOctave`).
 - `audio/flute/`: the tone (`SustainedToneSynth`, `AudioTrackFluteTonePlayer`).
 

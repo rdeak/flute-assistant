@@ -83,16 +83,20 @@ the state's `shown` field, drawn by nothing since, went on 2026-11-10. A screen 
 each step once ("G4, 2 beats", "Breathe here"). `TuneStaff` draws a real five-line staff from `StaffGeometry` (pure
 Kotlin, in dp: lines 18 apart, three quarters of the canvas's 24, to leave room for the bubble and
 for the stems, a note step 9, `StaffNotes.positionOf` for the height, every stem up on the right
-of the head as the user asked, ledger lines from `StaffNotes.ledgerLinesFor`): the faint treble clef
-(`ui/common/drawTrebleClef`, shared with the notes game) and the time signature fixed at the left,
+of the head as the user asked, ledger lines from `StaffNotes.ledgerLinesFor`): the treble clef (since 2026-11-24 the
+music font's, in full ink at x 0, `ui/common/MusicSymbols`; until then a faint hand-drawn clef, gone from the code since the notes game took the font's the same day)
+and the time signature fixed at the left (its figures centred at x 50, 48 before 2026-11-24),
 then a `LazyRow` of the `Bars.write` marks, each a `Spacer` that draws itself in a dp-scaled
-`drawBehind` (a step's width is its pieces' `slotWidth`, 29 dp a beat; a bar line 10, a breath 18). Each note is drawn as printed music draws it, all of it in
-its letter's colour (the user's call: "same colour as the note name, shape by the rules"): a
-tilted oval head (`HEAD_TILT`) with a thin ink edge so a yellow e¹ stays visible on white and on
-the yellow ring, no letter in it (the line under it names the note), filled for an eighth (plus a
-flag) and a quarter, a ring for a half and a dotted half (plus a dot, moved up off a line), a wider
-ring and no stem for a whole note; the stem, flag, dot and tie in the note's colour too; a rest is its symbol in `mutedText`
-over its grey 💤 pill; a breath the comma with 😮‍💨 over the staff; ties go under the heads. The step at `litIndex` gets a yellow ring per head, the one at `heldIndex` also a yellow
+`drawBehind` (a step's width is its pieces' `slotWidth`, 29 dp a beat; a bar line 10, a breath 18). Each note is drawn as printed music draws it, since
+2026-11-24 in the music font's symbols (`ui/common/MusicSymbols`; spec `2026-11-24-flute-staff-music-symbols-design.md`,
+the user's pick A2): ink as a book prints it, the letter's colour only in the heads (the user's call of 2026-11-02, "same
+colour as the note name, shape by the rules", kept in the heads). A filled head (eighth, quarter) is the letter's colour
+with a thin ink edge so a yellow e¹ stays visible on white and on the yellow ring; an open head (half, dotted half, whole)
+is ink with its hollow in the letter's colour, and on a lit or chosen step its ring takes the dark ink a bright fill takes
+(`InkOnFill`) in both themes, as a lit rest does; no letter in a head (the line under it names the note); a stem, an
+eighth's flag, a dotted half's dot (moved up off a line), the ties and the rests in ink; no stem for a whole note; a rest
+over its grey 💤 pill. (Until 2026-11-24 the heads were tilted ovals and the stem, flag, dot and tie were in the note's
+colour, the rests in `mutedText`.) a breath the comma with 😮‍💨 over the staff; ties go under the heads. The step at `litIndex` gets a yellow ring per head, the one at `heldIndex` also a yellow
 band across its room, and is drawn under its neighbours (`zIndex(-1)`) so the ring never covers the
 head beside it; it grows in place because the held step's length in `tune` is updated as it
 grows. Text on the staff (the time signature, the emoji) is measured at a fixed dp size, so it
@@ -187,7 +191,8 @@ tab's tempo and in its time signature, and the flute now shows and sets both. `S
 ring's knob moved to the staff, where printed music writes the tempo: a `ChunkyButton` in `Sun`,
 `CircleShape`, `SpeedKnobSize` (54 dp) across with a 5 dp shadow, laid by `FluteContent` over `TuneStaff`'s
 box at its top left, `KNOB_LIFT` (8 dp) above the box's top, in the stage's padding
-(`StaffGeometry.knobTop`), clear of the faint clef (the clef's tip is `TOP_LINE_Y - LINE_GAP`, 57 dp,
+(`StaffGeometry.knobTop`), clear of the clef (its tip is `CLEF_TIP_Y`, 65.8 dp since the music font's clef of
+2026-11-24; the drawn clef's stood a space over the top line, 57 dp,
 the signature stands lower still, and `NOTES_CLIP`, also 57 dp, keeps every note, stem, ring and band
 from running under the knob); nothing on the staff moved for it, and it shows on an empty tune too.
 The lift is of 2026-11-10: until then the knob's top was the box's, the rule was that the badge may
@@ -482,14 +487,14 @@ that locked within `NEAR_CENTS` (70) of it, "🍃 Maybe too high? Gentler air" /
 (`WrongNote.tooHigh`, gone since, and `TunerAdvice.TOO_HIGH`: the right fingers blown high sound like that, as the sharp flute of 2026-11-13 did on all 30
 of its b's heard as c; a guess, so "maybe"; "gentler air" is the tuner's own phrase; no "too low", since on that
 flute an f-sharp fingered for g came out just under the g and would have blamed the air), and over either stands the fingering of the note that was wanted (`FluteUiState.fingeringMidi`, the tuner's
-`FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage; since 2026-11-17 the flute as the
-player sees it, 72 dp tall at the stage's 372 where the strip was 54), until the right note is played: the
+`FingeringDiagram`, which moved to `ui/common` for this, as wide as the stage; since 2026-11-24 the book-style chart,
+61 dp tall at the stage's 372, where the flute of 2026-11-17 was 72 and the strip before it 54), until the right note is played: the
 heard note says what came out, this says how to get the other. Nothing is added while things go right, which is why
 the user chose it over the fingering under every note (the child would read the picture and not the notes). Playing
 the tune back shows nothing there. (On 2026-11-18 the line moved to the top of the room, over the fingering, and the
 user put it back under it the same day.) On a short screen, where the room is not spread by weight, it grows to hold the
 fingering and the tab scrolls. A phone on its side has the line alone, at the top of its column where the advice
-stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the diagram would be about 23 dp tall (17 with the strip before 2026-11-17), and
+stands (`FluteRunningSideways`'s `prompt`): the column is 116 dp wide and the chart would be about 19 dp tall (23 with the flute of 2026-11-17, 17 with the strip before it), and
 from a music stand's distance its keys could not be read anyway. (From 2026-11-16 to 17 the room also held the
 levels' pair under the prompt, "Practice and Exam".) Tests: `ListenRunTest` (the advice and its order),
 `FluteUiStateTest` (the two values), `FluteScreenTest` ("The room under the stage") and `FluteSidewaysTest` (the line
@@ -741,11 +746,11 @@ text in Croatian on a 360 dp phone. On the staff (Claude's calls, from `staff.ht
 place (`FluteNotes.positionOf`) with its own ♯ or ♭, and a white note whose place carried a ♯ or ♭ earlier in the bar
 gets a ♮ (`Bars`, the bar is the one the note's first piece starts in; a rest or a breath changes nothing; the next bar
 starts clean); a signed step is `ACCIDENTAL_ROOM` (10 dp) wider, the sign centred `SIGN_X` (17 dp) left of the head
-(`StaffSigns.kt`), and the pill under it as much wider, so the name with its sign fits. After the final review: the slur
+(the music font's since 2026-11-24, `StaffSigns.kt`'s drawn signs before), and the pill under it as much wider, so the name with its sign fits. After the final review: the slur
 layer counts the room once (a split signed note's later heads stood 10 dp right of where they are drawn, and a slur or tie
 from them hung past the head; since 2026-11-17 the step's drawing, the slur layer and the pills' ties all read one
 `StaffGeometry.layout`, so they cannot part again); a ledger line beside a sign starts a dp right of it (`StaffGeometry.ledgerLeft`; it ran 3 dp
-into C♯4's sharp); and a slur passes under the foot of a sign it reaches (`SIGN_BELOW` 12, with `SIGN_SLUR_AIR` 1.5 rather
+into C♯4's sharp); and a slur passes under the foot of a sign it reaches (`SIGN_BELOW`, 12 then, 15.5 for the font's signs since 2026-11-24, with `SIGN_SLUR_AIR` 1.5 rather
 than a head's 4, so it dips under and does not sag), as one coming down onto F♯ ran through its sharp at every pitch. A
 sign right after the time signature has about 3.4 dp of air before its figure, left as it is. The tracker (the review's first
 finding): a semitone slurred on a flute off its pitch read as drift, G⌒F♯ on a flute 40 cents sharp leaving F♯ unheard

@@ -89,15 +89,17 @@ it) and ignores microphone frames meanwhile; it does nothing unless a tap on the
 Boehm chart (Woodwind Fingering Guide basic fingerings, checked again on 2026-11-17; every note from MIDI 60 to
 96 has one since then, B♭6 and B6 with a trill key; B♭ stays "one and one") that `FingeringDiagram` draws
 (`ui/common` since 2026-11-10: the flute's listening room shows it too, after a wrong note, and since 2026-11-17
-the Fingers tab). Since 2026-11-17 it is the flute as the player sees it, the fifteen keys a finger touches each
-where it sits, a teacher's ask ("not how they mark keys"; spec `2026-11-17-fingers-tab-design.md`); its numbers
-are `FingeringGeometry`, 340 x 66, so it is 66 dp tall at the stage's 340 where the strip was 49. The tuner draws
+the Fingers tab). Since 2026-11-24 it is a fingering chart as a flute book prints it, the fifteen keys a finger
+touches each on its side of a thin tube line (the user's pick A, spec `2026-11-24-fingers-music-symbols-and-book-chart-design.md`;
+from 2026-11-17 it was the whole flute, a teacher's ask, spec `2026-11-17-fingers-tab-design.md`); its numbers
+are `FingeringGeometry`, 340 x 56, so it is 56 dp tall at the stage's 340 (the flute was 66, the strip before it 49). The tuner draws
 it in both modes, for the chosen or the heard note, and with no note every key open. The tab's least height grew
 with it, 440 to 457 on a 412 dp phone: below that the window, at its least, would stand on the flute (it squeezed Hear
 while Hear stood under the window, until 2026-11-18). The picture fills the stage and its height
 follows the stage's width, so the least height does too (`TunerMinHeightLessFingering` and the picture's own); it was
 the one number 457 until the review of 2026-11-17. Since the calmer Tune view (2026-11-18: no Hear and How?, one line)
-it is 395 on a 412 dp phone, 385 at 360 dp wide, 430 in a pane 590 wide, measured so the window keeps about 124 dp.
+it was 395 on a 412 dp phone, 385 at 360 dp wide, 430 in a pane 590 wide, measured so the window keeps about 124 dp;
+with the shorter chart (2026-11-24) it is 385, 376 and 414.
 
 Two pieces of this path are shared with the flute's "Your turn" (`ui/flute/DESIGN.md`, since
 2026-11-04): `NoteOnsetTracker`, a pure class that applies the same frame rules as this view
@@ -268,9 +270,10 @@ as the height leaves little choice. The numbers come from `SidewaysGeometry`, wh
   leaves it less, as a hole takes width from the tab (the emulator's takes 45 dp at 800 x 360). An 800 wide phone
   keeps the full-size ring with a hole up to 50 dp, a 780 wide one with a hole up to 30. The number was 240 first,
   which put the edge at 785 and sent a 780 wide phone, or an 800 wide one with a hole over 15 dp, to the
-  small layout (the final review, 2026-11-06). 205 keeps it down to 750 with the fingering 205 wide and about 40 tall
-  (30 with the strip before 2026-11-17); under the window it is at most 300 dp wide (`UnderFingeringWidth`), so the
-  taller flute takes no more of the window than the strip did across the whole card; `TunerSidewaysTest` covers 780 and 750. The one
+  small layout (the final review, 2026-11-06). 205 keeps it down to 750 with the fingering 205 wide and about 34 tall
+  (since the chart of 2026-11-24; the flute of 2026-11-17 was about 40, the strip before it 30); under the window it
+  is at most 300 dp wide (`UnderFingeringWidth`, set for the taller flute so it took no more of the window than the
+  strip did across the whole card; the chart is 49 dp tall there); `TunerSidewaysTest` covers 780 and 750. The one
   line (since 2026-11-18, the calmer Tune view; until then a status line, 40 sp in a 48 dp box, over an advice line in
   a fixed 58 dp box) takes the room both had, 108 dp, up to two lines at 40 sp (124 dp and three lines at 28 sp under
   the 750 dp edge), so the fingering stands where it stood and never moves whatever the line says. A failed microphone

@@ -67,7 +67,7 @@ change that part).
 ## Tests
 
 - Rules, on the JVM with no dispatcher: `NotesRoundTest`, `PhrasesTest`, `NoteProgressTest`,
-  `StaffNotesTest`, `NoteStaffColumnsTest`, `LetterDotsTest`, `RoundSummaryFitTest`.
+  `StaffNotesTest`, `NoteStaffColumnsTest`, `NoteStaffSymbolsTest`, `LetterDotsTest`, `RoundSummaryFitTest`.
 - `NotesViewModelTest`: the sound, the waits, the saving and the log lines.
 - On the emulator: `NotesScreenTest`, `NotesSidewaysTest` (what each pins is listed in
   `DESIGN.md`, "Tests").

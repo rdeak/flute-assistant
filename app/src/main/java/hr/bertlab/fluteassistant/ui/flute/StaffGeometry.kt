@@ -11,8 +11,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.SidewaysGeometry
-import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_X
-import hr.bertlab.fluteassistant.ui.common.TREBLE_CLEF_TIP_Y
+import hr.bertlab.fluteassistant.ui.common.MusicSymbols
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import kotlin.math.hypot
 
@@ -151,21 +150,46 @@ internal object StaffGeometry {
     /** Whether [position] is on a line (a ledger line too) rather than in a space: a dot moves up off it. */
     fun onLine(position: Int): Boolean = position % 2 == 0
 
-    /** The treble clef's unit (one space), drawn from the top line as the canvas placed it. */
-    const val CLEF_X = 4f
-    const val CLEF_UNIT = LINE_GAP
-    const val CLEF_STROKE = 0.14f
-    const val CLEF_ALPHA = 0.45f
+    /**
+     * The staff's symbols come from the music font (since 2026-11-24; spec `2026-11-24-flute-staff-music-symbols-design.md`,
+     * part 3): a SMuFL em is four line gaps, and each symbol is drawn at a share of it that keeps today's room, so the
+     * animal, the slurs, the rings, the knob and the book keep their numbers. The sizes these give are `MusicSymbols`'
+     * (Bravura 1.482's, in staff spaces) times [LINE_GAP] times the share.
+     */
+    const val EM = 4 * LINE_GAP
+    const val HEAD_SHARE = 0.9f
+    const val WHOLE_SHARE = 0.7f
+    const val FLAG_SHARE = 0.45f
+    const val REST_SHARE = 0.65f
+    const val SIGN_SHARE = 0.6f
+    const val DOT_SHARE = 1f
+    const val CLEF_SHARE = 0.8f
+    const val BREATH_SHARE = 0.4f
 
     /**
-     * The lowest control point of `drawTrebleClef`'s hook (5.12 units under the top line): a bound
-     * the clef's stroke never passes, so the book button may stand under it.
+     * The half and the whole rest, short blocks: at this share 15.3 dp wide, the width drawn before the font (15); at
+     * [REST_SHARE] they would be 13 dp, at the em's full size 20 (the final review: then a dotted half rest's dot touched it).
      */
-    const val CLEF_BOTTOM = TOP_LINE_Y + 5.12f * CLEF_UNIT
+    const val REST_BLOCK_SHARE = 0.75f
 
-    /** The clef's tip, its highest point and the nearest it comes to the speed knob: a space over the top line. */
-    const val CLEF_TIP_X = CLEF_X + TREBLE_CLEF_TIP_X * CLEF_UNIT
-    const val CLEF_TIP_Y = TOP_LINE_Y + TREBLE_CLEF_TIP_Y * CLEF_UNIT
+    /** A dotted half rest's dot, right of the rest's centre, a space up. */
+    const val REST_DOT_X = 13.5f
+
+    /** The G line, the second from the bottom: the clef's baseline. */
+    const val G_LINE_Y = TOP_LINE_Y + 3 * LINE_GAP
+
+    /** The clef, from the staff's left edge (4 dp in until 2026-11-24: the font's clef is wider). */
+    const val CLEF_X = 0f
+
+    /** The clef's foot, its lowest point: the book button stands under it. */
+    const val CLEF_BOTTOM = G_LINE_Y + MusicSymbols.CLEF_DROP * LINE_GAP * CLEF_SHARE
+
+    /** The clef's tip, its highest point and the nearest it comes to the speed knob. */
+    const val CLEF_TIP_X = CLEF_X + MusicSymbols.CLEF_TOP_X * LINE_GAP * CLEF_SHARE
+    const val CLEF_TIP_Y = G_LINE_Y - MusicSymbols.CLEF_RISE * LINE_GAP * CLEF_SHARE
+
+    /** The clef's right edge: the time signature keeps clear of it. */
+    const val CLEF_RIGHT = CLEF_X + MusicSymbols.CLEF_WIDTH * LINE_GAP * CLEF_SHARE
 
     /**
      * The buttons in the staff's left corner (since 2026-11-04): the round speed knob at the top
@@ -222,7 +246,7 @@ internal object StaffGeometry {
         val badgeMiddle = CORNER_BUTTON + KNOB_BADGE_OVERHANG - badge
         val toShadow = hypot(tipX - knob, tipY - (top + CORNER_SHADOW + knob)) - knob
         val toBadge = hypot(tipX - badgeMiddle, tipY - (top + badgeMiddle)) - badge
-        return minOf(toShadow, toBadge) - CLEF_STROKE * CLEF_UNIT * scale / 2
+        return minOf(toShadow, toBadge)
     }
 
     /**
@@ -252,7 +276,7 @@ internal object StaffGeometry {
      */
     fun animalY(scale: Float): Float {
         val half = ANIMAL_SIZE * scale / 2
-        val headTop = (yOf(C3_PLACE) - HEAD_RY - 0.25f - HEAD_EDGE) * scale // the head's tilt adds a quarter dp
+        val headTop = (yOf(C3_PLACE) - HEAD_RY - 0.25f - HEAD_EDGE) * scale // a quarter dp of air over the edge
         return if (ANIMAL_Y + half - headTop <= ANIMAL_COVER) ANIMAL_Y else half + HOP
     }
 
@@ -263,10 +287,17 @@ internal object StaffGeometry {
     fun bookButtonTop(scale: Float, room: Float = 0f): Float = (NAMES_TOP + room + PILL_HEIGHT / 2) * scale - BOOK_BUTTON_HEIGHT / 2
 
     /** The time signature's figures: centred at this x, each across two spaces of the staff. */
-    const val SIGNATURE_X = 48f
+    const val SIGNATURE_X = 50f
     const val SIGNATURE_TOP_Y = TOP_LINE_Y + LINE_GAP
     const val SIGNATURE_BOTTOM_Y = TOP_LINE_Y + LINE_GAP * 3
     const val SIGNATURE_SIZE = 24f
+
+    /**
+     * Half the widest single figure's ink at [SIGNATURE_SIZE] (Nunito Bold, measured: centred at 50 its ink ends at 56.8):
+     * the figures keep left of [NOTES_CLIP]. A two-figure signature (12/8) reaches about 6 dp under the notes' row, 4 dp
+     * at 48 before 2026-11-24, and cannot move left without meeting the clef: a known case.
+     */
+    const val SIGNATURE_FIGURE_HALF = 0.285f * SIGNATURE_SIZE
 
     /** Where the first step starts; the notes scroll in from [NOTES_CLIP] so a ring is never cut. */
     const val NOTES_START = 62f
@@ -307,8 +338,11 @@ internal object StaffGeometry {
     const val SIGN_X = 17f
     const val SIGN_HALF_WIDTH = 5.5f
 
-    /** How far under its head's centre a sign's ink reaches: the sharp's and the natural's right stem, 11, and its cap. */
-    const val SIGN_BELOW = 12f
+    /**
+     * How far under its head's centre a sign's ink reaches: the font's sharp at [SIGN_SHARE] hangs 15.03 under its line,
+     * the natural 14.5 (12 when the signs were drawn by hand, until 2026-11-24), and a little air.
+     */
+    const val SIGN_BELOW = 15.5f
 
     /** The air a slur keeps under a sign's foot (a head's is [SLUR_CLEAR]): less, so a slur onto a sign does not sag. */
     const val SIGN_SLUR_AIR = 1.5f
@@ -398,25 +432,26 @@ internal object StaffGeometry {
     const val HEAD_X = 14.5f
 
     /**
-     * A head as printed music draws it: an oval about a space tall, tilted [HEAD_TILT] degrees, in the
-     * note's letter colour (the user, 2026-11-02: each note in its name's colour, its shape by the rules
-     * of notation), filled for an eighth and a quarter, a ring [OPEN_RING] thick for a half and a
-     * dotted half, a wider ring for a whole note; a thin [HEAD_EDGE] in the outline colour keeps a
-     * yellow e on white, or on the yellow ring of the lit note, in sight.
+     * A head's half sizes, the music font's at its share (since 2026-11-24): a black or half head 19.1 x 16.2 dp at
+     * [HEAD_SHARE], the size of the tilted oval drawn before, so the animal, the slurs, the ties, the rings and the ledger
+     * lines keep their numbers; a whole head at [WHOLE_SHARE], today's width. A filled head is the letter's colour with a
+     * thin [HEAD_EDGE] in the outline colour, which keeps a yellow e on white, or on the yellow ring of the lit note, in
+     * sight; an open head is ink, its hollow in the letter's colour (`StaffDrawing`).
      */
-    const val HEAD_RX = 9.6f
-    const val HEAD_RY = 7.6f
-    const val HEAD_TILT = -20f
+    const val HEAD_RX = MusicSymbols.NOTE_WIDTH * LINE_GAP * HEAD_SHARE / 2
+    const val HEAD_RY = MusicSymbols.NOTE_HALF_HEIGHT * LINE_GAP * HEAD_SHARE
     const val HEAD_EDGE = 1.25f
-    const val OPEN_RING = 3f
-    const val WHOLE_RX = 11f
-    const val WHOLE_RY = 8f
+    const val WHOLE_RX = MusicSymbols.WHOLE_WIDTH * LINE_GAP * WHOLE_SHARE / 2
+    const val WHOLE_RY = MusicSymbols.NOTE_HALF_HEIGHT * LINE_GAP * WHOLE_SHARE
 
-    /** The stem, always up on the right of the head, in the note's colour: from inside the head to [STEM_REACH] above its centre. */
-    const val STEM_X = 8.5f
+    /** The stem, always up on the right of the head, in the staff's ink (the note's colour until 2026-11-24): from inside the head to [STEM_REACH] above its centre. */
+    const val STEM_WIDTH = 2f
+    const val STEM_X = HEAD_RX - STEM_WIDTH / 2
     const val STEM_START = 1f
     const val STEM_REACH = 50f
-    const val STEM_WIDTH = 2f
+
+    /** How far right of its head's centre an eighth's flag reaches: from its stem's left edge, the font's flag at its share. */
+    const val FLAG_RIGHT = STEM_X - STEM_WIDTH / 2 + MusicSymbols.FLAG_WIDTH * LINE_GAP * FLAG_SHARE
 
     /** Half the length of a ledger line. */
     const val LEDGER_HALF = 14.5f
@@ -430,7 +465,7 @@ internal object StaffGeometry {
 
     /** A dotted half's dot, right of the head. */
     const val DOT_X = 16.5f
-    const val DOT_RADIUS = 2.75f
+    const val DOT_RADIUS = MusicSymbols.DOT_WIDTH * LINE_GAP * DOT_SHARE / 2
 
     /** The yellow behind the lit note's head, and behind a lit rest. */
     const val LIT_RADIUS = 15f

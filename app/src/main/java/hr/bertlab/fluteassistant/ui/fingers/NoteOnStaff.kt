@@ -3,75 +3,61 @@
 
 package hr.bertlab.fluteassistant.ui.fingers
 
+import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.unit.dp
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
+import hr.bertlab.fluteassistant.domain.tuner.Accidental
 import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
-import hr.bertlab.fluteassistant.ui.common.SIGN_LINE_GAP
-import hr.bertlab.fluteassistant.ui.common.drawSign
-import hr.bertlab.fluteassistant.ui.common.drawStaffClef
+import hr.bertlab.fluteassistant.ui.common.MusicSymbols
+import hr.bertlab.fluteassistant.ui.common.drawMusicSymbol
+import hr.bertlab.fluteassistant.ui.common.rememberMusicPaint
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 
 /**
- * The note as the book writes it, on a small staff: five lines, the treble clef, the note in its letter's colour with its
- * ♯ or ♭ and the ledger lines it needs. Room for c1 to c4 in the height it is given: the line gap is that height less
- * 15 dp over 10.5, 7.5 dp in a row's 94 (the mockup's `staff()` in `gen.py`). Decorative: the row's flute names the note.
+ * The note as a book prints it, in Bravura's music symbols (since 2026-11-24; spec
+ * `2026-11-24-fingers-music-symbols-and-book-chart-design.md`, part 2): five lines, the treble clef, the whole note with
+ * its hollow in the letter's colour, its ♯ or ♭ and the ledger lines it needs, all in the theme's ink. The sizes are
+ * [SymbolStaff]'s: room for c1 to c4 and their signs in the height it is given, the line gap 8.2 dp where that allows
+ * and less on a short row. The symbols are sized in dp, so large text does not grow them. Decorative: the row's chart names the note.
  */
 @Composable
 internal fun NoteOnStaff(midi: Int, modifier: Modifier = Modifier) {
     val colors = FluteTheme.colors
+    val paint = rememberMusicPaint()
     Canvas(modifier) {
-        val gap = (size.height - StaffMargins.toPx()) / STAFF_GAPS
-        val bottom = StaffTopMargin.toPx() + BOTTOM_LINE_GAPS * gap
-        val line = 1.5.dp.toPx()
-        // `StaffNotes`' places, two to a line gap, counted up from the bottom line.
-        fun yOf(place: Int) = bottom - (place - StaffNotes.LINE_POSITIONS.first()) * gap / 2
+        val ink = colors.text
+        val gapDp = SymbolStaff.gapFor(size.height.toDp().value)
+        val g = gapDp.dp.toPx()
+        val bottom = SymbolStaff.bottomLine(size.height.toDp().value, gapDp).dp.toPx()
+        fun yOf(place: Int) = SymbolStaff.yOf(place, bottom, g)
 
-        StaffNotes.LINE_POSITIONS.forEach { drawLine(colors.text, Offset(0f, yOf(it)), Offset(size.width, yOf(it)), line) }
-        drawStaffClef(gap, yOf(StaffNotes.G_LINE), x = 2.dp.toPx(), color = colors.mutedText, strokeUnits = CLEF_STROKE)
+        val line = maxOf(1.2.dp.toPx(), 0.13f * g)
+        StaffNotes.LINE_POSITIONS.forEach { drawLine(ink, Offset(0f, yOf(it)), Offset(size.width, yOf(it)), line) }
 
         val place = NoteSpelling.placeOf(midi)
-        val x = size.width - NoteFromEnd.toPx()
+        val x = SymbolStaff.noteX(size.width, g)
         val y = yOf(place)
-        val ledgerHalf = LedgerHalf.toPx()
-        StaffNotes.ledgerLinesFor(place).forEach { drawLine(colors.text, Offset(x - ledgerHalf, yOf(it)), Offset(x + ledgerHalf, yOf(it)), line) }
-        val head = Size(gap * HEAD_RX * 2, gap * HEAD_RY * 2)
-        val topLeft = Offset(x - head.width / 2, y - head.height / 2)
-        rotate(HEAD_TILT, pivot = Offset(x, y)) {
-            drawOval(noteColor(midi), topLeft, head)
-            drawOval(colors.outline, topLeft, head, style = Stroke(2.dp.toPx()))
+        val ledger = 0.16f * g + 0.2.dp.toPx()
+        StaffNotes.ledgerLinesFor(place).forEach {
+            drawLine(ink, Offset(x - SymbolStaff.LEDGER_HALF * g, yOf(it)), Offset(x + SymbolStaff.LEDGER_HALF * g, yOf(it)), ledger)
         }
-        NoteSpelling.signOf(midi)?.let { sign ->
-            // drawSign draws in the flute staff's units, whose line gap is 18: one unit here is this staff's gap over that.
-            val unit = gap / SIGN_LINE_GAP
-            scale(unit, pivot = Offset.Zero) {
-                drawSign(sign, cx = (x - SignBeforeNote.toPx()) / unit, y = y / unit, color = colors.text)
-            }
+        val hollow = Size(MusicSymbols.WHOLE_HOLLOW_RX * 2 * g, MusicSymbols.WHOLE_HOLLOW_RY * 2 * g)
+        drawOval(noteColor(midi), Offset(x - hollow.width / 2, y - hollow.height / 2), hollow)
+
+        val em = MusicSymbols.em(g)
+        drawMusicSymbol(paint, MusicSymbols.G_CLEF, SymbolStaff.CLEF_LEFT.dp.toPx(), yOf(StaffNotes.G_LINE), em, ink)
+        drawMusicSymbol(paint, MusicSymbols.NOTE_WHOLE, x, y, em, ink, Paint.Align.CENTER)
+        val sign = when (NoteSpelling.signOf(midi)) {
+            Accidental.SHARP -> MusicSymbols.SHARP
+            Accidental.FLAT -> MusicSymbols.FLAT
+            Accidental.NATURAL, null -> null
         }
+        if (sign != null) drawMusicSymbol(paint, sign, SymbolStaff.signRight(size.width, g), y, em, ink, Paint.Align.RIGHT)
     }
 }
-
-/** Thicker than the clef's default 0.13 of a unit: this clef is small. */
-private const val CLEF_STROKE = 0.2f
-
-/** The staff in its box: 15 dp of margin in all, 8 of it over the top, and 10.5 line gaps of height, the bottom line 9.5 down. */
-private val StaffMargins = 15.dp
-private val StaffTopMargin = 8.dp
-private const val STAFF_GAPS = 10.5f
-private const val BOTTOM_LINE_GAPS = 9.5f
-
-/** The note: its head's radii in line gaps and its tilt, how far it stands from the staff's end, its ledger lines' half width and its sign before it. */
-private const val HEAD_RX = 0.72f
-private const val HEAD_RY = 0.54f
-private const val HEAD_TILT = -18f
-private val NoteFromEnd = 17.dp
-private val LedgerHalf = 9.dp
-private val SignBeforeNote = 15.dp

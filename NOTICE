@@ -14,6 +14,9 @@ Additional terms under GPLv3 section 7:
     its icon.
 
 Third party: Nunito font (SIL OFL 1.1, docs/licenses/Nunito-OFL.txt);
+music symbols cut from the Bravura font by Steinberg Media Technologies
+GmbH (SIL OFL 1.1, docs/licenses/Bravura-OFL.txt), renamed Flute
+Assistant Music as the licence asks of a changed copy;
 AndroidX, Hilt, Kotlin, kotlinx.coroutines and the Gradle wrapper
 (Apache-2.0). The app icon: the Android robot is reproduced or modified
 from work created and shared by Google and used according to terms

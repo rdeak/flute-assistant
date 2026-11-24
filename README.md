@@ -216,5 +216,7 @@ description of the internals, kept in step with the code.
 Flute Assistant is free software under the [GNU General Public License, version 3 or later](LICENSE),
 with the additional terms in [NOTICE](NOTICE). Anyone who distributes a modified version must share
 its source under the same licence, keep the credit and the link to this repository, and mark it as
-changed. The Nunito font stays under the [SIL Open Font License](docs/licenses/Nunito-OFL.txt).
+changed. The Nunito font stays under the [SIL Open Font License](docs/licenses/Nunito-OFL.txt), and so do the
+staves' music symbols, cut from Steinberg's Bravura and renamed
+([licence](docs/licenses/Bravura-OFL.txt), `tools/cut-music-font.py`).
 Changes are welcome back here: see [CONTRIBUTING](CONTRIBUTING.md).

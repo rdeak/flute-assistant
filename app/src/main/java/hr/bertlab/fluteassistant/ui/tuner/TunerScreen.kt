@@ -224,10 +224,10 @@ private fun TunerMicrophoneCard(state: TunerUiState, actions: TunerActions, modi
 /**
  * The pitch window shrinks to fit a small phone; only below a least height (split screen, a tiny
  * phone) does the tab scroll instead: this much and the fingering's own height, under which the window,
- * at its least (120 dp), would stand on the flute. The fingering fills the stage's inside, the tab less [TabSide] and
- * [StagePadding] either side, and its height follows that width (340:66), so the least height is 395 on a 412 dp
- * phone, where the flute is 66 dp tall, 385 at 360 and 430 in a pane 590 dp wide (measured: the window keeps about
- * 124 dp there).
+ * at its least (120 dp), would stand on the chart. The fingering fills the stage's inside, the tab less [TabSide] and
+ * [StagePadding] either side, and its height follows that width (340:56 since the book-style chart of 2026-11-24), so
+ * the least height is 385 on a 412 dp phone, where the chart is 56 dp tall, 376 at 360 and 414 in a pane 590 dp wide
+ * (measured with the flute's 340:66, 395 / 385 / 430: the window kept about 124 dp there).
  */
 private val TunerMinHeightLessFingering = 329.dp
 

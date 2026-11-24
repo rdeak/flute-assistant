@@ -27,7 +27,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The flute as the fingering picture draws it (spec `2026-11-17-fingers-tab-design.md`, part 2). */
+/** The fingering chart (spec `2026-11-24-fingers-music-symbols-and-book-chart-design.md`, part 1). */
 @RunWith(AndroidJUnit4::class)
 class FingeringDiagramTest {
 
@@ -66,11 +66,11 @@ class FingeringDiagramTest {
     }
 
     @Test
-    fun the_picture_is_66_tall_at_340_wide() {
+    fun the_picture_is_56_tall_at_340_wide() {
         show(69)
         val bounds = compose.onNodeWithTag("diagram").getUnclippedBoundsInRoot()
         assertEquals(340f, bounds.width.value, 0.5f)
-        assertEquals(66f, bounds.height.value, 0.5f)
+        assertEquals(56f, bounds.height.value, 0.5f)
     }
 
     @Test

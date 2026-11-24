@@ -57,7 +57,8 @@ root CLAUDE.md, "Kid-friendly UI constraint".
 - `ValueWheel`'s content description stays on the `LazyColumn` node: the tests scroll it by it.
 - `ModeChoice` is shared by the tuner's modes and the notes tab's games: change it for both (the flute's level used
   it from 2026-11-16 until the levels went, 2026-11-17).
-  `FingeringDiagram` (the flute as the player sees it, its numbers in `FingeringGeometry`, since 2026-11-17) is
+  `FingeringDiagram` (the fingering chart, its numbers in `FingeringGeometry`: since 2026-11-24 a book's strip of the
+  fifteen touch keys, the whole flute from 2026-11-17) is
   shared by the tuner, the flute's listening room and the Fingers tab, and `AdviceLine` is the flute's (it also takes
   its "Play B4"; the tuner's one line took its advice on 2026-11-18): the same. A key (`KeyLook.kt`: its look, `KeyShape`, `KeyDepth`,
   `drawKeyRing`, `SharpFlatPicture`, and the key itself, `ChunkyKey`, with `TapKey`, `SharpFlatKey` and

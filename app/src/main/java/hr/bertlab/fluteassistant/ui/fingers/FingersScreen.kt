@@ -37,11 +37,12 @@ fun FingersScreen(state: FingerPick, viewModel: FingersViewModel, onTune: (Int) 
 
 /**
  * The Fingers tab (since 2026-11-17, a teacher's ask; spec `2026-11-17-fingers-tab-design.md`): the chosen note in
- * every octave the flute plays, each on its staff with its name and the flute, and under them the seven letter keys and
- * ♯♭. Nothing else: no sound, no legend, nothing stored. A tap on a row's flute is [onTune] with its note, which the
- * frame opens in the tuner's Tune mode (since 2026-11-18, the user's ask). The rows stand in the middle of the room the keys leave and
- * scroll on a screen too short for them; the keys never scroll. A row's flute fills the row's width, but only as far
- * as four rows still fit the room: on a wide and short tab it stops there (`NoteRow`).
+ * every octave the flute plays, each on its staff in music symbols with its name and the fingering chart (since
+ * 2026-11-24; spec `2026-11-24-fingers-music-symbols-and-book-chart-design.md`), and under them the seven letter keys
+ * and ♯♭. Nothing else: no sound, no legend, nothing stored. A tap on a row's chart is [onTune] with its note, which the
+ * frame opens in the tuner's Tune mode (since 2026-11-18, the user's ask). The rows stand in the middle of the room the
+ * keys leave and scroll on a screen too short for them; the keys never scroll. A row's chart fills the row's width, but
+ * only as far as four rows still fit the room: on a wide and short tab it stops there (`NoteRow`).
  */
 @Composable
 fun FingersContent(

@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.flute
 
+import android.graphics.Paint
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -47,7 +48,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -97,7 +97,9 @@ import hr.bertlab.fluteassistant.ui.common.FLASH_DURATION_MS
 import hr.bertlab.fluteassistant.ui.common.LocalSideways
 import hr.bertlab.fluteassistant.ui.common.OutlineWidth
 import hr.bertlab.fluteassistant.ui.common.asTextSize
-import hr.bertlab.fluteassistant.ui.common.drawTrebleClef
+import hr.bertlab.fluteassistant.ui.common.MusicSymbols
+import hr.bertlab.fluteassistant.ui.common.drawMusicSymbol
+import hr.bertlab.fluteassistant.ui.common.rememberMusicPaint
 import hr.bertlab.fluteassistant.ui.common.facingRight
 import hr.bertlab.fluteassistant.ui.common.hopOnBeat
 import hr.bertlab.fluteassistant.ui.common.noteColor
@@ -181,14 +183,18 @@ internal inline fun DrawScope.atStaff(scale: Float, room: Float, crossinline blo
  * step an equal ink and the steps that did not change skip: the walking animal recomposes the staff on each hop.
  */
 internal data class StaffInk(
-    /** The lines, stems, ledger and bar lines, ties and dots: the text colour. */
+    /**
+     * Everything on the staff but the heads' colour (since 2026-11-24, the user's pick A2): the lines, the clef, stems,
+     * flags, dots, rests, signs, the breath comma, open heads, ledger and bar lines, ties and slurs: the text colour.
+     */
     val line: Color,
-    /** Round a note head, like everything outlined. */
+    /** Round a filled head, like everything outlined. */
     val outline: Color,
-    /** Inside an open head: the card behind the staff. */
-    val card: Color,
-    /** A rest's symbol, quieter than a note. */
-    val rest: Color,
+    /**
+     * The music font's paint (`rememberMusicPaint`), made once per screen. A Paint is not a stable type: the steps skip
+     * only because `TuneStaff` remembers this ink and hands the same instance down until the theme changes.
+     */
+    val symbols: Paint,
 )
 
 /**
@@ -200,13 +206,15 @@ internal data class StaffInk(
  * retry; under the step waited on the note the phone hears right now ([Listening.heardNow] of [listening]) as a bubble in
  * its own colour, so the child sees it listening, else the wrong note last heard for it
  * ([Listening.wrong]) until the next note is judged, else grey listening dots). While the tune runs the knob's [animal] walks the
- * staff at the knob's height ([WalkingAnimal]), hopping on to each beat's place. The faint treble clef
+ * staff at the knob's height ([WalkingAnimal]), hopping on to each beat's place. The treble clef
  * and the metronome tab's time signature stand at the left while the steps scroll past after
- * them, written in bars of [timeSignature] by [Bars.write]. Each note sits at its true height,
- * its head filled with its letter's colour (an open head with a coloured ring from a half note
- * up), a stem up on its right, ledger lines where it needs them, a flag on an eighth and a dot
- * on a dotted half, and as much room after it as it is long ([StaffGeometry.slotWidth]). A rest
- * is its rest symbol in grey over a grey 💤 pill; a breath the breath mark with 😮‍💨 over the
+ * them, written in bars of [timeSignature] by [Bars.write]. Every symbol is the music font's
+ * (since 2026-11-24, `ui/common/MusicSymbols`), in ink as a book prints it with the letter's colour
+ * only in the heads (the user's pick A2): each note at its true height, a filled head in its
+ * letter's colour from an eighth to a quarter, an open head in ink with its hollow coloured from a
+ * half note up, a stem up on its right, ledger lines where it needs them, a flag on an eighth and a
+ * dot on a dotted half, and as much room after it as it is long ([StaffGeometry.slotWidth]). A rest
+ * is its rest symbol in ink over a grey 💤 pill; a breath the breath mark with 😮‍💨 over the
  * staff and no pill; a bar line follows every full bar, through the names too, and a note running
  * past one is drawn as heads tied under them and pills tied under those, a rest just split. The
  * step at [litIndex] (sounding now, waited for, or held) gets a yellow ring on every head and
@@ -244,7 +252,10 @@ fun TuneStaff(
     onStepTap: ((Int) -> Unit)? = null,
 ) {
     val colors = FluteTheme.colors
-    val ink = StaffInk(line = colors.text, outline = colors.outline, card = colors.card, rest = colors.mutedText)
+    // Remembered: a Paint is not a stable type, so the steps skip only while they are handed this same ink (the final
+    // review, 2026-11-24: rebuilt on every recomposition, every step redrew on each hop of the walking animal).
+    val symbols = rememberMusicPaint()
+    val ink = remember(colors.text, colors.outline, symbols) { StaffInk(line = colors.text, outline = colors.outline, symbols = symbols) }
     val measurer = rememberTextMeasurer()
     Box(
         modifier = modifier
@@ -257,11 +268,9 @@ fun TuneStaff(
                         val y = TOP_LINE_Y + line * StaffGeometry.STEP * 2
                         drawLine(ink.line, Offset(0f, y), Offset(width, y), StaffGeometry.LINE_WIDTH)
                     }
-                    drawTrebleClef(
-                        unit = StaffGeometry.CLEF_UNIT,
-                        origin = Offset(StaffGeometry.CLEF_X, TOP_LINE_Y),
-                        color = ink.line.copy(alpha = StaffGeometry.CLEF_ALPHA),
-                        strokeUnits = StaffGeometry.CLEF_STROKE,
+                    drawMusicSymbol(
+                        ink.symbols, MusicSymbols.G_CLEF, StaffGeometry.CLEF_X, StaffGeometry.G_LINE_Y,
+                        StaffGeometry.EM * StaffGeometry.CLEF_SHARE, ink.line,
                     )
                 }
             },
@@ -786,13 +795,10 @@ private fun BreathMark(ink: StaffInk, measurer: TextMeasurer, chosen: Boolean = 
                 atStaff(s, room) {
                     val x = BREATH_SLOT / 2
                     if (chosen) drawCircle(Sun, StaffGeometry.LIT_RADIUS, Offset(x, BREATH_FACE_Y))
-                    drawPath(
-                        Path().apply {
-                            moveTo(x - 1.5f, TOP_LINE_Y + 3f)
-                            quadraticTo(x + 2.25f, TOP_LINE_Y + 4.5f, x + 0.75f, TOP_LINE_Y + 9.75f)
-                        },
-                        ink.line,
-                        style = Stroke(2.5f, cap = StrokeCap.Round),
+                    // The font's comma, at the size and place of the one drawn before 2026-11-24: its foot on the top line's 9.75.
+                    drawMusicSymbol(
+                        ink.symbols, MusicSymbols.BREATH, x, TOP_LINE_Y + 9.75f,
+                        StaffGeometry.EM * StaffGeometry.BREATH_SHARE, ink.line, Paint.Align.CENTER,
                     )
                     drawEmoji(face, x, BREATH_FACE_Y)
                 }

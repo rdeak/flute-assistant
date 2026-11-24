@@ -11,16 +11,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import hr.bertlab.fluteassistant.domain.tuner.Accidental
 
-/** The staff line gap, in dp, that [drawSign]'s sizes are for: the flute staff's (`StaffGeometry.LINE_GAP`). A smaller staff scales by its own gap over this. */
-internal const val SIGN_LINE_GAP = 18f
-
 /**
  * A sharp, a flat or a natural before a note (since 2026-11-16), centred at [cx] on the head's height [y], in dp inside the
  * staff's scaled drawing, in [color] (the ink): as engraved, thin stems and thick bars rising to the right. The sharp: two
  * stems 4 apart, 21 tall, two bars 7 apart. The flat: a stem from 16 above the head's centre to 6 under it and a bowl
  * on the head's place. The natural: two stems, the left from 11 above to 5 under, the right from 5 above to 11 under,
- * and two bars between them. All of it within 5.5 of [cx] (the flute staff's `StaffGeometry.SIGN_HALF_WIDTH`). In `ui/common`
- * since 2026-11-17: the flute's staff and ♯♭ key and the Fingers tab draw it.
+ * and two bars between them. All of it within 5.5 of [cx]. In `ui/common` since 2026-11-17; since 2026-11-24 the staves draw
+ * their signs from the music font (`MusicSymbols`), and only the ♯♭ key's picture (`KeyLook.kt`'s `SharpFlatPicture`, the
+ * flute's and the Fingers tab's) draws these, whose sizes fit its 28 x 26 box.
  */
 internal fun DrawScope.drawSign(sign: Accidental, cx: Float, y: Float, color: Color) {
     val thin = 1.4f

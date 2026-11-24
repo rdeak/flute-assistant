@@ -32,7 +32,6 @@ import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneWriter
-import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.HEAD_RY
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.yOf
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
@@ -136,7 +135,7 @@ private fun joinArc(arc: JoinArc, tune: List<TuneItem>, places: Map<Int, StepPla
     if (arc.tie) {
         val tie = ArcDrawing(
             tiePath(from.heads.last(), to.heads.first(), headY(first)),
-            noteColor(first.midi),
+            ink, // the staff's ink since 2026-11-24 (A2: colour only in the heads); the note's colour before
             Stroke(StaffGeometry.TIE_WIDTH, cap = StrokeCap.Round),
         )
         return listOf(tie, pillArc(from.pills.last(), to.pills.first(), muted))

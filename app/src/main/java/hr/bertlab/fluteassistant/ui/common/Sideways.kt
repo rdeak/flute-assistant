@@ -113,7 +113,8 @@ internal object SidewaysGeometry {
     internal const val PITCH_WINDOW_WIDTH = 132f
 
     /**
-     * The least the fingering is given beside the window, 205 dp wide and about 40 tall. It is not
+     * The least the fingering is given beside the window, 205 dp wide and about 34 tall (the chart of 2026-11-24; the
+     * flute before it was about 40). It is not
      * higher because a camera hole takes width from the tab: an 800 wide phone with a hole of 45 dp
      * (the emulator's) or a 780 wide one with 30 leave 210 or 205, and both must keep the full-size
      * ring. The edge is a window 750 wide at 360 tall.

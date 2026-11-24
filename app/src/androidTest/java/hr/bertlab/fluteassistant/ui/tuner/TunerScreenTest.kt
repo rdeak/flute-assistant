@@ -494,30 +494,30 @@ class TunerScreenTest {
         assertTrue("the window ends at ${window.bottom}, the fingering starts at ${fingering.top}", window.bottom <= fingering.top + 1.dp)
     }
 
-    /** A tab a little shorter than the tuner needs (395 dp on a 411 dp phone) scrolls, so the window keeps its least. */
+    /** A tab a little shorter than the tuner needs (385 dp on a 411 dp phone) scrolls, so the window keeps its least. */
     @Test
     fun on_a_tab_just_short_of_the_tuner_the_window_keeps_its_least() {
-        assertTheWindowClearOfTheFlute(DpSize(411.dp, 390.dp))
+        assertTheWindowClearOfTheFlute(DpSize(411.dp, 380.dp))
         compose.onAllNodes(hasScrollAction()).assertCountEquals(1)
     }
 
     /**
      * The fingering's height follows the stage's width, so the least height does too (the review of 2026-11-17: it was
-     * one number, right only for a 412 dp phone). A wider and short tab, a pane 590 dp wide whose flute is 100 dp tall,
-     * scrolls at a height a 412 dp phone still fits (it needs 430 dp).
+     * one number, right only for a 412 dp phone). A wider and short tab, a pane 590 dp wide whose chart is 85 dp tall,
+     * scrolls at a height a 412 dp phone still fits (it needs 414 dp).
      */
     @Test
     fun on_a_wide_tab_just_short_of_the_tuner_the_window_keeps_its_least() {
-        assertTheWindowClearOfTheFlute(DpSize(590.dp, 425.dp))
+        assertTheWindowClearOfTheFlute(DpSize(590.dp, 410.dp))
         compose.onAllNodes(hasScrollAction()).assertCountEquals(1)
         val fingering = compose.onNodeWithContentDescription("Fingering for A4").getUnclippedBoundsInRoot()
-        assertEquals("the flute fills the stage and is 340:66", 100.5f, (fingering.bottom - fingering.top).value, 1.5f)
+        assertEquals("the chart fills the stage and is 340:56", 85.3f, (fingering.bottom - fingering.top).value, 1.5f)
     }
 
-    /** A narrow phone's flute is lower, so its tab fits at a height where a 411 dp phone's scrolls: nothing scrolls at 360 x 390. */
+    /** A narrow phone's chart is lower, so its tab fits at a height where a 411 dp phone's scrolls: nothing scrolls at 360 x 380. */
     @Test
     fun a_narrow_tab_fits_where_a_wider_one_scrolls() {
-        assertTheWindowClearOfTheFlute(DpSize(360.dp, 390.dp))
+        assertTheWindowClearOfTheFlute(DpSize(360.dp, 380.dp))
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
     }
 

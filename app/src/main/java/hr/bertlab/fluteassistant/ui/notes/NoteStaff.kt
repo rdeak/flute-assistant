@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.notes
 
+import android.graphics.Paint.Align as GlyphAlign
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -46,7 +47,10 @@ import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.notes.NotesRound
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.SPARKLES_EMOJI
-import hr.bertlab.fluteassistant.ui.common.drawStaffClef
+import hr.bertlab.fluteassistant.ui.common.MusicSymbols
+import hr.bertlab.fluteassistant.ui.common.drawMusicSymbol
+import hr.bertlab.fluteassistant.ui.common.drawMusicSymbolPath
+import hr.bertlab.fluteassistant.ui.common.rememberMusicPaint
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 import hr.bertlab.fluteassistant.ui.theme.Sun
@@ -70,6 +74,10 @@ private const val COLUMN_STEP = 0.16f
  */
 private const val SLOT_HALF_WIDTH = 1f
 private const val SLOT_STEP_SHARE = 0.42f
+
+/** A slot's half width on a staff [width] wide whose places are [pitch] tall (the clef's room is measured to it). */
+internal fun slotHalfWidth(width: Float, pitch: Float): Float =
+    min(pitch * SLOT_HALF_WIDTH, width * COLUMN_STEP * SLOT_STEP_SHARE)
 
 /**
  * A slot's look, as fractions of full alpha: the note to find is a pale yellow, the later ones have no fill; a
@@ -116,15 +124,10 @@ internal fun slotIndices(phraseSize: Int, placed: Int, solved: Boolean): List<In
 }
 
 /**
- * Room kept above the highest place and below the lowest, in places, so the clef's loop and
- * tail (a space beyond the staff each way) are never cut; the end places' strips extend
- * over it.
+ * Room kept above the highest place and below the lowest, in places, so the clef's tail (most of
+ * a place under the bottom line) is never cut; the end places' strips extend over it.
  */
 private const val END_MARGIN_PLACES = 1
-
-/** A note head's half width and half height, in pitches (a place's height). */
-private const val HEAD_RX = 0.58f
-private const val HEAD_RY = 0.42f
 
 /** A wrong place's cross circle, in pitches. */
 private const val CROSS_RADIUS = 0.45f
@@ -282,6 +285,7 @@ private fun StaffDrawing(state: NotesRound, placing: Int?, visible: IntRange) {
     val measurer = rememberTextMeasurer()
     // The layer paint of a faded emoji: one, whose alpha is set for each, not one per emoji per frame.
     val fadePaint = remember { Paint() }
+    val symbols = rememberMusicPaint()
     val emojiStyle = MaterialTheme.typography.titleLarge
 
     Canvas(Modifier.fillMaxSize()) {
@@ -306,8 +310,16 @@ private fun StaffDrawing(state: NotesRound, placing: Int?, visible: IntRange) {
         for (position in StaffNotes.LINE_POSITIONS) {
             drawLine(colors.text, Offset(0f, yOf(position)), Offset(size.width, yOf(position)), lineWidth)
         }
-        // Small and faint, as on the canvas.
-        drawStaffClef(space, yOf(StaffNotes.G_LINE), x = space * 0.15f, color = colors.mutedText.copy(alpha = 0.4f))
+        val columnStepPx = size.width * COLUMN_STEP
+        val slotHalf = slotHalfWidth(size.width, pitch)
+        // Faint, as on the canvas: the music font's clef since 2026-11-24, as tall as the drawn one was, but ending a
+        // line short of the nearest slot there can be, which a staff tall for its width would otherwise put it under
+        // (`NoteStaffSymbols.clefRoom`). Drawn as its outline path: it is too tall for Android 7 to 8.1's glyph cache.
+        drawMusicSymbolPath(
+            symbols, MusicSymbols.G_CLEF, NoteStaffSymbols.clefLeft(space), yOf(StaffNotes.G_LINE),
+            NoteStaffSymbols.clefEm(space, NoteStaffSymbols.clefRoom(size.width, space, lineWidth)),
+            colors.mutedText.copy(alpha = NoteStaffSymbols.CLEF_ALPHA),
+        )
 
         fun emoji(text: String, centre: Offset, sizePx: Float, alpha: Float = 1f) {
             val layout = measurer.measure(text, emojiStyle.copy(fontSize = (sizePx / density / fontScale).sp))
@@ -328,8 +340,6 @@ private fun StaffDrawing(state: NotesRound, placing: Int?, visible: IntRange) {
         // the text colour (the outline colour is nearly the card's own at night); the later ones only a light outline.
         // The ❓ gives way to the see-through note while a finger is down, and to the crosses and the arrow while a
         // wrong tap stands: they are drawn over the middle of the column, where the ❓ is.
-        val columnStepPx = size.width * COLUMN_STEP
-        val slotHalf = min(pitch * SLOT_HALF_WIDTH, columnStepPx * SLOT_STEP_SHARE)
         val slotTop = yOf(visible.last) - pitch / 2
         val slotBottom = yOf(visible.first) + pitch / 2
         // The slot's dashes, and the see-through note's: 6 dp on, 4 off.
@@ -385,14 +395,25 @@ private fun StaffDrawing(state: NotesRound, placing: Int?, visible: IntRange) {
             stubs()
         }
 
+        // A found or placed note is the music font's filled head in its letter's colour with an ink edge (since
+        // 2026-11-24, the user's pick B); the see-through note under a finger stays a drawn dashed oval of the head's size.
+        val headEdge = NoteStaffSymbols.HEAD_EDGE.dp.toPx()
         fun head(position: Int, fill: Color, dashed: Boolean = false, centreX: Float = x) {
-            val topLeft = Offset(centreX - pitch * HEAD_RX, yOf(position) - pitch * HEAD_RY)
-            val headSize = Size(pitch * HEAD_RX * 2, pitch * HEAD_RY * 2)
             StaffNotes.ledgerLinesFor(position).forEach {
                 drawLine(colors.text, Offset(centreX - ledgerHalf, yOf(it)), Offset(centreX + ledgerHalf, yOf(it)), lineWidth)
             }
-            drawOval(fill, topLeft, headSize)
-            drawOval(colors.outline, topLeft, headSize, style = Stroke(lineWidth, pathEffect = if (dashed) slotDashes else null))
+            if (dashed) {
+                val half = Size(NoteStaffSymbols.headHalfWidth(space), NoteStaffSymbols.headHalfHeight(space))
+                val topLeft = Offset(centreX - half.width, yOf(position) - half.height)
+                val headSize = Size(half.width * 2, half.height * 2)
+                drawOval(fill, topLeft, headSize)
+                drawOval(colors.outline, topLeft, headSize, style = Stroke(lineWidth, pathEffect = slotDashes))
+            } else {
+                drawMusicSymbol(
+                    symbols, MusicSymbols.NOTE_BLACK, centreX, yOf(position), NoteStaffSymbols.headEm(space), fill,
+                    GlyphAlign.CENTER, edge = colors.outline, edgeWidth = headEdge,
+                )
+            }
         }
 
         // The halo of the note sounding, behind its head: a pitch round it, or less where the next capsule's edge is

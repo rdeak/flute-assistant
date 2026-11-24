@@ -20,10 +20,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hr.bertlab.fluteassistant.R
 import hr.bertlab.fluteassistant.domain.fingers.FingerChart
 import hr.bertlab.fluteassistant.domain.fingers.FingerPick
+import hr.bertlab.fluteassistant.ui.common.FingeringDiagram
 import hr.bertlab.fluteassistant.ui.common.KeyDepth
 import hr.bertlab.fluteassistant.ui.common.KeyRingReach
 import hr.bertlab.fluteassistant.ui.common.SidewaysPage
@@ -33,7 +36,7 @@ import hr.bertlab.fluteassistant.ui.theme.FluteTheme
 
 /**
  * The Fingers tab on a phone on its side (spec `2026-11-17-fingers-tab-design.md`, part 3; the mockup's `side_board`):
- * the notes in the card, a row each with the name, the staff and the flute, parted by thin lines; the eight keys two by
+ * the notes in the card, a row each with the name, the staff and the chart, parted by thin lines; the eight keys two by
  * two in the right column, where the other tabs have their buttons. No hand names here. A row is a quarter of the
  * card whatever the note, so three rows look as four would.
  */
@@ -64,7 +67,8 @@ internal fun FingersSideways(
 }
 
 /**
- * One note on its side: the name, the staff and the flute, the flute as wide as the row's height allows. On a wider
+ * One note on its side: the name, the staff and the chart, the chart as wide as the row's height allows; the whole row
+ * opens the note in the tuner (`tuneOnTap`). On a wider
  * phone that stops short of the card's end, and the three stand in the middle of the card (the final review).
  */
 @Composable
@@ -72,11 +76,11 @@ private fun SideRow(midi: Int, onTune: (Int) -> Unit, modifier: Modifier = Modif
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-        modifier = modifier,
+        modifier = modifier.tuneOnTap(stringResource(R.string.fingers_tune), midi, onTune),
     ) {
         Box(Modifier.widthIn(min = PillSlot)) { NotePill(midi) }
         NoteOnStaff(midi, Modifier.width(SideStaffWidth).fillMaxHeight())
-        Box(Modifier.weight(1f, fill = false).fillMaxHeight(), contentAlignment = Alignment.Center) { NoteFlute(midi, onTune) }
+        Box(Modifier.weight(1f, fill = false).fillMaxHeight(), contentAlignment = Alignment.Center) { FingeringDiagram(midi) }
     }
 }
 

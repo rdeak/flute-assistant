@@ -6,6 +6,7 @@ package hr.bertlab.fluteassistant.ui.fingers
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -27,11 +29,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import hr.bertlab.fluteassistant.domain.fingers.FingerPick
-import hr.bertlab.fluteassistant.domain.tuner.FluteKey
 import hr.bertlab.fluteassistant.ui.common.FingeringGeometry
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.UprightHost
@@ -44,7 +46,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** The Fingers tab upright (spec `2026-11-17-fingers-tab-design.md`, part 3). */
+/** The Fingers tab upright (spec `2026-11-17-fingers-tab-design.md`, part 3; the row since `2026-11-24-fingers-music-symbols-and-book-chart-design.md`, part 3). */
 @RunWith(AndroidJUnit4::class)
 class FingersScreenTest {
 
@@ -67,8 +69,27 @@ class FingersScreenTest {
         }
     }
 
-    private fun bounds(description: String) = compose.onNodeWithContentDescription(description).getUnclippedBoundsInRoot()
+    /**
+     * Where the node described [description] is: the chart itself, not the row it belongs to. The whole row is a button
+     * since 2026-11-24, so its chart's description, pill and names merge into it; the unmerged tree keeps each where it is.
+     */
+    private fun bounds(description: String) =
+        compose.onNodeWithContentDescription(description, useUnmergedTree = true).getUnclippedBoundsInRoot()
 
+
+    /**
+     * The whole white row is the button (the user, 2026-11-24: "make whole white rectangle as link for opening tuner
+     * tune view"): a tap on its staff, at its left end, or on its pill asks for the row's note.
+     */
+    @Test
+    fun a_tap_anywhere_on_a_row_asks_for_its_note_in_the_tuner() {
+        show(FingerPick(1)) // C♯: its rows C♯4, C♯5, C♯6
+        val rows = compose.onAllNodesWithTag("fingers_row")
+        rows[1].assertHasClickAction().performTouchInput { click(Offset(24.dp.toPx(), height / 2f)) }
+        rows[0].performTouchInput { click(Offset(width - 14.dp.toPx(), height - 8.dp.toPx())) }
+        compose.onNodeWithText("C♯6", useUnmergedTree = true).performTouchInput { click() }
+        compose.runOnIdle { assertEquals(listOf(73, 61, 85), tuned) }
+    }
 
     /** A tap on a row's flute asks for that note in the tuner (the user, 2026-11-18); MainScreen opens it there. */
     @Test
@@ -85,8 +106,8 @@ class FingersScreenTest {
         val rows = listOf("C4", "C5", "C6", "C7").map { bounds("Fingering for $it") }
         rows.zipWithNext().forEach { (upper, lower) -> assertTrue("$upper over $lower", lower.top >= upper.bottom) }
         compose.onNodeWithContentDescription("C").assertIsSelected()
-        compose.onAllNodesWithText("Left hand").assertCountEquals(4)
-        compose.onAllNodesWithText("Right hand").assertCountEquals(4)
+        compose.onAllNodesWithText("Left hand", useUnmergedTree = true).assertCountEquals(4)
+        compose.onAllNodesWithText("Right hand", useUnmergedTree = true).assertCountEquals(4)
     }
 
     @Test
@@ -185,29 +206,33 @@ class FingersScreenTest {
     }
 
     /**
-     * The hands' names stand by the keys they name whatever the row's width: "Left hand" over the left hand's keys,
-     * from its first finger's cup to the little finger's G sharp lever, and "Right hand" under the right hand's, from
-     * its first finger's cup to the little finger's E flat key (the review of 2026-11-17: pinned to the row's ends, on
-     * a tablet's wider row "Right hand" stood under the foot joint and "Left hand" by the lip plate).
+     * The hands' names stand under the chart, each inside its hand's bracket, whatever the row's width (spec
+     * 2026-11-24, part 3): "Left hand" from the thumb keys to the G sharp lever, "Right hand" from the side B flat lever
+     * to the C key, the two apart. They used to be pinned to the row's ends and stood by the wrong keys on a tablet's
+     * wider row (the review of 2026-11-17).
      */
-    private fun assertTheHandNamesStandByTheirKeys(width: Int, height: Int = 653) {
-        show(FingerPick(7), width = width, height = height)
-        val flute = bounds("Fingering for G4")
-        val unit = (flute.right - flute.left) / FingeringGeometry.WIDTH
-        fun leftOf(key: FluteKey) = FingeringGeometry.KEYS.getValue(key).let { flute.left + unit * (it.x - it.width / 2) }
-        fun rightOf(key: FluteKey) = FingeringGeometry.KEYS.getValue(key).let { flute.left + unit * (it.x + it.width / 2) }
-        val left = compose.onAllNodesWithText("Left hand")[0].getUnclippedBoundsInRoot()
-        val right = compose.onAllNodesWithText("Right hand")[0].getUnclippedBoundsInRoot()
-        assertTrue(
-            "$width wide: \"Left hand\" is at ${left.left} to ${left.right}, its keys at ${leftOf(FluteKey.L1)} to ${rightOf(FluteKey.G_SHARP)}",
-            left.left >= leftOf(FluteKey.L1) - SLACK && left.right <= rightOf(FluteKey.G_SHARP) + SLACK,
-        )
-        assertTrue(
-            "$width wide: \"Right hand\" is at ${right.left} to ${right.right}, its keys at ${leftOf(FluteKey.R1)} to ${rightOf(FluteKey.E_FLAT)}",
-            right.left >= leftOf(FluteKey.R1) - SLACK && right.right <= rightOf(FluteKey.E_FLAT) + SLACK,
-        )
-        assertTrue("\"Left hand\" is over the flute", left.bottom <= flute.top + SLACK)
-        assertTrue("\"Right hand\" is under the flute", right.top >= flute.bottom - SLACK)
+    private fun assertTheHandNamesStandByTheirKeys(width: Int, height: Int = 653, locale: Locale = Locale.ENGLISH) {
+        show(FingerPick(7), locale, width = width, height = height)
+        val croatian = locale.language == "hr"
+        val chart = bounds(if (croatian) "Hvat za g1" else "Fingering for G4")
+        val unit = (chart.right - chart.left) / FingeringGeometry.WIDTH
+        val leftName = compose.onAllNodesWithText(if (croatian) "Lijeva ruka" else "Left hand", useUnmergedTree = true)[0]
+        val rightName = compose.onAllNodesWithText(if (croatian) "Desna ruka" else "Right hand", useUnmergedTree = true)[0]
+        val left = leftName.getUnclippedBoundsInRoot()
+        val right = rightName.getUnclippedBoundsInRoot()
+        fun inside(name: String, at: DpRect, span: ClosedFloatingPointRange<Float>) {
+            val from = chart.left + unit * span.start
+            val to = chart.left + unit * span.endInclusive
+            assertTrue("$width wide: $name is at ${at.left} to ${at.right}, its bracket at $from to $to", at.left >= from - SLACK && at.right <= to + SLACK)
+            assertTrue("$width wide: $name starts at ${at.top}, the chart ends at ${chart.bottom}", at.top >= chart.bottom - SLACK)
+        }
+        inside("the left hand's name", left, FingeringGeometry.LEFT_HAND_SPAN)
+        inside("the right hand's name", right, FingeringGeometry.RIGHT_HAND_SPAN)
+        assertTrue("the two names are apart: ${left.right} and ${right.left}", left.right <= right.left)
+        if (croatian) {
+            assertWhole("Lijeva ruka", leftName)
+            assertWhole("Desna ruka", rightName)
+        }
     }
 
     @Test
@@ -219,6 +244,40 @@ class FingersScreenTest {
     /** The 7-inch tablet's upright tab, as it is laid out before the zoom (`TabletSize.EIGHT_UPRIGHT`: 560 x 708). */
     @Test
     fun the_hand_names_stand_by_their_keys_on_a_tablets_wide_row() = assertTheHandNamesStandByTheirKeys(width = 560, height = 708)
+
+    /** The Croatian names are the longer ones. */
+    @Test
+    fun in_croatian_on_a_narrow_phone_the_hand_names_stand_under_their_keys() =
+        assertTheHandNamesStandByTheirKeys(width = 360, locale = Locale("hr"))
+
+    /**
+     * In a pane narrower than any phone (a third of a foldable) the names cannot keep to their brackets, but they stay
+     * inside the chart's width (the final review, 2026-11-24: the right one ran past the chart's end).
+     */
+    @Test
+    fun in_a_narrow_pane_the_hand_names_stay_inside_the_chart() {
+        show(FingerPick(7), width = 250)
+        val chart = bounds("Fingering for G4")
+        listOf("Left hand", "Right hand").forEach {
+            val name = compose.onAllNodesWithText(it, useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
+            assertTrue("$it is at ${name.left} to ${name.right}, the chart at ${chart.left} to ${chart.right}",
+                name.left >= chart.left - SLACK && name.right <= chart.right + SLACK)
+        }
+    }
+
+    /** On the user's phone the staff has its full size (an 8.2 dp line gap) and the four rows of C open without scrolling. */
+    @Test
+    fun on_the_a55_the_staff_has_its_full_size_and_four_rows_fit() {
+        show(FingerPick(), width = 411, height = 653)
+        val staff = compose.onAllNodesWithTag("fingers_staff", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
+        assertEquals("the staff's height", SymbolStaff.TALL, (staff.bottom - staff.top).value, 0.5f)
+        val room = compose.onNodeWithTag("fingers_rows").getUnclippedBoundsInRoot()
+        compose.onAllNodesWithTag("fingers_row").assertCountEquals(4)
+        (0 until 4).forEach { i ->
+            val row = compose.onAllNodesWithTag("fingers_row")[i].getUnclippedBoundsInRoot()
+            assertTrue("row $i $row is inside $room", row.isInside(room))
+        }
+    }
 
     /**
      * As on the flute tab, a key acts as the finger goes down and not when it lifts (the review of 2026-11-17: these
@@ -243,25 +302,25 @@ class FingersScreenTest {
     fun croatian_writes_h_and_names_the_hands() {
         show(FingerPick(11), Locale("hr"))
         compose.onNodeWithContentDescription("H").assertIsSelected()
-        compose.onAllNodesWithText("Lijeva ruka")[0].assertIsDisplayed()
-        compose.onAllNodesWithText("Desna ruka")[0].assertIsDisplayed()
+        compose.onAllNodesWithText("Lijeva ruka", useUnmergedTree = true)[0].assertIsDisplayed()
+        compose.onAllNodesWithText("Desna ruka", useUnmergedTree = true)[0].assertIsDisplayed()
         compose.onNodeWithContentDescription("Hvat za h1").assertExists()
     }
 
+    /** The pill has its own line over the chart since the names went under it (2026-11-24). */
     @Test
-    fun on_a_narrow_phone_in_croatian_the_pill_and_the_hand_name_do_not_meet() {
+    fun on_a_narrow_phone_in_croatian_the_pill_stands_over_the_chart() {
         show(FingerPick(8), Locale("hr"), width = 360)
         listOf("gis1", "gis2", "gis3").forEachIndexed { i, name ->
-            val pill = compose.onNodeWithText(name)
-            val left = compose.onAllNodesWithText("Lijeva ruka")[i]
-            val right = compose.onAllNodesWithText("Desna ruka")[i]
-            assertTrue("$name ends at ${pill.getUnclippedBoundsInRoot().right}, its hand starts at ${left.getUnclippedBoundsInRoot().left}",
-                pill.getUnclippedBoundsInRoot().right <= left.getUnclippedBoundsInRoot().left)
+            val pill = compose.onNodeWithText(name, useUnmergedTree = true)
+            val chart = bounds("Hvat za $name")
+            assertTrue("$name ends at ${pill.getUnclippedBoundsInRoot().bottom}, its chart starts at ${chart.top}",
+                pill.getUnclippedBoundsInRoot().bottom <= chart.top + SLACK)
             assertWhole("$name", pill)
-            assertWhole("Lijeva ruka $i", left)
-            assertWhole("Desna ruka $i", right)
+            assertWhole("Lijeva ruka $i", compose.onAllNodesWithText("Lijeva ruka", useUnmergedTree = true)[i])
+            assertWhole("Desna ruka $i", compose.onAllNodesWithText("Desna ruka", useUnmergedTree = true)[i])
             val row = compose.onAllNodesWithTag("fingers_row")[i].getUnclippedBoundsInRoot()
-            assertTrue("$name's flute is inside its row", bounds("Hvat za $name").isInside(row))
+            assertTrue("$name's chart is inside its row", chart.isInside(row))
         }
     }
 
@@ -289,10 +348,10 @@ class FingersScreenTest {
     @Test
     fun the_words_do_not_grow_with_the_text_size() {
         show(FingerPick(9))
-        val before = compose.onAllNodesWithText("Left hand")[0].getUnclippedBoundsInRoot()
+        val before = compose.onAllNodesWithText("Left hand", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
         compose.runOnIdle { scale = 2f }
         compose.waitForIdle()
-        val after = compose.onAllNodesWithText("Left hand")[0].getUnclippedBoundsInRoot()
+        val after = compose.onAllNodesWithText("Left hand", useUnmergedTree = true)[0].getUnclippedBoundsInRoot()
         assertEquals((before.right - before.left).value, (after.right - after.left).value, 1f)
         assertEquals((before.bottom - before.top).value, (after.bottom - after.top).value, 1f)
     }

@@ -13,6 +13,7 @@ import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.metronome.TimeSignature
 import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.domain.tuner.Accidental
+import hr.bertlab.fluteassistant.ui.common.MusicSymbols
 import hr.bertlab.fluteassistant.ui.common.TabletGeometry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -451,5 +452,75 @@ class StaffGeometryTest {
             assertTrue("scale $s room $room: book at $top", top >= (StaffGeometry.CLEF_BOTTOM + room) * s - 0.5f)
             assertTrue("scale $s room $room", top + StaffGeometry.BOOK_BUTTON_HEIGHT + StaffGeometry.CORNER_SHADOW <= (StaffGeometry.TOTAL_HEIGHT + room) * s)
         }
+    }
+
+    // ---- The staff's symbols from the music font (spec 2026-11-24-flute-staff-music-symbols-design.md, part 3) ----
+
+    @Test
+    fun `the heads, stems and dots are the font's at their shares`() {
+        assertEquals(9.558f, StaffGeometry.HEAD_RX, 0.01f)
+        assertEquals(8.1f, StaffGeometry.HEAD_RY, 0.01f)
+        assertEquals(10.634f, StaffGeometry.WHOLE_RX, 0.01f)
+        assertEquals(6.3f, StaffGeometry.WHOLE_RY, 0.01f)
+        assertEquals(8.558f, StaffGeometry.STEM_X, 0.01f)
+        assertEquals(3.6f, StaffGeometry.DOT_RADIUS, 0.01f)
+    }
+
+    @Test
+    fun `the clef is the font's at its share, its tip, foot and right edge`() {
+        assertEquals(26.21f, StaffGeometry.CLEF_TIP_X, 0.01f)
+        assertEquals(65.76f, StaffGeometry.CLEF_TIP_Y, 0.01f)
+        assertEquals(166.9f, StaffGeometry.CLEF_BOTTOM, 0.01f)
+        assertEquals(38.65f, StaffGeometry.CLEF_RIGHT, 0.01f)
+    }
+
+    /** The figures' ink must not reach under the notes' row, which starts at NOTES_CLIP, nor meet the clef. */
+    @Test
+    fun `the time signature's figures end before the notes' row and clear of the clef`() {
+        assertTrue(StaffGeometry.SIGNATURE_X + StaffGeometry.SIGNATURE_FIGURE_HALF <= StaffGeometry.NOTES_CLIP)
+        assertTrue(StaffGeometry.CLEF_RIGHT + 3f <= StaffGeometry.SIGNATURE_X - StaffGeometry.SIGNATURE_FIGURE_HALF)
+    }
+
+    private fun signHalfWidths() = listOf(MusicSymbols.SHARP_WIDTH, MusicSymbols.FLAT_WIDTH, MusicSymbols.NATURAL_WIDTH)
+        .map { it * StaffGeometry.LINE_GAP * StaffGeometry.SIGN_SHARE / 2 }
+
+    /**
+     * The flag hangs right of its stem no further than [StaffGeometry.FLAG_RIGHT] from its head, and never above the stem's
+     * top, so checking across is enough at every interval: the next head stands a beat on, a signed one's sign before it.
+     */
+    @Test
+    fun `an eighth's flag keeps clear of the next step`() {
+        val nextHead = StaffGeometry.BEAT_WIDTH - StaffGeometry.HEAD_RX - StaffGeometry.HEAD_EDGE / 2
+        assertTrue("to the next head: ${nextHead - StaffGeometry.FLAG_RIGHT}", StaffGeometry.FLAG_RIGHT + 2.5f <= nextHead)
+        signHalfWidths().forEach { half ->
+            val nextSign = StaffGeometry.BEAT_WIDTH + StaffGeometry.ACCIDENTAL_ROOM - StaffGeometry.SIGN_X - half
+            assertTrue("to a sign $half wide each side: ${nextSign - StaffGeometry.FLAG_RIGHT}", StaffGeometry.FLAG_RIGHT + 0.5f <= nextSign)
+        }
+    }
+
+    /** Boxes: the shapes keep 1.1 dp. */
+    @Test
+    fun `a whole head keeps clear of its own sign`() {
+        signHalfWidths().forEach { half ->
+            assertTrue("a sign $half wide each side", StaffGeometry.SIGN_X - half - StaffGeometry.WHOLE_RX >= 0.9f)
+        }
+    }
+
+    @Test
+    fun `a sign fits today's half width and its foot is counted`() {
+        signHalfWidths().forEach { assertTrue("$it", it <= StaffGeometry.SIGN_HALF_WIDTH) }
+        val share = StaffGeometry.LINE_GAP * StaffGeometry.SIGN_SHARE
+        assertTrue(StaffGeometry.SIGN_BELOW >= MusicSymbols.SHARP_DROP * share)
+        assertTrue(StaffGeometry.SIGN_BELOW >= MusicSymbols.NATURAL_DROP * share)
+        assertTrue(StaffGeometry.SIGN_BELOW >= MusicSymbols.FLAT_DROP * share)
+    }
+
+    /** The half and the whole rest's block about the width drawn before the font (15 dp), and a dotted half rest's dot clear of it. */
+    @Test
+    fun `a half rest is today's width and its dot keeps clear of it`() {
+        val block = MusicSymbols.REST_BLOCK_WIDTH * StaffGeometry.LINE_GAP * StaffGeometry.REST_BLOCK_SHARE
+        assertEquals("the block's width", 15f, block, 1f)
+        val gap = StaffGeometry.REST_DOT_X - StaffGeometry.DOT_RADIUS - block / 2
+        assertTrue("the dot is $gap from the block", gap >= 1.5f)
     }
 }

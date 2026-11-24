@@ -40,8 +40,12 @@ secondary constructor for deterministic tests. `NoteStaff` draws the staff on a 
 (it takes all the height left in the stage and sizes the places from it; it shows the staff
 and its two neighbouring spaces, d1 to g2, plus the ledger-line places c1, a2, h2, c3 only as
 far as a chosen note needs them, `StaffNotes.visiblePositions`, their ledger lines dashed; every
-place a full-width band, the spaces tinted, the lines thick; a small, faint hand-built clef whose
-curl sits on the G line; one note column in the middle of the width, clear of a right-handed
+place a full-width band, the spaces tinted, the lines thick; a faint clef whose curl sits on the G
+line (since 2026-11-24 the music font's, `ui/common/MusicSymbols`, as tall as the hand-built one it replaced and drawn at
+0.3 as it is solid, and smaller only on a staff so tall for its width that it would reach the four-note phrase's
+second slot, and drawn as its outline path since Android 7 to 8.1 drop a glyph that tall from their glyph cache; each found or placed note is the font's filled head in its letter's colour with an ink edge, about the
+drawn oval's size, the user's pick B; spec `2026-11-24-notes-staff-music-symbols-design.md`, sizes in `NoteStaffSymbols`;
+the see-through note under a finger stays a drawn dashed oval of the head's size); one note column in the middle of the width, clear of a right-handed
 finger sliding on the right, after the user rejected a two-column split; Hear's phrase columns
 are another thing, answered one after the other). The child answers by touch and slide: a finger down shows a see-through note
 on the nearest place and turns its band yellow (`placing`, hoisted to `NotesContent` for the
@@ -472,7 +476,8 @@ Recorded so nobody "fixes" them blindly; each was seen and left.
 
 ## Tests
 
-JVM: `PhrasesTest`, `NoteProgressTest`, `NoteStaffColumnsTest`, `LetterDotsTest`, `RoundSummaryFitTest` (the trophy
+JVM: `PhrasesTest`, `NoteProgressTest`, `NoteStaffColumnsTest`, `NoteStaffSymbolsTest` (the clef's and a head's size),
+`LetterDotsTest`, `RoundSummaryFitTest` (the trophy
 giving way, the keys' size and rows), and the Hear and progress cases in `NotesViewModelTest` (staircase, last phrase cut, game
 switch, playback gate, progress and its saving, the phrase log's id). Instrumented: `NotesScreenTest` (pills and their
 words at twice the text, speaker bubble, when a phrase is asked for, the feedback line's order, the place let go when
@@ -480,14 +485,15 @@ the question goes or the staff locks, a cancelled touch answering nothing, picke
 summary keys and its fit at 713, 650 and 623 dp, the hero row's words at twice the text in both languages at 411 and
 360 dp wide, the burst, Hear's slots, the lighting of the note sounding and the prompt, and Find's bare staff). The
 slot, miss, outline, stub, halo, lighting, finger-and-❓ and Find tests read the staff's pixels by its own formula
-(`StaffPixels`), in the light theme except the night-outline test, which is dark:
+(`StaffPixels`), in the light theme except the night-outline test and the found note's night twin, which are dark:
 `the_note_to_find_has_a_slot_and_later_notes_fainter_ones`,
 `a_miss_takes_the_question_marks_off_the_slots_and_keeps_the_capsules`,
 `the_slot_of_the_note_to_find_has_a_bright_outline_at_night`, `the_far_places_stub_stays_inside_the_slot` (it looks at
 the stub's start, where a dashed line always has a dash, since the other end can fall in a gap),
 `the_note_sounding_lights_up`, `the_playback_after_the_last_note_lights_the_found_note`,
 `the_halo_stops_at_the_next_capsule`, `the_halo_is_a_whole_pitch_where_there_is_room`,
-`the_question_mark_gives_way_to_the_finger` and `find_draws_its_slot_until_its_note_is_found` (it was `find_draws_no_slot_no_question_mark_and_no_halo` until Find got its slot on 2026-11-10). The prompt tests read
+`the_question_mark_gives_way_to_the_finger`, `a_found_note_is_its_letters_colour_with_an_ink_edge` and its
+`_at_night` twin (the music font's head, 2026-11-24) and `find_draws_its_slot_until_its_note_is_found` (it was `find_draws_no_slot_no_question_mark_and_no_halo` until Find got its slot on 2026-11-10). The prompt tests read
 the text, not the pixels. Also instrumented: `NotesSidewaysTest` (the column at 360 and 411 tall, the pills on all three screens, the keys in the card, a turn not asking for the phrase again, the Hear prompt whole in the panel),
 `LabelsTest` (the pills' words in both languages) and `SharedPreferencesSettingsStoreTest` (the game and the book, read
 leniently). A test of a fit compares `getUnclippedBoundsInRoot()` with the room: `assertIsDisplayed` does not prove

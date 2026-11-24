@@ -3,6 +3,7 @@
 
 package hr.bertlab.fluteassistant.ui.fingers
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +21,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.testTag
@@ -41,12 +47,17 @@ import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import kotlin.math.roundToInt
 
 /**
- * One note upright: a white card with the note on its staff, and beside it the flute with the note's name and "Left
- * hand" over it and "Right hand" under it ([FluteWithHands]). On its side the tab has a row of its own with no hand
- * names (`FingersSideways`).
+ * One note upright: a white card with the note on its staff in music symbols, and beside it the note's name over the
+ * chart and the hands named under it ([ChartWithHands]; spec `2026-11-24-fingers-music-symbols-and-book-chart-design.md`,
+ * part 3). On its side the tab has a row of its own with no hand names (`FingersSideways`).
  *
- * The flute fills the row's width, but the row is never taller than [tallest], what four rows have room for: on a wide
- * and short tab the flute stops short of the card's end, and the staff and the flute stand in the middle of the card.
+ * The whole card is the button (the user, 2026-11-24: "make whole white rectangle as link for opening tuner tune
+ * view"): a tap anywhere on it is [onTune] with [midi] ([tuneOnTap]); until then only the chart was.
+ *
+ * The staff asks for its full size ([SymbolStaff.TALL], an 8.2 dp line gap, its signs held) and takes less when the row is shorter;
+ * the row is never under [RowHeight] nor taller than [tallest], what four rows have room for. The chart fills the
+ * row's width as far as that height allows: on a wide and short tab it stops short of the card's end, and the staff
+ * and the chart stand in the middle of the card.
  */
 @Composable
 internal fun NoteRow(midi: Int, tallest: Dp, onTune: (Int) -> Unit, modifier: Modifier = Modifier) {
@@ -56,56 +67,92 @@ internal fun NoteRow(midi: Int, tallest: Dp, onTune: (Int) -> Unit, modifier: Mo
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         modifier = modifier
             .heightIn(min = RowHeight, max = maxOf(tallest, RowHeight))
+            .clip(RowShape)
             .background(colors.card, RowShape)
             .border(OutlineWidth, colors.border, RowShape)
+            .tuneOnTap(stringResource(R.string.fingers_tune), midi, onTune)
             .padding(horizontal = 12.dp, vertical = RowPadding),
     ) {
-        NoteOnStaff(midi, Modifier.width(StaffWidth).height(RowHeight - RowPadding * 2))
-        FluteWithHands(midi, onTune, Modifier.weight(1f, fill = false))
+        NoteOnStaff(midi, Modifier.width(StaffWidth).height(SymbolStaff.TALL.dp).testTag("fingers_staff"))
+        ChartWithHands(midi, Modifier.weight(1f, fill = false))
     }
 }
 
 /**
- * The flute for [midi] with the words round it: a line over it with the note's pill at its start and "Left hand", and
- * a line under it with "Right hand". The flute is as wide as it is given, or as wide as the height it is given leaves
- * it once the two lines are measured, whichever is less; nothing here is an estimate of a line's height.
+ * The chart for [midi] with the words round it: the note's pill on a line of its own over it, and under it two
+ * brackets with "Left hand" and "Right hand". The chart is as wide as it is given, or as wide as the height it is given
+ * leaves it once the pill's line and the names' line are measured, whichever is less; nothing here is an estimate of a
+ * line's height.
  *
- * The words are the row's own text, in dp, so a narrow phone or large text cannot push them into the picture (spec,
- * part 3). Each is centred on its hand's keys, a place along the flute in the picture's own units ([LEFT_HAND_X],
- * [RIGHT_HAND_X] of [FingeringGeometry.WIDTH]), so it follows them as the flute grows or shrinks with the row; it
- * stays inside the flute's width, and "Left hand" right of the pill with [LeadGap] between, so the two cannot meet.
+ * The words are the row's own text, in dp, so a narrow phone or large text cannot push them into the picture. Each name
+ * is centred on its bracket and kept inside it, a span along the chart in the picture's own units
+ * ([FingeringGeometry.LEFT_HAND_SPAN], [FingeringGeometry.RIGHT_HAND_SPAN] of [FingeringGeometry.WIDTH]), so it follows
+ * its hand's keys as the chart grows or shrinks with the row. In a pane too narrow for a name's bracket it still stays
+ * inside the chart's width.
  */
 @Composable
-private fun FluteWithHands(midi: Int, onTune: (Int) -> Unit, modifier: Modifier = Modifier) {
+private fun ChartWithHands(midi: Int, modifier: Modifier = Modifier) {
     Layout(
         content = {
             NotePill(midi)
+            FingeringDiagram(midi)
+            HandBrackets()
             HandName(stringResource(R.string.hand_left))
-            NoteFlute(midi, onTune)
             HandName(stringResource(R.string.hand_right))
         },
         modifier = modifier,
-    ) { (pillBox, leftName, fluteBox, rightName), constraints ->
+    ) { (pillBox, chartBox, bracketsBox, leftName, rightName), constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val pill = pillBox.measure(loose)
         val left = leftName.measure(loose)
         val right = rightName.measure(loose)
-        val over = maxOf(pill.height, left.height)
-        val under = right.height
+        val bracketHeight = BracketHeight.roundToPx()
+        val over = pill.height + PillGap.roundToPx()
+        val under = bracketHeight + maxOf(left.height, right.height)
         val room = if (constraints.hasBoundedHeight) ((constraints.maxHeight - over - under) * FINGERING_ASPECT_RATIO).toInt() else Int.MAX_VALUE
         val width = minOf(constraints.maxWidth, room).coerceAtLeast(0)
-        val fluteHeight = (width / FINGERING_ASPECT_RATIO).roundToInt()
-        val flute = fluteBox.measure(Constraints.fixed(width, fluteHeight))
+        val chartHeight = (width / FINGERING_ASPECT_RATIO).roundToInt()
+        val chart = chartBox.measure(Constraints.fixed(width, chartHeight))
+        val brackets = bracketsBox.measure(Constraints.fixed(width, bracketHeight))
 
-        fun across(at: Float, name: Placeable, least: Int): Int {
-            val most = maxOf(least, width - name.width)
-            return (width * at / FingeringGeometry.WIDTH - name.width / 2f).roundToInt().coerceIn(least, most)
+        // Centred on its bracket and kept inside it; in a pane too narrow for that, still inside the chart.
+        fun nameX(span: ClosedFloatingPointRange<Float>, name: Placeable): Int {
+            val from = width * span.start / FingeringGeometry.WIDTH
+            val to = width * span.endInclusive / FingeringGeometry.WIDTH
+            val inBracket = ((from + to) / 2 - name.width / 2f).coerceIn(from, maxOf(from, to - name.width))
+            return inBracket.coerceIn(0f, maxOf(0f, (width - name.width).toFloat())).roundToInt()
         }
-        layout(width, over + fluteHeight + under) {
-            pill.place(0, (over - pill.height) / 2)
-            left.place(across(LEFT_HAND_X, left, least = pill.width + LeadGap.roundToPx()), (over - left.height) / 2)
-            flute.place(0, over)
-            right.place(across(RIGHT_HAND_X, right, least = 0), over + fluteHeight)
+        layout(width, over + chartHeight + under) {
+            pill.place(0, 0)
+            chart.place(0, over)
+            brackets.place(0, over + chartHeight)
+            left.place(nameX(FingeringGeometry.LEFT_HAND_SPAN, left), over + chartHeight + bracketHeight)
+            right.place(nameX(FingeringGeometry.RIGHT_HAND_SPAN, right), over + chartHeight + bracketHeight)
+        }
+    }
+}
+
+/**
+ * The two hands' brackets, as wide as the chart over them: each from its span's start down, across and up to its end,
+ * the ends turned up towards the keys.
+ */
+@Composable
+private fun HandBrackets() {
+    val color = FluteTheme.colors.border
+    Canvas(Modifier) {
+        val line = BracketLine.toPx()
+        val ends = line / 2
+        val across = BracketDrop.toPx()
+        listOf(FingeringGeometry.LEFT_HAND_SPAN, FingeringGeometry.RIGHT_HAND_SPAN).forEach { span ->
+            val from = size.width * span.start / FingeringGeometry.WIDTH
+            val to = size.width * span.endInclusive / FingeringGeometry.WIDTH
+            val path = Path().apply {
+                moveTo(from, ends)
+                lineTo(from, across)
+                lineTo(to, across)
+                lineTo(to, ends)
+            }
+            drawPath(path, color, style = Stroke(line, cap = StrokeCap.Round, join = StrokeJoin.Round))
         }
     }
 }
@@ -132,16 +179,14 @@ internal fun NotePill(midi: Int, modifier: Modifier = Modifier) {
 }
 
 /**
- * The flute for [midi], as wide as it is given. A tap on it is [onTune] with [midi]: the frame opens the note in the
- * tuner's Tune mode (since 2026-11-18, the user's ask), and the tab keeps its note for the way back.
+ * A row of [midi] as the button that opens it: a tap anywhere on the row is [onTune] with [midi], and the frame opens the
+ * note in the tuner's Tune mode (since 2026-11-18, the user's ask; the whole row since 2026-11-24, before only the
+ * chart). [label] is what a screen reader says the tap does (`fingers_tune`). It acts on a tap, not as the finger goes
+ * down, so a slide that scrolls the rows opens nothing. The row's words and the chart's description are what a screen
+ * reader hears of it.
  */
-@Composable
-internal fun NoteFlute(midi: Int, onTune: (Int) -> Unit, modifier: Modifier = Modifier) {
-    FingeringDiagram(
-        midi,
-        modifier.clickable(onClickLabel = stringResource(R.string.fingers_tune), role = Role.Button) { onTune(midi) },
-    )
-}
+internal fun Modifier.tuneOnTap(label: String, midi: Int, onTune: (Int) -> Unit): Modifier =
+    clickable(onClickLabel = label, role = Role.Button) { onTune(midi) }
 
 @Composable
 private fun HandName(text: String) {
@@ -153,20 +198,19 @@ private fun HandName(text: String) {
     )
 }
 
-/** A row's least height, and what the phones it was drawn for give it (a flute about 280 dp wide at 412). */
+/** A row's least height, and its padding over and under (5 dp since 2026-11-24, so a row at its least gives the staff 98 dp). */
 private val RowHeight = 108.dp
-private val RowPadding = 7.dp
+private val RowPadding = 5.dp
 private val PillHeight = 24.dp
 
-/** Between the pill and "Left hand" at the least. */
-private val LeadGap = 6.dp
+/** Between the pill's line and the chart. */
+private val PillGap = 4.dp
 
-/**
- * Where the hands' names stand along the flute, in the picture's units: the mockup's (`gen.py`, `real()`), over the
- * left hand's keys (L1 at 66 to the G sharp lever at 158) and under the right hand's (R1 at 205 to E flat at 288).
- */
-private const val LEFT_HAND_X = 100f
-private const val RIGHT_HAND_X = 250f
+/** The brackets' room under the chart, how far down their line runs, and its width. */
+private val BracketHeight = 6.dp
+private val BracketDrop = 4.dp
+private val BracketLine = 2.dp
 
-private val StaffWidth = 60.dp
+/** The staff's width (74 dp, for an 8.2 dp line gap; 60 before 2026-11-24). */
+private val StaffWidth = 74.dp
 private val RowShape = RoundedCornerShape(24.dp)

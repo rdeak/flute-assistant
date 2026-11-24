@@ -73,10 +73,15 @@ import hr.bertlab.fluteassistant.domain.notes.StaffNotes
 import hr.bertlab.fluteassistant.ui.common.BackKey
 import hr.bertlab.fluteassistant.ui.common.LocaleProvider
 import hr.bertlab.fluteassistant.ui.common.assertWhole
+import hr.bertlab.fluteassistant.ui.common.isNear
 import hr.bertlab.fluteassistant.ui.common.needsDevice
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.metronome.MetronomeUiState
+import hr.bertlab.fluteassistant.ui.theme.DarkFluteColors
+import hr.bertlab.fluteassistant.ui.theme.FluteAssistantTheme
+import hr.bertlab.fluteassistant.ui.theme.InkOnFill
 import hr.bertlab.fluteassistant.ui.theme.LightFluteColors
+import hr.bertlab.fluteassistant.ui.theme.NoteLetterColors
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -133,6 +138,7 @@ class FluteScreenTest {
         height: Dp? = null,
         restoration: StateRestorationTester? = null,
         timeSignature: TimeSignature = TimeSignature.FOUR_FOUR,
+        dark: Boolean = false,
     ) {
         state = mutableStateOf(initial)
         metronome = mutableStateOf(MetronomeUiState(config = MetronomeConfig(bpm = 120, timeSignature = timeSignature)))
@@ -179,7 +185,8 @@ class FluteScreenTest {
                         ),
                     )
                 }
-                if (height == null) flute() else Box(Modifier.height(height)) { flute() }
+                val sized: @Composable () -> Unit = { if (height == null) flute() else Box(Modifier.height(height)) { flute() } }
+                if (dark) FluteAssistantTheme(darkTheme = true) { sized() } else sized()
             }
         }
         if (restoration != null) restoration.setContent(content) else compose.setContent(content)
@@ -482,10 +489,12 @@ class FluteScreenTest {
         assertTrue("the knob $knobBounds should sit above the time signature $signature", knobBounds.bottom <= signature.top + 1.dp)
         assertTrue("the knob $knobBounds should start left of the time signature $signature", knobBounds.left < signature.left)
         assertTrue("the knob should be 54 dp, was ${knobBounds.width}", abs((knobBounds.width - 54.dp).value) <= 0.5f)
-        // The clef's tip is one space (18 dp) over the top line, where the signature's box starts. The
-        // knob's shadow, 5 dp under it, ends over the tip with white between (it lay on the tip until 2026-11-10).
+        // The clef's tip stands over the top line, where the signature's box starts, by StaffGeometry's numbers (the font's
+        // clef since 2026-11-24: 9.2 dp over; the drawn one stood a space over). The knob's shadow, 5 dp under it, ends
+        // over the tip with white between (it lay on the tip until 2026-11-10).
         val shadowEnd = knobBounds.bottom + 5.dp
-        assertTrue("the knob's shadow, ending at $shadowEnd, should end over the clef's tip", shadowEnd + 3.dp <= signature.top - 18.dp)
+        val tip = signature.top - (StaffGeometry.TOP_LINE_Y - StaffGeometry.CLEF_TIP_Y).dp
+        assertTrue("the knob's shadow, ending at $shadowEnd, should end over the clef's tip at $tip", shadowEnd + 3.dp <= tip)
         compose.runOnIdle { metronome.value = MetronomeUiState(config = MetronomeConfig(bpm = 60)) }
         compose.onNodeWithContentDescription("Speed: Turtle, tap to change").assertIsDisplayed()
     }
@@ -1302,10 +1311,12 @@ class FluteScreenTest {
         // Since 2026-11-18 the staff's box has what the screen spares over it, up to 63 dp, and the staff stands that much lower.
         val room = roomOf(row)
         assertTrue("a slur under c and d", inkIn(row, first + 6, first + beat - 6, 171f + room, 186f + room) > 0)
-        assertEquals("nothing under d and e, not joined", 0, inkIn(row, first + beat + 6, first + 2 * beat - 6, 162f + room, 180f + room))
+        // From 166: d¹'s head, the font's at 0.9 since 2026-11-24, reaches 164.7 with its edge.
+        assertEquals("nothing under d and e, not joined", 0, inkIn(row, first + beat + 6, first + 2 * beat - 6, 166f + room, 180f + room))
         state.value = state.value.copy(joinWaiting = true)
         val waiting = compose.onNodeWithContentDescription("Your tune, 3 notes").captureToImage().toPixelMap()
-        assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 6, first + 2 * beat + 26, 152f + room, 168f + room) > 0)
+        // From 10.5 right of e¹'s centre: its head's edge, the font's since 2026-11-24, reaches 151.9 at 6 (the final review).
+        assertTrue("a dashed arc runs on from e", inkIn(waiting, first + 2 * beat + 10.5f, first + 2 * beat + 26, 152f + room, 168f + room) > 0)
     }
 
     @Test
@@ -1545,8 +1556,135 @@ class FluteScreenTest {
         val f = StaffGeometry.yOf(StaffNotes.positionOf(65))
         assertTrue("the sharp", signInk(compose.onNodeWithContentDescription("F♯4, 1 beat").captureToImage().toPixelMap(), 13f, f) > 0)
         assertTrue("the natural", signInk(compose.onNodeWithContentDescription("F4, 1 beat").captureToImage().toPixelMap(), 13f, f) > 0)
-        // That a plain step draws no sign is held by its width (`a_signed_step_is_ten_dp_wider`): its tilted head starts
-        // 4.5 dp in, so a pixel window before it would be too narrow to say anything.
+        // That a plain step draws no sign is held by its width (`a_signed_step_is_ten_dp_wider`): its head starts about
+        // 5 dp in, so a pixel window before it would be too narrow to say anything.
+    }
+
+    // ---- The staff's symbols from the music font (spec 2026-11-24-flute-staff-music-symbols-design.md) ----
+
+    private fun tuneRow() = compose.onNodeWithContentDescription("Your tune", substring = true).captureToImage().toPixelMap()
+
+    /** The row's pixel at [x], [y] in dp from its left and the staff's top. */
+    private fun PixelMap.at(x: Float, y: Float) = this[with(compose.density) { x.dp.roundToPx() }, with(compose.density) { y.dp.roundToPx() }]
+
+    /**
+     * The symbols drawn in ink (the sharp, an eighth's stem and flag, a rest) are the night's ink at night, with none of the
+     * day's, each read in its own box with the staff's lines left out (they are night ink themselves, and would pass the
+     * test with no symbol drawn; the final review). Not the whole staff: where a head's dark edge meets the dark card the
+     * smoothed pixels come within a hair of the day ink, and the name pills write in the day's ink on their fills by design.
+     */
+    @Test
+    fun the_staffs_symbols_are_in_the_night_ink() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(66, NoteLength.EIGHTH), TuneRest(NoteLength.QUARTER), TuneNote(65, NoteLength.HALF))), dark = true)
+        val row = tuneRow()
+        val room = roomOf(row)
+        val d = compose.density
+        // F♯4's step has a sign's room before its head; the rest's step follows an eighth's room on.
+        val head = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.ACCIDENTAL_ROOM + StaffGeometry.HEAD_X
+        val y = StaffGeometry.yOf(StaffNotes.positionOf(65)) + room
+        val rest = head + StaffGeometry.BEAT_WIDTH
+        val boxes = mapOf(
+            "the sharp" to listOf(head - StaffGeometry.SIGN_X - 6f, head - StaffGeometry.SIGN_X + 6f, y - 16f, y + 16f),
+            "the stem and the flag" to listOf(head + 7f, head + 19f, y - StaffGeometry.STEM_REACH, y - 22f),
+            "the rest" to listOf(rest - 8f, rest + 8f, StaffGeometry.MIDDLE_LINE_Y + room - 18f, StaffGeometry.MIDDLE_LINE_Y + room + 18f),
+        )
+        val lines = (0..4).map { StaffGeometry.TOP_LINE_Y + room + it * StaffGeometry.LINE_GAP }
+        boxes.forEach { (name, box) ->
+            val (x0, x1, y0, y1) = box
+            val rows = (with(d) { y0.dp.roundToPx() } until with(d) { y1.dp.roundToPx() }).filter { py ->
+                lines.none { kotlin.math.abs(it - py / d.density) < 1.6f }
+            }
+            val pixels = (with(d) { x0.dp.roundToPx() } until with(d) { x1.dp.roundToPx() }).flatMap { x -> rows.map { py -> row[x, py] } }
+            assertTrue("$name has the night ink", pixels.any { it.isNear(DarkFluteColors.text) })
+            assertTrue("$name has none of the day ink", pixels.none { it.isNear(LightFluteColors.text) })
+        }
+    }
+
+    /** A2 (the user's pick, 2026-11-24): the letter's colour in the heads, a half note's in its hollow; the stem in ink. */
+    @Test
+    fun a_filled_head_is_its_letters_colour_an_open_heads_hollow_too_and_the_stem_ink() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(67, NoteLength.QUARTER), TuneNote(67, NoteLength.HALF))))
+        val row = tuneRow()
+        val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
+        val y = StaffGeometry.yOf(StaffNotes.positionOf(67)) + roomOf(row)
+        val g = NoteLetterColors[4]
+        assertTrue("the quarter's head is G's colour", row.at(first, y).near(g))
+        assertTrue("the half note's hollow is G's colour", row.at(first + StaffGeometry.BEAT_WIDTH, y).near(g))
+        assertTrue("the quarter's stem is ink", row.at(first + StaffGeometry.STEM_X, y - 25f).near(LightFluteColors.text))
+    }
+
+    /** E's yellow is the lit disc's: a chosen (or lit) E keeps its ink edge, or it would vanish into the disc. */
+    @Test
+    fun a_lit_e_keeps_its_ink_edge() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(64, NoteLength.QUARTER)), selected = 0))
+        val row = tuneRow()
+        val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
+        val y = StaffGeometry.yOf(StaffNotes.positionOf(64)) + roomOf(row)
+        val d = compose.density
+        val edge = (with(d) { (first + StaffGeometry.HEAD_RX - 1.5f).dp.roundToPx() }..with(d) { (first + StaffGeometry.HEAD_RX + 1f).dp.roundToPx() })
+            .count { row[it, with(d) { y.dp.roundToPx() }].near(LightFluteColors.outline) }
+        assertTrue("the edge right of E's head", edge > 0)
+    }
+
+    /** Pixels near [color] along the row [y] from [x0] to [x1], in dp. */
+    private fun PixelMap.countNear(color: Color, x0: Float, x1: Float, y: Float, tolerance: Float = 0.08f): Int {
+        val d = compose.density
+        val py = with(d) { y.dp.roundToPx() }
+        return (with(d) { x0.dp.roundToPx() }..with(d) { x1.dp.roundToPx() }).count { this[it, py].isNear(color, tolerance) }
+    }
+
+    /**
+     * At night a chosen (or lit) half E is an open head on the yellow disc: its ring keeps the dark ink a bright fill
+     * takes (`InkOnFill`), not the night's light ink, which would vanish on the yellow (the final review, 2026-11-24).
+     */
+    @Test
+    fun at_night_a_chosen_half_e_keeps_dark_ink_on_its_disc() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(64, NoteLength.HALF)), selected = 0), dark = true)
+        val row = tuneRow()
+        val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
+        val y = StaffGeometry.yOf(StaffNotes.positionOf(64)) + roomOf(row) - 3f // over the staff line through E
+        assertTrue("dark ink round the head", row.countNear(InkOnFill, first + StaffGeometry.HEAD_RX - 4f, first + StaffGeometry.HEAD_RX + 1f, y) > 0)
+    }
+
+    /** The same for a chosen rest at night: its symbol in the fill's dark ink on the disc. */
+    @Test
+    fun at_night_a_chosen_rest_keeps_dark_ink_on_its_disc() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneRest(NoteLength.QUARTER)), selected = 0), dark = true)
+        val row = tuneRow()
+        val first = StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X
+        val room = roomOf(row)
+        val dark = (-12..12 step 2).sumOf { dy ->
+            row.countNear(InkOnFill, first - 6f, first + 6f, StaffGeometry.MIDDLE_LINE_Y + room + dy)
+        }
+        assertTrue("the rest in dark ink on its disc", dark > 0)
+    }
+
+    /**
+     * The half note's hollow is all the letter's colour: no hairline of the card between the colour and the ring (the
+     * oval is measured on the font's outline; the final review asked for a pixel check, as the Fingers tab's whole note has).
+     */
+    @Test
+    fun the_half_notes_hollow_is_all_colour() {
+        needsDevice()
+        show(FluteUiState(tune = listOf(TuneNote(64, NoteLength.HALF))))
+        val row = tuneRow()
+        val d = compose.density
+        val cx = with(d) { (StaffGeometry.NOTES_START - StaffGeometry.NOTES_CLIP + StaffGeometry.HEAD_X).dp.toPx() }
+        val cy = with(d) { (StaffGeometry.yOf(StaffNotes.positionOf(64)) + roomOf(row)).dp.toPx() }
+        val (rx, ry) = with(d) { (StaffGeometry.HEAD_RX * 0.8f).dp.toPx() } to with(d) { (StaffGeometry.HEAD_RY * 0.75f).dp.toPx() }
+        val yellow = NoteLetterColors[2]
+        var pale = 0
+        for (x in (cx - rx).toInt()..(cx + rx).toInt()) for (y in (cy - ry).toInt()..(cy + ry).toInt()) {
+            val (dx, dy) = (x - cx) / rx to (y - cy) / ry
+            val pixel = row[x, y]
+            if (dx * dx + dy * dy <= 1f && pixel.red > 0.6f && pixel.blue > yellow.blue + 0.08f) pale++
+        }
+        assertEquals("pixels of the yellow paled by the card inside the head", 0, pale)
     }
 
     // ---- The staff's room for a tune above c³ (2026-11-18) ----

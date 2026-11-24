@@ -62,8 +62,9 @@ private val NarrowWordsGap = 6.dp
 private val FingeringUnderGap = 12.dp
 
 /**
- * The most the fingering is wide under the window (since 2026-11-17): the flute picture is taller for its width than
- * the strip was, and across the whole card it would take 20 dp more from the window than the strip did.
+ * The most the fingering is wide under the window (since 2026-11-17): the flute picture of then was taller for its
+ * width than the strip, and across the whole card it would have taken 20 dp more from the window than the strip did.
+ * The chart of 2026-11-24 is shorter (49 dp at 300); the cap stays, so the window keeps what it had.
  */
 private val UnderFingeringWidth = 300.dp
 
