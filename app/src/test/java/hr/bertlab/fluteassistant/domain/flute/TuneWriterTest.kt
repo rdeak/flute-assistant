@@ -503,4 +503,241 @@ class TuneWriterTest {
         writer.open(listOf(TuneNote(67, QUARTER)))
         assertEquals(3, writer.octave)
     }
+
+    // A step chosen on the staff, for the keys to change (since 2026-11-24, spec 2026-11-24-flute-edit-a-note-design.md).
+
+    /** Writes c¹ d¹ e¹, each a quarter, a second apart. */
+    private fun cde() {
+        tap(60, at = 0, heldMs = quarter)
+        tap(62, at = 1000, heldMs = quarter)
+        tap(64, at = 2000, heldMs = quarter)
+    }
+
+    @Test
+    fun `a tap selects a step, the same tap again unselects it, another moves it`() {
+        cde()
+        assertEquals(1, writer.select(1))
+        assertEquals(1, writer.selected)
+        assertEquals(2, writer.select(2))
+        assertNull(writer.select(2))
+        assertNull(writer.selected)
+    }
+
+    @Test
+    fun `a key pressed on the selected step changes it in place, its length from the hold, and ends the choice`() {
+        cde()
+        writer.select(1)
+        writer.press(writer.key(67), 3000)
+        assertEquals(Held(67, index = 1, replaces = true), writer.held)
+        assertEquals("chosen while the key is held", 1, writer.selected)
+        val ended = writer.release(3000 + hold(HALF))!!
+        assertTrue(ended.replaced)
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(67, HALF), TuneNote(64, QUARTER)), writer.tune)
+        assertNull("the key that changed it let the choice go", writer.selected)
+        writer.press(writer.key(69), 4000)
+        writer.release(4000 + hold(EIGHTH))
+        assertEquals("the next key writes at the end", TuneNote(69, EIGHTH), writer.tune.last())
+        assertEquals(4, writer.tune.size)
+    }
+
+    @Test
+    fun `a bounce of the key goes on with the chosen step's note`() {
+        cde()
+        writer.select(1)
+        writer.press(writer.key(67), 3000)
+        writer.release(3000 + quarter)
+        assertNull(writer.selected)
+        writer.press(writer.key(67), 3000 + quarter + 30) // the touch screen split one hold in two
+        assertEquals(Held(67, index = 1, replaces = true), writer.held)
+        assertEquals("chosen again while it goes on", 1, writer.selected)
+        writer.release(3000 + hold(HALF))
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(67, HALF), TuneNote(64, QUARTER)), writer.tune)
+        assertNull(writer.selected)
+    }
+
+    @Test
+    fun `the rest key and the breath key change the selected step too`() {
+        tap(60, at = 0, heldMs = quarter)
+        tap(62, at = 1000, heldMs = quarter)
+        writer.select(0)
+        writer.press(null, 2000)
+        writer.release(2000 + quarter)
+        assertEquals(listOf(TuneRest(QUARTER), TuneNote(62, QUARTER)), writer.tune)
+        assertNull("the rest key let the choice go", writer.selected)
+        writer.select(0)
+        val breath = writer.breath()
+        assertTrue(breath.added)
+        assertTrue(breath.replaced)
+        assertEquals(listOf(TuneBreath, TuneNote(62, QUARTER)), writer.tune)
+        assertNull("so did the breath key", writer.selected)
+    }
+
+    @Test
+    fun `a selected step is changed at the cap, where nothing can be added`() {
+        repeat(Tune.MAX_NOTES) { tap(60, at = it * 1000L, heldMs = quarter) }
+        writer.select(5)
+        writer.press(writer.key(62), 999_000)
+        writer.release(999_000 + quarter)
+        assertEquals(TuneNote(62, QUARTER), writer.tune[5])
+        assertEquals(Tune.MAX_NOTES, writer.tune.size)
+    }
+
+    @Test
+    fun `the sign and the octave apply to the replacement, and a join only when the key waits`() {
+        tap(60, at = 0, heldMs = quarter)
+        writer.join()
+        tap(62, at = 1000, heldMs = quarter) // d joined to c
+        writer.select(1)
+        writer.press(writer.key(64), 2000)
+        writer.release(2000 + quarter)
+        assertEquals("a replacement made without ⌒ is not joined", TuneNote(64, QUARTER), writer.tune[1])
+        writer.select(1)
+        writer.sign()
+        writer.chooseOctave(2)
+        assertTrue(writer.join())
+        writer.press(3, 3000) // F, with the sign, in octave 2
+        writer.release(3000 + quarter)
+        assertEquals(TuneNote(78, QUARTER, joined = true), writer.tune[1]) // F♯5, joined to the c before it
+    }
+
+    @Test
+    fun `the join key needs a note before the selected step`() {
+        tap(null, at = 0, heldMs = quarter)
+        tap(62, at = 1000, heldMs = quarter)
+        writer.select(1)
+        assertFalse(TuneWriter.canJoin(writer.tune, writer.selected))
+        assertFalse(writer.join())
+        writer.select(0)
+        assertFalse(TuneWriter.canJoin(writer.tune, 0))
+        writer.unselect()
+        assertTrue(TuneWriter.canJoin(writer.tune, null))
+    }
+
+    @Test
+    fun `erase with a selection removes the selected step, after a waiting join or sign goes first`() {
+        cde()
+        writer.select(1)
+        writer.sign()
+        assertEquals(TuneWriter.Erase(TuneWriter.Dropped(sign = true), erased = false), writer.erase())
+        assertEquals(TuneWriter.Erase(TuneWriter.Dropped(), erased = true, selected = true), writer.erase())
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(64, QUARTER)), writer.tune)
+        assertNull(writer.selected)
+        assertTrue("no selection: the last step again", writer.erase().erased)
+        assertEquals(listOf(TuneNote(60, QUARTER)), writer.tune)
+    }
+
+    @Test
+    fun `the note after a removed or silenced step loses its join`() {
+        tap(60, at = 0, heldMs = quarter)
+        writer.join()
+        tap(62, at = 1000, heldMs = quarter)
+        writer.join()
+        tap(64, at = 2000, heldMs = quarter) // c ⌒ d ⌒ e
+        writer.select(1)
+        writer.press(writer.key(65), 3000)
+        writer.release(3000 + quarter)
+        assertEquals("a note in its place keeps the next note's join", TuneNote(64, QUARTER, joined = true), writer.tune[2])
+        writer.select(1)
+        writer.press(null, 4000) // the chosen step becomes a rest
+        writer.release(4000 + quarter)
+        assertEquals(TuneNote(64, QUARTER), writer.tune[2])
+        tap(60, at = 5000, heldMs = quarter)
+        writer.join()
+        tap(62, at = 6000, heldMs = quarter) // … c ⌒ d at the end
+        writer.select(3)
+        writer.erase() // removes the c the last d is joined to
+        assertEquals(TuneNote(62, QUARTER), writer.tune.last())
+    }
+
+    @Test
+    fun `a tap while a key is held selects nothing`() {
+        tap(60, at = 0, heldMs = quarter)
+        writer.press(writer.key(62), 1000)
+        assertNull(writer.select(0))
+        assertNull(writer.selected)
+    }
+
+    @Test
+    fun `the selection never points outside the tune`() {
+        tap(60, at = 0, heldMs = quarter)
+        tap(62, at = 1000, heldMs = quarter)
+        assertNull(writer.select(2))
+        assertNull(writer.select(-1))
+        writer.select(1)
+        writer.open(listOf(TuneNote(60, QUARTER)))
+        assertNull(writer.selected)
+        writer.select(0)
+        writer.erase()
+        assertNull(writer.selected)
+        assertTrue(writer.tune.isEmpty())
+    }
+
+    @Test
+    fun `choosing a step drops a waiting join, which then runs from the note before the chosen step`() {
+        cde()
+        assertTrue(writer.join())
+        writer.select(0)
+        assertFalse("the note it would join from changed", writer.joinWaiting)
+        writer.press(writer.key(65), 3000)
+        writer.release(3000 + quarter)
+        assertEquals(TuneNote(65, QUARTER), writer.tune[0])
+        assertNull("no note before the first step", TuneWriter.joinFrom(writer.tune, 0))
+        assertEquals(0, TuneWriter.joinFrom(writer.tune, 1))
+        assertEquals("nothing chosen: the last note", 2, TuneWriter.joinFrom(writer.tune, null))
+        writer.select(1)
+        assertTrue(writer.join())
+        writer.select(1) // let go: the join would now run from the last note
+        assertFalse(writer.joinWaiting)
+    }
+
+    @Test
+    fun `the rest key again after changing the chosen step does not go on with that rest`() {
+        cde()
+        writer.select(1)
+        writer.press(null, 3000)
+        writer.release(3000 + hold(HALF))
+        assertEquals(TuneRest(HALF), writer.tune[1])
+        writer.press(null, 5000)
+        writer.release(5000 + quarter)
+        assertEquals("the rest in the middle stays as it was", TuneRest(HALF), writer.tune[1])
+        assertEquals("a new rest at the end", TuneRest(QUARTER), writer.tune.last())
+    }
+
+    @Test
+    fun `letting the chosen step go ends the chance to go on with its rest`() {
+        cde()
+        writer.select(1)
+        writer.press(null, 3000)
+        writer.release(3000 + quarter)
+        writer.unselect()
+        writer.press(null, 5000)
+        writer.release(5000 + quarter)
+        assertEquals(
+            listOf(TuneNote(60, QUARTER), TuneRest(QUARTER), TuneNote(64, QUARTER), TuneRest(QUARTER)),
+            writer.tune,
+        )
+    }
+
+    @Test
+    fun `no two breaths side by side, by a breath on the chosen step or by erasing between two`() {
+        tap(60, at = 0, heldMs = quarter)
+        writer.breath()
+        tap(62, at = 1000, heldMs = quarter)
+        writer.breath()
+        tap(64, at = 2000, heldMs = quarter) // c , d , e
+        writer.select(2)
+        assertFalse(writer.breath().added)
+        assertEquals(TuneNote(62, QUARTER), writer.tune[2])
+        writer.erase() // d goes, and the two breaths would meet
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneBreath, TuneNote(64, QUARTER)), writer.tune)
+    }
+
+    @Test
+    fun `letting the chosen step go drops a waiting join`() {
+        cde()
+        writer.select(1)
+        assertTrue(writer.join())
+        assertTrue(writer.unselect())
+        assertFalse("the note it would join from changed", writer.joinWaiting)
+    }
 }

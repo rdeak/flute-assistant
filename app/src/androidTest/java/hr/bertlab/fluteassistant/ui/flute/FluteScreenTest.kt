@@ -46,6 +46,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -102,6 +103,8 @@ class FluteScreenTest {
     private var signs = 0
     private val octaves = mutableListOf<Int>()
     private var erases = 0
+    private val stepTaps = mutableListOf<Int>()
+    private var stageTaps = 0
     private val restEvents = mutableListOf<String>()
     private var breaths = 0
     private var joins = 0
@@ -152,7 +155,13 @@ class FluteScreenTest {
                             onSign = { signs++ },
                             onOctave = { octaves += it },
                             onTogglePlayback = { playToggles++ },
-                            onEraseLast = { erases++ },
+                            // As the view model: an erase with a step chosen removes it and lets the choice go.
+                            onEraseLast = {
+                                erases++
+                                state.value = state.value.copy(selected = null)
+                            },
+                            onStepTapped = { stepTaps += it },
+                            onStageTapped = { stageTaps++ },
                             onBpmChange = { bpm ->
                             chosenBpm = bpm
                             metronome.value = metronome.value.copy(config = metronome.value.config.withBpm(bpm))
@@ -1695,5 +1704,117 @@ class FluteScreenTest {
         compose.onNodeWithContentDescription("Oktava 1").assertExists()
         compose.onNodeWithContentDescription("d3").assertIsEnabled()
         compose.onNodeWithContentDescription("h3").assertIsEnabled()
+    }
+
+    // A step chosen on the staff for the keys to change (since 2026-11-24, spec 2026-11-24-flute-edit-a-note-design.md).
+
+    @Test
+    fun a_tap_on_a_step_chooses_it() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(64, NoteLength.HALF))))
+        compose.onNodeWithContentDescription("E4, 2 beats").performClick()
+        assertEquals(listOf(1), stepTaps)
+    }
+
+    @Test
+    fun the_chosen_step_is_selected_and_the_sponge_says_so() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(64, NoteLength.HALF)), selected = 1))
+        compose.onNodeWithContentDescription("E4, 2 beats").assertIsSelected()
+        // Unchosen steps say nothing about it, or a screen reader says "not selected" on every one.
+        compose.onNodeWithContentDescription("C4, 1 beat").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        compose.onNodeWithContentDescription("Erase the chosen note").assertIsEnabled()
+        compose.onNodeWithContentDescription("Erase the last note").assertDoesNotExist()
+    }
+
+    @Test
+    fun holding_erase_with_a_chosen_note_erases_once() {
+        show(FluteUiState(tune = List(6) { TuneNote(60 + it, NoteLength.QUARTER) }, selected = 2))
+        compose.onNodeWithContentDescription("Erase the chosen note").assertExists()
+        // Found by either name: the first erase lets the choice go and the key is renamed under the finger.
+        val sponge = compose.onNode(hasContentDescription("Erase the", substring = true))
+        compose.mainClock.autoAdvance = false
+        sponge.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_500)
+        sponge.performTouchInput { up() }
+        assertEquals("the first erase lets the choice go, and the hold goes on no further", 1, erases)
+        // The same hold with nothing chosen repeats, so the clock did reach the repeats.
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("Erase the last note").assertExists()
+        compose.mainClock.autoAdvance = false
+        sponge.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_500)
+        sponge.performTouchInput { up() }
+        assertTrue("held with nothing chosen it repeats", erases > 2)
+    }
+
+    @Test
+    fun a_breath_can_be_chosen_and_shows_it() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneBreath, TuneNote(64, NoteLength.HALF))))
+        compose.onNodeWithContentDescription("Breathe here").performClick()
+        assertEquals(listOf(1), stepTaps)
+        state.value = state.value.copy(selected = 1)
+        compose.onNodeWithContentDescription("Breathe here").assertIsSelected()
+    }
+
+    @Test
+    fun steps_cannot_be_chosen_while_the_tune_runs() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(64, NoteLength.HALF)), playing = Playing(0)))
+        compose.onNodeWithContentDescription("E4, 2 beats").performClick()
+        assertTrue(stepTaps.isEmpty())
+    }
+
+    @Test
+    fun choosing_and_changing_a_step_does_not_scroll_the_staff() {
+        val tune = List(24) { TuneNote(if (it == 3) 76 else 60, NoteLength.QUARTER) } // E5 is the fourth step
+        show(FluteUiState(tune = tune))
+        compose.onNodeWithContentDescription("Your tune, 24 notes").performTouchInput { swipeRight() } // back to the start
+        compose.waitForIdle()
+        val before = compose.onNodeWithContentDescription("E5, 1 beat").getBoundsInRoot().left
+        state.value = state.value.copy(selected = 3)
+        compose.waitForIdle()
+        state.value = state.value.copy(held = Held(76, index = 3, replaces = true))
+        compose.waitForIdle()
+        assertEquals(before, compose.onNodeWithContentDescription("E5, 1 beat").getBoundsInRoot().left)
+    }
+
+    @Test
+    fun a_step_let_go_leaves_the_staff_where_it_is_until_a_key_writes_at_the_end() {
+        val tune = List(24) { TuneNote(if (it == 3) 76 else 60, NoteLength.QUARTER) } // E5 is the fourth step
+        show(FluteUiState(tune = tune))
+        compose.onNodeWithContentDescription("Your tune, 24 notes").performTouchInput { swipeRight() } // back to the start
+        compose.waitForIdle()
+        fun e5() = compose.onNodeWithContentDescription("E5, 1 beat").getBoundsInRoot().left
+        val before = e5()
+        state.value = state.value.copy(selected = 2)
+        compose.waitForIdle()
+        state.value = state.value.copy(selected = null) // the same tap again lets it go
+        compose.waitForIdle()
+        assertEquals("let go", before, e5())
+        state.value = state.value.copy(selected = 5)
+        compose.waitForIdle()
+        state.value = state.value.copy(tune = tune.filterIndexed { index, _ -> index != 5 }, selected = null) // 🧽 on it
+        compose.waitForIdle()
+        assertEquals("erased", before, e5())
+        // The next key writes at the end, and the staff follows it there again.
+        state.value = state.value.copy(tune = state.value.tune + TuneNote(67, NoteLength.EIGHTH), held = Held(67, index = 23))
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("G4, half a beat").assertIsDisplayed()
+    }
+
+    @Test
+    fun a_tap_beside_the_notes_lets_the_chosen_step_go() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(64, NoteLength.HALF)), selected = 1))
+        compose.onNodeWithContentDescription("Your tune, 2 notes").performTouchInput { click(Offset(width - 4f, height / 2f)) }
+        assertEquals(1, stageTaps)
+        compose.onNodeWithContentDescription("E4, 2 beats").performClick()
+        assertEquals("a note's tap is the note's", 1, stageTaps)
+        assertEquals(listOf(1), stepTaps)
+    }
+
+    @Test
+    fun the_stage_takes_no_tap_while_the_tune_runs() {
+        show(FluteUiState(tune = listOf(TuneNote(60, NoteLength.QUARTER), TuneNote(64, NoteLength.HALF)), playing = Playing(0)))
+        compose.onNodeWithContentDescription("Your tune, 2 notes").performTouchInput { click(Offset(width - 4f, height / 2f)) }
+        assertEquals(0, stageTaps)
     }
 }

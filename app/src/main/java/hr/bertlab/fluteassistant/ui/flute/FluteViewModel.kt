@@ -79,15 +79,17 @@ import javax.inject.Inject
  * metronome's ring or the shelf takes the stage.
  *
  * Logs under [LogTags.FLUTE]: `flute.note` per note ended (midi, heldMs, length, added: false
- * at the cap, joined: joined to the note before), `flute.rest` per rest ended (heldMs, length, added), `flute.rejoin` (midi, none
- * for the rest, gapMs) when a key let go of goes on, `flute.breath` (added: false
- * at the cap or right after a breath), `flute.join` (waiting: true when the ⌒ key set a join, false when its
+ * at the cap, joined: joined to the note before; replaced: it took the chosen step's place, since 2026-11-24), `flute.rest`
+ * per rest ended (heldMs, length, added, replaced), `flute.rejoin` (midi, none for the rest, gapMs) when a key let go of
+ * goes on, `flute.breath` (added: false at the cap or right after a breath; replaced), `flute.select` (index: the step
+ * chosen on the staff, none when let go; reason: tap; key or breath, the key that changed it; or play, listen, book,
+ * speed or leave when that let it go; since 2026-11-24), `flute.join` (waiting: true when the ⌒ key set a join, false when its
  * second tap cancelled one or there was nothing to join from), `flute.join_cancel` (reason: rest, breath, erase,
- * play, listen, book, speed or leave: a waiting join dropped), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its
+ * select, play, listen, book, speed or leave: a waiting join dropped), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its
  * second tap dropped it, since 2026-11-17), `flute.sign_cancel` (reason: erase, play, listen, book, speed or leave: a waiting sign
  * dropped), `flute.octave` (octave: 1 to 4, when an octave pill changed the octave the keys write in, since
  * 2026-11-18), `flute.play` (notes, rests, bpm, time), `flute.play_done`,
- * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left),
+ * `flute.stop` (reason: pill, key, erase, leave, speed or book), `flute.erase` (left; selected: the chosen step erased),
  * `flute.speed_open` and `flute.speed_done` (bpm, time), `flute.shelf_open` (book: the open
  * one's index), `flute.book_open` (from, to, notes: the steps in the book opened, bpm and time:
  * what the metronome must be set to, none for an empty book, which leaves it alone) and
@@ -137,6 +139,9 @@ class FluteViewModel @Inject constructor(
 
     /** The microphone, while "Your turn" listens. */
     private var listenJob: Job? = null
+    /** A tapped note sounding until its length is over ([soundStep]); null when none. */
+    private var tapSoundJob: Job? = null
+
     /** The "Your turn" in progress; null when not listening. */
     private var run: ListenRun? = null
     /** The room's own level as the last run left it, which the next one starts from. */
@@ -162,6 +167,7 @@ class FluteViewModel @Inject constructor(
      */
     fun onKeyPressed(key: Int) {
         if (!writer.takes(key, clock.nowMillis())) return // a key the keys do not have is not taken either
+        hushTap(silence = false) // the key's own note takes the voice
         stopRunning(reason = "key")
         activationJob?.cancel()
         press(key)
@@ -183,6 +189,7 @@ class FluteViewModel @Inject constructor(
 
     /** A finger went down on the rest key: silence a held note and add a rest that grows while the key stays down, or go on with its rest. */
     fun onRestPressed() {
+        hushTap(silence = true)
         stopRunning(reason = "key")
         activationJob?.cancel()
         if (writer.held?.midi != null) tonePlayer.noteOff()
@@ -200,7 +207,10 @@ class FluteViewModel @Inject constructor(
         letGoAfterTap(::holdsRest)
     }
 
-    /** The breath key: ends a held key and marks a breath, unless the last step is one already. */
+    /**
+     * The breath key: ends a held key and marks a breath, unless the last step is one already; with a step chosen on the
+     * staff the breath takes its place, unless a breath stands beside it.
+     */
     fun onBreath() {
         stopRunning(reason = "key")
         endHeld()
@@ -208,7 +218,8 @@ class FluteViewModel @Inject constructor(
         if (breath.added || breath.dropped.any) written()
         logDropped(breath.dropped, reason = "breath")
         if (breath.added) save()
-        logger.d(LogTags.FLUTE, "flute.breath", "added" to breath.added)
+        logger.d(LogTags.FLUTE, "flute.breath", "added" to breath.added, "replaced" to breath.replaced)
+        if (breath.replaced) logger.d(LogTags.FLUTE, "flute.select", "index" to null, "reason" to "breath")
     }
 
     /** Plays the tune from the first step, or stops a playback in progress. Nothing to play, or the flute listening: nothing happens. */
@@ -218,6 +229,7 @@ class FluteViewModel @Inject constructor(
             return
         }
         if (_state.value.isEmpty || _state.value.isListening) return
+        hushTap(silence = true)
         endHeld()
         dropWaiting(reason = "play")
         val items = writer.tune
@@ -269,6 +281,7 @@ class FluteViewModel @Inject constructor(
     fun startListening() {
         val current = _state.value
         if (current.isPlaying || current.isListening || !current.canListen) return
+        hushTap(silence = true) // the microphone must not hear a tapped note
         endHeld()
         dropWaiting(reason = "listen")
         beginRun()
@@ -393,7 +406,10 @@ class FluteViewModel @Inject constructor(
         )
     }
 
-    /** Drops the last step of the tune; ignored while a key is held or the tune is empty. Stops playback and listening first. */
+    /**
+     * Drops the step chosen on the staff, or else the last step of the tune; ignored while a key is held or the tune is
+     * empty. Stops playback and listening first.
+     */
     fun eraseLast() {
         stopRunning(reason = "erase")
         val erase = writer.erase()
@@ -405,7 +421,7 @@ class FluteViewModel @Inject constructor(
         if (!erase.erased) return
         written()
         save()
-        logger.d(LogTags.FLUTE, "flute.erase", "left" to writer.tune.size)
+        logger.d(LogTags.FLUTE, "flute.erase", "left" to writer.tune.size, "selected" to erase.selected)
     }
 
     /**
@@ -601,17 +617,42 @@ class FluteViewModel @Inject constructor(
             logger.d(
                 LogTags.FLUTE, "flute.note",
                 "midi" to ended.midi, "heldMs" to ended.heldMs, "length" to ended.length, "added" to ended.added, "joined" to ended.joined,
+                "replaced" to ended.replaced,
             )
         } else {
-            logger.d(LogTags.FLUTE, "flute.rest", "heldMs" to ended.heldMs, "length" to ended.length, "added" to ended.added)
+            logger.d(
+                LogTags.FLUTE, "flute.rest",
+                "heldMs" to ended.heldMs, "length" to ended.length, "added" to ended.added, "replaced" to ended.replaced,
+            )
+        }
+        // The key that changed the chosen step let the choice go (since 2026-11-24).
+        if (ended.replaced && writer.selected == null) logger.d(LogTags.FLUTE, "flute.select", "index" to null, "reason" to "key")
+    }
+
+    /** Shows what the writer holds: the tune, the key under a finger, whether a join or a sign waits, the octave and the chosen step. */
+    private fun written() {
+        _state.update {
+            it.copy(
+                tune = writer.tune, held = writer.held, joinWaiting = writer.joinWaiting, signWaiting = writer.signWaiting,
+                octave = writer.octave, selected = writer.selected,
+            )
         }
     }
 
-    /** Shows what the writer holds: the tune, the key under a finger, and whether a join or a sign waits. */
-    private fun written() {
-        _state.update {
-            it.copy(tune = writer.tune, held = writer.held, joinWaiting = writer.joinWaiting, signWaiting = writer.signWaiting, octave = writer.octave)
-        }
+    /**
+     * A tap on the step at [index] of the staff (since 2026-11-24): it is chosen for the keys to change, or let go when it
+     * was the chosen one ([TuneWriter.select]). Nothing while the tune runs, whose staff takes no tap.
+     */
+    fun onStepTapped(index: Int) {
+        if (_state.value.isRunning) return
+        soundStep(index)
+        val before = writer.selected
+        val joinWaited = writer.joinWaiting
+        val selected = writer.select(index)
+        if (selected == before) return // a tap while a key is held, or off the tune
+        written()
+        logger.d(LogTags.FLUTE, "flute.select", "index" to selected, "reason" to "tap")
+        if (joinWaited && !writer.joinWaiting) logDropped(TuneWriter.Dropped(join = true), reason = "select")
     }
 
     /**
@@ -666,16 +707,65 @@ class FluteViewModel @Inject constructor(
      * ends, then a held key, and a waiting join or sign is dropped.
      */
     private fun clearStage(reason: String) {
+        hushTap(silence = true)
         stopRunning(reason)
         endHeld()
         dropWaiting(reason)
     }
 
-    /** Drops a waiting join and a waiting sign, shown and logged with what dropped them. */
+    /**
+     * A tap on the stage beside the notes (since 2026-11-24, the user: "when user tap on white section with metronom and
+     * notes, but does not select any note it should deselect currently selected note"): the chosen step is let go.
+     * Nothing while the tune runs, or with nothing chosen.
+     */
+    fun onStageTapped() {
+        if (_state.value.isRunning) return
+        val joinWaited = writer.joinWaiting
+        if (!writer.unselect()) return
+        written()
+        logger.d(LogTags.FLUTE, "flute.select", "index" to null, "reason" to "tap")
+        if (joinWaited && !writer.joinWaiting) logDropped(TuneWriter.Dropped(join = true), reason = "select")
+    }
+
+    /**
+     * A tapped step sounds (since 2026-11-24, the user: "when user tap on note it should play that note also"): a note
+     * for its written length at the knob's speed, as Play plays it; a rest is silence.
+     */
+    private fun soundStep(index: Int) {
+        if (writer.held != null) return // the key under a finger keeps the voice
+        hushTap(silence = false)
+        val note = writer.tune.getOrNull(index) as? TuneNote
+        if (note == null) {
+            tonePlayer.noteOff()
+            return
+        }
+        tonePlayer.noteOn(NoteMath.midiToFrequency(note.midi), TONE_VOLUME)
+        tapSoundJob = viewModelScope.launch {
+            delay(Tune.durationMs(note.length, pulse()))
+            tonePlayer.noteOff()
+        }
+    }
+
+    /**
+     * Ends a tapped note's sound before something else takes the voice: [silence] fades it out (the rest key, Play, Listen
+     * to me, whose microphone must not hear it, and leaving the stage); without it a note key's own sound takes over with
+     * no note off. Either way its end can no longer cut what sounds next.
+     */
+    private fun hushTap(silence: Boolean) {
+        val job = tapSoundJob ?: return
+        tapSoundJob = null
+        if (!job.isActive) return
+        job.cancel()
+        if (silence) tonePlayer.noteOff()
+    }
+
+    /** Drops a waiting join and a waiting sign, and lets a chosen step go, shown and logged with what dropped them. */
     private fun dropWaiting(reason: String) {
         val dropped = writer.dropWaiting()
-        if (dropped.any) written()
+        val unselected = writer.unselect()
+        if (dropped.any || unselected) written()
         logDropped(dropped, reason)
+        if (unselected) logger.d(LogTags.FLUTE, "flute.select", "index" to null, "reason" to reason)
     }
 
     /**
@@ -716,6 +806,7 @@ class FluteViewModel @Inject constructor(
     private fun Pulse?.fields(): Array<Pair<String, Any?>> = arrayOf("bpm" to this?.bpm, "time" to this?.timeSignature?.label)
 
     override fun onCleared() {
+        tapSoundJob?.cancel()
         playbackJob?.cancel()
         activationJob?.cancel()
         growJob?.cancel()

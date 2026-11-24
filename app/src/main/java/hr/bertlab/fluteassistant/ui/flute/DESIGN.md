@@ -815,21 +815,76 @@ recommendation"). Tests: `FluteNotesTest`, `TuneWriterTest`, `FluteUiStateTest`,
 `StaffGeometryTest`, `SidewaysGeometryTest`, `TabletGeometryTest`, `FluteScreenTest`, `FluteSidewaysTest`, and
 `ListenPathTest` (three h³ heard as the same notes two octaves down).
 
+Changing a note (2026-11-24; spec `docs/superpowers/specs/2026-11-24-flute-edit-a-note-design.md`, plan
+`docs/superpowers/plans/2026-11-24-flute-edit-a-note.md`, both local; the look from
+`.superpowers/brainstorm/63487-1795518129/content/selection-look.html`). It came out of a brainstorm about reading a
+photo of a page into a book (feedback: songs are long and typing them note by note is tedious); the camera is parked,
+and this came first because a tune read from a photo will have a few wrong notes, and the sponge only erased from the
+end. Of a check step after a scan, a fix on the flute tab and no fixing, the user picked the flute tab, in their
+words: "tap on note, mark note as selected and change with note user tap, to unselect tap again and selection is gone,
+if note is selected and sponge is tapped remove selected note"; inserting a step in the middle: "not in this feature".
+The rule is `TuneWriter.selected`: `select(index)` chooses a step (the same one again lets it go, another moves the
+choice, nothing while a key is held or off the tune); while one is chosen a key writes in its place instead of at the
+end, at the cap too, its length from the hold at the writing pace as always (so a quick tap makes an eighth, and one
+press fixes a wrong pitch or a wrong length), and the choice ends when that key is let go (the user, the same day: "if
+user tap on notes it should also deselect currently selected note"; the build had kept it for another try): the next
+key writes at the end again, and a wrong hold is fixed by tapping the step again. A bounce of the key, the touch screen
+splitting one hold within `HOLD_REJOIN_MS`, goes on with the step it changed, chosen again while it lasts (`goOn`);
+💤 pressed again later does not go on with the rest it wrote in the middle, as it would with a rest at the end
+(`rejoinable` and `Held.replaces`). 💤 writes a rest there and 😮‍💨 a breath, which ends the choice at once, unless a breath stands beside it (two breaths never stand side by side: `Tune.sanitize` would
+drop the second on the next start, and an erase between two breaths takes the second with it); ♯♭, the octave pills
+and ⌒ apply to the replacement, ⌒ joining it to the step before it (`TuneWriter.canJoin`, which the ⌒ key's fade
+follows, and `joinFrom`, where the dashed waiting arc is drawn from), and a replacement made without ⌒ is not joined.
+Choosing another step, or letting the chosen one go, drops a waiting ⌒ (`flute.join_cancel`, reason select): the note
+it would join from changed. A breath is chosen like a note, its yellow disc behind its face (the final review of the
+build found a breath could not be chosen, and a step turned into a breath stayed chosen with nothing showing it). A note joined
+to a step that is removed, or that becomes a rest or a breath, loses its join (`replaceAt`, `unjoin`); a note in its
+place keeps it. 🧽 removes the chosen step and ends the choice, after a waiting ⌒ or ♯♭ goes first as always; with a
+step chosen it reads "Erase the chosen note" and a press that starts then erases once, never repeating on into the end
+of the tune (`EraseKey`'s `chosen`, decided as the finger goes down). A screen reader hears "selected" on the chosen
+step only, never "not selected" on the others. Play, Listen to me, the book, the speed panel and
+leaving the tab let it go (`FluteViewModel.dropWaiting`, the call that drops a waiting ⌒ and ♯♭; on the listening path
+this is the one change, and nothing in `ListenRun`, `TuneCheck`, `Listening`, `Joins` or `domain/listen` changed);
+it is never saved. The look (the user's pick, A, of three drawn at true size): the step lit as Play and Your turn light
+"this note", the yellow ring on its heads and pills, kept on; a key held on it adds the soft band of writing. Not taken:
+the band kept on as well (selected and held would look the same) and an ink frame round the column. Each step of the
+writing staff takes a tap in its whole box, the staff's height and the step's width (`StaffStep`'s `onTap`); the
+running staff takes none, and the knob and the book button keep theirs. While a step is chosen the staff does not
+follow on by itself (`TuneMarks`' scroll effect is skipped): the chosen step, and a key held on it, would otherwise be
+the lit step it follows, and the staff would jump on every tap. Once the step is let go or erased it stays there still,
+until the next key writes at the end (the tune changes again) or something is lit (a key held, Play, Listen to me):
+the plan had it follow the end again at once, the final review noted that a child fixing several notes of a long tune
+would scroll back each time, and the user chose, the same day, "keep where it is until the next key writes at the
+end" (`TuneMarks`' `LetGoPlace`). A screen reader hears each step as before, "selected" on the chosen one, and can tap it ("Change this
+note", `flute_step_change`). Two more of the user's asks the same day, after trying the build: a tap on the stage
+beside the notes lets the chosen step go ("when user tap on white section with metronom and notes, but does not select
+any note it should deselct currently selected note": the writing stage's own tap, `onStageTapped`, which a note, the
+knob, the book and a drag take before it, and which drops a waiting ⌒ as letting go always does), and a tapped note
+sounds ("when user tap on note it should play that note also": for its written length at the knob's speed, as Play
+would play it; a rest is silence; `soundStep`). A note key takes the voice from a tapped note with no note off, and the
+rest key, Play, Listen to me and leaving the stage silence it first, so its end never cuts what sounds next and the
+microphone never hears it (`hushTap`; on the listening path this is one call before the run starts, nothing in the
+run). A tap while a key is held sounds nothing. Tests: `TuneWriterTest`, `FluteUiStateTest`, `FluteViewModelTest`,
+`FluteScreenTest`.
+
 Log events (tag `FA.Flute`): `tone.track_open` (rate, block and
 buffer frames) / `tone.track_closed` (underruns) / `tone.error`, `flute.note` (midi, heldMs,
-length, added: false at the cap, joined: joined to the note before, since 2026-11-16, per note ended), `flute.join`
+length, added: false at the cap, joined: joined to the note before, since 2026-11-16; replaced: it took the place of the
+step chosen on the staff, since 2026-11-24; per note ended), `flute.select` (index: the step chosen on the staff, `none`
+when it is let go; reason: tap; key or breath, the key that changed it; or play, listen, book, speed or leave when that
+let it go; since 2026-11-24), `flute.join`
 (waiting: true when the ⌒ key set a join, false when its second tap cancelled one or there was nothing to join from;
-since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, play, listen, book, speed or leave: a waiting join
-dropped; since 2026-11-16), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its second tap
+since 2026-11-16), `flute.join_cancel` (reason: rest, breath, erase, select (since 2026-11-24), play, listen, book, speed
+or leave: a waiting join dropped; since 2026-11-16), `flute.sign` (waiting: true when the ♯♭ key set a sign, false when its second tap
 dropped it; since 2026-11-17), `flute.sign_cancel` (reason: erase, play, listen, book, speed or leave: a waiting sign
 dropped; since 2026-11-17), `flute.octave` (octave: 1 to 4, when an octave pill changed the octave the keys write in;
-since 2026-11-18), `flute.rest` (heldMs, length, added, per rest
+since 2026-11-18), `flute.rest` (heldMs, length, added, replaced, per rest
 ended), `flute.rejoin` (midi: the note gone on with, E♭ for E's key when the ♯♭ key wrote it; `none` for the rest; gapMs: a key let go of and pressed again within
 `HOLD_REJOIN_MS`, or the rest key at any time, went on with its note or rest, so the `flute.note`
-or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath), `flute.play` (notes,
+or `flute.rest` before it was not the end of that step), `flute.breath` (added: false at the cap or right after a breath; replaced: it took the chosen step's place), `flute.play` (notes,
 rests, bpm, time), `flute.play_done`, `flute.stop`
 (reason: pill, key, erase, leave, speed or book, so every `flute.play` has a closing line), `flute.erase`
-(left), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and
+(left; selected: the step chosen on the staff was the one erased, since 2026-11-24), `flute.speed_open` (bpm, time: the metronome's, when the knob opens the panel) and
 `flute.speed_done` (bpm, time, when OK closes it; leaving the tab with the panel open logs none);
 for the songbook, `flute.shelf_open` (book: the index of the open one, when the button opens the
 shelf), `flute.book_open` (from, to, notes, bpm, time: `to` is the book opened and `notes` its steps,

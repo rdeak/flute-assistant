@@ -243,4 +243,12 @@ class FluteUiStateTest {
         assertEquals(0, FluteUiState(tune = listOf(TuneNote(60, NoteLength.EIGHTH)), held = Held(60, index = 0), octave = 2).litLetter)
         assertNull(FluteUiState().litLetter)
     }
+
+    @Test
+    fun `the join key follows the selection`() {
+        val tune = listOf(TuneRest(NoteLength.QUARTER), TuneNote(62, NoteLength.QUARTER), TuneNote(64, NoteLength.QUARTER))
+        assertTrue(FluteUiState(tune = tune).canJoin)
+        assertFalse(FluteUiState(tune = tune, selected = 1).canJoin)
+        assertTrue(FluteUiState(tune = tune, selected = 2).canJoin)
+    }
 }

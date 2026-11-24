@@ -31,6 +31,7 @@ import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.LineMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
+import hr.bertlab.fluteassistant.domain.flute.TuneWriter
 import hr.bertlab.fluteassistant.ui.common.noteColor
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.HEAD_RY
 import hr.bertlab.fluteassistant.ui.flute.StaffGeometry.yOf
@@ -58,18 +59,28 @@ internal fun stepPlaces(lineMarks: List<LineMark>, starts: List<Float>): Map<Int
  * scrolled away is still drawn, and clipped at the row's sides only.
  */
 @Composable
-internal fun SlurLayer(tune: List<TuneItem>, lineMarks: List<LineMark>, starts: List<Float>, listState: LazyListState, joinWaiting: Boolean, ink: StaffInk) {
+internal fun SlurLayer(
+    tune: List<TuneItem>,
+    lineMarks: List<LineMark>,
+    starts: List<Float>,
+    listState: LazyListState,
+    joinWaiting: Boolean,
+    ink: StaffInk,
+    selectedIndex: Int? = null,
+) {
     val arcs = remember(tune) { Joins.arcs(tune) }
-    val waitingOn = (tune.lastOrNull() as? TuneNote)?.takeIf { joinWaiting }
+    // From the last note, or, with a step chosen (since 2026-11-24), from the note before it.
+    val waitingFrom = TuneWriter.joinFrom(tune, selectedIndex)?.takeIf { joinWaiting }
+    val waitingOn = waitingFrom?.let { tune[it] as TuneNote }
     if (arcs.isEmpty() && waitingOn == null) return
     val s = LocalStaffScale.current
     val room = LocalStaffRoom.current
     val muted = FluteTheme.colors.mutedText
     // Built once per tune and look, not on every frame the row scrolls or the animal hops.
-    val drawings = remember(tune, lineMarks, starts, waitingOn, ink.line, muted) {
+    val drawings = remember(tune, lineMarks, starts, waitingFrom, ink.line, muted) {
         val places = stepPlaces(lineMarks, starts)
         arcs.flatMap { joinArc(it, tune, places, ink.line, muted) } +
-            (waitingOn?.let { note -> places[tune.lastIndex]?.let { waitingArc(it, note, ink.line, muted) } } ?: emptyList())
+            (waitingOn?.let { note -> places[waitingFrom]?.let { waitingArc(it, note, ink.line, muted) } } ?: emptyList())
     }
     Box(
         Modifier

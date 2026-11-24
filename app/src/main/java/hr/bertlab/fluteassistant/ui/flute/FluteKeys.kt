@@ -118,7 +118,7 @@ private const val EraseRepeatMs = 120L
  * [signWaiting]; faded where it writes none: D and A then, and all of octave 4 but c⁴); and under those the tools in
  * columns 1 2, 4 5 and 7: ♯♭ ([SharpFlatKey], [FluteActions.onSign]), ⌒ (down while [joinWaiting], faded unless
  * [joinEnabled]), 💤 (held like a note key, sunk while [restLit]), 😮‍💨, and 🧽 (repeating while held, faded unless
- * [eraseEnabled]). The key of [litLetter] sinks onto its shadow inside a yellow ring.
+ * [eraseEnabled]; while [eraseChosen], a step chosen on the staff, it erases that one step once, since 2026-11-24). The key of [litLetter] sinks onto its shadow inside a yellow ring.
  *
  * A finger down on a letter calls [FluteActions.onKeyPressed] with the letter (0 = C to 6 = B) at once, and the finger
  * lifting, or sliding off, calls [FluteActions.onKeyReleased]; sliding onto another key does not press it, so every note
@@ -136,6 +136,7 @@ fun FluteKeys(
     litLetter: Int?,
     restLit: Boolean,
     eraseEnabled: Boolean,
+    eraseChosen: Boolean,
     joinWaiting: Boolean,
     joinEnabled: Boolean,
     actions: FluteActions,
@@ -191,7 +192,7 @@ fun FluteKeys(
                 )
                 BreathKey(onBreath = actions.onBreath, modifier = key)
                 Spacer(key)
-                EraseKey(enabled = eraseEnabled, onErase = actions.onEraseLast, modifier = key)
+                EraseKey(enabled = eraseEnabled, chosen = eraseChosen, onErase = actions.onEraseLast, modifier = key)
             }
         }
     }
@@ -321,13 +322,16 @@ private fun BreathKey(onBreath: () -> Unit, modifier: Modifier = Modifier) {
  * The erase key: a plain key with a sponge that erases the last step as the finger goes down and
  * keeps erasing while it stays, so a long line is cleared by holding; it sinks while held, like the
  * breath key. Faded and inert while [enabled] is false; the gesture is attached only while it is
- * enabled, so a hold that empties the tune stops repeating and lets the key up at once.
+ * enabled, so a hold that empties the tune stops repeating and lets the key up at once. While a step is
+ * [chosen] on the staff (since 2026-11-24) it is "Erase the chosen note", and a press that starts then
+ * erases that step once and does not repeat on into the end of the tune.
  */
 @Composable
-private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier = Modifier) {
-    val label = stringResource(R.string.flute_erase)
+private fun EraseKey(enabled: Boolean, chosen: Boolean, onErase: () -> Unit, modifier: Modifier = Modifier) {
+    val label = stringResource(if (chosen) R.string.flute_erase_chosen else R.string.flute_erase)
     val scope = rememberCoroutineScope()
     val currentOnErase by rememberUpdatedState(onErase)
+    val currentChosen by rememberUpdatedState(chosen)
     var pressed by remember { mutableStateOf(false) }
     ToolKey(
         label = label,
@@ -340,8 +344,9 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
                     detectTapGestures(
                         onPress = {
                             pressed = true
+                            val once = currentChosen // decided as the finger goes down
                             currentOnErase()
-                            val repeat = scope.launch {
+                            val repeat = if (once) null else scope.launch {
                                 delay(EraseRepeatDelayMs)
                                 while (isActive) {
                                     currentOnErase()
@@ -352,7 +357,7 @@ private fun EraseKey(enabled: Boolean, onErase: () -> Unit, modifier: Modifier =
                                 tryAwaitRelease()
                             } finally {
                                 pressed = false
-                                repeat.cancel()
+                                repeat?.cancel()
                             }
                         },
                     )

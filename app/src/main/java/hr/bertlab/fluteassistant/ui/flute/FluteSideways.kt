@@ -60,6 +60,7 @@ internal fun FluteWritingSideways(
     keys: @Composable (Modifier, Dp, Dp) -> Unit,
     buttons: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    stageModifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         val margin = SidewaysGeometry.MARGIN.dp
@@ -79,7 +80,8 @@ internal fun FluteWritingSideways(
                 verticalArrangement = Arrangement.Center,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight(),
+                    .fillMaxHeight()
+                    .then(stageModifier),
             ) {
                 tune(Modifier)
             }

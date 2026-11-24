@@ -9,7 +9,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 - `domain/flute/`: the rules, pure Kotlin with no clock and no coroutine. `FluteNotes` (the flute's 37 notes,
   C4 to C7 since 2026-11-18, and the note a letter key writes in the chosen octave, `inOctave`), `Tune` (lengths, the
   stored string, `playSteps` for Play), `TuneWriter` (a key held makes a note: growth at the writing pace, the rejoin
-  window, the cap, breath, the join, the sign, erase; which key drops a waiting join or sign is its rule too, it says what
+  window, the cap, breath, the join, the sign, erase, the step chosen on the staff; which key drops a waiting join or sign is its rule too, it says what
   it dropped, `TuneWriter.Dropped`, and the view model only shows and logs that), `Bars` (how the staff writes bars, ties and
   signs), `Joins` (runs of
   joined notes: the arcs, and what Listen to me hears as one note), `TuneCheck` and `ListenRun` ("Your
@@ -166,6 +166,27 @@ change that part). The songbook is in `SONGBOOK.md`.
   before, upright; where the running staff is drawn smaller the animal walks higher (`animalY`, the user's "b,
   higher"), never over more than 4 dp of the top note's head. On its side the card's height sets the scale
   (`SidewaysGeometry.restingStaffScale`), and the keys' column has the pills and two rows of keys.
+- Changing a note (the user, 2026-11-24: "tap on note, mark note as selected and change with note user tap, to unselect
+  tap again and selection is gone, if note is selected and sponge is tapped remove selected note"; spec
+  `docs/superpowers/specs/2026-11-24-flute-edit-a-note-design.md`, `DESIGN.md`, "Changing a note"): a tap on a step of
+  the writing staff chooses it (`TuneWriter.select`), lit with Play's yellow ring; the next key writes in its place, the
+  length from the hold as always, and lets the choice go when it is let go (the user, the same day: "if user tap on
+  notes it should also deselect currently selected note"), 😮‍💨 at once; the same tap lets it go, a tap on another moves it,
+  and a tap on the stage beside the notes lets it go (the user: "when user tap on white section with metronom and notes,
+  but does not select any note it should deselct currently selected note"; `onStageTapped`, the stage of the writing
+  tab only). A tapped note sounds for its written length at the knob's speed, a rest is silence (the user: "when user tap
+  on note it should play that note also"); a note key takes the voice from it, and the rest key, Play, Listen to me
+  (whose microphone must not hear it) and leaving the stage silence it first (`hushTap`); a tap while a key is held
+  sounds nothing; 🧽 removes it
+  once ("Erase the chosen note"), never repeating on into the end. Play, Listen to me, the book, the speed panel and
+  leaving the tab let it go, through `FluteViewModel.dropWaiting`, the one change on the listening path; never saved;
+  nothing while a key is held or the tune runs. A breath is chosen like a note (a yellow disc behind its face). A note
+  joined to a step removed or turned into a rest or a breath loses its join; two breaths never stand side by side;
+  choosing another step drops a waiting ⌒ (its note changed); 💤 pressed again later does not go on with the rest it
+  wrote in the middle. While a
+  step is chosen, and after it is let go or erased until the next key writes at the end, the staff does not follow on
+  by itself (the user: "keep where it is until the next key writes at the end"). No adding a step in the middle (the user:
+  "not in this feature"), and no new key, word or mode for it.
 - A finished run played at another animal's speed than the knob's says so in one line, "🐢 Slower
   than the 🐇", the child's animal first (`Pace`, rules `paceMinPairs` 6 and `paceOff` 15%); its
   screen stays as the run ended, the microphone closed, until Stop. No other summary.
@@ -186,6 +207,7 @@ change that part). The songbook is in `SONGBOOK.md`.
 | The ⌒ key, slurs and ties on the staff and in Play, ✂️ | "Legato" |
 | The running staff, the walking animal, the marks row | "While the tune runs" |
 | A phone on its side; a tablet | "Sideways", "Tablets" |
+| Choosing a step on the staff, changing or removing it | "Changing a note" |
 | Books and the shelf | `SONGBOOK.md` |
 
 ## Sessions (debug builds only)

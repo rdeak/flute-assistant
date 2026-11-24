@@ -151,6 +151,8 @@
     <string name="flute_play">Odsviraj</string>
     <string name="flute_your_turn">Poslušaj me</string>
     <string name="flute_erase">Obriši zadnju notu</string>
+    <string name="flute_erase_chosen">Obriši odabranu notu</string>
+    <string name="flute_step_change">Promijeni ovu notu</string>
     <string name="flute_keys">Tipke flaute</string>
     <string name="flute_speed_knob">Brzina: %1$s, dodirni za promjenu</string>
     <string name="speed_done">U redu</string>

@@ -145,7 +145,8 @@ tab's CLAUDE.md; these rules hold on all of them:
   flats") and c¹ to c⁴ as four octave pills over seven letter keys named for the chosen octave (2026-11-18,
   "Octaves"): a key writes exactly the note on it and only a pill changes the octave; do not hide the octave figure,
   work the octave out for the child (the nearest note and ⬇ ⬆) or move the notes over rows (a high-notes key): both
-  were withdrawn after a child and an adult could not find the octave; and the fifth tab, Fingers 🖐️, last in the
+  were withdrawn after a child and an adult could not find the octave; a tap on a step of the flute's staff chooses it
+  for the keys to change or 🧽 to remove (2026-11-24, "Changing a note"); and the fifth tab, Fingers 🖐️, last in the
   row, nothing else on it, whose flutes open their note in the tuner's Tune mode (2026-11-17, a teacher's ask,
   `ui/fingers/CLAUDE.md`).
 - Turned down, do not add: tempo −/+ buttons (again on 2026-10-24), a volume control (the phone's

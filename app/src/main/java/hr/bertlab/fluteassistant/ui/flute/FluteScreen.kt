@@ -4,6 +4,7 @@
 package hr.bertlab.fluteassistant.ui.flute
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,10 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -105,6 +108,8 @@ fun FluteScreen(
             onSign = viewModel::onSign,
             onOctave = viewModel::onOctave,
             onEraseLast = viewModel::eraseLast,
+            onStepTapped = viewModel::onStepTapped,
+            onStageTapped = viewModel::onStageTapped,
             onTogglePlayback = viewModel::togglePlayback,
             onYourTurn = { if (mic.isGranted()) viewModel.startListening() else mic.request() },
             onStop = viewModel::stopRun,
@@ -142,6 +147,10 @@ class FluteActions(
     /** An octave pill, 1 to 4: the letter keys write in that octave (since 2026-11-18). */
     val onOctave: (Int) -> Unit = {},
     val onEraseLast: () -> Unit = {},
+    /** A tap on a step of the writing staff, its index: it is chosen for the keys to change, or let go (since 2026-11-24). */
+    val onStepTapped: (Int) -> Unit = {},
+    /** A tap on the stage beside the notes: the chosen step is let go (since 2026-11-24). */
+    val onStageTapped: () -> Unit = {},
     /** Play. */
     val onTogglePlayback: () -> Unit = {},
     /** "Your turn"; the stateful entry asks for the microphone first if need be. */
@@ -395,6 +404,8 @@ private fun TuneAndKeys(
                 listState = staffPlace,
                 joinWaiting = state.joinWaiting,
                 room = staff.room,
+                selectedIndex = state.selected,
+                onStepTap = actions.onStepTapped.takeUnless { running },
             )
             SpeedKnob(
                 bpm = metronome.config.bpm,
@@ -414,6 +425,10 @@ private fun TuneAndKeys(
             )
         }
     }
+    // A tap on the stage beside the notes lets the chosen step go (since 2026-11-24); a note, the knob and the book take
+    // their own taps first, and a drag scrolls the staff. The running stage takes none.
+    val currentOnStage by rememberUpdatedState(actions.onStageTapped)
+    val stageTap = if (running) Modifier else Modifier.pointerInput(Unit) { detectTapGestures(onTap = { currentOnStage() }) }
     val keys: @Composable (Modifier, Dp, Dp) -> Unit = { keysModifier, keyHeight, keyGap ->
         FluteKeys(
             octave = state.octave,
@@ -421,6 +436,7 @@ private fun TuneAndKeys(
             litLetter = state.litLetter,
             restLit = state.restLit,
             eraseEnabled = !state.isEmpty,
+            eraseChosen = state.selected != null,
             joinWaiting = state.joinWaiting,
             joinEnabled = state.canJoin,
             actions = actions,
@@ -467,7 +483,7 @@ private fun TuneAndKeys(
         if (running) {
             FluteRunningSideways(tune = tune, line = { line(true) }, onStop = actions.onStop)
         } else {
-            FluteWritingSideways(tune = tune, keys = keys, buttons = playRow)
+            FluteWritingSideways(tune = tune, keys = keys, buttons = playRow, stageModifier = stageTap)
         }
         return
     }
@@ -479,7 +495,7 @@ private fun TuneAndKeys(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(TabGap),
     ) {
-        Stage(modifier = Modifier.fillMaxWidth()) {
+        Stage(modifier = Modifier.fillMaxWidth().then(stageTap)) {
             tune(Modifier)
         }
         if (running) {

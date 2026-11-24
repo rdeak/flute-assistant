@@ -8,6 +8,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +54,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -59,6 +62,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
@@ -217,6 +222,9 @@ internal data class StaffInk(
  * lays Play and a run out differently) keeps above them, so the staff does not scroll in again
  * from its start each time it moves.
  * While [tune] is empty a dashed hint sits on the lines instead.
+ * The step at [selectedIndex], chosen for the keys to change (since 2026-11-24), is lit as well, and while one is
+ * chosen the staff does not follow on by itself; with [onStepTap] (the writing staff, never the running one) a tap on
+ * a step passes its index.
  */
 @Composable
 fun TuneStaff(
@@ -232,6 +240,8 @@ fun TuneStaff(
     listState: LazyListState = rememberLazyListState(),
     joinWaiting: Boolean = false,
     room: Float = 0f,
+    selectedIndex: Int? = null,
+    onStepTap: ((Int) -> Unit)? = null,
 ) {
     val colors = FluteTheme.colors
     val ink = StaffInk(line = colors.text, outline = colors.outline, card = colors.card, rest = colors.mutedText)
@@ -264,6 +274,7 @@ fun TuneStaff(
                 TuneMarks(
                     tune = tune, litIndex = litIndex, heldIndex = heldIndex, signature = timeSignature, marks = marks, animal = animal,
                     listening = listening, ink = ink, measurer = measurer, listState = listState, joinWaiting = joinWaiting,
+                    selectedIndex = selectedIndex, onStepTap = onStepTap,
                 )
             }
         }
@@ -385,6 +396,8 @@ private fun TuneMarks(
     measurer: TextMeasurer,
     listState: LazyListState,
     joinWaiting: Boolean,
+    selectedIndex: Int?,
+    onStepTap: ((Int) -> Unit)?,
 ) {
     val s = LocalStaffScale.current
     val notes = tune.count { it is TuneNote }
@@ -402,8 +415,26 @@ private fun TuneMarks(
     // the next note, as before).
     val animalX = animal?.let { animalX(it, tune, lineMarks, starts) }
     val follow = animalX?.takeIf { rowWidth > 0f }?.let { StaffGeometry.followScroll(starts[target], it, rowWidth, s) } ?: 0f
-    // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view.
-    LaunchedEffect(target, lineMarks, follow) {
+    // Keyed on the marks themselves, so a held note that grows (or splits at a bar line) stays in view. While a step is
+    // chosen (since 2026-11-24) the staff stays where the child has it: the chosen step, and a key held on it, would
+    // otherwise be the step it follows. Once it is let go, or erased, the staff stays there still, until the next key
+    // writes at the end (the tune changes again) or something is lit (a key held, Play, Listen to me): the user, the
+    // same day, "keep where it is until the next key writes at the end".
+    val letGo = remember { LetGoPlace() }
+    LaunchedEffect(target, lineMarks, follow, selectedIndex) {
+        if (selectedIndex != null) {
+            letGo.chosen = true
+            return@LaunchedEffect
+        }
+        if (letGo.chosen) {
+            letGo.chosen = false
+            if (litIndex == null) {
+                letGo.tune = tune
+                return@LaunchedEffect
+            }
+        }
+        if (letGo.tune == tune && litIndex == null) return@LaunchedEffect
+        letGo.tune = null
         listState.animateScrollToItem(target, with(density) { follow.dp.roundToPx() })
     }
     // The row starts a little before the first step, so a ring round it is never cut off.
@@ -430,7 +461,7 @@ private fun TuneMarks(
                         StaffStep(
                             item = tune[mark.index],
                             step = mark,
-                            lit = mark.index == litIndex,
+                            lit = mark.index == litIndex || mark.index == selectedIndex,
                             growing = mark.index == heldIndex,
                             mark = marks[mark.index],
                             waiting = waiting,
@@ -438,16 +469,32 @@ private fun TuneMarks(
                             heardNow = listening?.heardNow.takeIf { waiting },
                             pitch = listening?.pitch.takeIf { waiting },
                             ink = ink,
+                            chosen = mark.index == selectedIndex,
+                            onTap = onStepTap?.let { tap -> { tap(mark.index) } },
                         )
                     }
-                    is LineMark.Breath -> BreathMark(ink, measurer)
+                    is LineMark.Breath -> BreathMark(
+                        ink,
+                        measurer,
+                        chosen = mark.index == selectedIndex,
+                        onTap = onStepTap?.let { tap -> { tap(mark.index) } },
+                    )
                     LineMark.BarLine -> BarLineMark(ink)
                 }
             }
         }
-        SlurLayer(tune, lineMarks, starts, listState, joinWaiting, ink)
+        SlurLayer(tune, lineMarks, starts, listState, joinWaiting, ink, selectedIndex)
         if (animal != null && animalX != null) WalkingAnimal(animal, animalX, starts, listState)
     }
+}
+
+/**
+ * What the staff keeps of a step chosen and then let go (since 2026-11-24): whether one is [chosen] now, and the [tune]
+ * as the choice left it, while which the staff does not follow on by itself. Read only by the scroll effect, never drawn.
+ */
+private class LetGoPlace {
+    var chosen = false
+    var tune: List<TuneItem>? = null
 }
 
 /** Where [animal] stands along the row, in dp at rest from its first mark ([starts]); null when its step is not on the line. */
@@ -525,7 +572,9 @@ private fun lengthDescription(name: String, length: NoteLength): String = when (
  * those, what it earned ([MarkRow]: [mark], or the wrong note [heard] for it). A screen reader
  * hears it once, by its whole length, then what it earned, or that the animal is [waiting] on it
  * in Your turn ("play this one"). The lit step is drawn under its neighbours, so its yellow rings
- * never cover the edge of the head or the pill beside it.
+ * never cover the edge of the head or the pill beside it. With [onTap] (the writing staff, since 2026-11-24) a tap
+ * anywhere in its box, the staff's height and the step's width, chooses it for the keys to change; a screen reader
+ * hears it as "selected" when it is the [chosen] one, and can tap it ("Change this note").
  */
 @Composable
 private fun StaffStep(
@@ -539,9 +588,13 @@ private fun StaffStep(
     heardNow: Int?,
     pitch: Pitch?,
     ink: StaffInk,
+    chosen: Boolean = false,
+    onTap: (() -> Unit)? = null,
 ) {
     val s = LocalStaffScale.current
     val room = LocalStaffRoom.current
+    val currentOnTap by rememberUpdatedState(onTap)
+    val changeLabel = stringResource(R.string.flute_step_change)
     val name = when (item) {
         is TuneNote -> lengthDescription(noteLabel(item.midi), item.length).let {
             if (item.joined) stringResource(R.string.flute_note_joined, it) else it
@@ -562,7 +615,16 @@ private fun StaffStep(
         modifier = Modifier
             .zIndex(if (lit || growing) -1f else 0f)
             .size((layout.width * s).dp, tuneStaffHeight(s, room))
-            .clearAndSetSemantics { contentDescription = description }
+            .clearAndSetSemantics {
+                contentDescription = description
+                if (onTap != null) {
+                    if (chosen) selected = true // unchosen steps say nothing: no "not selected" on every one
+                    onClick(label = changeLabel) { currentOnTap?.invoke(); true }
+                }
+            }
+            .then(
+                if (onTap != null) Modifier.pointerInput(Unit) { detectTapGestures(onTap = { currentOnTap?.invoke() }) } else Modifier,
+            )
             .drawBehind {
                 atStaff(s, room) {
                     drawStep(item, step, layout, lit, growing, ink)
@@ -694,20 +756,36 @@ private fun BarLineMark(ink: StaffInk) {
     }
 }
 
-/** A breath: no time, only a little room for the breath mark in the top space and the breathing face over the staff; no name. */
+/**
+ * A breath: no time, only a little room for the breath mark in the top space and the breathing face over the staff; no
+ * name. With [onTap] (the writing staff, since 2026-11-24) it can be chosen like a step, and the [chosen] one has the
+ * lit steps' yellow disc behind its face.
+ */
 @Composable
-private fun BreathMark(ink: StaffInk, measurer: TextMeasurer) {
+private fun BreathMark(ink: StaffInk, measurer: TextMeasurer, chosen: Boolean = false, onTap: (() -> Unit)? = null) {
     val s = LocalStaffScale.current
     val room = LocalStaffRoom.current
     val description = stringResource(R.string.flute_breath_here)
+    val changeLabel = stringResource(R.string.flute_step_change)
+    val currentOnTap by rememberUpdatedState(onTap)
     val face = staffText(measurer, BREATH_EMOJI, BREATH_FACE_SIZE)
     Spacer(
         modifier = Modifier
             .size((BREATH_SLOT * s).dp, tuneStaffHeight(s, room))
-            .clearAndSetSemantics { contentDescription = description }
+            .clearAndSetSemantics {
+                contentDescription = description
+                if (onTap != null) {
+                    if (chosen) selected = true
+                    onClick(label = changeLabel) { currentOnTap?.invoke(); true }
+                }
+            }
+            .then(
+                if (onTap != null) Modifier.pointerInput(Unit) { detectTapGestures(onTap = { currentOnTap?.invoke() }) } else Modifier,
+            )
             .drawBehind {
                 atStaff(s, room) {
                     val x = BREATH_SLOT / 2
+                    if (chosen) drawCircle(Sun, StaffGeometry.LIT_RADIUS, Offset(x, BREATH_FACE_Y))
                     drawPath(
                         Path().apply {
                             moveTo(x - 1.5f, TOP_LINE_Y + 3f)

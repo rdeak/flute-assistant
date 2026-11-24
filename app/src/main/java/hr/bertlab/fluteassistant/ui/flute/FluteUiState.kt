@@ -6,7 +6,6 @@ package hr.bertlab.fluteassistant.ui.flute
 import hr.bertlab.fluteassistant.domain.flute.Book
 import hr.bertlab.fluteassistant.domain.flute.FluteNotes
 import hr.bertlab.fluteassistant.domain.flute.Held
-import hr.bertlab.fluteassistant.domain.flute.Joins
 import hr.bertlab.fluteassistant.domain.flute.Listening
 import hr.bertlab.fluteassistant.domain.flute.Pace
 import hr.bertlab.fluteassistant.domain.flute.Songbook
@@ -14,6 +13,7 @@ import hr.bertlab.fluteassistant.domain.flute.StepMark
 import hr.bertlab.fluteassistant.domain.flute.TuneItem
 import hr.bertlab.fluteassistant.domain.flute.TuneNote
 import hr.bertlab.fluteassistant.domain.flute.TuneRest
+import hr.bertlab.fluteassistant.domain.flute.TuneWriter
 import hr.bertlab.fluteassistant.domain.listen.TunerAdvice
 import hr.bertlab.fluteassistant.domain.tuner.NoteSpelling
 
@@ -61,9 +61,14 @@ data class FluteUiState(
     val signWaiting: Boolean = false,
     /** The octave the letter keys write in, 1 to 4: the chosen pill (since 2026-11-18). */
     val octave: Int = 1,
+    /** The step chosen on the staff for the keys to change (since 2026-11-24); null when none. Never saved. */
+    val selected: Int? = null,
 ) {
-    /** Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full. */
-    val canJoin: Boolean get() = Joins.canJoinAfter(tune)
+    /**
+     * Whether the ⌒ key has a note to join the next one to: the last step is a note and the tune is not full, or, with a
+     * step [selected], the step before it is a note ([TuneWriter.canJoin]).
+     */
+    val canJoin: Boolean get() = TuneWriter.canJoin(tune, selected)
 
     /** [books] with the open entry's tune replaced by [tune], the tune as the child sees it now. */
     val shelf: List<Book>

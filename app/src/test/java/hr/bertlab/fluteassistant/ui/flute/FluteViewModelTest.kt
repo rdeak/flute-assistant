@@ -2147,4 +2147,170 @@ class FluteViewModelTest {
         assertEquals(on(96), tonePlayer.notesOn.single())
         assertEquals(vm.current.tune, settings.tune)
     }
+
+    // A step chosen on the staff for the keys to change (since 2026-11-24, spec 2026-11-24-flute-edit-a-note-design.md).
+
+    @Test
+    fun `a tapped step is changed by the next key and saved, and the key ends the choice`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.tap(64, quarter)
+        vm.onStepTapped(1)
+        assertEquals(1, vm.current.selected)
+        assertEquals(mapOf("index" to 1, "reason" to "tap"), logger.events("flute.select").single().fields)
+        vm.tap(67, half)
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(67, HALF), TuneNote(64, QUARTER)), vm.current.tune)
+        assertEquals(vm.current.tune, settings.tune)
+        assertEquals(true, logger.events("flute.note").last()["replaced"])
+        assertNull(vm.current.selected)
+        assertEquals(mapOf("index" to null, "reason" to "key"), logger.events("flute.select").last().fields)
+        vm.onStepTapped(2)
+        vm.onBreath()
+        assertNull("the breath key ends it too", vm.current.selected)
+        assertEquals(mapOf("index" to null, "reason" to "breath"), logger.events("flute.select").last().fields)
+    }
+
+    @Test
+    fun `erase with a selection removes that step and logs it`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.tap(64, quarter)
+        vm.onStepTapped(0)
+        vm.eraseLast()
+        assertEquals(listOf(TuneNote(62, QUARTER), TuneNote(64, QUARTER)), vm.current.tune)
+        assertEquals(vm.current.tune, settings.tune)
+        assertNull(vm.current.selected)
+        assertEquals(true, logger.events("flute.erase").single()["selected"])
+    }
+
+    @Test
+    fun `play, the book, the speed panel and leaving the tab clear the selection`() {
+        for (reason in listOf("play", "book", "speed", "leave")) {
+            val vm = viewModel()
+            vm.tap(60, quarter)
+            vm.tap(62, quarter)
+            vm.onStepTapped(0)
+            when (reason) {
+                "play" -> vm.togglePlayback()
+                "book" -> vm.openShelf()
+                "speed" -> vm.openSpeed()
+                "leave" -> vm.leaveTab()
+            }
+            assertNull(reason, vm.current.selected)
+            assertEquals(reason, reason, logger.events("flute.select").last()["reason"])
+            if (reason == "play") vm.togglePlayback() // stop it again before the next view model
+        }
+    }
+
+    @Test
+    fun `starting listen to me clears the selection and nothing else changes for the run`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.onStepTapped(1)
+        vm.onMicResult(granted = true)
+        assertNull(vm.current.selected)
+        assertEquals("listen", logger.events("flute.select").last()["reason"])
+        assertEquals(listOf(TuneNote(60, QUARTER), TuneNote(62, QUARTER)), vm.current.tune)
+        vm.stopRun()
+    }
+
+    @Test
+    fun `a tap on the staff while the tune plays selects nothing`() {
+        val vm = playingViewModel()
+        vm.onStepTapped(0)
+        assertNull(vm.current.selected)
+        assertTrue(logger.events("flute.select").isEmpty())
+    }
+
+    @Test
+    fun `a tap on the stage beside the notes lets the chosen step go`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.tap(62, quarter)
+        vm.onStepTapped(1)
+        vm.onStageTapped()
+        assertNull(vm.current.selected)
+        assertEquals(mapOf("index" to null, "reason" to "tap"), logger.events("flute.select").last().fields)
+        val lines = logger.events("flute.select").size
+        vm.onStageTapped()
+        assertEquals("nothing chosen: nothing happens", lines, logger.events("flute.select").size)
+    }
+
+    // A tapped note sounds (since 2026-11-24, the user: "when user tap on note it should play that note also").
+
+    @Test
+    fun `a tap on a note sounds it for its length at the knob's speed, and a tap on a rest is silent`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120)
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.rest(quarter)
+        val notes = tonePlayer.notesOn.size
+        val offs = tonePlayer.offCount
+        vm.onStepTapped(0)
+        assertEquals(notes + 1, tonePlayer.notesOn.size)
+        assertEquals(on(60), tonePlayer.sounding)
+        val length = Tune.durationMs(QUARTER, Pulse(120))
+        advanceTimeBy(length - 1)
+        runCurrent()
+        assertEquals(on(60), tonePlayer.sounding)
+        advanceTimeBy(1)
+        runCurrent()
+        assertNull(tonePlayer.sounding)
+        assertEquals(offs + 1, tonePlayer.offCount)
+        vm.onStepTapped(0) // the same note again lets the choice go, and sounds too
+        assertEquals(notes + 2, tonePlayer.notesOn.size)
+        vm.onStepTapped(1) // the rest: silence
+        assertNull(tonePlayer.sounding)
+        assertEquals(notes + 2, tonePlayer.notesOn.size)
+    }
+
+    @Test
+    fun `a key pressed while a tapped note sounds takes the voice, and the tapped note's end does not cut it`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.onStepTapped(0)
+        val offs = tonePlayer.offCount
+        vm.onKeyPressed(vm.key(67))
+        advanceTimeBy(10_000)
+        runCurrent()
+        assertEquals("the held key still sounds", on(67), tonePlayer.sounding)
+        assertEquals(offs, tonePlayer.offCount)
+    }
+
+    @Test
+    fun `play takes over from a tapped note, whose end does not cut Play's`() = runTest(dispatcher) {
+        settings.config = MetronomeConfig(bpm = 120)
+        val vm = viewModel()
+        vm.tap(60, hold(WHOLE))
+        vm.tap(67, half)
+        vm.onStepTapped(1) // g, a half: 1 s at 120
+        vm.togglePlayback()
+        runCurrent()
+        advanceTimeBy(1_001)
+        runCurrent()
+        assertEquals("Play's whole note c goes on", on(60), tonePlayer.sounding)
+        vm.togglePlayback()
+    }
+
+    @Test
+    fun `listen to me silences a tapped note first`() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.onStepTapped(0)
+        vm.onMicResult(granted = true)
+        assertNull("the microphone must not hear it", tonePlayer.sounding)
+        vm.stopRun()
+    }
+
+    @Test
+    fun `a tap on a note while a key is held sounds nothing`() {
+        val vm = viewModel()
+        vm.tap(60, quarter)
+        vm.onKeyPressed(vm.key(67))
+        vm.onStepTapped(0)
+        assertEquals(on(67), tonePlayer.sounding)
+    }
 }
