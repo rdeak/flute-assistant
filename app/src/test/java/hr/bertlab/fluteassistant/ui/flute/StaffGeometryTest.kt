@@ -474,11 +474,17 @@ class StaffGeometryTest {
         assertEquals(38.65f, StaffGeometry.CLEF_RIGHT, 0.01f)
     }
 
-    /** The figures' ink must not reach under the notes' row, which starts at NOTES_CLIP, nor meet the clef. */
+    /**
+     * The figures' ink must not reach under the notes' row, which starts at NOTES_CLIP, nor meet the clef: they stand in
+     * the middle between, with air each side (a note scrolled to the row's left edge sat 0.2 dp from the 4 at x 50).
+     */
     @Test
-    fun `the time signature's figures end before the notes' row and clear of the clef`() {
-        assertTrue(StaffGeometry.SIGNATURE_X + StaffGeometry.SIGNATURE_FIGURE_HALF <= StaffGeometry.NOTES_CLIP)
-        assertTrue(StaffGeometry.CLEF_RIGHT + 3f <= StaffGeometry.SIGNATURE_X - StaffGeometry.SIGNATURE_FIGURE_HALF)
+    fun `the time signature's figures stand clear of the clef and of the notes' row`() {
+        val notesAir = StaffGeometry.NOTES_CLIP - (StaffGeometry.SIGNATURE_X + StaffGeometry.SIGNATURE_FIGURE_HALF)
+        val clefAir = StaffGeometry.SIGNATURE_X - StaffGeometry.SIGNATURE_FIGURE_HALF - StaffGeometry.CLEF_RIGHT
+        assertTrue("air before the notes' row: $notesAir", notesAir >= 2f)
+        assertTrue("air after the clef: $clefAir", clefAir >= 2f)
+        assertEquals("in the middle", clefAir, notesAir, 0.01f)
     }
 
     private fun signHalfWidths() = listOf(MusicSymbols.SHARP_WIDTH, MusicSymbols.FLAT_WIDTH, MusicSymbols.NATURAL_WIDTH)

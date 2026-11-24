@@ -286,23 +286,27 @@ internal object StaffGeometry {
     /** Where the book button's top is at [scale] (1 at rest, [RunningStaffScale] while the tune runs): centred on the names' pills. */
     fun bookButtonTop(scale: Float, room: Float = 0f): Float = (NAMES_TOP + room + PILL_HEIGHT / 2) * scale - BOOK_BUTTON_HEIGHT / 2
 
-    /** The time signature's figures: centred at this x, each across two spaces of the staff. */
-    const val SIGNATURE_X = 50f
+    /** Where the first step starts; the notes scroll in from [NOTES_CLIP] so a ring is never cut. */
+    const val NOTES_START = 62f
+    const val NOTES_CLIP = 57f
+    const val NOTES_END_PADDING = 4f
+
+    /**
+     * The time signature's figures: centred at this x, each across two spaces of the staff. Halfway between the clef's
+     * right edge and the notes' row (47.8; 50 for a day, where a note scrolled to the row's left edge sat 0.2 dp from the
+     * 4; 48 before 2026-11-24), so the widest figure has 2.3 dp of air each side.
+     */
+    const val SIGNATURE_X = (CLEF_RIGHT + NOTES_CLIP) / 2
     const val SIGNATURE_TOP_Y = TOP_LINE_Y + LINE_GAP
     const val SIGNATURE_BOTTOM_Y = TOP_LINE_Y + LINE_GAP * 3
     const val SIGNATURE_SIZE = 24f
 
     /**
-     * Half the widest single figure's ink at [SIGNATURE_SIZE] (Nunito Bold, measured: centred at 50 its ink ends at 56.8):
-     * the figures keep left of [NOTES_CLIP]. A two-figure signature (12/8) reaches about 6 dp under the notes' row, 4 dp
-     * at 48 before 2026-11-24, and cannot move left without meeting the clef: a known case.
+     * Half the widest single figure's ink at [SIGNATURE_SIZE] (Nunito Bold, measured: centred at 50 its ink ended at
+     * 56.8): the figures keep left of [NOTES_CLIP]. A two-figure signature (12/8) reaches about 4 dp under the notes'
+     * row and cannot move left without meeting the clef: a known case.
      */
     const val SIGNATURE_FIGURE_HALF = 0.285f * SIGNATURE_SIZE
-
-    /** Where the first step starts; the notes scroll in from [NOTES_CLIP] so a ring is never cut. */
-    const val NOTES_START = 62f
-    const val NOTES_CLIP = 57f
-    const val NOTES_END_PADDING = 4f
 
     /**
      * The room after the last step: [NOTES_END_PADDING], and while the tune runs also what the arrow beside a live bubble

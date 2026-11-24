@@ -85,7 +85,8 @@ Kotlin, in dp: lines 18 apart, three quarters of the canvas's 24, to leave room 
 for the stems, a note step 9, `StaffNotes.positionOf` for the height, every stem up on the right
 of the head as the user asked, ledger lines from `StaffNotes.ledgerLinesFor`): the treble clef (since 2026-11-24 the
 music font's, in full ink at x 0, `ui/common/MusicSymbols`; until then a faint hand-drawn clef, gone from the code since the notes game took the font's the same day)
-and the time signature fixed at the left (its figures centred at x 50, 48 before 2026-11-24),
+and the time signature fixed at the left (its figures centred at x 47.8, halfway between the clef and the notes' row, since the evening of 2026-11-24: at
+x 50 that day a note scrolled to the row's left edge sat 0.2 dp from the 4; 48 before),
 then a `LazyRow` of the `Bars.write` marks, each a `Spacer` that draws itself in a dp-scaled
 `drawBehind` (a step's width is its pieces' `slotWidth`, 29 dp a beat; a bar line 10, a breath 18). Each note is drawn as printed music draws it, since
 2026-11-24 in the music font's symbols (`ui/common/MusicSymbols`; spec `2026-11-24-flute-staff-music-symbols-design.md`,
